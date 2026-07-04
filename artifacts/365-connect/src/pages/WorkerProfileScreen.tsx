@@ -1,7 +1,33 @@
 import { useParams, useLocation } from 'wouter';
-import { BadgeCheck, Star, MapPin, ChevronLeft, Loader2 } from 'lucide-react';
+import { BadgeCheck, Star, ChevronLeft, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { supabase, type UserRow } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
+
+// Only the public columns we need — intentionally excludes email
+type PublicUserRow = {
+  id: string;
+  role: 'worker' | 'client';
+  username: string;
+  photo_url: string | null;
+  bio: string | null;
+  job_types: string[];
+  certifications: string[];
+  rating: number;
+  created_at: string;
+};
+
+type ShiftRef = {
+  title: string;
+  date: string;
+  client: { username: string } | null;
+} | null;
+
+type ReviewWithShift = {
+  id: string;
+  rating: number;
+  created_at: string;
+  shift: ShiftRef;
+};
 
 type PastShift = {
   id: string;
@@ -11,7 +37,7 @@ type PastShift = {
   rating: number;
 };
 
-type WorkerProfileData = UserRow & {
+type WorkerProfileData = PublicUserRow & {
   followers: number;
   following: number;
   pastShifts: PastShift[];
@@ -58,10 +84,10 @@ export function WorkerProfileScreen() {
       setLoading(true);
       setNotFound(false);
 
-      // Fetch user row by username
+      // Select only public-safe columns — never email
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('*')
+        .select('id, role, username, photo_url, bio, job_types, certifications, rating, created_at')
         .eq('username', params.username)
         .single();
 
@@ -71,7 +97,7 @@ export function WorkerProfileScreen() {
         return;
       }
 
-      // Fetch reviews received by this user, joined with shift title/date and client info
+      // Reviews received by this user, with shift title/date and client username
       const { data: reviewData } = await supabase
         .from('reviews')
         .select(`
@@ -86,24 +112,30 @@ export function WorkerProfileScreen() {
             )
           )
         `)
-        .eq('to_user_id', userData.id)
+        .eq('to_user_id', (userData as PublicUserRow).id)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(10)
+        .returns<ReviewWithShift[]>();
 
-      const pastShifts: PastShift[] = (reviewData ?? []).map((r: any) => ({
+      const pastShifts: PastShift[] = (reviewData ?? []).map(r => ({
         id: r.id,
         name: r.shift?.title ?? 'Unnamed Shift',
         date: r.shift?.date
-          ? new Date(r.shift.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          ? new Date(r.shift.date).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })
           : '—',
-        client: r.shift?.client?.username ? `@${r.shift.client.username}` : 'Private Client',
+        client: r.shift?.client?.username
+          ? `@${r.shift.client.username}`
+          : 'Private Client',
         rating: r.rating,
       }));
 
       setProfile({
-        ...(userData as UserRow),
-        // followers/following will come from a follows table in a future phase
-        followers: 0,
+        ...(userData as PublicUserRow),
+        followers: 0,  // follows table — future phase
         following: 0,
         pastShifts,
       });
@@ -113,7 +145,6 @@ export function WorkerProfileScreen() {
     fetchProfile();
   }, [params.username]);
 
-  // ── Loading ──
   if (loading) {
     return (
       <div className="flex flex-col h-full bg-black items-center justify-center">
@@ -122,7 +153,6 @@ export function WorkerProfileScreen() {
     );
   }
 
-  // ── Not found ──
   if (notFound || !profile) {
     return (
       <div className="flex flex-col h-full bg-black text-white items-center justify-center px-6">
@@ -140,12 +170,9 @@ export function WorkerProfileScreen() {
     );
   }
 
-  const initials = (profile.username ?? '??')
-    .slice(0, 2)
-    .toUpperCase();
-
-  // Supabase free tier doesn't give a followers count — placeholder until follows table is added
-  const isVerified = false; // will be driven by a subscriptions table in a future phase
+  const initials = (profile.username ?? '??').slice(0, 2).toUpperCase();
+  // isVerified will be driven by a subscriptions table in a future phase
+  const isVerified = false;
 
   return (
     <div className="flex flex-col h-full bg-black text-white overflow-y-auto">
@@ -163,7 +190,7 @@ export function WorkerProfileScreen() {
           {profile.photo_url ? (
             <img
               src={profile.photo_url}
-              alt={profile.username ?? ''}
+              alt={profile.username}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -177,11 +204,9 @@ export function WorkerProfileScreen() {
       {/* ── Profile info ── */}
       <div className="px-5 pt-2 pb-6">
 
-        {/* Name + verified */}
+        {/* Handle + verified */}
         <div className="flex items-center gap-2 mb-[2px]">
-          <h1 className="text-[22px] font-bold text-white">
-            @{profile.username}
-          </h1>
+          <h1 className="text-[22px] font-bold text-white">@{profile.username}</h1>
           {isVerified && (
             <BadgeCheck size={20} className="text-primary fill-primary flex-shrink-0" />
           )}
@@ -213,11 +238,11 @@ export function WorkerProfileScreen() {
 
         {/* Stats row */}
         <div className="flex items-center justify-around bg-[#0E0E0E] rounded-[14px] border border-[#2A2A2A] py-4 px-3 mb-6">
-          <StatItem value={0} label="Shifts" />
+          <StatItem value={profile.pastShifts.length} label="Shifts" />
           <div className="w-px h-8 bg-[#2A2A2A]" />
           <div className="flex flex-col items-center gap-[2px]">
             <span className="text-white font-bold text-[18px] leading-none">
-              {profile.rating > 0 ? profile.rating.toFixed(1) : '—'}
+              {profile.rating > 0 ? Number(profile.rating).toFixed(1) : '—'}
             </span>
             <div className="flex items-center gap-[3px] mt-[2px]">
               <Star size={10} className="text-primary fill-primary" />
@@ -263,8 +288,8 @@ export function WorkerProfileScreen() {
           </div>
         )}
 
-        {/* Past shifts from reviews */}
-        {profile.pastShifts.length > 0 && (
+        {/* Past shifts */}
+        {profile.pastShifts.length > 0 ? (
           <div>
             <h2 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-widest mb-4">
               Past Shifts
@@ -292,13 +317,10 @@ export function WorkerProfileScreen() {
               ))}
             </div>
           </div>
-        )}
-
-        {/* Empty state — new profile, no shifts yet */}
-        {profile.pastShifts.length === 0 && (
+        ) : (
           <div className="text-center py-8">
             <p className="text-muted-foreground text-[14px]">No rated shifts yet.</p>
-            <p className="text-[#3A3A3A] text-[12px] mt-1">Shifts will appear here after they're reviewed.</p>
+            <p className="text-[#3A3A3A] text-[12px] mt-1">Shifts appear here after they're reviewed.</p>
           </div>
         )}
 

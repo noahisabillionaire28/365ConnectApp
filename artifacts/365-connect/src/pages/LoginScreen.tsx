@@ -9,26 +9,33 @@ export function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   async function handleLogin() {
     if (!email || !password) return;
     setLoading(true);
     setError(null);
+    setInfo(null);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) throw authError;
 
-      // Check whether the user has completed their profile
-      const { data: profile } = await supabase
+      // Check whether the user has completed their profile (has a username set)
+      const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('username')
         .eq('id', data.user.id)
-        .single();
+        .maybeSingle(); // returns null (not an error) when no row exists
+
+      if (profileError) {
+        // Real DB/RLS error — surface it; do not misroute
+        throw new Error(`Could not load profile: ${profileError.message}`);
+      }
 
       if (profile?.username) {
         navigate('/home');
       } else {
-        // Profile not set up yet — send them through the setup flow
+        // Row missing or username not yet set → send through setup flow
         navigate('/role-select');
       }
     } catch (err) {
@@ -40,17 +47,18 @@ export function LoginScreen() {
 
   async function handleForgotPassword() {
     if (!email) {
-      setError('Enter your email above first, then tap Forgot password.');
+      setError('Enter your email above, then tap Forgot password.');
       return;
     }
     setLoading(true);
     setError(null);
+    setInfo(null);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}reset-password`,
       });
       if (error) throw error;
-      setError('Password reset email sent! Check your inbox.');
+      setInfo('Password reset email sent! Check your inbox.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send reset email.');
     } finally {
@@ -60,7 +68,7 @@ export function LoginScreen() {
 
   return (
     <div className="min-h-[100dvh] flex flex-col px-6 py-10 pb-12 overflow-y-auto">
-      {/* Top Header */}
+      {/* Header */}
       <div className="flex flex-col">
         <button
           onClick={() => navigate('/')}
@@ -69,7 +77,6 @@ export function LoginScreen() {
         >
           <ChevronLeft className="w-6 h-6 text-white" />
         </button>
-
         <div className="flex items-center gap-1.5">
           <span className="text-primary font-bold text-[28px] leading-none tracking-tight">365</span>
           <span className="text-white font-bold text-[28px] leading-none tracking-tight">CONNECT</span>
@@ -81,19 +88,19 @@ export function LoginScreen() {
         <p className="text-muted-foreground text-[14px] mt-1">Sign in to your account</p>
       </div>
 
-      {/* Error / info banner */}
+      {/* Error banner */}
       {error && (
-        <div className={`mt-4 flex items-start gap-2 rounded-[12px] px-4 py-3 border ${
-          error.includes('sent') || error.includes('Enter')
-            ? 'bg-blue-500/10 border-blue-500/30'
-            : 'bg-red-500/10 border-red-500/30'
-        }`}>
-          <AlertCircle size={16} className={`flex-shrink-0 mt-[1px] ${
-            error.includes('sent') || error.includes('Enter') ? 'text-blue-400' : 'text-red-400'
-          }`} />
-          <p className={`text-[13px] leading-snug ${
-            error.includes('sent') || error.includes('Enter') ? 'text-blue-400' : 'text-red-400'
-          }`}>{error}</p>
+        <div className="mt-4 flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-[12px] px-4 py-3">
+          <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-[1px]" />
+          <p className="text-red-400 text-[13px] leading-snug">{error}</p>
+        </div>
+      )}
+
+      {/* Info banner */}
+      {info && (
+        <div className="mt-4 flex items-start gap-2 bg-blue-500/10 border border-blue-500/30 rounded-[12px] px-4 py-3">
+          <AlertCircle size={16} className="text-blue-400 flex-shrink-0 mt-[1px]" />
+          <p className="text-blue-400 text-[13px] leading-snug">{info}</p>
         </div>
       )}
 

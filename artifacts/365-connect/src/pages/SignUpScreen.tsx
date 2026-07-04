@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ChevronLeft, Phone, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Phone, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 import { FaApple } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
@@ -11,20 +11,28 @@ export function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  // null = not submitted | 'confirm' = email confirmation needed | 'done' = session active
+  const [signupState, setSignupState] = useState<'idle' | 'confirm' | 'done'>('idle');
 
   async function handleSignUp() {
-    if (!email || !password) return;
+    if (!email || password.length < 6) {
+      setError('Enter a valid email and a password of at least 6 characters.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
-      // Show confirmation message (Supabase sends a verification email by default)
-      setSuccess(true);
-      // Navigate to role select so user can complete setup after email confirmation
-      // For development with email confirmation disabled, this goes straight through
-      setTimeout(() => navigate('/role-select'), 1500);
+
+      if (data.session) {
+        // Email confirmation is disabled in this Supabase project — user is signed in immediately
+        setSignupState('done');
+        setTimeout(() => navigate('/role-select'), 800);
+      } else {
+        // Email confirmation is required — do NOT advance yet; wait for user to verify
+        setSignupState('confirm');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed. Please try again.');
     } finally {
@@ -43,7 +51,7 @@ export function SignUpScreen() {
         },
       });
       if (error) throw error;
-      // Browser will redirect — nothing more to do here
+      // Browser will redirect — nothing else to do
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Google sign-in failed.');
       setLoading(false);
@@ -67,9 +75,29 @@ export function SignUpScreen() {
     }
   }
 
+  // ── Email confirmation pending state ──
+  if (signupState === 'confirm') {
+    return (
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 py-10 bg-black text-white">
+        <CheckCircle2 size={48} className="text-primary mb-6" />
+        <h1 className="text-[24px] font-bold text-center mb-3">Check your email</h1>
+        <p className="text-muted-foreground text-[14px] text-center leading-relaxed max-w-[280px]">
+          We sent a confirmation link to <span className="text-white font-medium">{email}</span>.
+          Open it to activate your account, then come back to log in.
+        </p>
+        <button
+          onClick={() => navigate('/login')}
+          className="mt-8 text-primary font-semibold text-[14px]"
+        >
+          Go to Log In
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-[100dvh] flex flex-col px-6 py-10 pb-12 overflow-y-auto">
-      {/* Top Header */}
+      {/* Header */}
       <div className="flex flex-col">
         <button
           onClick={() => navigate('/')}
@@ -78,7 +106,6 @@ export function SignUpScreen() {
         >
           <ChevronLeft className="w-6 h-6 text-white" />
         </button>
-
         <div className="flex items-center gap-1.5">
           <span className="text-primary font-bold text-[28px] leading-none tracking-tight">365</span>
           <span className="text-white font-bold text-[28px] leading-none tracking-tight">CONNECT</span>
@@ -95,13 +122,6 @@ export function SignUpScreen() {
         <div className="mt-4 flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-[12px] px-4 py-3">
           <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-[1px]" />
           <p className="text-red-400 text-[13px] leading-snug">{error}</p>
-        </div>
-      )}
-
-      {/* Success banner */}
-      {success && (
-        <div className="mt-4 bg-green-500/10 border border-green-500/30 rounded-[12px] px-4 py-3">
-          <p className="text-green-400 text-[13px]">Account created! Check your email to verify, then continue.</p>
         </div>
       )}
 

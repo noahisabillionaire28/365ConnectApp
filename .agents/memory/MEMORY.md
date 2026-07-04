@@ -1,1 +1,2 @@
-- [Worker profile setup flow](worker-profile-setup.md) — 6-step onboarding at /profile-setup; completes to /worker/:username (not /home)
+- [Worker profile setup flow](worker-profile-setup.md) — 6-step onboarding at /profile-setup; completes to /home after DB save
+- [Supabase integration](supabase-integration.md) — credentials in Replit Secrets; schema in supabase/schema.sql; must run SQL manually in dashboard
