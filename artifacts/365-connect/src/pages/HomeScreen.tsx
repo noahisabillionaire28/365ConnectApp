@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MapPin, Clock, Sparkles, Bell, Search, Users } from 'lucide-react';
+import { Heart, MapPin, Clock, Sparkles, Bell, Search, Users, PlusCircle } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { STORY_WORKERS, MOCK_SHIFTS, type MockShift } from '@/data/mockFeed';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
@@ -203,6 +203,7 @@ function ShiftCard({ shift, onTap }: { shift: MockShift; onTap: () => void }) {
 /* ─── Header ──────────────────────────────────────────────────────────────── */
 
 function FeedHeader() {
+  const [, navigate] = useLocation();
   return (
     <div className="flex items-center justify-between px-4 pt-4 pb-2">
       <div>
@@ -212,6 +213,14 @@ function FeedHeader() {
         <p className="text-[#666] text-[12px] font-medium mt-[1px]">Miami Beach, FL</p>
       </div>
       <div className="flex items-center gap-2">
+        <button
+          type="button"
+          aria-label="Post a shift"
+          onClick={() => navigate('/post-shift/step1')}
+          className="w-9 h-9 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center"
+        >
+          <PlusCircle size={16} aria-hidden="true" className="text-primary" />
+        </button>
         <button
           type="button"
           aria-label="Search shifts"

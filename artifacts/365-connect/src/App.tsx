@@ -20,6 +20,9 @@ import { ProfileSetupScreen } from '@/pages/ProfileSetupScreen';
 import { WorkerProfileScreen } from '@/pages/WorkerProfileScreen';
 import { ResetPasswordScreen } from '@/pages/ResetPasswordScreen';
 import { ShiftDetailScreen } from '@/pages/ShiftDetailScreen';
+import { PostShiftStep1Screen } from '@/pages/PostShiftStep1Screen';
+import { PostShiftStep2Screen } from '@/pages/PostShiftStep2Screen';
+import { PostShiftStep3Screen } from '@/pages/PostShiftStep3Screen';
 
 const queryClient = new QueryClient();
 
@@ -35,6 +38,9 @@ function Router() {
       <Route path="/worker/:username" component={WorkerProfileScreen} />
       <Route path="/reset-password" component={ResetPasswordScreen} />
       <Route path="/shift/:id" component={ShiftDetailScreen} />
+      <Route path="/post-shift/step1" component={PostShiftStep1Screen} />
+      <Route path="/post-shift/step2" component={PostShiftStep2Screen} />
+      <Route path="/post-shift/step3" component={PostShiftStep3Screen} />
       <Route path="/home" component={HomeScreen} />
       <Route path="/jobs" component={JobsScreen} />
       <Route path="/messages" component={MessagesScreen} />
