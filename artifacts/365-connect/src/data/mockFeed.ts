@@ -24,7 +24,9 @@ export type MockShift = {
   description: string;
   requirements: string[];
   dressCode: string;
+  dressCodeItems: string[];
   pointOfContact: string;
+  contactPhone: string;
   lat: number;
   lng: number;
 };
@@ -109,7 +111,9 @@ export const MOCK_SHIFTS: MockShift[] = [
       'High-volume craft cocktail bar atop the 1 Hotel South Beach. Looking for experienced bartenders comfortable with speed and precision during peak rooftop service hours.',
     requirements: ['2+ yrs bartending', 'Craft cocktail knowledge', 'TIPS certified'],
     dressCode: 'All black uniform provided',
+    dressCodeItems: ['All Black', 'Black Dress Shirt', 'Black Slacks', 'Black Non-Slip Shoes', 'Black Belt', 'No Visible Tattoos'],
     pointOfContact: 'Samantha Cruz',
+    contactPhone: '(305) 555-0142',
     lat: 25.7825,
     lng: -80.1298,
   },
@@ -133,7 +137,9 @@ export const MOCK_SHIFTS: MockShift[] = [
       'Corporate gala for 400 guests at the Grand Hyatt Ballroom. Seeking polished cocktail servers for a black-tie charity event benefiting youth arts programs.',
     requirements: ['Fine dining experience', 'Professional demeanor', 'English + Spanish preferred'],
     dressCode: 'Black tie — formal wear provided',
+    dressCodeItems: ['Black Tuxedo', 'White Dress Shirt', 'Black Bow Tie', 'Black Dress Pants', 'Black Dress Shoes', 'Black Belt'],
     pointOfContact: 'James Whitfield',
+    contactPhone: '(305) 555-0267',
     lat: 25.7637,
     lng: -80.1915,
   },
@@ -157,7 +163,9 @@ export const MOCK_SHIFTS: MockShift[] = [
       'LIV is seeking experienced crowd-control security for a sold-out DJ residency. Must be comfortable managing VIP lines and guest de-escalation in a high-energy nightlife environment.',
     requirements: ['G License (FL)', '200 lbs+ preferred', 'Nightclub experience'],
     dressCode: 'Black LIV polo + black slacks',
+    dressCodeItems: ['Black LIV Polo (Provided)', 'Black Cargo Pants', 'Black Boots', 'Black Cap (Optional)', 'No Jewelry'],
     pointOfContact: 'Ricardo Vega',
+    contactPhone: '(305) 555-0381',
     lat: 25.7910,
     lng: -80.1285,
   },
@@ -181,7 +189,9 @@ export const MOCK_SHIFTS: MockShift[] = [
       'Nike Footwear is launching the Air Max 2026 in Wynwood. Looking for outgoing, fashion-forward brand ambassadors to engage consumers, distribute samples, and capture social content.',
     requirements: ['Outgoing personality', 'Social media presence preferred', 'Bilingual a plus'],
     dressCode: 'Casual — Nike gear provided',
+    dressCodeItems: ['Nike Tee (Provided)', 'Nike Joggers (Provided)', 'Air Max 2026 (Provided)', 'Clean White Sneakers'],
     pointOfContact: 'Tasha Monroe',
+    contactPhone: '(305) 555-0445',
     lat: 25.8011,
     lng: -80.1985,
   },
@@ -205,7 +215,9 @@ export const MOCK_SHIFTS: MockShift[] = [
       'Setup crew needed for the premier contemporary art fair. Tasks include booth assembly, art hanging assistance, signage installation, and venue prep across 250,000 sq ft of exhibition space.',
     requirements: ['Physical stamina', 'Attention to detail', 'Team player'],
     dressCode: 'Comfortable work clothes + closed-toe shoes',
+    dressCodeItems: ['Comfortable Work Clothes', 'Closed-Toe Shoes', 'High-Vis Vest (Provided)', 'Work Gloves (Provided)', 'No Open-Toe Shoes'],
     pointOfContact: 'Luis Fontaine',
+    contactPhone: '(305) 555-0523',
     lat: 25.7928,
     lng: -80.1310,
   },
@@ -229,7 +241,9 @@ export const MOCK_SHIFTS: MockShift[] = [
       'Intimate dinner for 30 guests at a private Coral Gables estate. We need an experienced catering lead to oversee plated service, coordinate the kitchen team, and ensure impeccable presentation for UHNW clientele.',
     requirements: ['Fine dining lead experience', 'Wine knowledge', 'Reliable transportation'],
     dressCode: 'Formal — white glove service',
+    dressCodeItems: ['White Gloves', 'White Dress Shirt', 'Black Vest', 'Black Dress Pants', 'Black Dress Shoes', 'Black Belt'],
     pointOfContact: 'Elena Marchetti',
+    contactPhone: '(305) 555-0689',
     lat: 25.7218,
     lng: -80.2681,
   },
@@ -253,7 +267,9 @@ export const MOCK_SHIFTS: MockShift[] = [
       'NoMad Miami is seeking a warm, polished host or hostess for a busy Monday dinner service. You will manage reservations via SevenRooms, greet guests, and coordinate seating for a 180-cover dining room.',
     requirements: ['SevenRooms or OpenTable experience', 'Hospitality degree a plus', 'Fluent English'],
     dressCode: 'All-black professional attire',
+    dressCodeItems: ['All Black', 'Black Blouse or Dress Shirt', 'Black Slacks or Skirt', 'Black Heels or Dress Shoes', 'Minimal Jewelry'],
     pointOfContact: 'Natalie Osei',
+    contactPhone: '(305) 555-0712',
     lat: 25.7632,
     lng: -80.1970,
   },
@@ -277,7 +293,9 @@ export const MOCK_SHIFTS: MockShift[] = [
       'The iconic Fontainebleau is seeking VIP servers for LIV pool party weekend. Handle high-profile table service, bottle presentations, and celebrity guest relations with professionalism and discretion.',
     requirements: ['VIP/bottle service experience', 'Upbeat professional attitude', 'TIPS certified'],
     dressCode: 'Fontainebleau uniform provided',
+    dressCodeItems: ['Fontainebleau Uniform (Provided)', 'Black Non-Slip Shoes', 'Hair Tied Back', 'Minimal Accessories', 'Clean Shaven or Neat Beard'],
     pointOfContact: 'David Park',
+    contactPhone: '(305) 555-0835',
     lat: 25.8134,
     lng: -80.1218,
   },
