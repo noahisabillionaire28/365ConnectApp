@@ -18,7 +18,7 @@ import {
   AlarmClock,
 } from 'lucide-react';
 import { MOCK_SHIFTS } from '@/data/mockFeed';
-import { useFeedStore, toggleSaved, markApplied, markAccepted, markClockedIn } from '@/store/feedStore';
+import { useFeedStore, toggleSaved, markApplied, markAccepted } from '@/store/feedStore';
 
 /* ─── Leaflet overrides ──────────────────────────────────────────────────── */
 const MAP_STYLE = `
@@ -150,8 +150,8 @@ export function ShiftDetailScreen() {
     : 'apply';
 
   function handleCta() {
-    if (ctaState === 'apply')     markApplied(shiftId);
-    if (ctaState === 'clock-in')  markClockedIn(shiftId);
+    if (ctaState === 'apply')    markApplied(shiftId);
+    if (ctaState === 'clock-in') navigate(`/clock/${shiftId}`);
   }
 
   return (
