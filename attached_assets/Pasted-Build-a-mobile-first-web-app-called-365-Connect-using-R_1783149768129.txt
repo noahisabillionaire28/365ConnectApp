@@ -1,0 +1,68 @@
+Build a mobile-first web app called 365 Connect using React and Tailwind CSS.
+
+<app_type>Event staffing marketplace — connects clients who need event workers with workers who want gigs</app_type>
+
+<core_user_action>Workers browse and apply to shifts. Clients post shifts and hire workers.</core_user_action>
+
+<data_to_store>Users, shifts, applications, messages, reviews</data_to_store>
+
+<phase>Phase 1 only: Foundation, navigation, and design system</phase>
+
+<design_system>
+- Background: #000000 pure black always
+- Surface cards: #0E0E0E and #1A1A1A
+- Primary text: #FFFFFF
+- Secondary text: #9A9A9A
+- PRIMARY BUTTONS: electric gold #FFD700 with black text, bold
+- Silver accents: gradient #E8E8E8 to #A0A0A0 for borders and dividers
+- Font: Space Grotesk from Google Fonts — import and apply globally
+- Border radius: 14px on all cards and buttons
+- Thin silver borders #2A2A2A, no heavy box shadows
+- Mobile width: 390px centered, iPhone 14 size
+</design_system>
+
+<logo>
+"365 CONNECT" wordmark — "365" in large electric gold #FFD700, "CONNECT" in white beside it, bold weight, Space Grotesk font
+</logo>
+
+<build_these_screens>
+
+1. SPLASH SCREEN (first thing user sees)
+- Pure black background
+- 365 CONNECT logo centered vertically and horizontally
+- Tagline below in gray: "Staff smarter. Work better."
+- Two buttons stacked: gold "Sign Up" button, silver outlined "Log In" button
+- Clean, minimal, premium feel
+
+2. BOTTOM TAB NAVIGATION (always visible on all screens)
+Five tabs with icons from a free icon library:
+- Home (house icon)
+- Jobs (briefcase icon)  
+- Messages (chat bubble icon)
+- Notifications (bell icon)
+- Profile (person icon)
+
+Active tab: gold icon + gold underline indicator
+Inactive tab: gray #555555 icon
+Tab bar background: #0A0A0A with thin silver top border
+
+3. PLACEHOLDER SCREENS for each tab
+Each screen has:
+- Black background
+- Screen name in white Space Grotesk at top
+- Centered placeholder text in gray: "Coming soon"
+- Correct tab highlighted in bottom nav
+
+</build_these_screens>
+
+<rules>
+- Mobile-first: 390px width, centered on desktop with black side margins
+- Space Grotesk font applied to every element globally
+- Gold = all interactive actions (buttons, active states, highlights)
+- Silver = structure and borders only
+- No gray placeholder boxes — every element must be fully styled
+- Make it look good enough to show investors today
+- Test that navigation works between all 5 tabs before finishing
+</rules>
+
+When done, confirm all 5 tabs navigate correctly and the splash screen displays the logo properly.

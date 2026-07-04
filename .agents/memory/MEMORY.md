@@ -1,0 +1,1 @@
+- [Worker profile setup flow](worker-profile-setup.md) — 6-step onboarding at /profile-setup; completes to /worker/:username (not /home)

@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "365 Connect"
+version = "1.0.0"
+id = "artifacts/365-connect"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25836
+
+[services.development]
+run = "pnpm --filter @workspace/365-connect run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/365-connect", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/365-connect/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25836"
+BASE_PATH = "/"

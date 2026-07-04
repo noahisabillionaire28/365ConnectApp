@@ -1,0 +1,309 @@
+import { useParams, useLocation } from 'wouter';
+import { BadgeCheck, Star, MapPin, ChevronLeft, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { supabase, type UserRow } from '@/lib/supabase';
+
+type PastShift = {
+  id: string;
+  name: string;
+  date: string;
+  client: string;
+  rating: number;
+};
+
+type WorkerProfileData = UserRow & {
+  followers: number;
+  following: number;
+  pastShifts: PastShift[];
+};
+
+function StarRow({ rating, max = 5 }: { rating: number; max?: number }) {
+  return (
+    <div className="flex items-center gap-[2px]">
+      {Array.from({ length: max }).map((_, i) => (
+        <Star
+          key={i}
+          size={12}
+          className={i < Math.round(rating) ? 'text-primary fill-primary' : 'text-[#3A3A3A] fill-[#3A3A3A]'}
+        />
+      ))}
+    </div>
+  );
+}
+
+function StatItem({ value, label }: { value: string | number; label: string }) {
+  const formatted =
+    typeof value === 'number' && value >= 1000
+      ? `${(value / 1000).toFixed(1)}k`
+      : String(value);
+  return (
+    <div className="flex flex-col items-center gap-[2px]">
+      <span className="text-white font-bold text-[18px] leading-none">{formatted}</span>
+      <span className="text-muted-foreground text-[11px] font-medium leading-none">{label}</span>
+    </div>
+  );
+}
+
+export function WorkerProfileScreen() {
+  const params = useParams<{ username: string }>();
+  const [, navigate] = useLocation();
+  const [profile, setProfile] = useState<WorkerProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    if (!params.username) return;
+
+    async function fetchProfile() {
+      setLoading(true);
+      setNotFound(false);
+
+      // Fetch user row by username
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', params.username)
+        .single();
+
+      if (userError || !userData) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch reviews received by this user, joined with shift title/date and client info
+      const { data: reviewData } = await supabase
+        .from('reviews')
+        .select(`
+          id,
+          rating,
+          created_at,
+          shift:shifts (
+            title,
+            date,
+            client:users!shifts_client_id_fkey (
+              username
+            )
+          )
+        `)
+        .eq('to_user_id', userData.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      const pastShifts: PastShift[] = (reviewData ?? []).map((r: any) => ({
+        id: r.id,
+        name: r.shift?.title ?? 'Unnamed Shift',
+        date: r.shift?.date
+          ? new Date(r.shift.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          : '—',
+        client: r.shift?.client?.username ? `@${r.shift.client.username}` : 'Private Client',
+        rating: r.rating,
+      }));
+
+      setProfile({
+        ...(userData as UserRow),
+        // followers/following will come from a follows table in a future phase
+        followers: 0,
+        following: 0,
+        pastShifts,
+      });
+      setLoading(false);
+    }
+
+    fetchProfile();
+  }, [params.username]);
+
+  // ── Loading ──
+  if (loading) {
+    return (
+      <div className="flex flex-col h-full bg-black items-center justify-center">
+        <Loader2 size={28} className="text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  // ── Not found ──
+  if (notFound || !profile) {
+    return (
+      <div className="flex flex-col h-full bg-black text-white items-center justify-center px-6">
+        <p className="text-[18px] font-bold mb-2">Profile not found</p>
+        <p className="text-muted-foreground text-[14px] text-center mb-6">
+          @{params.username} doesn't exist on 365 Connect yet.
+        </p>
+        <button
+          onClick={() => navigate('/home')}
+          className="text-primary font-semibold text-[14px]"
+        >
+          Go home
+        </button>
+      </div>
+    );
+  }
+
+  const initials = (profile.username ?? '??')
+    .slice(0, 2)
+    .toUpperCase();
+
+  // Supabase free tier doesn't give a followers count — placeholder until follows table is added
+  const isVerified = false; // will be driven by a subscriptions table in a future phase
+
+  return (
+    <div className="flex flex-col h-full bg-black text-white overflow-y-auto">
+
+      {/* ── Hero / Profile photo ── */}
+      <div className="relative">
+        <button
+          onClick={() => navigate('/home')}
+          className="absolute top-12 left-4 z-10 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform"
+        >
+          <ChevronLeft size={20} className="text-white" />
+        </button>
+
+        <div className="w-full aspect-square bg-[#0E0E0E] flex items-center justify-center">
+          {profile.photo_url ? (
+            <img
+              src={profile.photo_url}
+              alt={profile.username ?? ''}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <span className="text-[72px] font-bold text-[#2A2A2A]">{initials}</span>
+          )}
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black to-transparent" />
+      </div>
+
+      {/* ── Profile info ── */}
+      <div className="px-5 pt-2 pb-6">
+
+        {/* Name + verified */}
+        <div className="flex items-center gap-2 mb-[2px]">
+          <h1 className="text-[22px] font-bold text-white">
+            @{profile.username}
+          </h1>
+          {isVerified && (
+            <BadgeCheck size={20} className="text-primary fill-primary flex-shrink-0" />
+          )}
+        </div>
+
+        {/* Role badge */}
+        <p className="text-muted-foreground text-[13px] font-medium mb-1 capitalize">
+          {profile.role}
+        </p>
+
+        {/* Bio */}
+        {profile.bio && (
+          <p className="text-[14px] text-white leading-relaxed mt-3 mb-5">{profile.bio}</p>
+        )}
+
+        {/* Job type tags */}
+        {profile.job_types.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-6">
+            {profile.job_types.map(job => (
+              <span
+                key={job}
+                className="px-3 py-[6px] rounded-full bg-[#0E0E0E] border border-[#2A2A2A] text-white text-[12px] font-semibold"
+              >
+                {job}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Stats row */}
+        <div className="flex items-center justify-around bg-[#0E0E0E] rounded-[14px] border border-[#2A2A2A] py-4 px-3 mb-6">
+          <StatItem value={0} label="Shifts" />
+          <div className="w-px h-8 bg-[#2A2A2A]" />
+          <div className="flex flex-col items-center gap-[2px]">
+            <span className="text-white font-bold text-[18px] leading-none">
+              {profile.rating > 0 ? profile.rating.toFixed(1) : '—'}
+            </span>
+            <div className="flex items-center gap-[3px] mt-[2px]">
+              <Star size={10} className="text-primary fill-primary" />
+              <span className="text-muted-foreground text-[11px] font-medium leading-none">Rating</span>
+            </div>
+          </div>
+          <div className="w-px h-8 bg-[#2A2A2A]" />
+          <StatItem value={profile.followers} label="Followers" />
+          <div className="w-px h-8 bg-[#2A2A2A]" />
+          <StatItem value={profile.following} label="Following" />
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex gap-3 mb-8">
+          <button className="flex-1 bg-primary text-black font-bold text-[14px] py-[14px] rounded-[14px] active:scale-[0.98] transition-transform">
+            Follow
+          </button>
+          <button className="flex-1 bg-[#0E0E0E] border border-[#2A2A2A] text-white font-bold text-[14px] py-[14px] rounded-[14px] active:scale-[0.98] transition-transform">
+            Message
+          </button>
+          <button className="w-[52px] bg-[#0E0E0E] border border-[#2A2A2A] text-white font-bold py-[14px] rounded-[14px] active:scale-[0.98] transition-transform flex items-center justify-center">
+            <span className="text-[16px] leading-none tracking-widest">···</span>
+          </button>
+        </div>
+
+        {/* Certifications */}
+        {profile.certifications.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+              Certifications
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {profile.certifications.map(cert => (
+                <span
+                  key={cert}
+                  className="inline-flex items-center gap-[6px] px-3 py-[7px] rounded-full bg-[#0E0E0E] border border-[#2A2A2A] text-[#B8B8B8] text-[12px] font-semibold"
+                >
+                  <BadgeCheck size={12} className="text-[#9A9A9A]" />
+                  {cert}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Past shifts from reviews */}
+        {profile.pastShifts.length > 0 && (
+          <div>
+            <h2 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-widest mb-4">
+              Past Shifts
+            </h2>
+            <div className="flex flex-col gap-3">
+              {profile.pastShifts.map(shift => (
+                <div
+                  key={shift.id}
+                  className="flex items-center gap-4 bg-[#0E0E0E] border border-[#2A2A2A] rounded-[14px] p-4"
+                >
+                  <div className="w-11 h-11 rounded-[10px] bg-[#1A1A1A] border border-[#2A2A2A] flex items-center justify-center flex-shrink-0">
+                    <Star size={16} className="text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-semibold text-[14px] leading-snug truncate">{shift.name}</p>
+                    <p className="text-muted-foreground text-[12px] mt-[2px]">
+                      {shift.client} · {shift.date}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-[3px] flex-shrink-0">
+                    <StarRow rating={shift.rating} />
+                    <span className="text-muted-foreground text-[11px]">{shift.rating}.0</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty state — new profile, no shifts yet */}
+        {profile.pastShifts.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground text-[14px]">No rated shifts yet.</p>
+            <p className="text-[#3A3A3A] text-[12px] mt-1">Shifts will appear here after they're reviewed.</p>
+          </div>
+        )}
+
+        <div className="h-8" />
+      </div>
+    </div>
+  );
+}
