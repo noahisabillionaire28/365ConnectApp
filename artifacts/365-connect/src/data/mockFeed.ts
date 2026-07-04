@@ -25,6 +25,8 @@ export type MockShift = {
   requirements: string[];
   dressCode: string;
   pointOfContact: string;
+  lat: number;
+  lng: number;
 };
 
 export const STORY_WORKERS: StoryWorker[] = [
@@ -108,6 +110,8 @@ export const MOCK_SHIFTS: MockShift[] = [
     requirements: ['2+ yrs bartending', 'Craft cocktail knowledge', 'TIPS certified'],
     dressCode: 'All black uniform provided',
     pointOfContact: 'Samantha Cruz',
+    lat: 25.7825,
+    lng: -80.1298,
   },
   {
     id: 'shift-2',
@@ -130,6 +134,8 @@ export const MOCK_SHIFTS: MockShift[] = [
     requirements: ['Fine dining experience', 'Professional demeanor', 'English + Spanish preferred'],
     dressCode: 'Black tie — formal wear provided',
     pointOfContact: 'James Whitfield',
+    lat: 25.7637,
+    lng: -80.1915,
   },
   {
     id: 'shift-3',
@@ -152,6 +158,8 @@ export const MOCK_SHIFTS: MockShift[] = [
     requirements: ['G License (FL)', '200 lbs+ preferred', 'Nightclub experience'],
     dressCode: 'Black LIV polo + black slacks',
     pointOfContact: 'Ricardo Vega',
+    lat: 25.7910,
+    lng: -80.1285,
   },
   {
     id: 'shift-4',
@@ -174,6 +182,8 @@ export const MOCK_SHIFTS: MockShift[] = [
     requirements: ['Outgoing personality', 'Social media presence preferred', 'Bilingual a plus'],
     dressCode: 'Casual — Nike gear provided',
     pointOfContact: 'Tasha Monroe',
+    lat: 25.8011,
+    lng: -80.1985,
   },
   {
     id: 'shift-5',
@@ -196,6 +206,8 @@ export const MOCK_SHIFTS: MockShift[] = [
     requirements: ['Physical stamina', 'Attention to detail', 'Team player'],
     dressCode: 'Comfortable work clothes + closed-toe shoes',
     pointOfContact: 'Luis Fontaine',
+    lat: 25.7928,
+    lng: -80.1310,
   },
   {
     id: 'shift-6',
@@ -218,6 +230,8 @@ export const MOCK_SHIFTS: MockShift[] = [
     requirements: ['Fine dining lead experience', 'Wine knowledge', 'Reliable transportation'],
     dressCode: 'Formal — white glove service',
     pointOfContact: 'Elena Marchetti',
+    lat: 25.7218,
+    lng: -80.2681,
   },
   {
     id: 'shift-7',
@@ -240,6 +254,8 @@ export const MOCK_SHIFTS: MockShift[] = [
     requirements: ['SevenRooms or OpenTable experience', 'Hospitality degree a plus', 'Fluent English'],
     dressCode: 'All-black professional attire',
     pointOfContact: 'Natalie Osei',
+    lat: 25.7632,
+    lng: -80.1970,
   },
   {
     id: 'shift-8',
@@ -262,5 +278,7 @@ export const MOCK_SHIFTS: MockShift[] = [
     requirements: ['VIP/bottle service experience', 'Upbeat professional attitude', 'TIPS certified'],
     dressCode: 'Fontainebleau uniform provided',
     pointOfContact: 'David Park',
+    lat: 25.8134,
+    lng: -80.1218,
   },
 ];
