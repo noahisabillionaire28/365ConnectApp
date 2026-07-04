@@ -3,6 +3,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import { MobileContainer } from '@/components/MobileContainer';
@@ -34,29 +35,41 @@ const queryClient = new QueryClient();
 
 /** Worker-facing mobile app routes (wrapped in 390px MobileContainer) */
 function MobileRouter() {
+  const [location] = useLocation();
   return (
     <MobileContainer>
-      <Switch>
-        <Route path="/" component={SplashScreen} />
-        <Route path="/signup" component={SignUpScreen} />
-        <Route path="/role-select" component={RoleSelectScreen} />
-        <Route path="/onboarding" component={OnboardingScreen} />
-        <Route path="/login" component={LoginScreen} />
-        <Route path="/profile-setup" component={ProfileSetupScreen} />
-        <Route path="/worker/:username" component={WorkerProfileScreen} />
-        <Route path="/reset-password" component={ResetPasswordScreen} />
-        <Route path="/shift/:id" component={ShiftDetailScreen} />
-        <Route path="/post-shift/step1" component={PostShiftStep1Screen} />
-        <Route path="/post-shift/step2" component={PostShiftStep2Screen} />
-        <Route path="/post-shift/step3" component={PostShiftStep3Screen} />
-        <Route path="/clock/:id" component={ClockInScreen} />
-        <Route path="/home" component={HomeScreen} />
-        <Route path="/jobs" component={JobsScreen} />
-        <Route path="/messages" component={MessagesScreen} />
-        <Route path="/notifications" component={NotificationsScreen} />
-        <Route path="/profile" component={ProfileScreen} />
-        <Route component={NotFound} />
-      </Switch>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={location}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.13, ease: 'easeInOut' }}
+          style={{ width: '100%' }}
+        >
+          <Switch>
+            <Route path="/" component={SplashScreen} />
+            <Route path="/signup" component={SignUpScreen} />
+            <Route path="/role-select" component={RoleSelectScreen} />
+            <Route path="/onboarding" component={OnboardingScreen} />
+            <Route path="/login" component={LoginScreen} />
+            <Route path="/profile-setup" component={ProfileSetupScreen} />
+            <Route path="/worker/:username" component={WorkerProfileScreen} />
+            <Route path="/reset-password" component={ResetPasswordScreen} />
+            <Route path="/shift/:id" component={ShiftDetailScreen} />
+            <Route path="/post-shift/step1" component={PostShiftStep1Screen} />
+            <Route path="/post-shift/step2" component={PostShiftStep2Screen} />
+            <Route path="/post-shift/step3" component={PostShiftStep3Screen} />
+            <Route path="/clock/:id" component={ClockInScreen} />
+            <Route path="/home" component={HomeScreen} />
+            <Route path="/jobs" component={JobsScreen} />
+            <Route path="/messages" component={MessagesScreen} />
+            <Route path="/notifications" component={NotificationsScreen} />
+            <Route path="/profile" component={ProfileScreen} />
+            <Route component={NotFound} />
+          </Switch>
+        </motion.div>
+      </AnimatePresence>
     </MobileContainer>
   );
 }
