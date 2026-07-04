@@ -1,12 +1,302 @@
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import {
+  MapPin, AlarmClock, DollarSign, Star,
+  CheckCheck, UserPlus, Bell,
+} from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
+import {
+  MOCK_NOTIFICATIONS,
+  type NotificationItem,
+  type Segment,
+  type NotificationType,
+} from '@/data/mockNotifications';
 
-export function NotificationsScreen() {
+/* ──────────────────────────────────────────────────────────────────────────
+   Rich text renderer
+────────────────────────────────────────────────────────────────────────── */
+function RichDescription({ segments }: { segments: Segment[] }) {
   return (
-    <div className="min-h-[100dvh] flex flex-col pb-[72px]">
-      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-        <h1 className="text-white font-bold text-4xl mb-3 tracking-tight">Notifications</h1>
-        <p className="text-[#9A9A9A] text-[15px]">Coming soon</p>
+    <span>
+      {segments.map((seg, i) => {
+        if (seg.mention) {
+          return (
+            <span key={i} className="text-primary font-semibold">
+              {seg.text}
+            </span>
+          );
+        }
+        if (seg.strong) {
+          return (
+            <span key={i} className="text-white font-bold">
+              {seg.text}
+            </span>
+          );
+        }
+        return (
+          <span key={i} className="text-[#A0A0A0]">
+            {seg.text}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   System icon avatar
+────────────────────────────────────────────────────────────────────────── */
+type IconColor = 'amber' | 'green' | 'gold' | 'blue';
+
+const ICON_META: Record<
+  NotificationType,
+  { icon: React.ComponentType<{ size?: number; className?: string; aria?: string }>; color: IconColor }
+> = {
+  'new-shift':      { icon: MapPin,     color: 'gold'  },
+  'shift-accepted': { icon: CheckCheck, color: 'green' },
+  'shift-applied':  { icon: UserPlus,   color: 'blue'  },
+  'shift-reminder': { icon: AlarmClock, color: 'amber' },
+  'payment':        { icon: DollarSign, color: 'green' },
+  'review':         { icon: Star,       color: 'gold'  },
+};
+
+const COLOR_CLASSES: Record<IconColor, { bg: string; icon: string }> = {
+  amber: { bg: 'bg-amber-500/20  border-amber-500/30',  icon: 'text-amber-400'  },
+  green: { bg: 'bg-emerald-500/20 border-emerald-500/30', icon: 'text-emerald-400' },
+  gold:  { bg: 'bg-primary/20   border-primary/30',      icon: 'text-primary'    },
+  blue:  { bg: 'bg-blue-500/20   border-blue-500/30',    icon: 'text-blue-400'   },
+};
+
+function SystemAvatar({
+  type,
+  colorOverride,
+}: {
+  type: NotificationType;
+  colorOverride?: string;
+}) {
+  const meta   = ICON_META[type];
+  const color  = (colorOverride as IconColor) ?? meta.color;
+  const styles = COLOR_CLASSES[color] ?? COLOR_CLASSES.gold;
+  const Icon   = meta.icon;
+
+  return (
+    <div
+      className={`w-11 h-11 rounded-full border flex items-center justify-center flex-shrink-0 ${styles.bg}`}
+      aria-hidden
+    >
+      <Icon size={19} className={styles.icon} />
+    </div>
+  );
+}
+
+function PersonAvatar({ url, alt }: { url: string; alt: string }) {
+  return (
+    <img
+      src={url}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      className="w-11 h-11 rounded-full object-cover border border-[#1E1E1E] flex-shrink-0"
+    />
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Star rating strip (right element for reviews)
+────────────────────────────────────────────────────────────────────────── */
+function StarStrip({ count }: { count: number }) {
+  return (
+    <div className="flex gap-0.5 flex-shrink-0" aria-label={`${count} stars`}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Star
+          key={i}
+          size={11}
+          aria-hidden
+          className={i < count ? 'text-primary fill-primary' : 'text-[#2A2A2A] fill-[#2A2A2A]'}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Notification row
+────────────────────────────────────────────────────────────────────────── */
+function NotificationRow({
+  item,
+  index,
+}: {
+  item: NotificationItem;
+  index: number;
+}) {
+  const hasPerson = !!item.actorPhoto;
+  const hasThumb  = !!item.shiftThumb;
+  const hasStars  = typeof item.stars === 'number';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, delay: index * 0.04, ease: 'easeOut' }}
+      className={`flex items-start gap-3 px-4 py-3.5 border-b border-[#0D0D0D] transition-colors ${
+        item.unread ? 'bg-[#060400]' : 'bg-black'
+      }`}
+      role="listitem"
+      aria-label={item.segments.map((s) => s.text).join('')}
+    >
+      {/* Unread dot column */}
+      <div className="w-2 flex-shrink-0 flex items-center justify-center self-center">
+        {item.unread && (
+          <div
+            aria-label="Unread"
+            className="w-2 h-2 rounded-full bg-primary"
+          />
+        )}
       </div>
+
+      {/* Avatar */}
+      {hasPerson ? (
+        <PersonAvatar url={item.actorPhoto!} alt="Sender" />
+      ) : (
+        <SystemAvatar type={item.type} colorOverride={item.iconColor} />
+      )}
+
+      {/* Body */}
+      <div className="flex-1 min-w-0">
+        <p className="text-[14px] leading-[1.5]">
+          <RichDescription segments={item.segments} />
+        </p>
+        <p className="text-[#3A3A3A] text-[12px] font-medium mt-1">{item.timestamp}</p>
+        {/* Stars inline under text (mobile-friendly) */}
+        {hasStars && (
+          <div className="mt-1.5">
+            <StarStrip count={item.stars!} />
+          </div>
+        )}
+      </div>
+
+      {/* Right: shift thumbnail */}
+      {hasThumb && (
+        <div className="flex-shrink-0 w-[52px] h-[52px] rounded-[10px] overflow-hidden border border-[#1A1A1A]">
+          <img
+            src={item.shiftThumb}
+            alt="Shift venue"
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Section header
+────────────────────────────────────────────────────────────────────────── */
+function SectionHeader({
+  label,
+  showMarkRead,
+  onMarkRead,
+}: {
+  label: string;
+  showMarkRead?: boolean;
+  onMarkRead?: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between px-4 pt-5 pb-2">
+      <p className="text-[#3A3A3A] text-[11px] font-bold uppercase tracking-[0.18em]">
+        {label}
+      </p>
+      {showMarkRead && (
+        <button
+          type="button"
+          aria-label="Mark all notifications as read"
+          onClick={onMarkRead}
+          className="text-primary text-[12px] font-semibold active:opacity-60 transition-opacity"
+        >
+          Mark all as read
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   NotificationsScreen
+────────────────────────────────────────────────────────────────────────── */
+export function NotificationsScreen() {
+  const [readAll, setReadAll] = useState(false);
+
+  const today = MOCK_NOTIFICATIONS.filter((n) => n.section === 'today');
+  const week  = MOCK_NOTIFICATIONS.filter((n) => n.section === 'week');
+
+  const todayUnread = !readAll && today.some((n) => n.unread);
+  const totalUnread = readAll
+    ? 0
+    : MOCK_NOTIFICATIONS.filter((n) => n.unread).length;
+
+  function withReadState(item: NotificationItem): NotificationItem {
+    return readAll ? { ...item, unread: false } : item;
+  }
+
+  return (
+    <div className="min-h-[100dvh] bg-black flex flex-col">
+      {/* ── Header ── */}
+      <div className="px-4 pt-[52px] pb-3 border-b border-[#0D0D0D]">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-white font-bold text-[22px] tracking-tight">
+              Notifications
+            </h1>
+            {totalUnread > 0 && (
+              <span
+                aria-label={`${totalUnread} unread notifications`}
+                className="min-w-[20px] h-5 rounded-full bg-primary flex items-center justify-center px-1.5"
+              >
+                <span className="text-black text-[11px] font-bold leading-none">
+                  {totalUnread}
+                </span>
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            aria-label="Notification settings"
+            className="w-9 h-9 rounded-full bg-[#0E0E0E] border border-[#1A1A1A] flex items-center justify-center active:opacity-60 transition-opacity"
+          >
+            <Bell size={15} aria-hidden className="text-[#555]" />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Feed ── */}
+      <div
+        className="flex-1 overflow-y-auto pb-[80px]"
+        role="list"
+        aria-label="Notifications"
+      >
+        {/* Today */}
+        <SectionHeader
+          label="Today"
+          showMarkRead={todayUnread}
+          onMarkRead={() => setReadAll(true)}
+        />
+        {today.map((item, i) => (
+          <NotificationRow key={item.id} item={withReadState(item)} index={i} />
+        ))}
+
+        {/* This Week */}
+        <SectionHeader label="This Week" />
+        {week.map((item, i) => (
+          <NotificationRow
+            key={item.id}
+            item={withReadState(item)}
+            index={today.length + i}
+          />
+        ))}
+      </div>
+
       <BottomTabNav />
     </div>
   );
