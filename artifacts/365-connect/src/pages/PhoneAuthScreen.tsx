@@ -123,7 +123,14 @@ export function PhoneAuthScreen() {
         .eq('id', data.session.user.id)
         .maybeSingle();
 
-      if (profileErr) throw new Error(`Could not load profile: ${profileErr.message}`);
+      const tableNotFound =
+        profileErr?.message?.toLowerCase().includes('relation') ||
+        profileErr?.message?.toLowerCase().includes('does not exist') ||
+        (profileErr as { code?: string } | null)?.code === '42P01';
+
+      if (profileErr && !tableNotFound) {
+        throw new Error(friendlyError(profileErr.message));
+      }
 
       navigate(profile?.username ? '/home' : '/role-select');
     } catch (err) {

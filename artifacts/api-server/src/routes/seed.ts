@@ -33,13 +33,17 @@ export async function seedTestUser(): Promise<{ ok: boolean; message: string }> 
   // ── 1. Create auth user ─────────────────────────────────────────────────────
   let userId: string | null = null;
 
+  const testPassword = process.env['SEED_TEST_PASSWORD'];
+  if (!testPassword) {
+    return { ok: false, message: 'SEED_TEST_PASSWORD not set — skipping seed to avoid hardcoded credentials' };
+  }
+
   const createRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
     method:  'POST',
     headers: authHeaders,
     body: JSON.stringify({
       email:         TEST_EMAIL,
-      // Password read from env so it never appears in source code
-      password:      process.env['SEED_TEST_PASSWORD'] ?? 'Test123!',
+      password:      testPassword,
       email_confirm: true,
     }),
   });

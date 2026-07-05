@@ -32,14 +32,23 @@ export function LoginScreen() {
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) throw authError;
 
-      // Check whether the user has completed their profile
+      // Check whether the user has completed their profile.
+      // If the users table doesn't exist yet (schema not applied) treat it as
+      // "no profile" and send the user through onboarding rather than crashing.
       const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('username')
         .eq('id', data.user.id)
         .maybeSingle();
 
-      if (profileError) throw new Error(`Could not load profile: ${profileError.message}`);
+      const tableNotFound =
+        profileError?.message?.toLowerCase().includes('relation') ||
+        profileError?.message?.toLowerCase().includes('does not exist') ||
+        (profileError as { code?: string } | null)?.code === '42P01';
+
+      if (profileError && !tableNotFound) {
+        throw new Error(`Could not load profile: ${profileError.message}`);
+      }
 
       navigate(profile?.username ? '/home' : '/role-select');
     } catch (err) {

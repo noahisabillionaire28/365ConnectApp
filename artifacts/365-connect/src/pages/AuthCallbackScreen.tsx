@@ -47,7 +47,12 @@ export function AuthCallbackScreen() {
         .eq('id', session.user.id)
         .maybeSingle();
 
-      if (profileErr) {
+      const tableNotFound =
+        profileErr?.message?.toLowerCase().includes('relation') ||
+        profileErr?.message?.toLowerCase().includes('does not exist') ||
+        (profileErr as { code?: string } | null)?.code === '42P01';
+
+      if (profileErr && !tableNotFound) {
         throw new Error(`Could not load your profile: ${profileErr.message}`);
       }
 
