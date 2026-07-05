@@ -14,8 +14,13 @@ All DDL lives in `supabase/schema.sql`. It must be run manually in the Supabase 
 ## Auth flow
 - Email sign-up: `supabase.auth.signUp` → if `data.session` is truthy (email confirmation disabled), navigate to /role-select immediately; otherwise show "check your email" screen and do NOT advance the user.
 - Login: `supabase.auth.signInWithPassword` → use `.maybeSingle()` (not `.single()`) for the profile check so a missing row is null, not an error. Only route to /role-select on null result; throw on actual DB errors.
-- OAuth (Google/Apple): `signInWithOAuth` with `redirectTo` pointing to `/role-select` path. Provider must be enabled in Supabase Dashboard → Authentication → Providers.
+- **Missing-table resilience**: LoginScreen, AuthCallbackScreen, and PhoneAuthScreen all check for PostgREST error code `42P01` (or "relation"/"does not exist" in message) and treat it as "no profile → /role-select" instead of crashing. This makes the app functional before the schema is applied.
+- OAuth (Google/Apple): `signInWithOAuth` with `redirectTo` pointing to `/auth/callback`. Dedicated `AuthCallbackScreen` handles the redirect, upserts the users row, and routes new vs returning users. Provider must be enabled in Supabase Dashboard → Authentication → Providers.
+- Phone: `/phone-auth` route — two-step SMS OTP via Twilio (must be configured in Supabase Dashboard → Auth → Providers → Phone). Code handles graceful error if provider not configured.
 - Password reset: `resetPasswordForEmail` with `redirectTo` pointing to `/reset-password`. The `ResetPasswordScreen` listens for the `PASSWORD_RECOVERY` auth event to gate the form.
+
+## Replit network constraint
+Outbound TCP on port 5432/6543 is blocked — psql/pg cannot connect to Supabase Postgres from Replit. Direct DB migrations must be run via the Supabase SQL Editor in the dashboard, not from shell scripts. The Supabase Management API (api.supabase.com) requires a PAT (not the service role key), so that path also requires a separate credential.
 
 ## Profile save
 ProfileSetupScreen reads `sessionStorage.getItem('selectedRole')` (set by RoleSelectScreen) and upserts to `public.users`. Storage uploads (avatars, post-photos) require public buckets named "avatars" and "post-photos" — see schema.sql comments for bucket creation SQL.
