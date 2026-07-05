@@ -25,6 +25,8 @@ import { PostShiftStep1Screen } from '@/pages/PostShiftStep1Screen';
 import { PostShiftStep2Screen } from '@/pages/PostShiftStep2Screen';
 import { PostShiftStep3Screen } from '@/pages/PostShiftStep3Screen';
 import { ClockInScreen } from '@/pages/ClockInScreen';
+import { PhoneAuthScreen } from '@/pages/PhoneAuthScreen';
+import { AuthCallbackScreen } from '@/pages/AuthCallbackScreen';
 import { AdminLogin } from '@/pages/admin/AdminLogin';
 import { AdminDashboard } from '@/pages/admin/AdminDashboard';
 import { AdminUsers } from '@/pages/admin/AdminUsers';
@@ -61,6 +63,8 @@ function MobileRouter() {
             <Route path="/post-shift/step2" component={PostShiftStep2Screen} />
             <Route path="/post-shift/step3" component={PostShiftStep3Screen} />
             <Route path="/clock/:id" component={ClockInScreen} />
+            <Route path="/phone-auth" component={PhoneAuthScreen} />
+            <Route path="/auth/callback" component={AuthCallbackScreen} />
             <Route path="/home" component={HomeScreen} />
             <Route path="/jobs" component={JobsScreen} />
             <Route path="/messages" component={MessagesScreen} />
