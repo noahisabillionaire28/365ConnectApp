@@ -18,44 +18,36 @@ export function AdminNav() {
   }
 
   return (
-    <header className="sticky top-0 z-50 bg-[#020202] border-b border-[#1A1A1A]">
+    <header className="sticky top-0 z-50 bg-white border-b border-[#DBDBDB]">
       {/* Brand row */}
-      <div className="flex items-center justify-between px-4 h-12 border-b border-[#111]">
+      <div className="flex items-center justify-between px-4 h-12 border-b border-[#DBDBDB]">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-[5px] bg-primary flex items-center justify-center">
-            <ShieldCheck size={13} aria-hidden className="text-black" />
+          <div className="w-6 h-6 rounded-[5px] bg-black flex items-center justify-center">
+            <ShieldCheck size={13} aria-hidden className="text-white" />
           </div>
-          <span className="text-white font-bold text-[14px] tracking-tight">
-            365 <span className="text-primary">Admin</span>
+          <span className="text-black font-bold text-[14px] tracking-tight">
+            365 <span className="text-[#737373]">Admin</span>
           </span>
         </div>
-        <button
-          type="button"
-          aria-label="Log out of admin panel"
-          onClick={handleLogout}
-          className="flex items-center gap-1.5 text-[#555] text-[12px] font-medium active:text-[#888] transition-colors"
-        >
+        <button type="button" aria-label="Log out of admin panel" onClick={handleLogout}
+          className="flex items-center gap-1.5 text-[#737373] text-[12px] font-medium active:text-black transition-colors">
           <LogOut size={13} aria-hidden />
           Logout
         </button>
       </div>
 
       {/* Tab row */}
-      <nav aria-label="Admin navigation" className="flex">
+      <nav aria-label="Admin navigation" className="flex bg-white">
         {TABS.map(({ path, icon: Icon, label }) => {
           const active = location === path || location.startsWith(path);
           return (
-            <Link
-              key={path}
-              href={path}
-              aria-label={`Go to ${label}`}
+            <Link key={path} href={path} aria-label={`Go to ${label}`}
               aria-current={active ? 'page' : undefined}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 h-12 relative transition-colors ${
-                active ? 'text-primary' : 'text-[#444] hover:text-[#666]'
-              }`}
-            >
+                active ? 'text-black' : 'text-[#AAAAAA] hover:text-[#737373]'
+              }`}>
               {active && (
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-[2px] bg-primary rounded-t-full" />
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-[2px] bg-black rounded-t-full" />
               )}
               <Icon size={17} aria-hidden />
               <span className="text-[10px] font-semibold uppercase tracking-wide">{label}</span>
