@@ -1,6 +1,4 @@
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
+import { Map, Marker, useMap } from '@vis.gl/react-google-maps';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion, useMotionValue, animate, type PanInfo } from 'framer-motion';
@@ -8,48 +6,17 @@ import { Search, SlidersHorizontal, Heart, MapPin, Clock, Users, Sparkles } from
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { MOCK_SHIFTS, type MockShift } from '@/data/mockFeed';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
+import { DARK_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
 
-/* ─── Leaflet overrides injected once ───────────────────────────────────────*/
-const LEAFLET_STYLE = `
-  .leaflet-container { background: #000 !important; font-family: 'Space Grotesk', sans-serif; }
-  .leaflet-control-zoom, .leaflet-control-attribution { display: none !important; }
-  .leaflet-tile { filter: brightness(0.92) saturate(0.85); }
-`;
-
-/* ─── Gold pin factory ───────────────────────────────────────────────────── */
-function makePinIcon(selected: boolean): L.DivIcon {
-  const size = selected ? 38 : 30;
-  const r = selected ? 15 : 11;
-  const stroke = selected ? '#FFFFFF' : '#111111';
-  const sw = selected ? 2.5 : 1.5;
-  const shadow = selected
-    ? 'filter:drop-shadow(0 0 8px rgba(255,215,0,0.9))'
-    : 'filter:drop-shadow(0 2px 4px rgba(0,0,0,0.7))';
-  const svg = `
-    <svg width="${size}" height="${Math.round(size * 1.28)}" viewBox="0 0 ${size} ${Math.round(size * 1.28)}" xmlns="http://www.w3.org/2000/svg" style="${shadow}">
-      <path d="M${size / 2} 0C${size * 0.232} 0 0 ${size * 0.232} 0 ${size / 2}
-               c0 ${size * 0.375} ${size / 2} ${size * 0.78} ${size / 2} ${size * 0.78}
-               s${size / 2}-${size * 0.405} ${size / 2}-${size * 0.78}
-               C${size} ${size * 0.232} ${size * 0.768} 0 ${size / 2} 0z"
-            fill="#FFD700" stroke="${stroke}" stroke-width="${sw}"/>
-      <circle cx="${size / 2}" cy="${size / 2}" r="${r * 0.45}" fill="#000"/>
-    </svg>`;
-  return L.divIcon({
-    html: svg,
-    className: '',
-    iconSize: [size, Math.round(size * 1.28)],
-    iconAnchor: [size / 2, Math.round(size * 1.28)],
-  });
-}
-
-/* ─── Map fly-to effect ──────────────────────────────────────────────────── */
-function MapFlyTo({ shift }: { shift: MockShift | null }) {
+/* ─── Map fly-to controller ──────────────────────────────────────────────── */
+function MapController({ shift }: { shift: MockShift | null }) {
   const map = useMap();
   useEffect(() => {
-    if (shift) {
-      map.flyTo([shift.lat, shift.lng], 14, { animate: true, duration: 0.7 });
+    if (map && shift) {
+      map.panTo({ lat: shift.lat, lng: shift.lng });
+      map.setZoom(14);
     }
-  }, [shift, map]);
+  }, [map, shift]);
   return null;
 }
 
@@ -227,7 +194,6 @@ function BottomSheet({
   function handleDragEnd(_: unknown, info: PanInfo) {
     const cur = y.get();
     const mid = (SNAP_EXP + SNAP_COLL) / 2;
-    // Velocity takes priority; fall back to nearest snap point
     if (info.velocity.y < -300) {
       snapTo(SNAP_EXP, true);
     } else if (info.velocity.y > 300) {
@@ -340,42 +306,35 @@ export function JobsScreen() {
 
   function handlePinClick(shift: MockShift) {
     setSelectedId(shift.id);
-    // Don't navigate — just highlight the card in the sheet
   }
 
   return (
     <div className="relative h-[100dvh] bg-black overflow-hidden">
-      {/* Inject Leaflet CSS overrides */}
-      <style>{LEAFLET_STYLE}</style>
 
       {/* ── Map layer ──────────────────────────────────────────────────── */}
       <div className="absolute inset-0 z-0">
-        <MapContainer
-          center={[25.7913, -80.1450]}
-          zoom={12}
-          zoomControl={false}
-          attributionControl={false}
-          style={{ height: '100%', width: '100%', background: '#000' }}
+        <Map
+          defaultCenter={{ lat: 25.7913, lng: -80.1450 }}
+          defaultZoom={12}
+          styles={DARK_MAP_STYLES}
+          disableDefaultUI
+          gestureHandling="greedy"
+          backgroundColor="#000000"
+          style={{ width: '100%', height: '100%' }}
         >
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            subdomains="abcd"
-            maxZoom={19}
-          />
-
           {/* Fly to selected shift */}
-          <MapFlyTo shift={selectedShift} />
+          <MapController shift={selectedShift} />
 
           {/* Gold pins */}
           {visibleShifts.map((shift) => (
             <Marker
               key={shift.id}
-              position={[shift.lat, shift.lng]}
-              icon={makePinIcon(selectedId === shift.id)}
-              eventHandlers={{ click: () => handlePinClick(shift) }}
+              position={{ lat: shift.lat, lng: shift.lng }}
+              icon={goldPinUrl(selectedId === shift.id)}
+              onClick={() => handlePinClick(shift)}
             />
           ))}
-        </MapContainer>
+        </Map>
       </div>
 
       {/* ── Top overlay: search + filters ──────────────────────────────── */}

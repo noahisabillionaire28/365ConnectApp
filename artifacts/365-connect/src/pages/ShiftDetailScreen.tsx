@@ -1,6 +1,4 @@
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
-import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import { Map, Marker } from '@vis.gl/react-google-maps';
 import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -19,31 +17,7 @@ import {
 } from 'lucide-react';
 import { MOCK_SHIFTS } from '@/data/mockFeed';
 import { useFeedStore, toggleSaved, markApplied, markAccepted } from '@/store/feedStore';
-
-/* ─── Leaflet overrides ──────────────────────────────────────────────────── */
-const MAP_STYLE = `
-  .leaflet-container { background: #000 !important; font-family: 'Space Grotesk', sans-serif; }
-  .leaflet-control-zoom, .leaflet-control-attribution { display: none !important; }
-  .leaflet-tile { filter: brightness(0.9) saturate(0.8); }
-  .leaflet-grab, .leaflet-dragging { cursor: default !important; }
-`;
-
-function makeDetailPin(): L.DivIcon {
-  const svg = `
-    <svg width="38" height="50" viewBox="0 0 38 50" xmlns="http://www.w3.org/2000/svg"
-         style="filter:drop-shadow(0 4px 12px rgba(255,215,0,0.7))">
-      <path d="M19 0C8.507 0 0 8.507 0 19c0 12.666 19 31 19 31S38 31.666 38 19C38 8.507 29.493 0 19 0z"
-            fill="#FFD700" stroke="#000" stroke-width="2"/>
-      <circle cx="19" cy="19" r="7" fill="#000"/>
-      <circle cx="19" cy="19" r="3.5" fill="#FFD700"/>
-    </svg>`;
-  return L.divIcon({
-    html: svg,
-    className: '',
-    iconSize:   [38, 50],
-    iconAnchor: [19, 50],
-  });
-}
+import { DARK_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
 
 /* ─── Duration helper ────────────────────────────────────────────────────── */
 function calcDuration(start: string, end: string): string {
@@ -156,7 +130,6 @@ export function ShiftDetailScreen() {
 
   return (
     <div className="min-h-[100dvh] bg-black flex flex-col">
-      <style>{MAP_STYLE}</style>
 
       {/* ── Scrollable body ── */}
       <div className="flex-1 overflow-y-auto pb-[104px]">
@@ -178,9 +151,9 @@ export function ShiftDetailScreen() {
             type="button"
             aria-label="Go back"
             onClick={() => {
-            if (window.history.length > 1) window.history.back();
-            else navigate('/jobs');
-          }}
+              if (window.history.length > 1) window.history.back();
+              else navigate('/jobs');
+            }}
             className="absolute top-5 left-4 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 flex items-center justify-center"
           >
             <ChevronLeft size={20} aria-hidden className="text-white" />
@@ -325,25 +298,20 @@ export function ShiftDetailScreen() {
         <div className="px-5 pb-6">
           <SectionHeading>Location</SectionHeading>
           <div className="rounded-[16px] overflow-hidden border border-[#1E1E1E]" style={{ height: 180 }}>
-            <MapContainer
-              center={[shift.lat, shift.lng]}
-              zoom={15}
-              zoomControl={false}
-              attributionControl={false}
-              dragging={false}
-              scrollWheelZoom={false}
-              touchZoom={false}
-              doubleClickZoom={false}
-              keyboard={false}
-              style={{ height: '100%', width: '100%', background: '#000' }}
+            <Map
+              defaultCenter={{ lat: shift.lat, lng: shift.lng }}
+              defaultZoom={15}
+              styles={DARK_MAP_STYLES}
+              disableDefaultUI
+              gestureHandling="none"
+              backgroundColor="#000000"
+              style={{ width: '100%', height: '100%' }}
             >
-              <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                subdomains="abcd"
-                maxZoom={19}
+              <Marker
+                position={{ lat: shift.lat, lng: shift.lng }}
+                icon={goldPinUrl(true)}
               />
-              <Marker position={[shift.lat, shift.lng]} icon={makeDetailPin()} />
-            </MapContainer>
+            </Map>
           </div>
           <div className="flex items-center gap-2 mt-2.5">
             <MapPin size={13} aria-hidden className="text-primary flex-shrink-0" />

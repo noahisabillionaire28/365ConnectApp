@@ -1,7 +1,5 @@
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
-import { MapContainer, TileLayer, Marker } from 'react-leaflet';
-import { useState, useEffect } from 'react';
+import { Map, Marker, useMapsLibrary } from '@vis.gl/react-google-maps';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
@@ -9,27 +7,7 @@ import {
   Users, Shirt, FileText, User, Phone, Plus, Minus,
 } from 'lucide-react';
 import { getDraft, setDraft } from '@/store/postShiftStore';
-
-/* ─── Leaflet overrides ──────────────────────────────────────────────────── */
-const MAP_STYLE = `
-  .leaflet-container { background: #000 !important; font-family: 'Space Grotesk', sans-serif; }
-  .leaflet-control-zoom, .leaflet-control-attribution { display: none !important; }
-  .leaflet-tile { filter: brightness(0.85) saturate(0.8); }
-`;
-
-function makePin(): L.DivIcon {
-  return L.divIcon({
-    html: `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg"
-         style="filter:drop-shadow(0 3px 8px rgba(255,215,0,0.6))">
-      <path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 22 14 22S28 23.333 28 14C28 6.268 21.732 0 14 0z"
-            fill="#FFD700" stroke="#000" stroke-width="1.5"/>
-      <circle cx="14" cy="14" r="5" fill="#000"/>
-    </svg>`,
-    className: '',
-    iconSize: [28, 36],
-    iconAnchor: [14, 36],
-  });
-}
+import { DARK_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
 
 /* ─── Step indicator ─────────────────────────────────────────────────────── */
 function StepBar({ current, total }: { current: number; total: number }) {
@@ -91,6 +69,77 @@ const TEXTAREA_CLS = `
   resize-none leading-relaxed
 `;
 
+/* ─── Miami Beach default coords ─────────────────────────────────────────── */
+const DEFAULT_COORDS = { lat: 25.7825, lng: -80.1298 };
+
+/* ─── Places Autocomplete input ──────────────────────────────────────────── */
+function LocationAutocomplete({
+  value,
+  onChange,
+  onPlacePicked,
+  error,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onPlacePicked: (coords: { lat: number; lng: number }) => void;
+  error?: string;
+}) {
+  const placesLib = useMapsLibrary('places');
+  const inputRef  = useRef<HTMLInputElement>(null);
+
+  // Attach Google Places Autocomplete once library is loaded
+  useEffect(() => {
+    if (!placesLib || !inputRef.current) return;
+
+    const ac = new placesLib.Autocomplete(inputRef.current, {
+      types: ['establishment', 'geocode'],
+      componentRestrictions: { country: 'us' },
+      fields: ['name', 'formatted_address', 'geometry'],
+    });
+
+    const listener = ac.addListener('place_changed', () => {
+      const place = ac.getPlace();
+      if (!place) return;
+
+      // Compose display string: "Venue Name, Full Address"
+      const display = place.name && place.formatted_address
+        ? `${place.name}, ${place.formatted_address}`
+        : place.formatted_address ?? place.name ?? '';
+      onChange(display);
+
+      // Update map pin if geometry is available
+      if (place.geometry?.location) {
+        onPlacePicked({
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng(),
+        });
+      }
+    });
+
+    return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).google?.maps?.event?.removeListener(listener);
+    };
+  }, [placesLib]);
+
+  return (
+    <div>
+      <input
+        ref={inputRef}
+        type="text"
+        defaultValue={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="e.g. 1 Hotel South Beach, Miami FL"
+        aria-label="Shift location"
+        aria-invalid={!!error}
+        aria-autocomplete="list"
+        className={INPUT_CLS + (error ? ' border-red-500/60' : '')}
+      />
+      {error && <p className="text-red-400 text-[11px] mt-1">{error}</p>}
+    </div>
+  );
+}
+
 /* ─── PostShiftStep2Screen ───────────────────────────────────────────────── */
 export function PostShiftStep2Screen() {
   const [, navigate] = useLocation();
@@ -100,6 +149,7 @@ export function PostShiftStep2Screen() {
   const [startTime,      setStartTime]      = useState(initial.startTime || '18:00');
   const [endTime,        setEndTime]        = useState(initial.endTime   || '23:00');
   const [location,       setLocation]       = useState(initial.location  || 'Miami Beach, FL');
+  const [mapCoords,      setMapCoords]      = useState(DEFAULT_COORDS);
   // String state avoids browser number-input leading-zero bug ("050" instead of "50")
   const [payRateStr,     setPayRateStr]     = useState(String(initial.payRate ?? 35));
   const [workersNeeded,  setWorkersNeeded]  = useState(initial.workersNeeded || 1);
@@ -137,7 +187,6 @@ export function PostShiftStep2Screen() {
 
   return (
     <div className="min-h-[100dvh] bg-black flex flex-col">
-      <style>{MAP_STYLE}</style>
 
       {/* Header */}
       <div className="px-5 pt-5 pb-4 border-b border-[#111]">
@@ -207,36 +256,31 @@ export function PostShiftStep2Screen() {
         <FormSection icon={<MapPin size={13} aria-hidden className="text-primary" />} title="Location">
           <div>
             <FormLabel>Address or venue name</FormLabel>
-            <input
-              type="text"
+            <LocationAutocomplete
               value={location}
-              onChange={(e) => { setLocation(e.target.value); setErrors((p) => ({ ...p, location: '' })); }}
-              placeholder="e.g. 1 Hotel South Beach, Miami FL"
-              aria-label="Shift location"
-              aria-invalid={!!errors.location}
-              className={INPUT_CLS + (errors.location ? ' border-red-500/60' : '')}
+              onChange={(v) => { setLocation(v); setErrors((p) => ({ ...p, location: '' })); }}
+              onPlacePicked={setMapCoords}
+              error={errors.location}
             />
-            {errors.location && <p className="text-red-400 text-[11px] mt-1">{errors.location}</p>}
           </div>
-          {/* Static map preview */}
+          {/* Live map preview — updates when a place is selected */}
           <div>
             <FormLabel>Map preview</FormLabel>
             <div className="rounded-[12px] overflow-hidden border border-[#252525]" style={{ height: 140 }}>
-              <MapContainer
-                center={[25.7825, -80.1298]}
-                zoom={13}
-                zoomControl={false}
-                attributionControl={false}
-                dragging={false}
-                scrollWheelZoom={false}
-                touchZoom={false}
-                doubleClickZoom={false}
-                keyboard={false}
-                style={{ height: '100%', width: '100%', background: '#000' }}
+              <Map
+                center={mapCoords}
+                zoom={14}
+                styles={DARK_MAP_STYLES}
+                disableDefaultUI
+                gestureHandling="none"
+                backgroundColor="#000000"
+                style={{ width: '100%', height: '100%' }}
               >
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" subdomains="abcd" maxZoom={19} />
-                <Marker position={[25.7825, -80.1298]} icon={makePin()} />
-              </MapContainer>
+                <Marker
+                  position={mapCoords}
+                  icon={goldPinUrl(false)}
+                />
+              </Map>
             </div>
           </div>
         </FormSection>
@@ -253,7 +297,6 @@ export function PostShiftStep2Screen() {
                   inputMode="numeric"
                   value={payRateStr}
                   onChange={(e) => {
-                    // Keep only digits, strip leading zeros (e.g. "050" → "50")
                     const digits = e.target.value.replace(/[^0-9]/g, '');
                     const clean  = digits.replace(/^0+(\d)/, '$1');
                     setPayRateStr(clean);
