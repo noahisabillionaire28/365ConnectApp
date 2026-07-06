@@ -1,4 +1,4 @@
-import { Map, Marker, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, Marker, useMap } from '@vis.gl/react-google-maps';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion, useMotionValue, animate, type PanInfo } from 'framer-motion';
@@ -6,7 +6,7 @@ import { Search, SlidersHorizontal, Heart, MapPin, Clock, Users, Sparkles } from
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { type MockShift } from '@/data/mockFeed';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
-import { DARK_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
+import { LIGHT_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
 import { useShifts } from '@/hooks/useShifts';
 
 function MapController({ shift }: { shift: MockShift | null }) {
@@ -241,16 +241,18 @@ export function JobsScreen() {
     <div className="relative h-[100dvh] bg-white overflow-hidden">
 
       {/* Map */}
-      <div className="absolute inset-0 z-0">
-        <Map defaultCenter={{ lat: 25.7913, lng: -80.145 }} defaultZoom={12}
-          styles={DARK_MAP_STYLES} disableDefaultUI gestureHandling="greedy"
-          backgroundColor="#000000" style={{ width: '100%', height: '100%' }}>
-          <MapController shift={selectedShift} />
-          {visibleShifts.map((shift) => (
-            <Marker key={shift.id} position={{ lat: shift.lat, lng: shift.lng }}
-              icon={goldPinUrl(selectedId === shift.id)} onClick={() => handlePinClick(shift)} />
-          ))}
-        </Map>
+      <div className="absolute inset-0 z-0" style={{ height: '100dvh' }}>
+        <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? ''} libraries={['places']}>
+          <Map defaultCenter={{ lat: 25.7913, lng: -80.145 }} defaultZoom={12}
+            styles={LIGHT_MAP_STYLES} disableDefaultUI gestureHandling="greedy"
+            backgroundColor="#f5f5f5" style={{ width: '100%', height: '100%' }}>
+            <MapController shift={selectedShift} />
+            {visibleShifts.map((shift) => (
+              <Marker key={shift.id} position={{ lat: shift.lat, lng: shift.lng }}
+                icon={goldPinUrl(selectedId === shift.id)} onClick={() => handlePinClick(shift)} />
+            ))}
+          </Map>
+        </APIProvider>
       </div>
 
       {/* Search + filters overlay */}

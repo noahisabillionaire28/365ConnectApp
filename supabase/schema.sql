@@ -220,3 +220,32 @@ DROP POLICY IF EXISTS "follows_delete" ON public.follows;
 CREATE POLICY "follows_select" ON public.follows FOR SELECT USING (true);
 CREATE POLICY "follows_insert" ON public.follows FOR INSERT WITH CHECK (auth.uid() = follower_id);
 CREATE POLICY "follows_delete" ON public.follows FOR DELETE USING (auth.uid() = follower_id);
+Good. Now test the full app yourself.
+
+Go through every screen in the Replit preview:
+
+1. Splash screen - white, black logo
+2. Sign up as worker - full flow
+3. Complete profile setup
+4. Home feed - white cards, shifts loading
+5. Tap a shift - detail screen loads
+6. Jobs tab - map loads with pins
+7. Messages tab - loads
+8. Notifications tab - loads
+9. Profile tab - loads with data
+10. Sign out
+11. Sign up as client
+12. Post a shift using 5-step wizard
+13. Confirm shift appears in home feed
+14. Admin login: admin@365connect.com / Admin123!
+15. Check users list loads
+16. Check shifts list loads
+
+For each screen report:
+- Works or broken
+- What specifically is broken
+- Fix it immediately if broken
+
+Do not stop until every single screen works.
+Fix as you go.
+Report final status when all 12 are done.
