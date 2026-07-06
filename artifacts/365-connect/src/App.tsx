@@ -7,6 +7,7 @@ import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { MobileContainer } from '@/components/MobileContainer';
 import { SplashScreen } from '@/pages/SplashScreen';
 import { HomeScreen } from '@/pages/HomeScreen';
@@ -36,7 +37,16 @@ import { AdminUsers } from '@/pages/admin/AdminUsers';
 import { AdminShifts } from '@/pages/admin/AdminShifts';
 import { AdminDisputes } from '@/pages/admin/AdminDisputes';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime:            30_000,       // 30s before a query is considered stale
+      gcTime:               5 * 60_000,   // 5 min before inactive data is garbage collected
+      retry:                2,
+      refetchOnWindowFocus: false,        // prevents re-fetch on every tab switch
+    },
+  },
+});
 
 /** Worker-facing mobile app routes (wrapped in 390px MobileContainer) */
 function MobileRouter() {
@@ -116,7 +126,9 @@ function App() {
         <AuthProvider>
           <TooltipProvider>
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-              <AppRouter />
+              <ErrorBoundary>
+                <AppRouter />
+              </ErrorBoundary>
             </WouterRouter>
             <Toaster />
           </TooltipProvider>

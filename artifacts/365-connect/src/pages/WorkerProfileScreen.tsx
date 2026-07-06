@@ -1,9 +1,10 @@
 import { useParams } from 'wouter';
-import { BadgeCheck, Star, ChevronLeft, Loader2, Heart } from 'lucide-react';
+import { BadgeCheck, Star, ChevronLeft, Heart } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { friendlyDate } from '@/lib/supabase';
 import { useFollow } from '@/hooks/useFollow';
+import { ProfileSkeleton } from '@/components/skeletons/ProfileSkeleton';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -183,13 +184,7 @@ export function WorkerProfileScreen() {
   }, [params.username]);
 
   // ── Loading ──────────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="flex flex-col h-full bg-black items-center justify-center">
-        <Loader2 size={28} className="text-primary animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return <ProfileSkeleton />;
 
   // ── Not found ────────────────────────────────────────────────────────────
   if (notFound || !profile) {
@@ -239,6 +234,8 @@ export function WorkerProfileScreen() {
             <img
               src={profile.photo_url}
               alt={profile.username}
+              loading="eager"
+              decoding="async"
               className="w-full h-full object-cover"
             />
           ) : (

@@ -71,6 +71,12 @@ A mobile-first event staffing marketplace that connects clients who need event w
 
 _Populate as you build — explicit user instructions worth remembering across sessions._
 
+## Logging convention
+
+- `console.log` is **banned** in production code under `artifacts/365-connect/src/` and `artifacts/api-server/src/`.
+- Only `console.error` (for genuine Supabase/auth/network failures) and `console.warn` (for degraded-but-recoverable states) are permitted.
+- Never add `console.log` debugging statements and leave them in a commit.
+
 ## Gotchas
 
 - Space Grotesk `@import url(...)` MUST be the first line of `index.css` — before `@import 'tailwindcss'`.
