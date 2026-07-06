@@ -10,12 +10,13 @@ import { useFeedStore, toggleSaved } from '@/store/feedStore';
 
 function StoryBubble({ worker }: { worker: (typeof STORY_WORKERS)[0] }) {
   const [tapped, setTapped] = useState(false);
+  const [, navigate] = useLocation();
 
   return (
     <button
       type="button"
       aria-label={`View ${worker.username}'s profile`}
-      onClick={() => setTapped(true)}
+      onClick={() => { setTapped(true); navigate(`/worker/${worker.username}`); }}
       className="flex flex-col items-center gap-1.5 flex-shrink-0 active:scale-95 transition-transform"
     >
       <div
@@ -224,6 +225,7 @@ function FeedHeader() {
         <button
           type="button"
           aria-label="Search shifts"
+          onClick={() => navigate('/jobs')}
           className="w-9 h-9 rounded-full bg-[#161616] border border-[#2A2A2A] flex items-center justify-center"
         >
           <Search size={16} aria-hidden="true" className="text-[#9A9A9A]" />
@@ -231,6 +233,7 @@ function FeedHeader() {
         <button
           type="button"
           aria-label="Notifications — 1 unread"
+          onClick={() => navigate('/notifications')}
           className="w-9 h-9 rounded-full bg-[#161616] border border-[#2A2A2A] flex items-center justify-center relative"
         >
           <Bell size={16} aria-hidden="true" className="text-[#9A9A9A]" />

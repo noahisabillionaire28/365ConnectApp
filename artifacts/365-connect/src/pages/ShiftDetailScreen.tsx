@@ -177,7 +177,10 @@ export function ShiftDetailScreen() {
           <button
             type="button"
             aria-label="Go back"
-            onClick={() => navigate(-1 as never)}
+            onClick={() => {
+            if (window.history.length > 1) window.history.back();
+            else navigate('/jobs');
+          }}
             className="absolute top-5 left-4 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 flex items-center justify-center"
           >
             <ChevronLeft size={20} aria-hidden className="text-white" />

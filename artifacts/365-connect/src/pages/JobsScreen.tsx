@@ -239,13 +239,18 @@ function BottomSheet({
   }
 
   return (
+    /* Outer div owns fixed positioning + centering so Framer Motion's y-transform
+       doesn't clobber the -translate-x-1/2 centering transform */
+    <div
+      className="fixed left-1/2 -translate-x-1/2 w-full max-w-[390px] z-30"
+      style={{ bottom: 72 }}
+    >
     <motion.div
       drag="y"
       dragConstraints={{ top: SNAP_EXP, bottom: SNAP_COLL }}
       dragElastic={{ top: 0.08, bottom: 0.08 }}
       onDragEnd={handleDragEnd}
-      style={{ y, bottom: 72, touchAction: 'none' }}
-      className="fixed left-1/2 -translate-x-1/2 w-full max-w-[390px] z-30"
+      style={{ y, touchAction: 'none' }}
     >
       <div
         className="bg-[#0A0A0A]/95 backdrop-blur-md border-t border-[#242424] rounded-t-[22px] overflow-hidden"
@@ -308,6 +313,7 @@ function BottomSheet({
         </div>
       </div>
     </motion.div>
+    </div>
   );
 }
 

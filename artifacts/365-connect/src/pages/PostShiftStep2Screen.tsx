@@ -100,7 +100,8 @@ export function PostShiftStep2Screen() {
   const [startTime,      setStartTime]      = useState(initial.startTime || '18:00');
   const [endTime,        setEndTime]        = useState(initial.endTime   || '23:00');
   const [location,       setLocation]       = useState(initial.location  || 'Miami Beach, FL');
-  const [payRate,        setPayRate]        = useState(initial.payRate   || 35);
+  // String state avoids browser number-input leading-zero bug ("050" instead of "50")
+  const [payRateStr,     setPayRateStr]     = useState(String(initial.payRate ?? 35));
   const [workersNeeded,  setWorkersNeeded]  = useState(initial.workersNeeded || 1);
   const [dressCode,      setDressCode]      = useState(initial.dressCode);
   const [description,    setDescription]    = useState(initial.description);
@@ -118,17 +119,19 @@ export function PostShiftStep2Screen() {
 
   function validate() {
     const e: Record<string, string> = {};
-    if (!date)        e.date        = 'Date is required';
-    if (!location.trim())     e.location    = 'Location is required';
-    if (!payRate || payRate < 1) e.payRate  = 'Enter a valid pay rate';
-    if (!contactName.trim())  e.contactName = 'Contact name is required';
+    if (!date)            e.date        = 'Date is required';
+    if (!location.trim()) e.location    = 'Location is required';
+    const payNum = Number(payRateStr);
+    if (!payRateStr || isNaN(payNum) || payNum < 1)   e.payRate = 'Enter a valid pay rate';
+    else if (payNum > 500)                            e.payRate = 'Pay rate cannot exceed $500/hr';
+    if (!contactName.trim()) e.contactName = 'Contact name is required';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
   function handlePost() {
     if (!validate()) return;
-    setDraft({ date, startTime, endTime, location, payRate, workersNeeded, dressCode, description, contactName, contactPhone });
+    setDraft({ date, startTime, endTime, location, payRate: Number(payRateStr), workersNeeded, dressCode, description, contactName, contactPhone });
     navigate('/post-shift/step3');
   }
 
@@ -246,15 +249,20 @@ export function PostShiftStep2Screen() {
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-bold text-[15px]">$</span>
                 <input
-                  type="number"
-                  min={1}
-                  max={500}
-                  value={payRate}
-                  onChange={(e) => { setPayRate(Number(e.target.value)); setErrors((p) => ({ ...p, payRate: '' })); }}
+                  type="text"
+                  inputMode="numeric"
+                  value={payRateStr}
+                  onChange={(e) => {
+                    // Keep only digits, strip leading zeros (e.g. "050" → "50")
+                    const digits = e.target.value.replace(/[^0-9]/g, '');
+                    const clean  = digits.replace(/^0+(\d)/, '$1');
+                    setPayRateStr(clean);
+                    setErrors((p) => ({ ...p, payRate: '' }));
+                  }}
+                  placeholder="35"
                   aria-label="Pay rate per hour"
                   aria-invalid={!!errors.payRate}
                   className={INPUT_CLS + ' pl-7' + (errors.payRate ? ' border-red-500/60' : '')}
-                  style={{ colorScheme: 'dark' }}
                 />
               </div>
               {errors.payRate && <p className="text-red-400 text-[11px] mt-1">{errors.payRate}</p>}

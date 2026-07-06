@@ -114,6 +114,7 @@ export function ProfileScreen() {
   const { signOut } = useAuth();
   const [, navigate]  = useLocation();
   const [available, setAvailable] = useState(DEMO_PROFILE.isAvailable);
+  const [comingSoonLabel, setComingSoon] = useState<string | null>(null);
   const p = DEMO_PROFILE;
 
   async function handleSignOut() {
@@ -123,6 +124,23 @@ export function ProfileScreen() {
 
   return (
     <div className="min-h-[100dvh] bg-black flex flex-col pb-[72px] overflow-y-auto">
+
+      {/* Coming-soon toast */}
+      {comingSoonLabel && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-[#111] border border-[#2A2A2A] rounded-[12px] px-4 py-3 flex items-center gap-3 shadow-xl max-w-[340px] w-[90%]"
+        >
+          <span className="text-white text-[13px] font-medium flex-1">{comingSoonLabel} — coming soon</span>
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={() => setComingSoon(null)}
+            className="text-[#555] text-[18px] leading-none"
+          >×</button>
+        </div>
+      )}
 
       {/* ── Cover + avatar ───────────────────────────────────────────────── */}
       <div className="relative">
@@ -144,6 +162,7 @@ export function ProfileScreen() {
         <button
           type="button"
           aria-label="Edit profile"
+          onClick={() => navigate('/profile-setup')}
           className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/50 border border-white/10 backdrop-blur-sm flex items-center justify-center"
         >
           <Edit3 size={15} aria-hidden className="text-white" />
@@ -359,11 +378,11 @@ export function ProfileScreen() {
           Account
         </p>
         <div className="bg-[#060606] border border-[#101010] rounded-[16px] overflow-hidden">
-          <SettingRow icon={Settings}    label="Account Settings"   onTap={() => {}} />
-          <SettingRow icon={CreditCard}  label="Payments & Earnings" onTap={() => {}} />
+          <SettingRow icon={Settings}    label="Account Settings"   onTap={() => setComingSoon('Account Settings')} />
+          <SettingRow icon={CreditCard}  label="Payments & Earnings" onTap={() => setComingSoon('Payments & Earnings')} />
           <SettingRow icon={Bell}        label="Notifications"       onTap={() => navigate('/notifications')} />
-          <SettingRow icon={Shield}      label="Privacy & Safety"    onTap={() => {}} />
-          <SettingRow icon={HelpCircle}  label="Help & Support"      onTap={() => {}} />
+          <SettingRow icon={Shield}      label="Privacy & Safety"    onTap={() => setComingSoon('Privacy & Safety')} />
+          <SettingRow icon={HelpCircle}  label="Help & Support"      onTap={() => setComingSoon('Help & Support')} />
         </div>
       </div>
 

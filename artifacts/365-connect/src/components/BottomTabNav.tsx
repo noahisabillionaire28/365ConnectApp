@@ -13,7 +13,7 @@ export function BottomTabNav() {
   ];
 
   return (
-    <div className="fixed bottom-0 w-full max-w-[390px] bg-[#0A0A0A] border-t border-[#2A2A2A] pb-safe z-50">
+    <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-[#0A0A0A] border-t border-[#2A2A2A] pb-safe z-50">
       <div className="flex justify-around items-center h-[72px]">
         {tabs.map((tab) => {
           const isActive = location === tab.path;
