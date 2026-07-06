@@ -2,41 +2,46 @@ import { APIProvider, Map, Marker, useMap } from '@vis.gl/react-google-maps';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion, useMotionValue, animate, type PanInfo } from 'framer-motion';
-import { Search, SlidersHorizontal, Heart, MapPin, Clock, Users, Sparkles } from 'lucide-react';
+import { Search, SlidersHorizontal, Heart, MapPin, Clock, Users, Sparkles, WifiOff } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { type MockShift } from '@/data/mockFeed';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { LIGHT_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
 import { useShifts } from '@/hooks/useShifts';
 
+/* ── API key — resolved once at module load ─────────────────────────────── */
+const API_KEY: string = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
+
+/* ── MapController — lives inside <Map> context ─────────────────────────── */
 function MapController({ shift }: { shift: MockShift | null }) {
   const map = useMap();
 
-  // The Map often initialises while its container still has 0 height (flex/dvh
-  // layout not yet painted), so it never requests tiles. Fire one synthetic
-  // resize after the first render cycle to make the SDK measure the real size.
   useEffect(() => {
     if (!map) return;
-    const id = window.setTimeout(() => {
-      window.dispatchEvent(new Event('resize'));
-    }, 0);
+    // Belt-and-suspenders resize after the SDK mounts, in case the container
+    // still reported 0 height at init time.
+    const id = window.setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
     return () => window.clearTimeout(id);
-  }, [map]); // intentionally runs only when map instance first becomes available
+  }, [map]);
 
   useEffect(() => {
-    if (map && shift) { map.panTo({ lat: shift.lat, lng: shift.lng }); map.setZoom(14); }
+    if (map && shift) {
+      map.panTo({ lat: shift.lat, lng: shift.lng });
+      map.setZoom(14);
+    }
   }, [map, shift]);
 
   return null;
 }
 
+/* ── Filter logic ────────────────────────────────────────────────────────── */
 type FilterKey = 'all' | 'pay30' | 'near3' | 'tonight' | 'vip';
 
 const FILTER_PILLS: { key: FilterKey; label: string }[] = [
-  { key: 'all',     label: 'All Jobs'       },
-  { key: 'pay30',   label: '$30+/hr'        },
-  { key: 'near3',   label: '< 3 mi'         },
-  { key: 'tonight', label: 'Tonight'        },
+  { key: 'all',     label: 'All Jobs'         },
+  { key: 'pay30',   label: '$30+/hr'          },
+  { key: 'near3',   label: '< 3 mi'           },
+  { key: 'tonight', label: 'Tonight'          },
   { key: 'vip',     label: 'VIP / Fine Dining' },
 ];
 
@@ -51,7 +56,7 @@ function applyFilter(shifts: MockShift[], f: FilterKey): MockShift[] {
   }
 }
 
-/* ─── Sheet card ──────────────────────────────────────────────────────────── */
+/* ── Sheet card ──────────────────────────────────────────────────────────── */
 function SheetCard({ shift, selected, onTap }: { shift: MockShift; selected: boolean; onTap: () => void }) {
   const store    = useFeedStore();
   const saved    = store.isSaved(shift.id);
@@ -129,7 +134,7 @@ function SheetCard({ shift, selected, onTap }: { shift: MockShift; selected: boo
   );
 }
 
-/* ─── Sheet skeleton card ────────────────────────────────────────────────── */
+/* ── Sheet skeleton card ─────────────────────────────────────────────────── */
 function SheetCardSkeleton() {
   return (
     <div className="w-[264px] flex-shrink-0 rounded-[12px] overflow-hidden bg-white border border-[#DBDBDB]">
@@ -148,7 +153,7 @@ function SheetCardSkeleton() {
   );
 }
 
-/* ─── Bottom sheet ───────────────────────────────────────────────────────── */
+/* ── Bottom sheet ────────────────────────────────────────────────────────── */
 const SHEET_H   = 428;
 const COLLAPSED = 216;
 const SNAP_COLL = SHEET_H - COLLAPSED;
@@ -230,94 +235,212 @@ function BottomSheet({ shifts, isLoading, selectedId, onSelectShift }: {
   );
 }
 
-/* ─── JobsScreen ─────────────────────────────────────────────────────────── */
+/* ── JobsScreen ──────────────────────────────────────────────────────────── */
 export function JobsScreen() {
-  const [, navigate]                 = useLocation();
-  const [query, setQuery]            = useState('');
+  const [, navigate]    = useLocation();
+  const [query, setQuery]               = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
-  const [selectedId, setSelectedId]  = useState<string | null>(null);
+  const [selectedId, setSelectedId]     = useState<string | null>(null);
+
+  // Map readiness tracking
+  const [tilesLoaded, setTilesLoaded]   = useState(false);
+  const [mapFailed,   setMapFailed]     = useState(false);
+  const tilesLoadedRef                  = useRef(false);   // sync ref — read inside timeout callback
+
+  // Container height measured via ResizeObserver so Map always gets real pixels
+  const containerRef  = useRef<HTMLDivElement>(null);
+  const [mapHeight, setMapHeight] = useState(0);
 
   const { shifts, isLoading } = useShifts();
 
-  const textFiltered = shifts.filter((s) =>
+  // ── 1. Log API-key presence on mount (never log the full key) ──
+  useEffect(() => {
+    if (API_KEY) {
+      console.log(
+        `[Jobs] Maps API key present — length: ${API_KEY.length}, prefix: ${API_KEY.slice(0, 6)}…`,
+      );
+    } else {
+      console.warn('[Jobs] Maps API key is MISSING (import.meta.env.VITE_GOOGLE_MAPS_API_KEY is undefined)');
+    }
+  }, []);
+
+  // ── 2. Measure container height so Map only mounts with a real pixel value ──
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = el.offsetHeight;
+      if (h > 0) setMapHeight(h);
+    };
+    measure(); // immediate read — usually good on desktop
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // ── 3. 5-second hard fallback — show list-only if tiles never arrive ──
+  useEffect(() => {
+    if (!API_KEY) return; // skip timer when key is missing; mapFailed=false, fallback shown by !API_KEY check
+    const t = window.setTimeout(() => {
+      if (!tilesLoadedRef.current) {
+        console.warn('[Jobs] Map tiles did not load within 5 s — switching to list-only fallback');
+        setMapFailed(true);
+      }
+    }, 5000);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  function handleTilesReady() {
+    tilesLoadedRef.current = true;
+    setTilesLoaded(true);
+    setMapFailed(false); // in case timer fired just before tiles arrived
+  }
+
+  const textFiltered  = shifts.filter((s) =>
     !query || [s.jobType, s.companyName, s.location].some((f) =>
-      f.toLowerCase().includes(query.toLowerCase())
-    )
+      f.toLowerCase().includes(query.toLowerCase()),
+    ),
   );
-  const visibleShifts  = applyFilter(textFiltered, activeFilter);
-  const selectedShift  = visibleShifts.find((s) => s.id === selectedId) ?? null;
+  const visibleShifts = applyFilter(textFiltered, activeFilter);
+  const selectedShift = visibleShifts.find((s) => s.id === selectedId) ?? null;
 
   function handleSelectShift(shift: MockShift) { setSelectedId(shift.id); navigate(`/shift/${shift.id}`); }
-  function handlePinClick(shift: MockShift) { setSelectedId(shift.id); }
+  function handlePinClick(shift: MockShift)    { setSelectedId(shift.id); }
+
+  // Show map only when key exists and it hasn't timed out
+  const showMap      = !!API_KEY && !mapFailed;
+  const showFallback = !API_KEY || mapFailed;
 
   return (
-    <div className="relative h-[100dvh] bg-white overflow-hidden">
+    // APIProvider wraps the ENTIRE screen — not just the inner map block —
+    // so the SDK context is ready before any child tries to useMap().
+    <APIProvider apiKey={API_KEY} libraries={['places']}>
+      <div ref={containerRef} className="relative h-[100dvh] bg-[#f5f5f5] overflow-hidden">
 
-      {/* Map */}
-      <div className="absolute inset-0 z-0" style={{ height: '100dvh' }}>
-        <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? ''} libraries={['places']}>
-          <Map defaultCenter={{ lat: 25.7913, lng: -80.145 }} defaultZoom={12}
-            styles={LIGHT_MAP_STYLES} disableDefaultUI gestureHandling="greedy"
-            backgroundColor="#f5f5f5" style={{ width: '100%', height: '100%' }}>
-            <MapController shift={selectedShift} />
-            {visibleShifts.map((shift) => (
-              <Marker key={shift.id} position={{ lat: shift.lat, lng: shift.lng }}
-                icon={goldPinUrl(selectedId === shift.id)} onClick={() => handlePinClick(shift)} />
-            ))}
-          </Map>
-        </APIProvider>
-      </div>
+        {/* ── Map layer ─────────────────────────────────────────────────── */}
+        {showMap && (
+          <div
+            className="absolute inset-0 z-0"
+            // Explicit pixel height from ResizeObserver — eliminates the
+            // "0-height init" race that causes blank tiles on mobile.
+            style={{ height: mapHeight > 0 ? mapHeight : '100dvh' }}
+          >
+            {/* Loading overlay — shown until onIdle/onTilesLoaded fires */}
+            {!tilesLoaded && (
+              <div
+                className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[#f5f5f5]"
+                aria-live="polite" aria-label="Map loading"
+              >
+                <div className="w-8 h-8 rounded-full border-[2.5px] border-[#DBDBDB] border-t-black animate-spin" />
+                <p className="text-[#737373] text-[13px] font-medium">Map loading…</p>
+              </div>
+            )}
 
-      {/* Search + filters overlay */}
-      <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none">
-        <div className="pointer-events-auto">
-          <div className="px-4 pt-5 pb-3 bg-gradient-to-b from-white/95 via-white/80 to-transparent">
-            <div className="flex items-center gap-2 bg-white border border-[#DBDBDB] rounded-[10px] px-3.5 h-[46px] shadow-sm">
-              <Search size={16} aria-hidden className="text-[#737373] flex-shrink-0" />
-              <input type="search" placeholder="Search shifts, job types, locations…"
-                value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search shifts"
-                className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] outline-none font-medium" />
-              {query && (
-                <button type="button" aria-label="Clear search" onClick={() => setQuery('')}
-                  className="text-[#737373] text-[12px]">✕</button>
-              )}
-              <div className="w-px h-4 bg-[#DBDBDB]" aria-hidden />
-              <button type="button" aria-label="Open filters" className="flex-shrink-0">
-                <SlidersHorizontal size={15} aria-hidden className="text-[#737373]" />
-              </button>
+            {/* Mount Map only after the container has measured non-zero height */}
+            {mapHeight > 0 && (
+              <Map
+                defaultCenter={{ lat: 25.7913, lng: -80.145 }}
+                defaultZoom={12}
+                styles={LIGHT_MAP_STYLES}
+                disableDefaultUI
+                gestureHandling="greedy"
+                backgroundColor="#f5f5f5"
+                style={{ width: '100%', height: '100%' }}
+                onIdle={handleTilesReady}
+                onTilesLoaded={handleTilesReady}
+              >
+                <MapController shift={selectedShift} />
+                {visibleShifts.map((shift) => (
+                  <Marker
+                    key={shift.id}
+                    position={{ lat: shift.lat, lng: shift.lng }}
+                    icon={goldPinUrl(selectedId === shift.id)}
+                    onClick={() => handlePinClick(shift)}
+                  />
+                ))}
+              </Map>
+            )}
+          </div>
+        )}
+
+        {/* ── Fallback — map unavailable ────────────────────────────────── */}
+        {showFallback && (
+          <div className="absolute inset-0 z-0 flex items-center justify-center bg-[#FAFAFA]">
+            <div className="flex flex-col items-center gap-2 text-center px-8">
+              <WifiOff size={28} aria-hidden className="text-[#DBDBDB]" />
+              <p className="text-[#737373] text-[14px] font-medium">
+                {!API_KEY ? 'Map unavailable' : 'Map timed out'}
+              </p>
+              <p className="text-[#AAAAAA] text-[12px]">Browse shifts in the list below</p>
             </div>
           </div>
+        )}
 
-          <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none"
-            role="radiogroup" aria-label="Filter shifts" style={{ WebkitOverflowScrolling: 'touch' }}>
-            {FILTER_PILLS.map((pill) => {
-              const active = activeFilter === pill.key;
-              return (
-                <button key={pill.key} type="button" role="radio" aria-checked={active}
-                  onClick={() => { setActiveFilter(pill.key); setSelectedId(null); }}
-                  className={`flex-shrink-0 h-[34px] px-4 rounded-full text-[12px] font-semibold transition-all duration-150 whitespace-nowrap shadow-sm
-                    ${active ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
-                  {pill.label}
+        {/* ── Search + filter overlay ───────────────────────────────────── */}
+        <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none">
+          <div className="pointer-events-auto">
+            <div className="px-4 pt-5 pb-3 bg-gradient-to-b from-white/95 via-white/80 to-transparent">
+              <div className="flex items-center gap-2 bg-white border border-[#DBDBDB] rounded-[10px] px-3.5 h-[46px] shadow-sm">
+                <Search size={16} aria-hidden className="text-[#737373] flex-shrink-0" />
+                <input
+                  type="search"
+                  placeholder="Search shifts, job types, locations…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  aria-label="Search shifts"
+                  className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] outline-none font-medium"
+                />
+                {query && (
+                  <button type="button" aria-label="Clear search" onClick={() => setQuery('')}
+                    className="text-[#737373] text-[12px]">✕</button>
+                )}
+                <div className="w-px h-4 bg-[#DBDBDB]" aria-hidden />
+                <button type="button" aria-label="Open filters" className="flex-shrink-0">
+                  <SlidersHorizontal size={15} aria-hidden className="text-[#737373]" />
                 </button>
-              );
-            })}
+              </div>
+            </div>
+
+            <div
+              className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none"
+              role="radiogroup" aria-label="Filter shifts"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              {FILTER_PILLS.map((pill) => {
+                const active = activeFilter === pill.key;
+                return (
+                  <button key={pill.key} type="button" role="radio" aria-checked={active}
+                    onClick={() => { setActiveFilter(pill.key); setSelectedId(null); }}
+                    className={`flex-shrink-0 h-[34px] px-4 rounded-full text-[12px] font-semibold transition-all duration-150 whitespace-nowrap shadow-sm
+                      ${active
+                        ? 'bg-black text-white border-2 border-black'
+                        : 'bg-white text-black border border-[#DBDBDB]'}`}>
+                    {pill.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
+
+        {/* SR-only shift list for keyboard/screen-reader users */}
+        <div className="sr-only" aria-label="Shifts on map">
+          {visibleShifts.map((shift) => (
+            <button key={shift.id} type="button"
+              aria-label={`Select ${shift.jobType} at ${shift.companyName}`}
+              onClick={() => handlePinClick(shift)} />
+          ))}
+        </div>
+
+        <BottomSheet
+          shifts={visibleShifts}
+          isLoading={isLoading}
+          selectedId={selectedId}
+          onSelectShift={handleSelectShift}
+        />
+
+        <BottomTabNav />
       </div>
-
-      {/* SR-only shift list */}
-      <div className="sr-only" aria-label="Shifts on map">
-        {visibleShifts.map((shift) => (
-          <button key={shift.id} type="button"
-            aria-label={`Select ${shift.jobType} at ${shift.companyName}`}
-            onClick={() => handlePinClick(shift)} />
-        ))}
-      </div>
-
-      <BottomSheet shifts={visibleShifts} isLoading={isLoading}
-        selectedId={selectedId} onSelectShift={handleSelectShift} />
-
-      <BottomTabNav />
-    </div>
+    </APIProvider>
   );
 }
