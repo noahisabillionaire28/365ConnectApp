@@ -11,9 +11,22 @@ import { useShifts } from '@/hooks/useShifts';
 
 function MapController({ shift }: { shift: MockShift | null }) {
   const map = useMap();
+
+  // The Map often initialises while its container still has 0 height (flex/dvh
+  // layout not yet painted), so it never requests tiles. Fire one synthetic
+  // resize after the first render cycle to make the SDK measure the real size.
+  useEffect(() => {
+    if (!map) return;
+    const id = window.setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [map]); // intentionally runs only when map instance first becomes available
+
   useEffect(() => {
     if (map && shift) { map.panTo({ lat: shift.lat, lng: shift.lng }); map.setZoom(14); }
   }, [map, shift]);
+
   return null;
 }
 
