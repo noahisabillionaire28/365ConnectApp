@@ -88,11 +88,14 @@ function StatTile({ icon, label, value, sub, accent }: {
 }
 
 export function ShiftDetailScreen() {
-  const { id }     = useParams<{ id: string }>();
+  // ── ALL hooks must be declared here, unconditionally, before any early return ──
+  const { id }       = useParams<{ id: string }>();
   const [, navigate] = useLocation();
-  const store      = useFeedStore();
+  const store        = useFeedStore();
+  // useApplications: 7 stable hooks (see hook/useApplications.ts inventory comment)
   const { appliedShiftIds, submitApplication } = useApplications();
-  const { data: shift, isLoading, error } = useShiftById(id);
+  const { data: shift, isLoading, error }      = useShiftById(id);
+  // ── No more hooks below this line ────────────────────────────────────────────
 
   if (isLoading) return <ShiftDetailSkeleton />;
 

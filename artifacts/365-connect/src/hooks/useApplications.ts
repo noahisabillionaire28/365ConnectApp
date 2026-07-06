@@ -7,37 +7,40 @@ import { useAuth } from '@/contexts/AuthContext';
  * plus a submitApplication function that writes to Supabase with an
  * optimistic local update so the badge / button flip instantly.
  *
+ * Hook inventory (7 hooks — stable count across all renders):
+ *   1. useContext  (via useAuth)
+ *   2. useState    (appliedShiftIds)
+ *   3. useRef      (inFlight — in-flight insert guard)
+ *   4. useEffect   (clear on logout / user switch)
+ *   5. useEffect   (initial fetch)
+ *   6. useEffect   (realtime INSERT subscription)
+ *   7. useCallback (submitApplication)
+ *
  * Hardening:
- *  - Duplicate insert (23505 unique violation) is treated as "already applied"
- *    — the optimistic state is kept, NOT rolled back.
- *  - An in-flight ref prevents concurrent double-submits for the same shift.
- *  - appliedShiftIds is cleared on logout / user switch to avoid leaking
- *    another user's data into the UI.
+ *   - 23505 unique-constraint error → row already exists, keep optimistic state.
+ *   - inFlight ref prevents concurrent double-submits for the same shift.
+ *   - State cleared on user change so stale badges never bleed between users.
  */
 export function useApplications() {
-  const { user } = useAuth();
-  const [appliedShiftIds, setAppliedShiftIds] = useState<Set<string>>(new Set());
-
-  // Ref mirror so submitApplication can read current state without stale closure
-  const appliedRef = useRef<Set<string>>(new Set());
-  useEffect(() => { appliedRef.current = appliedShiftIds; }, [appliedShiftIds]);
-
-  // Tracks shift IDs whose insert is currently in-flight (prevents double-submit)
-  const inFlight = useRef<Set<string>>(new Set());
+  const { user } = useAuth();                                           // hook 1
+  const [appliedShiftIds, setAppliedShiftIds] = useState<Set<string>>( // hook 2
+    new Set(),
+  );
+  // In-flight guard: prevents a second submit while the first is awaiting DB.
+  // Using a ref (not state) so it never triggers an extra render.
+  const inFlight = useRef<Set<string>>(new Set());                      // hook 3
 
   // ── Clear state on logout / user switch ───────────────────────────────────
-  useEffect(() => {
+  useEffect(() => {                                                      // hook 4
     if (!user?.id) {
       setAppliedShiftIds(new Set());
-      appliedRef.current = new Set();
       inFlight.current.clear();
     }
   }, [user?.id]);
 
   // ── Initial fetch ─────────────────────────────────────────────────────────
-  useEffect(() => {
+  useEffect(() => {                                                      // hook 5
     if (!user?.id) return;
-
     void supabase
       .from('applications')
       .select('shift_id')
@@ -54,19 +57,14 @@ export function useApplications() {
   }, [user?.id]);
 
   // ── Realtime subscription — INSERT on applications for this worker ─────────
-  useEffect(() => {
+  useEffect(() => {                                                      // hook 6
     if (!user?.id) return;
-
     const channel = supabase
       .channel(`applications-worker-${user.id}`)
       .on<ApplicationRow>(
         'postgres_changes',
-        {
-          event:  'INSERT',
-          schema: 'public',
-          table:  'applications',
-          filter: `worker_id=eq.${user.id}`,
-        },
+        { event: 'INSERT', schema: 'public', table: 'applications',
+          filter: `worker_id=eq.${user.id}` },
         (payload) => {
           setAppliedShiftIds((prev) => new Set([...prev, payload.new.shift_id]));
         },
@@ -76,20 +74,19 @@ export function useApplications() {
           console.log('[Applications] Realtime subscription active for worker', user.id);
         }
       });
-
     return () => { void supabase.removeChannel(channel); };
   }, [user?.id]);
 
-  // ── submitApplication — optimistic + DB write ─────────────────────────────
-  const submitApplication = useCallback(
+  // ── submitApplication ─────────────────────────────────────────────────────
+  // appliedShiftIds is in the dep array so the closure always sees the latest
+  // set — this is correct and intentional. inFlight is a ref so it's excluded.
+  const submitApplication = useCallback(                                // hook 7
     async (shiftId: string): Promise<void> => {
       if (!user?.id) return;
-
-      // Idempotency: already applied (from state ref) or insert in-flight → skip
-      if (appliedRef.current.has(shiftId) || inFlight.current.has(shiftId)) return;
+      // Idempotency: skip if already applied or if this shift's insert is live
+      if (appliedShiftIds.has(shiftId) || inFlight.current.has(shiftId)) return;
 
       inFlight.current.add(shiftId);
-
       // Optimistic: flip badge + button before the network round-trip
       setAppliedShiftIds((prev) => new Set([...prev, shiftId]));
 
@@ -103,13 +100,12 @@ export function useApplications() {
 
       if (error) {
         if (error.code === '23505') {
-          // Unique-constraint violation — row already exists in DB.
-          // The optimistic state is correct; do NOT roll back.
-          console.info('[Applications] Duplicate insert ignored (row already exists):', shiftId);
+          // Unique-constraint: row already exists — optimistic state is correct
+          console.info('[Applications] Duplicate insert ignored:', shiftId);
           return;
         }
-        // True write failure — roll back the optimistic update
         console.error('[Applications] Insert failed:', error.message, error.code);
+        // True failure — roll back optimistic update
         setAppliedShiftIds((prev) => {
           const next = new Set(prev);
           next.delete(shiftId);
@@ -117,7 +113,7 @@ export function useApplications() {
         });
       }
     },
-    [user?.id], // appliedRef + inFlight are refs, no closure staleness
+    [user?.id, appliedShiftIds],
   );
 
   return { appliedShiftIds, submitApplication };
