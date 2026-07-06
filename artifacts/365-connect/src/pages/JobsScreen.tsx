@@ -2,12 +2,13 @@ import { APIProvider, Map, Marker, useMap } from '@vis.gl/react-google-maps';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion, useMotionValue, animate, type PanInfo } from 'framer-motion';
-import { Search, SlidersHorizontal, Heart, MapPin, Clock, Users, Sparkles, WifiOff } from 'lucide-react';
+import { Search, SlidersHorizontal, Heart, MapPin, Clock, Users, Sparkles, WifiOff, CheckCircle2 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { type MockShift } from '@/data/mockFeed';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { LIGHT_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
 import { useShifts } from '@/hooks/useShifts';
+import { useApplications } from '@/hooks/useApplications';
 
 /* ── API key — resolved once at module load ─────────────────────────────── */
 const API_KEY: string = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
@@ -57,7 +58,9 @@ function applyFilter(shifts: MockShift[], f: FilterKey): MockShift[] {
 }
 
 /* ── Sheet card ──────────────────────────────────────────────────────────── */
-function SheetCard({ shift, selected, onTap }: { shift: MockShift; selected: boolean; onTap: () => void }) {
+function SheetCard({ shift, selected, onTap, applied }: {
+  shift: MockShift; selected: boolean; onTap: () => void; applied?: boolean;
+}) {
   const store    = useFeedStore();
   const saved    = store.isSaved(shift.id);
   const spotsLow = shift.spotsAvailable < 3;
@@ -66,7 +69,7 @@ function SheetCard({ shift, selected, onTap }: { shift: MockShift; selected: boo
 
   return (
     <div role="article" tabIndex={0}
-      aria-label={`${shift.jobType} at ${shift.companyName}, $${shift.payRate}/${shift.payPeriod}`}
+      aria-label={`${shift.jobType} at ${shift.companyName}, ${shift.payRate}/${shift.payPeriod}${applied ? ' — Applied' : ''}`}
       onClick={onTap} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onTap()}
       className={`w-[264px] flex-shrink-0 rounded-[12px] overflow-hidden bg-white cursor-pointer
         transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-black
@@ -82,6 +85,16 @@ function SheetCard({ shift, selected, onTap }: { shift: MockShift; selected: boo
             {shift.jobType}
           </span>
         </div>
+
+        {/* Applied badge — green circle, sits to the left of the heart when present */}
+        {applied && (
+          <div
+            aria-label="Already applied"
+            className="absolute top-2.5 right-[42px] w-7 h-7 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-sm"
+          >
+            <CheckCircle2 size={13} aria-hidden className="text-white" strokeWidth={2.5} />
+          </div>
+        )}
 
         <button type="button" aria-label={saved ? 'Remove from saved' : 'Save shift'} aria-pressed={saved}
           onClick={handleSave}
@@ -159,9 +172,9 @@ const COLLAPSED = 216;
 const SNAP_COLL = SHEET_H - COLLAPSED;
 const SNAP_EXP  = 0;
 
-function BottomSheet({ shifts, isLoading, selectedId, onSelectShift }: {
+function BottomSheet({ shifts, isLoading, selectedId, onSelectShift, appliedShiftIds }: {
   shifts: MockShift[]; isLoading: boolean; selectedId: string | null;
-  onSelectShift: (shift: MockShift) => void;
+  onSelectShift: (shift: MockShift) => void; appliedShiftIds: Set<string>;
 }) {
   const y         = useMotionValue(SNAP_COLL);
   const [expanded, setExpanded] = useState(false);
@@ -218,7 +231,7 @@ function BottomSheet({ shifts, isLoading, selectedId, onSelectShift }: {
 
             {!isLoading && shifts.map((shift) => (
               <div key={shift.id} role="listitem" ref={(el) => { cardRefs.current[shift.id] = el; }}>
-                <SheetCard shift={shift} selected={selectedId === shift.id} onTap={() => onSelectShift(shift)} />
+                <SheetCard shift={shift} selected={selectedId === shift.id} onTap={() => onSelectShift(shift)} applied={appliedShiftIds.has(shift.id)} />
               </div>
             ))}
 
@@ -252,6 +265,7 @@ export function JobsScreen() {
   const [mapHeight, setMapHeight] = useState(0);
 
   const { shifts, isLoading } = useShifts();
+  const { appliedShiftIds }   = useApplications();
 
   // ── 1. Log API-key presence on mount (never log the full key) ──
   useEffect(() => {
@@ -453,6 +467,7 @@ export function JobsScreen() {
           isLoading={isLoading}
           selectedId={selectedId}
           onSelectShift={handleSelectShift}
+          appliedShiftIds={appliedShiftIds}
         />
 
         <BottomTabNav />

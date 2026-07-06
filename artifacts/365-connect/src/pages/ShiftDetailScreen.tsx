@@ -5,7 +5,8 @@ import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock,
 } from 'lucide-react';
-import { useFeedStore, toggleSaved, markApplied, markAccepted } from '@/store/feedStore';
+import { useFeedStore, toggleSaved, markAccepted } from '@/store/feedStore';
+import { useApplications } from '@/hooks/useApplications';
 import { DARK_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
 import { useShiftById } from '@/hooks/useShifts';
 
@@ -90,6 +91,7 @@ export function ShiftDetailScreen() {
   const { id }     = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const store      = useFeedStore();
+  const { appliedShiftIds, submitApplication } = useApplications();
   const { data: shift, isLoading, error } = useShiftById(id);
 
   if (isLoading) return <ShiftDetailSkeleton />;
@@ -124,7 +126,8 @@ export function ShiftDetailScreen() {
 
   const shiftId     = shift.id;
   const saved       = store.isSaved(shiftId);
-  const applied     = store.isApplied(shiftId);
+  // applied comes from the live DB query + optimistic update in useApplications
+  const applied     = appliedShiftIds.has(shiftId);
   const accepted    = store.isAccepted(shiftId);
   const clockedIn   = store.isClockedIn(shiftId);
   const spotsLow    = shift.spotsAvailable < 3;
@@ -137,7 +140,7 @@ export function ShiftDetailScreen() {
     ? 'clocked-in' : accepted ? 'clock-in' : applied ? 'pending' : 'apply';
 
   function handleCta() {
-    if (ctaState === 'apply')    markApplied(shiftId);
+    if (ctaState === 'apply')    void submitApplication(shiftId);
     if (ctaState === 'clock-in') navigate(`/clock/${shiftId}`);
   }
 
@@ -367,10 +370,14 @@ export function ShiftDetailScreen() {
 
         {ctaState === 'pending' && (
           <div className="flex flex-col items-center gap-1.5">
-            <div className="w-full h-[52px] rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="text-[#737373] font-semibold text-[15px]">Application Sent</span>
-            </div>
+            {/* Disabled gray "Applied" button — spec requirement */}
+            <button
+              type="button" disabled aria-disabled="true" aria-label="Application already submitted"
+              className="w-full h-[52px] rounded-[8px] bg-[#F0F0F0] border border-[#DBDBDB] flex items-center justify-center gap-2 cursor-not-allowed"
+            >
+              <CheckCircle2 size={18} aria-hidden className="text-emerald-500" />
+              <span className="text-[#737373] font-semibold text-[15px]">Applied</span>
+            </button>
             <button type="button" onClick={() => markAccepted(shiftId)}
               className="text-[#737373] text-[11px] underline underline-offset-2">
               Demo: simulate client acceptance →
