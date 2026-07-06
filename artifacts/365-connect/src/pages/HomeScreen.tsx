@@ -3,10 +3,20 @@ import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, MapPin, Clock, Sparkles, Bell, Search, Users, PlusCircle } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
-import { STORY_WORKERS, MOCK_SHIFTS, type MockShift } from '@/data/mockFeed';
+import { STORY_WORKERS, type MockShift } from '@/data/mockFeed';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
+import { useShifts } from '@/hooks/useShifts';
 
 /* ─── Stories Row ─────────────────────────────────────────────────────────── */
+
+function StoryBubbleSkeleton() {
+  return (
+    <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+      <div className="w-[63px] h-[63px] rounded-full bg-[#1A1A1A] animate-pulse" />
+      <div className="w-10 h-2.5 rounded-full bg-[#1A1A1A] animate-pulse" />
+    </div>
+  );
+}
 
 function StoryBubble({ worker }: { worker: (typeof STORY_WORKERS)[0] }) {
   const [tapped, setTapped] = useState(false);
@@ -65,11 +75,32 @@ function StoriesRow() {
   );
 }
 
+/* ─── Shift Card skeleton ─────────────────────────────────────────────────── */
+
+function ShiftCardSkeleton() {
+  return (
+    <div className="mx-4 rounded-[18px] overflow-hidden bg-[#0E0E0E] border border-[#1E1E1E]">
+      <div className="w-full h-[220px] bg-[#1A1A1A] animate-pulse" />
+      <div className="px-4 pt-3.5 pb-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="w-16 h-7 rounded-lg bg-[#1A1A1A] animate-pulse" />
+          <div className="w-32 h-7 rounded-full bg-[#1A1A1A] animate-pulse" />
+        </div>
+        <div className="flex gap-2">
+          <div className="w-20 h-6 rounded-full bg-[#1A1A1A] animate-pulse" />
+          <div className="w-16 h-6 rounded-full bg-[#1A1A1A] animate-pulse" />
+          <div className="w-20 h-6 rounded-full bg-[#1A1A1A] animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Shift Card ──────────────────────────────────────────────────────────── */
 
 function ShiftCard({ shift, onTap }: { shift: MockShift; onTap: () => void }) {
-  const store = useFeedStore();
-  const saved = store.isSaved(shift.id);
+  const store    = useFeedStore();
+  const saved    = store.isSaved(shift.id);
   const spotsLow = shift.spotsAvailable < 3;
 
   function handleSave(e: React.MouseEvent) {
@@ -104,14 +135,14 @@ function ShiftCard({ shift, onTap }: { shift: MockShift; onTap: () => void }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/30" />
 
-        {/* Job type pill — top left */}
+        {/* Job type pill */}
         <div className="absolute top-3 left-3">
           <span className="bg-primary text-black text-[11px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wide shadow-lg">
             {shift.jobType}
           </span>
         </div>
 
-        {/* Save button — top right */}
+        {/* Save button */}
         <button
           type="button"
           aria-label={saved ? `Remove ${shift.companyName} from saved` : `Save ${shift.companyName} shift`}
@@ -136,7 +167,7 @@ function ShiftCard({ shift, onTap }: { shift: MockShift; onTap: () => void }) {
           </AnimatePresence>
         </button>
 
-        {/* Company name — bottom left overlay */}
+        {/* Company name overlay */}
         <div className="absolute bottom-3 left-3 right-16">
           <p className="text-white font-bold text-[16px] leading-tight drop-shadow-md truncate">
             {shift.companyName}
@@ -147,7 +178,7 @@ function ShiftCard({ shift, onTap }: { shift: MockShift; onTap: () => void }) {
           </div>
         </div>
 
-        {/* AI Match badge — bottom right on photo */}
+        {/* AI Match badge */}
         <div className="absolute bottom-3 right-3" aria-label={`${shift.aiMatchPct}% AI match`}>
           <div className="flex items-center gap-1 bg-black/70 backdrop-blur-sm border border-primary/40 rounded-full px-2.5 py-1">
             <Sparkles size={10} aria-hidden="true" className="text-primary" />
@@ -158,7 +189,6 @@ function ShiftCard({ shift, onTap }: { shift: MockShift; onTap: () => void }) {
 
       {/* Card body */}
       <div className="px-4 pt-3.5 pb-4">
-        {/* Pay + time row */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-baseline gap-1">
             <span className="text-primary font-bold text-[22px]">${shift.payRate}</span>
@@ -172,22 +202,17 @@ function ShiftCard({ shift, onTap }: { shift: MockShift; onTap: () => void }) {
           </div>
         </div>
 
-        {/* Meta chips row */}
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 bg-[#161616] border border-[#2A2A2A] rounded-full px-3 py-1.5">
             <span className="text-[#9A9A9A] text-[12px] font-medium">{shift.date}</span>
           </div>
-
           <div className="flex items-center gap-1.5 bg-[#161616] border border-[#2A2A2A] rounded-full px-3 py-1.5">
             <MapPin size={11} aria-hidden="true" className="text-[#666]" />
             <span className="text-[#9A9A9A] text-[12px] font-medium">{shift.distanceMiles} mi</span>
           </div>
-
           <div
             className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 border ${
-              spotsLow
-                ? 'bg-red-500/10 border-red-500/30'
-                : 'bg-[#161616] border-[#2A2A2A]'
+              spotsLow ? 'bg-red-500/10 border-red-500/30' : 'bg-[#161616] border-[#2A2A2A]'
             }`}
           >
             <Users size={11} aria-hidden="true" className={spotsLow ? 'text-red-400' : 'text-[#666]'} />
@@ -258,7 +283,8 @@ function SectionLabel({ title, sub }: { title: string; sub?: string }) {
 /* ─── HomeScreen ──────────────────────────────────────────────────────────── */
 
 export function HomeScreen() {
-  const [, navigate] = useLocation();
+  const [, navigate]          = useLocation();
+  const { shifts, isLoading, error } = useShifts();
 
   return (
     <div className="min-h-[100dvh] bg-black flex flex-col pb-[72px]">
@@ -276,23 +302,50 @@ export function HomeScreen() {
         <div className="pt-4 pb-4">
           <SectionLabel title="Shifts For You" sub="Based on your profile · Miami Beach" />
 
-          <div className="flex flex-col gap-4" role="feed" aria-label="Available shifts">
-            {MOCK_SHIFTS.map((shift, i) => (
-              <motion.div
-                key={shift.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.055, duration: 0.3, ease: 'easeOut' }}
-              >
-                <ShiftCard shift={shift} onTap={() => navigate(`/shift/${shift.id}`)} />
-              </motion.div>
-            ))}
-          </div>
+          {/* Loading skeletons */}
+          {isLoading && (
+            <div className="flex flex-col gap-4" aria-busy="true" aria-label="Loading shifts">
+              {[1, 2, 3].map((n) => <ShiftCardSkeleton key={n} />)}
+            </div>
+          )}
 
-          <div className="mt-8 flex flex-col items-center gap-2" aria-hidden="true">
-            <div className="w-8 h-[3px] rounded-full bg-[#222]" />
-            <p className="text-[#444] text-[12px]">You're all caught up</p>
-          </div>
+          {/* Error state */}
+          {error && !isLoading && (
+            <div className="mx-4 rounded-[18px] bg-[#0E0E0E] border border-[#1E1E1E] px-6 py-10 text-center">
+              <p className="text-[#555] text-[14px]">Couldn't load shifts right now.</p>
+              <p className="text-[#333] text-[12px] mt-1">Pull down to try again.</p>
+            </div>
+          )}
+
+          {/* Shift feed */}
+          {!isLoading && !error && (
+            <div className="flex flex-col gap-4" role="feed" aria-label="Available shifts">
+              {shifts.map((shift, i) => (
+                <motion.div
+                  key={shift.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.055, duration: 0.3, ease: 'easeOut' }}
+                >
+                  <ShiftCard shift={shift} onTap={() => navigate(`/shift/${shift.id}`)} />
+                </motion.div>
+              ))}
+
+              {shifts.length === 0 && (
+                <div className="mx-4 rounded-[18px] bg-[#0E0E0E] border border-[#1E1E1E] px-6 py-10 text-center">
+                  <p className="text-[#555] text-[14px]">No open shifts right now.</p>
+                  <p className="text-[#333] text-[12px] mt-1">Check back soon or post a shift.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isLoading && shifts.length > 0 && (
+            <div className="mt-8 flex flex-col items-center gap-2" aria-hidden="true">
+              <div className="w-8 h-[3px] rounded-full bg-[#222]" />
+              <p className="text-[#444] text-[12px]">You're all caught up</p>
+            </div>
+          )}
         </div>
       </main>
 

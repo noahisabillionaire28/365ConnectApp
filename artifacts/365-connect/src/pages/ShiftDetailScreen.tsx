@@ -2,22 +2,12 @@ import { Map, Marker } from '@vis.gl/react-google-maps';
 import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChevronLeft,
-  Heart,
-  Sparkles,
-  Calendar,
-  Clock,
-  Timer,
-  MapPin,
-  Phone,
-  Users,
-  Shirt,
-  CheckCircle2,
-  AlarmClock,
+  ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
+  MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock,
 } from 'lucide-react';
-import { MOCK_SHIFTS } from '@/data/mockFeed';
 import { useFeedStore, toggleSaved, markApplied, markAccepted } from '@/store/feedStore';
 import { DARK_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
+import { useShiftById } from '@/hooks/useShifts';
 
 /* ─── Duration helper ────────────────────────────────────────────────────── */
 function calcDuration(start: string, end: string): string {
@@ -36,23 +26,53 @@ function calcDuration(start: string, end: string): string {
   return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
 }
 
+/* ─── Loading skeleton ───────────────────────────────────────────────────── */
+function ShiftDetailSkeleton() {
+  return (
+    <div className="min-h-[100dvh] bg-black flex flex-col">
+      {/* Hero skeleton */}
+      <div className="w-full h-[300px] bg-[#111] animate-pulse" />
+      {/* Content skeleton */}
+      <div className="px-5 pt-5 flex flex-col gap-4">
+        <div className="flex justify-between">
+          <div className="w-28 h-8 rounded-full bg-[#1A1A1A] animate-pulse" />
+          <div className="w-20 h-8 rounded-lg bg-[#1A1A1A] animate-pulse" />
+        </div>
+        <div className="flex gap-4 py-2">
+          <div className="w-16 h-4 rounded bg-[#1A1A1A] animate-pulse" />
+          <div className="w-20 h-4 rounded bg-[#1A1A1A] animate-pulse" />
+        </div>
+        <div className="flex gap-3">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="flex-1 h-20 rounded-[14px] bg-[#1A1A1A] animate-pulse" />
+          ))}
+        </div>
+        <div className="h-px bg-[#111]" />
+        <div className="space-y-2">
+          <div className="w-32 h-5 rounded bg-[#1A1A1A] animate-pulse" />
+          <div className="h-20 rounded-[16px] bg-[#1A1A1A] animate-pulse" />
+        </div>
+        <div className="space-y-2">
+          <div className="w-40 h-5 rounded bg-[#1A1A1A] animate-pulse" />
+          <div className="h-16 rounded bg-[#1A1A1A] animate-pulse" />
+          <div className="h-12 rounded bg-[#1A1A1A] animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Section heading ────────────────────────────────────────────────────── */
 function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="text-white font-bold text-[17px] mb-3 tracking-tight">{children}</h2>
-  );
+  return <h2 className="text-white font-bold text-[17px] mb-3 tracking-tight">{children}</h2>;
 }
 
 /* ─── Client logo (initials) ─────────────────────────────────────────────── */
 function ClientLogo({ name }: { name: string }) {
-  const initials = name
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
+  const initials = name.split(' ').slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
   return (
     <div
-      aria-hidden="true"
+      aria-hidden
       className="w-[52px] h-[52px] rounded-[14px] bg-[#111] border border-[#2A2A2A] flex items-center justify-center flex-shrink-0"
     >
       <span className="text-primary font-bold text-[17px] tracking-tight">{initials}</span>
@@ -61,24 +81,12 @@ function ClientLogo({ name }: { name: string }) {
 }
 
 /* ─── Stat tile ──────────────────────────────────────────────────────────── */
-function StatTile({
-  icon,
-  label,
-  value,
-  sub,
-  accent,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  sub?: string;
-  accent?: boolean;
+function StatTile({ icon, label, value, sub, accent }: {
+  icon: React.ReactNode; label: string; value: string; sub?: string; accent?: boolean;
 }) {
   return (
     <div className="flex-1 bg-[#0E0E0E] border border-[#1E1E1E] rounded-[14px] px-3 py-3.5 flex flex-col gap-1.5">
-      <div className="w-7 h-7 rounded-[8px] bg-[#161616] flex items-center justify-center">
-        {icon}
-      </div>
+      <div className="w-7 h-7 rounded-[8px] bg-[#161616] flex items-center justify-center">{icon}</div>
       <p className="text-[#555] text-[10px] font-semibold uppercase tracking-wider">{label}</p>
       <p className={`font-bold text-[15px] leading-tight ${accent ? 'text-primary' : 'text-white'}`}>{value}</p>
       {sub && <p className="text-[#555] text-[11px]">{sub}</p>}
@@ -88,40 +96,69 @@ function StatTile({
 
 /* ─── ShiftDetailScreen ──────────────────────────────────────────────────── */
 export function ShiftDetailScreen() {
-  const { id } = useParams<{ id: string }>();
+  const { id }     = useParams<{ id: string }>();
   const [, navigate] = useLocation();
-  const store = useFeedStore();
+  const store      = useFeedStore();
+  const { data: shift, isLoading, error } = useShiftById(id);
 
-  const shift = MOCK_SHIFTS.find((s) => s.id === id);
+  if (isLoading) return <ShiftDetailSkeleton />;
 
-  if (!shift) {
+  // Network / query error — not the same as a missing shift
+  if (error) {
     return (
-      <div className="min-h-[100dvh] bg-black flex items-center justify-center">
-        <p className="text-[#666] text-[15px]">Shift not found.</p>
+      <div className="min-h-[100dvh] bg-black flex flex-col items-center justify-center px-6 gap-4 text-center">
+        <div className="w-16 h-16 rounded-full bg-[#0E0E0E] border border-[#1E1E1E] flex items-center justify-center mb-2">
+          <span className="text-[#555] text-[24px]">⚠</span>
+        </div>
+        <p className="text-[#666] text-[15px] font-medium">Couldn't load this shift</p>
+        <p className="text-[#333] text-[12px]">Check your connection and try again.</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-2 text-primary font-semibold text-[14px]"
+        >
+          Retry
+        </button>
+        <button
+          type="button"
+          onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/jobs'); }}
+          className="text-[#444] text-[13px]"
+        >
+          ← Go back
+        </button>
       </div>
     );
   }
 
-  // Hoist id so closures always see a non-nullable string
-  const shiftId    = shift.id;
-  const saved      = store.isSaved(shiftId);
-  const applied    = store.isApplied(shiftId);
-  const accepted   = store.isAccepted(shiftId);
-  const clockedIn  = store.isClockedIn(shiftId);
-  const spotsLow   = shift.spotsAvailable < 3;
-  const duration   = calcDuration(shift.startTime, shift.endTime);
-  const spotsFilled = shift.spotsTotal - shift.spotsAvailable;
-  const fillPct    = Math.round((spotsFilled / shift.spotsTotal) * 100);
+  // Query succeeded but no row returned — the shift doesn't exist
+  if (!shift) {
+    return (
+      <div className="min-h-[100dvh] bg-black flex flex-col items-center justify-center px-6 gap-4 text-center">
+        <p className="text-[#555] text-[15px]">This shift is no longer available.</p>
+        <button
+          type="button"
+          onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/jobs'); }}
+          className="text-primary font-semibold text-[14px]"
+        >
+          ← Browse shifts
+        </button>
+      </div>
+    );
+  }
 
-  /* CTA state */
+  const shiftId     = shift.id;
+  const saved       = store.isSaved(shiftId);
+  const applied     = store.isApplied(shiftId);
+  const accepted    = store.isAccepted(shiftId);
+  const clockedIn   = store.isClockedIn(shiftId);
+  const spotsLow    = shift.spotsAvailable < 3;
+  const duration    = calcDuration(shift.startTime, shift.endTime);
+  const spotsFilled = shift.spotsTotal - shift.spotsAvailable;
+  const fillPct     = Math.round((spotsFilled / Math.max(shift.spotsTotal, 1)) * 100);
+
   type CtaState = 'apply' | 'pending' | 'clock-in' | 'clocked-in';
   const ctaState: CtaState = clockedIn
-    ? 'clocked-in'
-    : accepted
-    ? 'clock-in'
-    : applied
-    ? 'pending'
-    : 'apply';
+    ? 'clocked-in' : accepted ? 'clock-in' : applied ? 'pending' : 'apply';
 
   function handleCta() {
     if (ctaState === 'apply')    markApplied(shiftId);
@@ -134,7 +171,7 @@ export function ShiftDetailScreen() {
       {/* ── Scrollable body ── */}
       <div className="flex-1 overflow-y-auto pb-[104px]">
 
-        {/* ── HERO PHOTO ── */}
+        {/* ── Hero photo ── */}
         <div className="relative w-full h-[300px] flex-shrink-0 overflow-hidden">
           <img
             src={shift.coverImage}
@@ -143,10 +180,8 @@ export function ShiftDetailScreen() {
             decoding="async"
             className="w-full h-full object-cover"
           />
-          {/* Gradient */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/10 to-black" />
 
-          {/* Back */}
           <button
             type="button"
             aria-label="Go back"
@@ -159,7 +194,6 @@ export function ShiftDetailScreen() {
             <ChevronLeft size={20} aria-hidden className="text-white" />
           </button>
 
-          {/* Save */}
           <button
             type="button"
             aria-label={saved ? 'Remove from saved' : 'Save this shift'}
@@ -181,7 +215,7 @@ export function ShiftDetailScreen() {
           </button>
         </div>
 
-        {/* ── JOB TYPE + PAY ── */}
+        {/* ── Job type + pay ── */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#111]">
           <span className="bg-primary text-black text-[12px] font-bold px-4 py-1.5 rounded-full uppercase tracking-wide">
             {shift.jobType}
@@ -192,7 +226,7 @@ export function ShiftDetailScreen() {
           </div>
         </div>
 
-        {/* ── CLIENT ── */}
+        {/* ── Client ── */}
         <div className="flex items-center gap-4 px-5 py-4 border-b border-[#111]">
           <ClientLogo name={shift.companyName} />
           <div className="flex-1 min-w-0">
@@ -204,28 +238,14 @@ export function ShiftDetailScreen() {
           </div>
         </div>
 
-        {/* ── DATE / TIME / DURATION tiles ── */}
+        {/* ── Schedule tiles ── */}
         <div className="flex gap-3 px-5 pt-4 pb-5" role="group" aria-label="Shift schedule">
-          <StatTile
-            icon={<Calendar size={14} aria-hidden className="text-primary" />}
-            label="Date"
-            value={shift.date}
-          />
-          <StatTile
-            icon={<Clock size={14} aria-hidden className="text-primary" />}
-            label="Time"
-            value={shift.startTime}
-            sub={`Ends ${shift.endTime}`}
-          />
-          <StatTile
-            icon={<Timer size={14} aria-hidden className="text-primary" />}
-            label="Duration"
-            value={duration}
-            accent
-          />
+          <StatTile icon={<Calendar size={14} aria-hidden className="text-primary" />} label="Date" value={shift.date} />
+          <StatTile icon={<Clock size={14} aria-hidden className="text-primary" />} label="Time" value={shift.startTime} sub={`Ends ${shift.endTime}`} />
+          <StatTile icon={<Timer size={14} aria-hidden className="text-primary" />} label="Duration" value={duration} accent />
         </div>
 
-        {/* ── DRESS CODE ── */}
+        {/* ── Dress code ── */}
         <div className="px-5 pb-6">
           <SectionHeading>
             <span className="flex items-center gap-2">
@@ -233,68 +253,72 @@ export function ShiftDetailScreen() {
               Dress Code
             </span>
           </SectionHeading>
-          <div
-            className="border border-[#323232] rounded-[16px] p-4"
-            role="list"
-            aria-label="Dress code items"
-          >
-            <div className="flex flex-wrap gap-2">
-              {shift.dressCodeItems.map((item) => (
-                <div
-                  key={item}
-                  role="listitem"
-                  className="bg-[#141414] border border-[#252525] rounded-full px-3.5 py-1.5"
-                >
-                  <span className="text-white text-[13px] font-medium">{item}</span>
-                </div>
+          <div className="border border-[#323232] rounded-[16px] p-4" role="list" aria-label="Dress code items">
+            {shift.dressCodeItems.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {shift.dressCodeItems.map((item) => (
+                  <div key={item} role="listitem" className="bg-[#141414] border border-[#252525] rounded-full px-3.5 py-1.5">
+                    <span className="text-white text-[13px] font-medium">{item}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[#888] text-[14px] leading-relaxed">{shift.dressCode || 'See shift details for dress code requirements.'}</p>
+            )}
+          </div>
+        </div>
+
+        {/* ── Description ── */}
+        {shift.description && (
+          <div className="px-5 pb-6">
+            <SectionHeading>About this Shift</SectionHeading>
+            <p className="text-[#888] text-[14px] leading-[1.7]">{shift.description}</p>
+          </div>
+        )}
+
+        {/* ── Requirements ── */}
+        {shift.requirements.length > 0 && (
+          <div className="px-5 pb-6">
+            <SectionHeading>Requirements</SectionHeading>
+            <ul className="flex flex-col gap-2.5" aria-label="Shift requirements">
+              {shift.requirements.map((req) => (
+                <li key={req} className="flex items-center gap-3">
+                  <CheckCircle2 size={15} aria-hidden className="text-primary flex-shrink-0" />
+                  <span className="text-[#888] text-[14px]">{req}</span>
+                </li>
               ))}
+            </ul>
+          </div>
+        )}
+
+        {/* ── Point of contact ── */}
+        {shift.pointOfContact && (
+          <div className="px-5 pb-6">
+            <SectionHeading>Point of Contact</SectionHeading>
+            <div className="bg-[#0E0E0E] border border-[#1E1E1E] rounded-[16px] px-4 py-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-[#161616] border border-[#2A2A2A] flex items-center justify-center flex-shrink-0">
+                <span className="text-primary font-bold text-[14px]">
+                  {shift.pointOfContact.split(' ').map((n) => n[0]).join('')}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-semibold text-[14px]">{shift.pointOfContact}</p>
+                <p className="text-[#666] text-[12px] mt-0.5">{shift.contactPhone}</p>
+              </div>
+              {shift.contactPhone && (
+                <a
+                  href={`tel:${shift.contactPhone}`}
+                  aria-label={`Call ${shift.pointOfContact}`}
+                  className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0"
+                >
+                  <Phone size={15} aria-hidden className="text-primary" />
+                </a>
+              )}
             </div>
           </div>
-        </div>
+        )}
 
-        {/* ── DESCRIPTION ── */}
-        <div className="px-5 pb-6">
-          <SectionHeading>About this Shift</SectionHeading>
-          <p className="text-[#888] text-[14px] leading-[1.7]">{shift.description}</p>
-        </div>
-
-        {/* ── REQUIREMENTS ── */}
-        <div className="px-5 pb-6">
-          <SectionHeading>Requirements</SectionHeading>
-          <ul className="flex flex-col gap-2.5" aria-label="Shift requirements">
-            {shift.requirements.map((req) => (
-              <li key={req} className="flex items-center gap-3">
-                <CheckCircle2 size={15} aria-hidden className="text-primary flex-shrink-0" />
-                <span className="text-[#888] text-[14px]">{req}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* ── POINT OF CONTACT ── */}
-        <div className="px-5 pb-6">
-          <SectionHeading>Point of Contact</SectionHeading>
-          <div className="bg-[#0E0E0E] border border-[#1E1E1E] rounded-[16px] px-4 py-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-[#161616] border border-[#2A2A2A] flex items-center justify-center flex-shrink-0">
-              <span className="text-primary font-bold text-[14px]">
-                {shift.pointOfContact.split(' ').map((n) => n[0]).join('')}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-white font-semibold text-[14px]">{shift.pointOfContact}</p>
-              <p className="text-[#666] text-[12px] mt-0.5">{shift.contactPhone}</p>
-            </div>
-            <a
-              href={`tel:${shift.contactPhone}`}
-              aria-label={`Call ${shift.pointOfContact}`}
-              className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0"
-            >
-              <Phone size={15} aria-hidden className="text-primary" />
-            </a>
-          </div>
-        </div>
-
-        {/* ── MINI MAP ── */}
+        {/* ── Mini map ── */}
         <div className="px-5 pb-6">
           <SectionHeading>Location</SectionHeading>
           <div className="rounded-[16px] overflow-hidden border border-[#1E1E1E]" style={{ height: 180 }}>
@@ -307,10 +331,7 @@ export function ShiftDetailScreen() {
               backgroundColor="#000000"
               style={{ width: '100%', height: '100%' }}
             >
-              <Marker
-                position={{ lat: shift.lat, lng: shift.lng }}
-                icon={goldPinUrl(true)}
-              />
+              <Marker position={{ lat: shift.lat, lng: shift.lng }} icon={goldPinUrl(true)} />
             </Map>
           </div>
           <div className="flex items-center gap-2 mt-2.5">
@@ -319,7 +340,7 @@ export function ShiftDetailScreen() {
           </div>
         </div>
 
-        {/* ── AI MATCH SCORE ── */}
+        {/* ── AI match score ── */}
         <div className="px-5 pb-6">
           <div className="bg-[#0D0D00] border border-primary/25 rounded-[16px] px-5 py-4 flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center flex-shrink-0">
@@ -343,19 +364,17 @@ export function ShiftDetailScreen() {
           </div>
         </div>
 
-        {/* ── SPOTS REMAINING ── */}
+        {/* ── Spots remaining ── */}
         <div className="px-5 pb-6">
           <div className="flex items-center justify-between mb-3">
             <SectionHeading>Spots Remaining</SectionHeading>
             <div className="flex items-center gap-1.5">
               <Users size={13} aria-hidden className={spotsLow ? 'text-red-400' : 'text-[#555]'} />
               <span className={`text-[13px] font-semibold ${spotsLow ? 'text-red-400' : 'text-[#666]'}`}>
-                {shift.spotsAvailable} of {shift.spotsTotal} left
-                {spotsLow && ' · Filling fast'}
+                {shift.spotsAvailable} of {shift.spotsTotal} left{spotsLow && ' · Filling fast'}
               </span>
             </div>
           </div>
-          {/* Progress bar — shows spots FILLED */}
           <div
             className="h-2 bg-[#1A1A1A] rounded-full overflow-hidden"
             role="progressbar"
@@ -371,7 +390,6 @@ export function ShiftDetailScreen() {
               className={`h-full rounded-full ${spotsLow ? 'bg-red-500' : 'bg-primary'}`}
             />
           </div>
-          {/* Worker avatars row */}
           <div className="flex items-center gap-2 mt-3">
             <div className="flex -space-x-2">
               {Array.from({ length: Math.min(spotsFilled, 4) }).map((_, i) => (
@@ -395,10 +413,8 @@ export function ShiftDetailScreen() {
         </div>
       </div>
 
-      {/* ── FIXED CTA ── */}
+      {/* ── Fixed CTA ── */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] px-5 pb-9 pt-4 bg-gradient-to-t from-black via-black/98 to-transparent z-30">
-
-        {/* Pending sub-label */}
         <AnimatePresence>
           {ctaState === 'pending' && (
             <motion.p
@@ -430,7 +446,6 @@ export function ShiftDetailScreen() {
               <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
               <span className="text-[#666] font-semibold text-[15px]">Application Sent</span>
             </div>
-            {/* Demo tap — simulates client acceptance so Clock In is reachable */}
             <button
               type="button"
               onClick={() => markAccepted(shiftId)}
@@ -449,10 +464,7 @@ export function ShiftDetailScreen() {
             aria-label="Clock in to your shift"
             className="w-full h-[54px] rounded-[14px] bg-primary text-black font-bold text-[16px] tracking-wide flex items-center justify-center gap-2.5"
           >
-            <motion.div
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ repeat: Infinity, duration: 1.6 }}
-            >
+            <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1.6 }}>
               <AlarmClock size={20} aria-hidden />
             </motion.div>
             Clock In

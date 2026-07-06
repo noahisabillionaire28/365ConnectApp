@@ -176,3 +176,47 @@ CREATE TRIGGER trg_on_auth_user_created
 -- ─── Storage buckets (run separately in Supabase Storage UI if needed) ────────
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true) ON CONFLICT DO NOTHING;
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('posts',   'posts',   true) ON CONFLICT DO NOTHING;
+
+-- ============================================================
+-- Phase 2 additions — safe to re-run (IF NOT EXISTS / ON CONFLICT)
+-- Run AFTER the initial schema above is applied.
+-- ============================================================
+
+-- ─── Shifts: extended columns ─────────────────────────────────────────────────
+ALTER TABLE public.shifts
+  ADD COLUMN IF NOT EXISTS lat                  FLOAT8,
+  ADD COLUMN IF NOT EXISTS lng                  FLOAT8,
+  ADD COLUMN IF NOT EXISTS cover_image          TEXT,
+  ADD COLUMN IF NOT EXISTS company_name         TEXT,
+  ADD COLUMN IF NOT EXISTS job_types            TEXT[]   NOT NULL DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS requirements         TEXT[]   NOT NULL DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS dress_code           TEXT,
+  ADD COLUMN IF NOT EXISTS dress_code_items     TEXT[]   NOT NULL DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS point_of_contact     TEXT,
+  ADD COLUMN IF NOT EXISTS contact_phone        TEXT,
+  ADD COLUMN IF NOT EXISTS pay_period           TEXT     NOT NULL DEFAULT 'hr',
+  ADD COLUMN IF NOT EXISTS spots_filled         INT      NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS ai_match_pct         INT      NOT NULL DEFAULT 85,
+  ADD COLUMN IF NOT EXISTS unit_info            TEXT,
+  ADD COLUMN IF NOT EXISTS parking_notes        TEXT,
+  ADD COLUMN IF NOT EXISTS special_instructions TEXT,
+  ADD COLUMN IF NOT EXISTS repeat_type          TEXT     NOT NULL DEFAULT 'once';
+
+-- ─── Follows ──────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.follows (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  follower_id  UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  following_id UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (follower_id, following_id)
+);
+
+ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "follows_select" ON public.follows;
+DROP POLICY IF EXISTS "follows_insert" ON public.follows;
+DROP POLICY IF EXISTS "follows_delete" ON public.follows;
+
+CREATE POLICY "follows_select" ON public.follows FOR SELECT USING (true);
+CREATE POLICY "follows_insert" ON public.follows FOR INSERT WITH CHECK (auth.uid() = follower_id);
+CREATE POLICY "follows_delete" ON public.follows FOR DELETE USING (auth.uid() = follower_id);

@@ -1,2 +1,3 @@
 - [Worker profile setup flow](worker-profile-setup.md) — 6-step onboarding at /profile-setup; completes to /home after DB save
 - [Supabase integration](supabase-integration.md) — credentials in Replit Secrets; schema in supabase/schema.sql; must run SQL manually in dashboard
+- [Shifts data layer](shifts-data-layer.md) — ShiftRow→MockShift adapter pattern; Phase 2 SQL required in Supabase before seed/data works

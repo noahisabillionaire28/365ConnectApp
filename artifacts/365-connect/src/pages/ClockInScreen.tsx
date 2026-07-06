@@ -5,8 +5,9 @@ import {
   MapPin, CheckCircle2, XCircle, Coffee,
   Square, Star, ChevronLeft, AlarmClock,
 } from 'lucide-react';
-import { MOCK_SHIFTS, type MockShift } from '@/data/mockFeed';
+import type { MockShift } from '@/data/mockFeed';
 import { markClockedIn } from '@/store/feedStore';
+import { useShiftById } from '@/hooks/useShifts';
 
 /* ──────────────────────────────────────────────────────────────────────────
    Helpers
@@ -751,7 +752,7 @@ export function ClockInScreen() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
 
-  const shift = MOCK_SHIFTS.find((s) => s.id === id);
+  const { data: shift, isLoading, error } = useShiftById(id);
 
   const [phase,        setPhase]       = useState<Phase>('geo-check');
   const [confirmEnd,   setConfirmEnd]  = useState(false);
@@ -813,10 +814,25 @@ export function ClockInScreen() {
   const serviceFee  = grossPay * 0.08;
   const netPay      = grossPay - serviceFee;
 
-  if (!shift) {
+  if (isLoading) {
     return (
       <div className="min-h-[100dvh] bg-black flex items-center justify-center">
-        <p className="text-[#555] text-[15px]">Shift not found.</p>
+        <div className="w-8 h-8 rounded-full border-2 border-[#222] border-t-primary animate-spin" role="status" aria-label="Loading shift" />
+      </div>
+    );
+  }
+
+  if (error || !shift) {
+    return (
+      <div className="min-h-[100dvh] bg-black flex flex-col items-center justify-center gap-4">
+        <p className="text-[#555] text-[15px]">{error ? 'Couldn\'t load this shift.' : 'Shift not found.'}</p>
+        <button
+          type="button"
+          onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/jobs'); }}
+          className="text-primary font-semibold text-[14px]"
+        >
+          ← Go back
+        </button>
       </div>
     );
   }

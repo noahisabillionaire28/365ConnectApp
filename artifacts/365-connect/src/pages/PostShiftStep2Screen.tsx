@@ -1,15 +1,10 @@
-import { Map, Marker, useMapsLibrary } from '@vis.gl/react-google-maps';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
-import {
-  ChevronLeft, Calendar, Clock, MapPin, DollarSign,
-  Users, Shirt, FileText, User, Phone, Plus, Minus,
-} from 'lucide-react';
-import { getDraft, setDraft } from '@/store/postShiftStore';
-import { DARK_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
+import { ChevronLeft, Calendar, Clock, Repeat2, Plus, Minus } from 'lucide-react';
+import { getDraft, setDraft, durationLabel } from '@/store/postShiftStore';
 
-/* ─── Step indicator ─────────────────────────────────────────────────────── */
+/* ─── Step bar ───────────────────────────────────────────────────────────── */
 function StepBar({ current, total }: { current: number; total: number }) {
   return (
     <div
@@ -29,7 +24,7 @@ function StepBar({ current, total }: { current: number; total: number }) {
   );
 }
 
-/* ─── Form field components ──────────────────────────────────────────────── */
+/* ─── Shared form primitives ─────────────────────────────────────────────── */
 function FormLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-[#555] text-[11px] font-semibold uppercase tracking-wider mb-1.5">
@@ -62,104 +57,74 @@ const INPUT_CLS = `
   focus:outline-none focus:border-primary/50 focus:bg-[#161616] transition-colors
 `;
 
-const TEXTAREA_CLS = `
-  w-full bg-[#141414] border border-[#252525] rounded-[10px] px-3 py-3
-  text-white text-[14px] font-medium placeholder:text-[#3A3A3A]
-  focus:outline-none focus:border-primary/50 focus:bg-[#161616] transition-colors
-  resize-none leading-relaxed
-`;
-
-/* ─── Miami Beach default coords ─────────────────────────────────────────── */
-const DEFAULT_COORDS = { lat: 25.7825, lng: -80.1298 };
-
-/* ─── Places Autocomplete input ──────────────────────────────────────────── */
-function LocationAutocomplete({
-  value,
-  onChange,
-  onPlacePicked,
-  error,
+/* ─── Worker count stepper per job type ──────────────────────────────────── */
+function WorkerStepper({
+  label,
+  count,
+  onIncrement,
+  onDecrement,
 }: {
-  value: string;
-  onChange: (v: string) => void;
-  onPlacePicked: (coords: { lat: number; lng: number }) => void;
-  error?: string;
+  label: string;
+  count: number;
+  onIncrement: () => void;
+  onDecrement: () => void;
 }) {
-  const placesLib = useMapsLibrary('places');
-  const inputRef  = useRef<HTMLInputElement>(null);
-
-  // Attach Google Places Autocomplete once library is loaded
-  useEffect(() => {
-    if (!placesLib || !inputRef.current) return;
-
-    const ac = new placesLib.Autocomplete(inputRef.current, {
-      types: ['establishment', 'geocode'],
-      componentRestrictions: { country: 'us' },
-      fields: ['name', 'formatted_address', 'geometry'],
-    });
-
-    const listener = ac.addListener('place_changed', () => {
-      const place = ac.getPlace();
-      if (!place) return;
-
-      // Compose display string: "Venue Name, Full Address"
-      const display = place.name && place.formatted_address
-        ? `${place.name}, ${place.formatted_address}`
-        : place.formatted_address ?? place.name ?? '';
-      onChange(display);
-
-      // Update map pin if geometry is available
-      if (place.geometry?.location) {
-        onPlacePicked({
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng(),
-        });
-      }
-    });
-
-    return () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).google?.maps?.event?.removeListener(listener);
-    };
-  }, [placesLib]);
-
   return (
-    <div>
-      <input
-        ref={inputRef}
-        type="text"
-        defaultValue={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="e.g. 1 Hotel South Beach, Miami FL"
-        aria-label="Shift location"
-        aria-invalid={!!error}
-        aria-autocomplete="list"
-        className={INPUT_CLS + (error ? ' border-red-500/60' : '')}
-      />
-      {error && <p className="text-red-400 text-[11px] mt-1">{error}</p>}
+    <div className="flex items-center justify-between py-1">
+      <span className="text-white text-[14px] font-medium">{label}</span>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          aria-label={`Decrease ${label} count`}
+          onClick={onDecrement}
+          className="w-8 h-8 rounded-[8px] bg-[#141414] border border-[#252525] flex items-center justify-center active:border-primary/40"
+        >
+          <Minus size={13} aria-hidden className="text-[#888]" />
+        </button>
+        <span className="text-white font-bold text-[17px] w-6 text-center tabular-nums" aria-live="polite">
+          {count}
+        </span>
+        <button
+          type="button"
+          aria-label={`Increase ${label} count`}
+          onClick={onIncrement}
+          className="w-8 h-8 rounded-[8px] bg-[#141414] border border-[#252525] flex items-center justify-center active:border-primary/40"
+        >
+          <Plus size={13} aria-hidden className="text-primary" />
+        </button>
+      </div>
     </div>
   );
 }
 
+/* ─── Repeat option ──────────────────────────────────────────────────────── */
+type RepeatType = 'once' | 'weekly' | 'custom';
+const REPEAT_OPTIONS: { key: RepeatType; label: string }[] = [
+  { key: 'once',   label: 'One-time' },
+  { key: 'weekly', label: 'Weekly'   },
+  { key: 'custom', label: 'Custom'   },
+];
+
 /* ─── PostShiftStep2Screen ───────────────────────────────────────────────── */
 export function PostShiftStep2Screen() {
   const [, navigate] = useLocation();
-  const initial = getDraft();
+  const initial      = getDraft();
 
-  const [date,           setDate]           = useState(initial.date);
-  const [startTime,      setStartTime]      = useState(initial.startTime || '18:00');
-  const [endTime,        setEndTime]        = useState(initial.endTime   || '23:00');
-  const [location,       setLocation]       = useState(initial.location  || 'Miami Beach, FL');
-  const [mapCoords,      setMapCoords]      = useState(DEFAULT_COORDS);
-  // String state avoids browser number-input leading-zero bug ("050" instead of "50")
-  const [payRateStr,     setPayRateStr]     = useState(String(initial.payRate ?? 35));
-  const [workersNeeded,  setWorkersNeeded]  = useState(initial.workersNeeded || 1);
-  const [dressCode,      setDressCode]      = useState(initial.dressCode);
-  const [description,    setDescription]    = useState(initial.description);
-  const [contactName,    setContactName]    = useState(initial.contactName);
-  const [contactPhone,   setContactPhone]   = useState(initial.contactPhone);
-  const [errors,         setErrors]         = useState<Record<string, string>>({});
+  const [date,         setDate]         = useState(initial.date);
+  const [startTime,    setStartTime]    = useState(initial.startTime || '18:00');
+  const [endTime,      setEndTime]      = useState(initial.endTime   || '23:00');
+  const [repeat,       setRepeat]       = useState<RepeatType>(initial.repeat || 'once');
+  const [workerCounts, setWorkerCounts] = useState<Record<string, number>>(
+    // Ensure every selected job type has a count entry
+    () => {
+      const wc = { ...initial.workerCounts };
+      for (const jt of initial.jobTypes) { if (!wc[jt]) wc[jt] = 1; }
+      return wc;
+    }
+  );
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Pre-fill today's date if empty
+  // Default to today if no date set
   useEffect(() => {
     if (!date) {
       const today = new Date().toISOString().split('T')[0];
@@ -167,23 +132,27 @@ export function PostShiftStep2Screen() {
     }
   }, []);
 
+  function updateCount(type: string, delta: number) {
+    setWorkerCounts((prev) => ({
+      ...prev,
+      [type]: Math.max(1, Math.min(50, (prev[type] ?? 1) + delta)),
+    }));
+  }
+
   function validate() {
     const e: Record<string, string> = {};
-    if (!date)            e.date        = 'Date is required';
-    if (!location.trim()) e.location    = 'Location is required';
-    const payNum = Number(payRateStr);
-    if (!payRateStr || isNaN(payNum) || payNum < 1)   e.payRate = 'Enter a valid pay rate';
-    else if (payNum > 500)                            e.payRate = 'Pay rate cannot exceed $500/hr';
-    if (!contactName.trim()) e.contactName = 'Contact name is required';
+    if (!date) e.date = 'Date is required';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
-  function handlePost() {
+  function handleContinue() {
     if (!validate()) return;
-    setDraft({ date, startTime, endTime, location, payRate: Number(payRateStr), workersNeeded, dressCode, description, contactName, contactPhone });
+    setDraft({ date, startTime, endTime, repeat, workerCounts });
     navigate('/post-shift/step3');
   }
+
+  const duration = durationLabel(startTime, endTime);
 
   return (
     <div className="min-h-[100dvh] bg-black flex flex-col">
@@ -193,19 +162,17 @@ export function PostShiftStep2Screen() {
         <div className="flex items-center gap-3 mb-4">
           <button
             type="button"
-            aria-label="Back to template picker"
+            aria-label="Back to job types"
             onClick={() => navigate('/post-shift/step1')}
             className="w-9 h-9 rounded-full bg-[#111] border border-[#222] flex items-center justify-center flex-shrink-0"
           >
             <ChevronLeft size={18} aria-hidden className="text-[#888]" />
           </button>
-          <div className="flex-1"><StepBar current={2} total={3} /></div>
-          <span className="text-[#555] text-[12px] font-medium flex-shrink-0">2 of 3</span>
+          <div className="flex-1"><StepBar current={2} total={5} /></div>
+          <span className="text-[#555] text-[12px] font-medium flex-shrink-0">2 of 5</span>
         </div>
-        <h1 className="text-white font-bold text-[22px] tracking-tight">Shift Details</h1>
-        <p className="text-[#555] text-[13px] mt-1">
-          Pre-filled from <span className="text-primary font-semibold">{initial.jobType}</span> template — edit as needed
-        </p>
+        <h1 className="text-white font-bold text-[22px] tracking-tight">When is it?</h1>
+        <p className="text-[#555] text-[13px] mt-1">Set the date, time, and staffing per role</p>
       </div>
 
       {/* Scrollable form */}
@@ -226,6 +193,7 @@ export function PostShiftStep2Screen() {
             />
             {errors.date && <p className="text-red-400 text-[11px] mt-1">{errors.date}</p>}
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <FormLabel>Start time</FormLabel>
@@ -250,150 +218,70 @@ export function PostShiftStep2Screen() {
               />
             </div>
           </div>
+
+          {/* Duration badge */}
+          <div className="flex items-center gap-2">
+            <Clock size={13} aria-hidden className="text-[#555]" />
+            <span className="text-[#666] text-[13px]">Duration:</span>
+            <span className="text-primary font-bold text-[14px]" aria-live="polite">
+              {duration}
+            </span>
+          </div>
         </FormSection>
 
-        {/* Location */}
-        <FormSection icon={<MapPin size={13} aria-hidden className="text-primary" />} title="Location">
-          <div>
-            <FormLabel>Address or venue name</FormLabel>
-            <LocationAutocomplete
-              value={location}
-              onChange={(v) => { setLocation(v); setErrors((p) => ({ ...p, location: '' })); }}
-              onPlacePicked={setMapCoords}
-              error={errors.location}
-            />
-          </div>
-          {/* Live map preview — updates when a place is selected */}
-          <div>
-            <FormLabel>Map preview</FormLabel>
-            <div className="rounded-[12px] overflow-hidden border border-[#252525]" style={{ height: 140 }}>
-              <Map
-                center={mapCoords}
-                zoom={14}
-                styles={DARK_MAP_STYLES}
-                disableDefaultUI
-                gestureHandling="none"
-                backgroundColor="#000000"
-                style={{ width: '100%', height: '100%' }}
+        {/* Repeat */}
+        <FormSection icon={<Repeat2 size={13} aria-hidden className="text-primary" />} title="Repeat">
+          <div
+            className="flex items-center rounded-[10px] overflow-hidden border border-[#252525]"
+            role="radiogroup"
+            aria-label="Repeat frequency"
+          >
+            {REPEAT_OPTIONS.map((opt, idx) => (
+              <button
+                key={opt.key}
+                type="button"
+                role="radio"
+                aria-checked={repeat === opt.key}
+                onClick={() => setRepeat(opt.key)}
+                className={`
+                  flex-1 h-[40px] text-[13px] font-semibold transition-all duration-150
+                  ${idx > 0 ? 'border-l border-[#252525]' : ''}
+                  ${repeat === opt.key
+                    ? 'bg-primary text-black'
+                    : 'bg-[#141414] text-[#666] hover:text-white'}
+                `}
               >
-                <Marker
-                  position={mapCoords}
-                  icon={goldPinUrl(false)}
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </FormSection>
+
+        {/* Workers per role */}
+        <FormSection icon={<Plus size={13} aria-hidden className="text-primary" />} title="Workers Per Role">
+          {initial.jobTypes.length === 0 ? (
+            <p className="text-[#444] text-[13px]">No job types selected — go back to Step 1.</p>
+          ) : (
+            <div className="flex flex-col divide-y divide-[#141414]" role="group" aria-label="Worker counts per role">
+              {initial.jobTypes.map((jt) => (
+                <WorkerStepper
+                  key={jt}
+                  label={jt}
+                  count={workerCounts[jt] ?? 1}
+                  onIncrement={() => updateCount(jt, 1)}
+                  onDecrement={() => updateCount(jt, -1)}
                 />
-              </Map>
+              ))}
             </div>
-          </div>
-        </FormSection>
-
-        {/* Pay & Workers */}
-        <FormSection icon={<DollarSign size={13} aria-hidden className="text-primary" />} title="Compensation & Headcount">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <FormLabel>Pay rate ($/hr)</FormLabel>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-bold text-[15px]">$</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={payRateStr}
-                  onChange={(e) => {
-                    const digits = e.target.value.replace(/[^0-9]/g, '');
-                    const clean  = digits.replace(/^0+(\d)/, '$1');
-                    setPayRateStr(clean);
-                    setErrors((p) => ({ ...p, payRate: '' }));
-                  }}
-                  placeholder="35"
-                  aria-label="Pay rate per hour"
-                  aria-invalid={!!errors.payRate}
-                  className={INPUT_CLS + ' pl-7' + (errors.payRate ? ' border-red-500/60' : '')}
-                />
-              </div>
-              {errors.payRate && <p className="text-red-400 text-[11px] mt-1">{errors.payRate}</p>}
+          )}
+          {initial.jobTypes.length > 0 && (
+            <div className="flex items-center justify-between pt-1 border-t border-[#141414]">
+              <span className="text-[#555] text-[12px] font-semibold uppercase tracking-wider">Total workers</span>
+              <span className="text-primary font-bold text-[16px]">
+                {Object.values(workerCounts).reduce((a, b) => a + b, 0)}
+              </span>
             </div>
-            <div>
-              <FormLabel>Workers needed</FormLabel>
-              <div className="flex items-center gap-2 h-[44px]">
-                <button
-                  type="button"
-                  aria-label="Decrease workers needed"
-                  onClick={() => setWorkersNeeded((n) => Math.max(1, n - 1))}
-                  className="w-9 h-9 rounded-[9px] bg-[#141414] border border-[#252525] flex items-center justify-center flex-shrink-0 active:border-primary/40"
-                >
-                  <Minus size={14} aria-hidden className="text-[#888]" />
-                </button>
-                <span className="flex-1 text-center text-white font-bold text-[18px]">{workersNeeded}</span>
-                <button
-                  type="button"
-                  aria-label="Increase workers needed"
-                  onClick={() => setWorkersNeeded((n) => Math.min(50, n + 1))}
-                  className="w-9 h-9 rounded-[9px] bg-[#141414] border border-[#252525] flex items-center justify-center flex-shrink-0 active:border-primary/40"
-                >
-                  <Plus size={14} aria-hidden className="text-primary" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </FormSection>
-
-        {/* Dress code */}
-        <FormSection icon={<Shirt size={13} aria-hidden className="text-primary" />} title="Dress Code">
-          <div>
-            <FormLabel>Dress code requirements</FormLabel>
-            <textarea
-              value={dressCode}
-              onChange={(e) => setDressCode(e.target.value)}
-              placeholder="Describe attire requirements…"
-              aria-label="Dress code"
-              rows={3}
-              className={TEXTAREA_CLS}
-            />
-          </div>
-        </FormSection>
-
-        {/* Description */}
-        <FormSection icon={<FileText size={13} aria-hidden className="text-primary" />} title="Shift Description">
-          <div>
-            <FormLabel>Tell workers about this shift</FormLabel>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe the event, expectations, and any special requirements…"
-              aria-label="Shift description"
-              rows={5}
-              className={TEXTAREA_CLS}
-            />
-          </div>
-        </FormSection>
-
-        {/* Point of contact */}
-        <FormSection icon={<User size={13} aria-hidden className="text-primary" />} title="Point of Contact">
-          <div>
-            <FormLabel>Full name</FormLabel>
-            <input
-              type="text"
-              value={contactName}
-              onChange={(e) => { setContactName(e.target.value); setErrors((p) => ({ ...p, contactName: '' })); }}
-              placeholder="e.g. Samantha Cruz"
-              aria-label="Contact name"
-              aria-invalid={!!errors.contactName}
-              className={INPUT_CLS + (errors.contactName ? ' border-red-500/60' : '')}
-            />
-            {errors.contactName && <p className="text-red-400 text-[11px] mt-1">{errors.contactName}</p>}
-          </div>
-          <div>
-            <FormLabel>Phone number</FormLabel>
-            <div className="relative">
-              <Phone size={14} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-[#444]" />
-              <input
-                type="tel"
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
-                placeholder="(305) 555-0100"
-                aria-label="Contact phone number"
-                className={INPUT_CLS + ' pl-9'}
-              />
-            </div>
-          </div>
+          )}
         </FormSection>
       </div>
 
@@ -402,11 +290,11 @@ export function PostShiftStep2Screen() {
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
-          onClick={handlePost}
-          aria-label="Post shift and preview matches"
-          className="w-full h-[54px] rounded-[14px] bg-primary text-black font-bold text-[16px] tracking-wide"
+          onClick={handleContinue}
+          aria-label="Continue to location"
+          className="w-full h-[54px] rounded-[14px] bg-primary text-black font-bold text-[16px]"
         >
-          Post Shift &amp; Preview Matches →
+          Continue
         </motion.button>
       </div>
     </div>

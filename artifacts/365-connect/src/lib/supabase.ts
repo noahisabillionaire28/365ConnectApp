@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import type { MockShift } from '@/data/mockFeed';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseUrl     = import.meta.env.VITE_SUPABASE_URL     as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -11,16 +12,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(
-  supabaseUrl ?? 'https://placeholder.supabase.co',
+  supabaseUrl     ?? 'https://placeholder.supabase.co',
   supabaseAnonKey ?? 'placeholder-anon-key'
 );
 
-// ─── Typed table row shapes ────────────────────────────────────────────────────
+// ─── Typed row shapes (match DB schema exactly) ───────────────────────────────
 
 export type UserRow = {
   id: string;
   email: string;
-  role: 'worker' | 'client';
+  role: 'worker' | 'client' | 'admin';
   username: string | null;
   photo_url: string | null;
   bio: string | null;
@@ -30,22 +31,38 @@ export type UserRow = {
   created_at: string;
 };
 
+/** Matches the actual `shifts` table after Phase 2 additions */
 export type ShiftRow = {
   id: string;
   client_id: string;
   title: string;
-  job_type: string;
   description: string | null;
-  date: string;
-  start_time: string;
-  end_time: string;
-  pay_rate: number | null;
   location: string | null;
-  dress_code: string | null;
-  point_of_contact: string | null;
-  status: 'open' | 'filled' | 'completed' | 'cancelled';
-  spots_available: number;
+  job_type: string;
+  job_types: string[];
+  hourly_rate: number | null;
+  pay_period: string;
+  start_time: string;       // ISO timestamptz from DB
+  end_time: string;         // ISO timestamptz from DB
+  spots: number;            // total slots posted
+  spots_filled: number;
+  status: 'open' | 'filled' | 'cancelled' | 'completed';
   created_at: string;
+  // Phase 2 extended columns
+  lat: number | null;
+  lng: number | null;
+  cover_image: string | null;
+  company_name: string | null;
+  requirements: string[];
+  dress_code: string | null;
+  dress_code_items: string[];
+  point_of_contact: string | null;
+  contact_phone: string | null;
+  ai_match_pct: number;
+  unit_info: string | null;
+  parking_notes: string | null;
+  special_instructions: string | null;
+  repeat_type: string;
 };
 
 export type ApplicationRow = {
@@ -53,34 +70,127 @@ export type ApplicationRow = {
   shift_id: string;
   worker_id: string;
   status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
-  match_score: number | null;
+  message: string | null;
   created_at: string;
 };
 
 export type MessageRow = {
   id: string;
-  conversation_id: string;
   sender_id: string;
-  text: string | null;
-  image_url: string | null;
-  read_at: string | null;
+  recipient_id: string;
+  body: string;
+  read: boolean;
   created_at: string;
 };
 
 export type ReviewRow = {
   id: string;
   shift_id: string;
-  from_user_id: string;
-  to_user_id: string;
+  reviewer_id: string;
+  reviewee_id: string;
   rating: number;
-  tags: string[];
+  comment: string | null;
   created_at: string;
 };
 
-// ─── Storage helpers ───────────────────────────────────────────────────────────
+export type FollowRow = {
+  id: string;
+  follower_id: string;
+  following_id: string;
+  created_at: string;
+};
+
+// ─── Date / time helpers ──────────────────────────────────────────────────────
+
+/** "9:00 PM" format from an ISO timestamptz string */
+export function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+/** "Tonight" / "Tomorrow" / "Mon Jul 8" from an ISO timestamptz string */
+export function friendlyDate(iso: string): string {
+  const d         = new Date(iso);
+  const today     = new Date();
+  const tomorrow  = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+
+  if (d.toDateString() === today.toDateString())    return 'Tonight';
+  if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+// Fallback cover images by job type
+const COVER_FALLBACKS: Record<string, string> = {
+  'Bartender':        'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=800&auto=format&fit=crop&q=80',
+  'Cocktail Server':  'https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=800&auto=format&fit=crop&q=80',
+  'Server':           'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&auto=format&fit=crop&q=80',
+  'Security':         'https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=800&auto=format&fit=crop&q=80',
+  'Brand Ambassador': 'https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=800&auto=format&fit=crop&q=80',
+  'Event Setup':      'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop&q=80',
+  'Catering Lead':    'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&auto=format&fit=crop&q=80',
+  'Host / Hostess':   'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80',
+  'VIP Server':       'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&auto=format&fit=crop&q=80',
+  'DJ':               'https://images.unsplash.com/photo-1571266028243-e30e3b89e3a0?w=800&auto=format&fit=crop&q=80',
+  default:            'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop&q=80',
+};
+
+// Miami Beach center — used for distance approximation when user location is unavailable
+const MIAMI_BEACH = { lat: 25.7913, lng: -80.145 };
+
+function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R    = 3958.8;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ─── Adapter: ShiftRow (DB) → MockShift (UI) ─────────────────────────────────
+
+export function shiftRowToMockShift(row: ShiftRow): MockShift {
+  const primaryType    = row.job_type || row.job_types?.[0] || 'Event Staff';
+  const lat            = row.lat  ?? MIAMI_BEACH.lat;
+  const lng            = row.lng  ?? MIAMI_BEACH.lng;
+  const spotsAvailable = Math.max(0, (row.spots ?? 1) - (row.spots_filled ?? 0));
+
+  return {
+    id:             row.id,
+    jobType:        primaryType,
+    companyName:    row.company_name    ?? 'Private Client',
+    coverImage:     row.cover_image     ?? COVER_FALLBACKS[primaryType] ?? COVER_FALLBACKS.default,
+    payRate:        Number(row.hourly_rate ?? 0),
+    payPeriod:      (row.pay_period as 'hr' | 'day' | 'event') ?? 'hr',
+    date:           friendlyDate(row.start_time),
+    startTime:      formatTime(row.start_time),
+    endTime:        formatTime(row.end_time),
+    distanceMiles:  Math.round(haversineMiles(MIAMI_BEACH.lat, MIAMI_BEACH.lng, lat, lng) * 10) / 10,
+    spotsAvailable,
+    spotsTotal:     row.spots ?? 1,
+    location:       row.location        ?? 'Miami, FL',
+    aiMatchPct:     row.ai_match_pct    ?? 85,
+    description:    row.description     ?? '',
+    requirements:   row.requirements    ?? [],
+    dressCode:      row.dress_code      ?? '',
+    dressCodeItems: row.dress_code_items ?? [],
+    pointOfContact: row.point_of_contact ?? '',
+    contactPhone:   row.contact_phone   ?? '',
+    lat,
+    lng,
+  };
+}
+
+// ─── Storage helpers ──────────────────────────────────────────────────────────
 
 export async function uploadAvatar(userId: string, file: File): Promise<string | null> {
-  const ext = file.name.split('.').pop() ?? 'jpg';
+  const ext  = file.name.split('.').pop() ?? 'jpg';
   const path = `${userId}/avatar.${ext}`;
   const { error } = await supabase.storage
     .from('avatars')
@@ -93,7 +203,7 @@ export async function uploadAvatar(userId: string, file: File): Promise<string |
 }
 
 export async function uploadPostPhoto(userId: string, file: File): Promise<string | null> {
-  const ext = file.name.split('.').pop() ?? 'jpg';
+  const ext  = file.name.split('.').pop() ?? 'jpg';
   const path = `${userId}/${Date.now()}.${ext}`;
   const { error } = await supabase.storage
     .from('post-photos')
