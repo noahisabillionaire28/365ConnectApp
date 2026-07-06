@@ -1,5 +1,5 @@
 import { APIProvider, Map, Marker, useMap } from '@vis.gl/react-google-maps';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion, useMotionValue, animate, type PanInfo } from 'framer-motion';
 import { Search, SlidersHorizontal, Heart, MapPin, Clock, Users, Sparkles, WifiOff } from 'lucide-react';
@@ -264,29 +264,35 @@ export function JobsScreen() {
     }
   }, []);
 
-  // ── 2. Measure container height so Map only mounts with a real pixel value ──
-  useEffect(() => {
+  // ── 2. Measure container height — useLayoutEffect fires synchronously after
+  //       React commits the DOM, so offsetHeight is the real painted value.
+  //       Reading it here forces a synchronous layout, giving us a non-zero
+  //       height before the first paint and before <Map> can mount at 0px.
+  useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const measure = () => {
-      const h = el.offsetHeight;
-      if (h > 0) setMapHeight(h);
-    };
-    measure(); // immediate read — usually good on desktop
-    const ro = new ResizeObserver(measure);
+    // Synchronous read — forces browser layout, always non-zero after commit
+    const h = el.offsetHeight;
+    if (h > 0) setMapHeight(h);
+    // ResizeObserver keeps the value fresh if the viewport resizes later
+    const ro = new ResizeObserver((entries) => {
+      const rh = entries[0]?.contentRect.height ?? 0;
+      if (rh > 0) setMapHeight(rh);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  // ── 3. 5-second hard fallback — show list-only if tiles never arrive ──
+  // ── 3. 10-second soft fallback — overlay a message if tiles are slow,
+  //       but keep <Map> mounted so it can still finish loading behind it.
   useEffect(() => {
-    if (!API_KEY) return; // skip timer when key is missing; mapFailed=false, fallback shown by !API_KEY check
+    if (!API_KEY) return;
     const t = window.setTimeout(() => {
       if (!tilesLoadedRef.current) {
-        console.warn('[Jobs] Map tiles did not load within 5 s — switching to list-only fallback');
+        console.warn('[Jobs] Map tiles did not load within 10 s — showing overlay (map stays mounted)');
         setMapFailed(true);
       }
-    }, 5000);
+    }, 10000);
     return () => window.clearTimeout(t);
   }, []);
 
@@ -307,36 +313,22 @@ export function JobsScreen() {
   function handleSelectShift(shift: MockShift) { setSelectedId(shift.id); navigate(`/shift/${shift.id}`); }
   function handlePinClick(shift: MockShift)    { setSelectedId(shift.id); }
 
-  // Show map only when key exists and it hasn't timed out
-  const showMap      = !!API_KEY && !mapFailed;
-  const showFallback = !API_KEY || mapFailed;
-
   return (
     // APIProvider wraps the ENTIRE screen — not just the inner map block —
     // so the SDK context is ready before any child tries to useMap().
     <APIProvider apiKey={API_KEY} libraries={['places']}>
       <div ref={containerRef} className="relative h-[100dvh] bg-[#f5f5f5] overflow-hidden">
 
-        {/* ── Map layer ─────────────────────────────────────────────────── */}
-        {showMap && (
+        {/* ── Map layer ─────────────────────────────────────────────────────
+            The map container is ALWAYS rendered when API_KEY is present.
+            Overlays (loading, timeout) sit on top — we never unmount <Map>
+            so a slow tile load can still complete and reveal itself.         */}
+        {!!API_KEY && (
           <div
             className="absolute inset-0 z-0"
-            // Explicit pixel height from ResizeObserver — eliminates the
-            // "0-height init" race that causes blank tiles on mobile.
             style={{ height: mapHeight > 0 ? mapHeight : '100dvh' }}
           >
-            {/* Loading overlay — shown until onIdle/onTilesLoaded fires */}
-            {!tilesLoaded && (
-              <div
-                className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[#f5f5f5]"
-                aria-live="polite" aria-label="Map loading"
-              >
-                <div className="w-8 h-8 rounded-full border-[2.5px] border-[#DBDBDB] border-t-black animate-spin" />
-                <p className="text-[#737373] text-[13px] font-medium">Map loading…</p>
-              </div>
-            )}
-
-            {/* Mount Map only after the container has measured non-zero height */}
+            {/* Mount Map only after useLayoutEffect gives us a real px height */}
             {mapHeight > 0 && (
               <Map
                 defaultCenter={{ lat: 25.7913, lng: -80.145 }}
@@ -360,17 +352,41 @@ export function JobsScreen() {
                 ))}
               </Map>
             )}
+
+            {/* Loading overlay — shown while tiles haven't arrived yet.
+                Sits above the map but does NOT unmount it.                  */}
+            {!tilesLoaded && !mapFailed && (
+              <div
+                className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[#f5f5f5]"
+                aria-live="polite" aria-label="Map loading"
+              >
+                <div className="w-8 h-8 rounded-full border-[2.5px] border-[#DBDBDB] border-t-black animate-spin" />
+                <p className="text-[#737373] text-[13px] font-medium">Map loading…</p>
+              </div>
+            )}
+
+            {/* Timeout overlay — shown after 10 s if tiles still haven't fired.
+                Map remains mounted underneath and will reveal itself if/when
+                onIdle fires (handleTilesReady clears mapFailed).             */}
+            {mapFailed && !tilesLoaded && (
+              <div
+                className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-[#FAFAFA]/90"
+                aria-live="polite" aria-label="Map slow to load"
+              >
+                <WifiOff size={28} aria-hidden className="text-[#DBDBDB]" />
+                <p className="text-[#737373] text-[14px] font-medium">Map is taking a while…</p>
+                <p className="text-[#AAAAAA] text-[12px]">Browse shifts in the list below</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* ── Fallback — map unavailable ────────────────────────────────── */}
-        {showFallback && (
+        {/* ── No-key fallback — only when VITE_GOOGLE_MAPS_API_KEY is absent ── */}
+        {!API_KEY && (
           <div className="absolute inset-0 z-0 flex items-center justify-center bg-[#FAFAFA]">
             <div className="flex flex-col items-center gap-2 text-center px-8">
               <WifiOff size={28} aria-hidden className="text-[#DBDBDB]" />
-              <p className="text-[#737373] text-[14px] font-medium">
-                {!API_KEY ? 'Map unavailable' : 'Map timed out'}
-              </p>
+              <p className="text-[#737373] text-[14px] font-medium">Map unavailable</p>
               <p className="text-[#AAAAAA] text-[12px]">Browse shifts in the list below</p>
             </div>
           </div>
