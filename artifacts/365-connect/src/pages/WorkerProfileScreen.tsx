@@ -1,7 +1,11 @@
-import { useParams, useLocation } from 'wouter';
-import { BadgeCheck, Star, ChevronLeft, Loader2 } from 'lucide-react';
+import { useParams } from 'wouter';
+import { BadgeCheck, Star, ChevronLeft, Loader2, Heart } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { friendlyDate } from '@/lib/supabase';
+import { useFollow } from '@/hooks/useFollow';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 // Only the public columns we need — intentionally excludes email
 type PublicUserRow = {
@@ -18,7 +22,7 @@ type PublicUserRow = {
 
 type ShiftRef = {
   title: string;
-  date: string;
+  start_time: string;   // ISO timestamptz
   client: { username: string } | null;
 } | null;
 
@@ -38,10 +42,10 @@ type PastShift = {
 };
 
 type WorkerProfileData = PublicUserRow & {
-  followers: number;
-  following: number;
   pastShifts: PastShift[];
 };
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StarRow({ rating, max = 5 }: { rating: number; max?: number }) {
   return (
@@ -70,12 +74,51 @@ function StatItem({ value, label }: { value: string | number; label: string }) {
   );
 }
 
+/**
+ * Follow / Following button — rendered only after profile is loaded
+ * so that useFollow is always called with a real UUID.
+ */
+function FollowButton({ profileId }: { profileId: string }) {
+  const { isFollowing, followerCount: _count, follow, unfollow, isFollowPending } = useFollow(profileId);
+
+  function handlePress() {
+    if (isFollowPending) return;
+    if (isFollowing) unfollow(); else follow();
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label={isFollowing ? 'Unfollow this worker' : 'Follow this worker'}
+      aria-pressed={isFollowing}
+      disabled={isFollowPending}
+      onClick={handlePress}
+      className={`flex-1 font-bold text-[14px] py-[14px] rounded-[14px] active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 ${
+        isFollowing
+          ? 'bg-[#0E0E0E] border border-primary/50 text-primary'
+          : 'bg-primary text-black'
+      }`}
+    >
+      <Heart
+        size={15}
+        aria-hidden
+        className={isFollowing ? 'fill-primary text-primary' : 'fill-black text-black'}
+      />
+      {isFollowing ? 'Following' : 'Follow'}
+    </button>
+  );
+}
+
+// ─── WorkerProfileScreen ──────────────────────────────────────────────────────
+
 export function WorkerProfileScreen() {
   const params = useParams<{ username: string }>();
-  const [, navigate] = useLocation();
   const [profile, setProfile] = useState<WorkerProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+
+  // useFollow is always called — passes '' when profile not yet loaded (query disabled)
+  const { followerCount } = useFollow(profile?.id ?? '');
 
   useEffect(() => {
     if (!params.username) return;
@@ -97,7 +140,7 @@ export function WorkerProfileScreen() {
         return;
       }
 
-      // Reviews received by this user, with shift title/date and client username
+      // Reviews received by this user — uses correct column name `reviewee_id`
       const { data: reviewData } = await supabase
         .from('reviews')
         .select(`
@@ -106,26 +149,22 @@ export function WorkerProfileScreen() {
           created_at,
           shift:shifts (
             title,
-            date,
+            start_time,
             client:users!shifts_client_id_fkey (
               username
             )
           )
         `)
-        .eq('to_user_id', (userData as PublicUserRow).id)
+        .eq('reviewee_id', (userData as PublicUserRow).id)
         .order('created_at', { ascending: false })
         .limit(10)
         .returns<ReviewWithShift[]>();
 
-      const pastShifts: PastShift[] = (reviewData ?? []).map(r => ({
-        id: r.id,
-        name: r.shift?.title ?? 'Unnamed Shift',
-        date: r.shift?.date
-          ? new Date(r.shift.date).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })
+      const pastShifts: PastShift[] = (reviewData ?? []).map((r) => ({
+        id:     r.id,
+        name:   r.shift?.title ?? 'Unnamed Shift',
+        date:   r.shift?.start_time
+          ? friendlyDate(r.shift.start_time)
           : '—',
         client: r.shift?.client?.username
           ? `@${r.shift.client.username}`
@@ -135,8 +174,6 @@ export function WorkerProfileScreen() {
 
       setProfile({
         ...(userData as PublicUserRow),
-        followers: 0,  // follows table — future phase
-        following: 0,
         pastShifts,
       });
       setLoading(false);
@@ -145,6 +182,7 @@ export function WorkerProfileScreen() {
     fetchProfile();
   }, [params.username]);
 
+  // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex flex-col h-full bg-black items-center justify-center">
@@ -153,26 +191,34 @@ export function WorkerProfileScreen() {
     );
   }
 
+  // ── Not found ────────────────────────────────────────────────────────────
   if (notFound || !profile) {
     return (
       <div className="flex flex-col h-full bg-black text-white items-center justify-center px-6">
-        <p className="text-[18px] font-bold mb-2">Profile not found</p>
+        <button
+          type="button"
+          aria-label="Go back"
+          onClick={() => window.history.back()}
+          className="absolute top-12 left-4 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center"
+        >
+          <ChevronLeft size={20} className="text-white" />
+        </button>
+        <p className="text-[18px] font-bold mb-2">User not found</p>
         <p className="text-muted-foreground text-[14px] text-center mb-6">
           @{params.username} doesn't exist on 365 Connect yet.
         </p>
         <button
-          onClick={() => navigate('/home')}
+          onClick={() => window.history.back()}
           className="text-primary font-semibold text-[14px]"
         >
-          Go home
+          Go back
         </button>
       </div>
     );
   }
 
-  const initials = (profile.username ?? '??').slice(0, 2).toUpperCase();
-  // isVerified will be driven by a subscriptions table in a future phase
-  const isVerified = false;
+  const initials  = (profile.username ?? '??').slice(0, 2).toUpperCase();
+  const isVerified = false; // subscription system — future phase
 
   return (
     <div className="flex flex-col h-full bg-black text-white overflow-y-auto">
@@ -180,7 +226,9 @@ export function WorkerProfileScreen() {
       {/* ── Hero / Profile photo ── */}
       <div className="relative">
         <button
-          onClick={() => navigate('/home')}
+          type="button"
+          aria-label="Go back"
+          onClick={() => window.history.back()}
           className="absolute top-12 left-4 z-10 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform"
         >
           <ChevronLeft size={20} className="text-white" />
@@ -222,13 +270,13 @@ export function WorkerProfileScreen() {
           <p className="text-[14px] text-white leading-relaxed mt-3 mb-5">{profile.bio}</p>
         )}
 
-        {/* Job type tags */}
+        {/* Job type tags — gold pill style */}
         {profile.job_types.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-6">
-            {profile.job_types.map(job => (
+            {profile.job_types.map((job) => (
               <span
                 key={job}
-                className="px-3 py-[6px] rounded-full bg-[#0E0E0E] border border-[#2A2A2A] text-white text-[12px] font-semibold"
+                className="px-3 py-[6px] rounded-full bg-primary/10 border border-primary/30 text-primary text-[12px] font-semibold"
               >
                 {job}
               </span>
@@ -236,7 +284,7 @@ export function WorkerProfileScreen() {
           </div>
         )}
 
-        {/* Stats row */}
+        {/* Stats row — followerCount from useFollow (live) */}
         <div className="flex items-center justify-around bg-[#0E0E0E] rounded-[14px] border border-[#2A2A2A] py-4 px-3 mb-6">
           <StatItem value={profile.pastShifts.length} label="Shifts" />
           <div className="w-px h-8 bg-[#2A2A2A]" />
@@ -250,20 +298,23 @@ export function WorkerProfileScreen() {
             </div>
           </div>
           <div className="w-px h-8 bg-[#2A2A2A]" />
-          <StatItem value={profile.followers} label="Followers" />
-          <div className="w-px h-8 bg-[#2A2A2A]" />
-          <StatItem value={profile.following} label="Following" />
+          <StatItem value={followerCount} label="Followers" />
         </div>
 
         {/* Action buttons */}
         <div className="flex gap-3 mb-8">
-          <button className="flex-1 bg-primary text-black font-bold text-[14px] py-[14px] rounded-[14px] active:scale-[0.98] transition-transform">
-            Follow
-          </button>
-          <button className="flex-1 bg-[#0E0E0E] border border-[#2A2A2A] text-white font-bold text-[14px] py-[14px] rounded-[14px] active:scale-[0.98] transition-transform">
+          <FollowButton profileId={profile.id} />
+          <button
+            type="button"
+            className="flex-1 bg-[#0E0E0E] border border-[#2A2A2A] text-white font-bold text-[14px] py-[14px] rounded-[14px] active:scale-[0.98] transition-transform"
+          >
             Message
           </button>
-          <button className="w-[52px] bg-[#0E0E0E] border border-[#2A2A2A] text-white font-bold py-[14px] rounded-[14px] active:scale-[0.98] transition-transform flex items-center justify-center">
+          <button
+            type="button"
+            aria-label="More options"
+            className="w-[52px] bg-[#0E0E0E] border border-[#2A2A2A] text-white font-bold py-[14px] rounded-[14px] active:scale-[0.98] transition-transform flex items-center justify-center"
+          >
             <span className="text-[16px] leading-none tracking-widest">···</span>
           </button>
         </div>
@@ -275,7 +326,7 @@ export function WorkerProfileScreen() {
               Certifications
             </h2>
             <div className="flex flex-wrap gap-2">
-              {profile.certifications.map(cert => (
+              {profile.certifications.map((cert) => (
                 <span
                   key={cert}
                   className="inline-flex items-center gap-[6px] px-3 py-[7px] rounded-full bg-[#0E0E0E] border border-[#2A2A2A] text-[#B8B8B8] text-[12px] font-semibold"
@@ -295,7 +346,7 @@ export function WorkerProfileScreen() {
               Past Shifts
             </h2>
             <div className="flex flex-col gap-3">
-              {profile.pastShifts.map(shift => (
+              {profile.pastShifts.map((shift) => (
                 <div
                   key={shift.id}
                   className="flex items-center gap-4 bg-[#0E0E0E] border border-[#2A2A2A] rounded-[14px] p-4"

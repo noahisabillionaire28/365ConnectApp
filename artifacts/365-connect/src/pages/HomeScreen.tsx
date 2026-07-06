@@ -3,9 +3,10 @@ import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, MapPin, Clock, Sparkles, Bell, Search, Users, PlusCircle } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
-import { STORY_WORKERS, type MockShift } from '@/data/mockFeed';
+import { type MockShift } from '@/data/mockFeed';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useShifts } from '@/hooks/useShifts';
+import { useWorkers, type WorkerStory } from '@/hooks/useWorkers';
 
 /* ─── Stories Row ─────────────────────────────────────────────────────────── */
 
@@ -18,7 +19,28 @@ function StoryBubbleSkeleton() {
   );
 }
 
-function StoryBubble({ worker }: { worker: (typeof STORY_WORKERS)[0] }) {
+function WorkerAvatar({ username, photoUrl }: { username: string; photoUrl: string | null }) {
+  const initials = username.slice(0, 2).toUpperCase();
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        decoding="async"
+        className="w-[58px] h-[58px] rounded-full object-cover"
+      />
+    );
+  }
+  return (
+    <div className="w-[58px] h-[58px] rounded-full bg-[#1A1A1A] flex items-center justify-center">
+      <span className="text-[#666] text-[16px] font-bold">{initials}</span>
+    </div>
+  );
+}
+
+function StoryBubble({ worker }: { worker: WorkerStory }) {
   const [tapped, setTapped] = useState(false);
   const [, navigate] = useLocation();
 
@@ -39,14 +61,7 @@ function StoryBubble({ worker }: { worker: (typeof STORY_WORKERS)[0] }) {
         }`}
       >
         <div className="p-[2px] rounded-full bg-black">
-          <img
-            src={worker.photoUrl}
-            alt=""
-            aria-hidden="true"
-            loading="lazy"
-            decoding="async"
-            className="w-[58px] h-[58px] rounded-full object-cover"
-          />
+          <WorkerAvatar username={worker.username} photoUrl={worker.photoUrl} />
         </div>
       </div>
       <span className="text-[#9A9A9A] text-[11px] font-medium max-w-[66px] truncate">
@@ -57,6 +72,8 @@ function StoryBubble({ worker }: { worker: (typeof STORY_WORKERS)[0] }) {
 }
 
 function StoriesRow() {
+  const { workers, isLoading } = useWorkers();
+
   return (
     <div className="py-3">
       <div
@@ -65,11 +82,23 @@ function StoriesRow() {
         className="flex gap-4 px-4 overflow-x-auto scrollbar-none"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        {STORY_WORKERS.map((w) => (
-          <div key={w.id} role="listitem">
-            <StoryBubble worker={w} />
-          </div>
-        ))}
+        {isLoading
+          ? Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} role="listitem">
+                <StoryBubbleSkeleton />
+              </div>
+            ))
+          : workers.length > 0
+          ? workers.map((w) => (
+              <div key={w.id} role="listitem">
+                <StoryBubble worker={w} />
+              </div>
+            ))
+          : (
+              <div role="listitem" className="flex items-center px-1 py-3">
+                <p className="text-[#444] text-[12px]">No workers available nearby yet.</p>
+              </div>
+            )}
       </div>
     </div>
   );
