@@ -8,7 +8,7 @@ import { ProfileSkeleton } from '@/components/skeletons/ProfileSkeleton';
 
 type PublicUserRow = {
   id: string;
-  role: 'worker' | 'client';
+  role: 'worker' | 'client' | 'staffer';
   username: string;
   photo_url: string | null;
   bio: string | null;

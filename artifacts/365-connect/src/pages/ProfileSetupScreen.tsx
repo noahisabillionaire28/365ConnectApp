@@ -74,7 +74,7 @@ export function ProfileSetupScreen() {
       if (photoFile)     photoUrl     = await uploadAvatar(user.id, photoFile);
       if (postPhotoFile) postPhotoUrl = await uploadPostPhoto(user.id, postPhotoFile);
 
-      const role = (sessionStorage.getItem('selectedRole') ?? 'worker') as 'worker' | 'client';
+      const role = (sessionStorage.getItem('selectedRole') ?? 'worker') as 'worker' | 'client' | 'staffer';
 
       const { error: profileError } = await supabase.from('users').upsert({
         id: user.id, email: user.email!, role,
