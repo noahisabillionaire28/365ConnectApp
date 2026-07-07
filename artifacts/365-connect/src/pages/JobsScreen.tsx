@@ -2,13 +2,16 @@ import { Map, Marker, useMap } from '@vis.gl/react-google-maps';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion, useMotionValue, animate, type PanInfo } from 'framer-motion';
-import { Search, SlidersHorizontal, Heart, MapPin, Clock, Users, Sparkles, WifiOff, CheckCircle2 } from 'lucide-react';
+import { Search, SlidersHorizontal, Heart, MapPin, Clock, Users, Sparkles, WifiOff, CheckCircle2, Plus } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { type MockShift } from '@/data/mockFeed';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { LIGHT_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
 import { useShifts } from '@/hooks/useShifts';
 import { useApplications } from '@/hooks/useApplications';
+import { useProfile } from '@/hooks/useProfile';
+import { resetStafferDraft } from '@/store/stafferPostShiftStore';
+import { resetDraft } from '@/store/postShiftStore';
 
 /* ── API key — resolved once at module load ─────────────────────────────── */
 const API_KEY: string = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
@@ -261,6 +264,19 @@ export function JobsScreen() {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [selectedId, setSelectedId]     = useState<string | null>(null);
 
+  // Role-gated FAB: visible only for staffer / client
+  const { role } = useProfile();
+  const canPost = role === 'staffer' || role === 'client';
+  function handlePostShift() {
+    if (role === 'staffer') {
+      resetStafferDraft();           // fresh wizard — clear any previous partial draft
+      navigate('/staffer-shift/step1');
+    } else {
+      resetDraft();                  // fresh wizard — clear any previous partial draft
+      navigate('/post-shift/step1');
+    }
+  }
+
   // Map readiness tracking
   const [tilesLoaded, setTilesLoaded]   = useState(false);
   const [mapFailed,   setMapFailed]     = useState(false);
@@ -474,6 +490,23 @@ export function JobsScreen() {
           onSelectShift={handleSelectShift}
           appliedShiftIds={appliedShiftIds}
         />
+
+        {/* ── Post-a-Shift FAB — visible only for staffer / client roles ── */}
+        {canPost && (
+          <motion.button
+            type="button"
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 28, delay: 0.15 }}
+            whileTap={{ scale: 0.93 }}
+            onClick={handlePostShift}
+            aria-label="Post a shift"
+            className="absolute bottom-[80px] right-4 z-50 flex items-center gap-2 h-[44px] px-4 bg-black text-white rounded-full shadow-lg font-bold text-[13px]"
+          >
+            <Plus size={16} aria-hidden className="flex-shrink-0" />
+            Post a Shift
+          </motion.button>
+        )}
 
         <BottomTabNav />
       </div>

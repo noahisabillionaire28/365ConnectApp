@@ -28,6 +28,13 @@ import { PostShiftStep2Screen } from '@/pages/PostShiftStep2Screen';
 import { PostShiftStep3Screen } from '@/pages/PostShiftStep3Screen';
 import { PostShiftStep4Screen } from '@/pages/PostShiftStep4Screen';
 import { PostShiftStep5Screen } from '@/pages/PostShiftStep5Screen';
+import { StafferPostStep1Screen } from '@/pages/StafferPostStep1Screen';
+import { StafferPostStep2Screen } from '@/pages/StafferPostStep2Screen';
+import { StafferPostStep3Screen } from '@/pages/StafferPostStep3Screen';
+import { StafferPostStep4Screen } from '@/pages/StafferPostStep4Screen';
+import { StafferPostStep5Screen } from '@/pages/StafferPostStep5Screen';
+import { StafferPostStep6Screen } from '@/pages/StafferPostStep6Screen';
+import { StafferPostStep7Screen } from '@/pages/StafferPostStep7Screen';
 import { ClockInScreen } from '@/pages/ClockInScreen';
 import { PhoneAuthScreen } from '@/pages/PhoneAuthScreen';
 import { AuthCallbackScreen } from '@/pages/AuthCallbackScreen';
@@ -77,6 +84,13 @@ function MobileRouter() {
             <Route path="/post-shift/step3" component={PostShiftStep3Screen} />
             <Route path="/post-shift/step4" component={PostShiftStep4Screen} />
             <Route path="/post-shift/step5" component={PostShiftStep5Screen} />
+            <Route path="/staffer-shift/step1" component={StafferPostStep1Screen} />
+            <Route path="/staffer-shift/step2" component={StafferPostStep2Screen} />
+            <Route path="/staffer-shift/step3" component={StafferPostStep3Screen} />
+            <Route path="/staffer-shift/step4" component={StafferPostStep4Screen} />
+            <Route path="/staffer-shift/step5" component={StafferPostStep5Screen} />
+            <Route path="/staffer-shift/step6" component={StafferPostStep6Screen} />
+            <Route path="/staffer-shift/step7" component={StafferPostStep7Screen} />
             <Route path="/clock/:id" component={ClockInScreen} />
             <Route path="/phone-auth" component={PhoneAuthScreen} />
             <Route path="/auth/callback" component={AuthCallbackScreen} />
