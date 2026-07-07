@@ -1,3 +1,4 @@
+// Canonical 14-entry job-type list — single source of truth for all wizards
 import {
   Wine, UtensilsCrossed, Disc3, ChefHat, ShieldCheck,
   UserCheck, Camera, Megaphone, Anchor, Briefcase,
