@@ -173,10 +173,13 @@ function MessageBubble({ msg, showSender, senderLabel, senderPhoto }: {
 }) {
   const mine = isFromMe(msg);
 
+  // Plain div — no entrance animation.
+  // A motion.div with initial/animate here stalls mid-animation because
+  // the parent ChatScreen container is itself animating (spring slide-in from
+  // x:100%), causing the browser to throttle rAF for partially off-screen
+  // children. This left every bubble stuck at opacity≈0.26, scale≈0.978.
   return (
-    <motion.div initial={{ opacity: 0, y: 6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.18, ease: 'easeOut' }}
-      className={`flex items-end gap-2 mb-1.5 ${mine ? 'flex-row-reverse' : 'flex-row'}`}>
+    <div className={`flex items-end gap-2 mb-1.5 ${mine ? 'flex-row-reverse' : 'flex-row'}`}>
 
       {!mine && (
         <div className="w-7 flex-shrink-0">
@@ -217,7 +220,7 @@ function MessageBubble({ msg, showSender, senderLabel, senderPhoto }: {
           {mine && <ReadReceipt status={msg.status} />}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -413,8 +416,8 @@ export function MessagesScreen() {
             <ConversationListScreen convMessages={convMessages} convUnread={convUnread} onOpen={handleOpen} />
           </motion.div>
         ) : (
-          <motion.div key={activeConv.id} initial={{ x: '100%', opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }} exit={{ x: '100%', opacity: 0 }}
+          <motion.div key={activeConv.id} initial={{ x: '100%' }}
+            animate={{ x: 0 }} exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 380, damping: 38 }}
             className="absolute inset-0">
             <ChatScreen conv={activeConv} messages={convMessages[activeConv.id] ?? []}
