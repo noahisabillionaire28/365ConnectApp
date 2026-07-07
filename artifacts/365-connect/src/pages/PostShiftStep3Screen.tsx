@@ -31,7 +31,7 @@ function FormSection({ icon, title, children }: { icon: React.ReactNode; title: 
         <div className="w-6 h-6 rounded-[7px] bg-[#F5F5F5] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
           {icon}
         </div>
-        <h2 className="text-black font-bold text-[15px]">{title}</h2>
+        <h2 className="text-black font-bold tFeature 1 - Applied checkmark on the Jobs tab and shift detail. Schema (confirmed): table 'applications' has columns id, shift_id (uuid), worker_id (uuid), status (text). The logged-in user's id is in users.id. Please: (1) For the logged-in worker, query the applications table for all rows where worker_id = current user id to get the set of shift_ids they have already applied to. (2) On the Jobs tab, for every shift card whose id is in that applied set, show a small GREEN circular checkmark badge in the TOP-RIGHT corner of the card. (3) On the shift DETAIL screen, if the user has already applied to that shift, replace the 'Apply Now' button with a disabled/gray 'Applied' button. (4) When the user taps Apply and it succeeds (a row is inserted into applications), update the UI in real time so the badge and the 'Applied' state appear immediately without a full reload - use a Supabase realtime subscription on the applications table OR optimistically update local state and refetch. Keep everything scoped to Jobs tab + shift detail. Report which files you changed.ext-[15px]">{title}</h2>
       </div>
       <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-4 flex flex-col gap-4">
         {children}
