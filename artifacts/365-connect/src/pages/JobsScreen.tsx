@@ -1,4 +1,4 @@
-import { APIProvider, Map, Marker, useMap } from '@vis.gl/react-google-maps';
+import { Map, Marker, useMap } from '@vis.gl/react-google-maps';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion, useMotionValue, animate, type PanInfo } from 'framer-motion';
@@ -183,8 +183,14 @@ function BottomSheet({ shifts, isLoading, selectedId, onSelectShift, appliedShif
 
   useEffect(() => {
     if (!selectedId || !scrollRef.current) return;
+    const container = scrollRef.current;
     const el = cardRefs.current[selectedId];
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    if (!el) return;
+    // Compute scroll position that centers the card in the viewport.
+    // scrollIntoView is unreliable for horizontal-only overflow containers
+    // because the browser may also scroll vertically or pick the wrong ancestor.
+    const targetLeft = el.offsetLeft - (container.clientWidth - el.offsetWidth) / 2;
+    container.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
   }, [selectedId]);
 
   function snapTo(target: number, isExpanded: boolean) {
@@ -328,10 +334,9 @@ export function JobsScreen() {
   function handlePinClick(shift: MockShift)    { setSelectedId(shift.id); }
 
   return (
-    // APIProvider wraps the ENTIRE screen — not just the inner map block —
-    // so the SDK context is ready before any child tries to useMap().
-    <APIProvider apiKey={API_KEY} libraries={['places']}>
-      <div ref={containerRef} className="relative h-[100dvh] bg-[#f5f5f5] overflow-hidden">
+    // APIProvider lives in App.tsx (app root) — the SDK is already loaded
+    // before this screen mounts, eliminating the per-navigation init delay.
+    <div ref={containerRef} className="relative h-[100dvh] bg-[#f5f5f5] overflow-hidden">
 
         {/* ── Map layer ─────────────────────────────────────────────────────
             The map container is ALWAYS rendered when API_KEY is present.
@@ -472,6 +477,5 @@ export function JobsScreen() {
 
         <BottomTabNav />
       </div>
-    </APIProvider>
   );
 }
