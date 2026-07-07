@@ -21,7 +21,7 @@ export const supabase = createClient(
 export type UserRow = {
   id: string;
   email: string;
-  role: 'worker' | 'client' | 'admin';
+  role: 'worker' | 'client' | 'admin' | 'staffer';
   username: string | null;
   photo_url: string | null;
   bio: string | null;
