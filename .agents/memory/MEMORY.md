@@ -10,3 +10,4 @@
 - [Edit tool corrupts $ in SQL dollar-quoting](edit-tool-dollar-quote-corruption.md) — Edit can collapse "$" to "$" in PL/pgSQL; always apply schema.sql against a scratch Postgres before trusting it
 - [Storage RLS must bind to the resource, not the uploader](supabase-storage-path-scoping.md) — namespace private-media object paths by conversation/thread id, not user id, or membership overlap leaks unrelated media
 - [Messaging data layer](messaging-data-layer.md) — conversations table (not raw sender/recipient pairs) backs DMs; getOrCreateDirectConversation finds-or-creates a thread before navigating to ChatScreen
+- [Shifts pay/spots column names](shifts-pay-spots-columns.md) — live `shifts` table uses `pay_rate`/`spots_available`, not the `hourly_rate`/`spots` names schema.sql and older code assumed

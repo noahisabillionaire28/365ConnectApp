@@ -72,7 +72,7 @@ export function StafferPostStep7Screen() {
         pay_rate:         draft.payRate,
         start_time:       startIso,
         end_time:         endIso,
-        spots:            draft.workersNeeded,
+        spots_available:  draft.workersNeeded,
         dress_code:       draft.dressCode     || undefined,
         point_of_contact: draft.contactName   || undefined,
         contact_phone:    draft.contactPhone  || undefined,

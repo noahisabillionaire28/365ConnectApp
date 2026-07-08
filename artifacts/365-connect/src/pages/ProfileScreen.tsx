@@ -4,11 +4,12 @@ import { motion } from 'framer-motion';
 import {
   Star, ChevronRight, Settings,
   CreditCard, Bell, Shield, HelpCircle, LogOut,
-  Edit3, MapPin, CheckCircle, UserCircle2,
+  Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
+import { useMyApplications, type MyApplication } from '@/hooks/useMyApplications';
 
 /* ── Sub-components ──────────────────────────────────────────────────────── */
 function StarRow({ rating, size = 12 }: { rating: number; size?: number }) {
@@ -102,6 +103,90 @@ function ProfileSkeleton() {
         ))}
       </div>
       <BottomTabNav />
+    </div>
+  );
+}
+
+/* ── My Applications ─────────────────────────────────────────────────────── */
+const APPLICATION_STATUS_META: Record<string, { label: string; className: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
+  pending:   { label: 'Pending',  className: 'bg-amber-50 border-amber-200 text-amber-600',     Icon: Hourglass },
+  accepted:  { label: 'Accepted', className: 'bg-emerald-50 border-emerald-200 text-emerald-600', Icon: CheckCircle },
+  declined:  { label: 'Not Selected', className: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]', Icon: XCircle },
+  rejected:  { label: 'Not Selected', className: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]', Icon: XCircle },
+  withdrawn: { label: 'Withdrawn', className: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]',    Icon: XCircle },
+};
+
+function ApplicationRow({ application, onTap }: { application: MyApplication; onTap: () => void }) {
+  const meta = APPLICATION_STATUS_META[application.status] ?? APPLICATION_STATUS_META.pending;
+  const { label, className, Icon } = meta;
+  return (
+    <motion.button type="button" whileTap={{ scale: 0.98 }} onClick={onTap}
+      aria-label={`${application.shiftTitle} at ${application.companyName ?? 'client'} — ${label}`}
+      className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-[#DBDBDB] text-left last:border-none">
+      <div className="w-11 h-11 rounded-[10px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0 overflow-hidden">
+        {application.coverImage
+          ? <img src={application.coverImage} alt="" className="w-full h-full object-cover" />
+          : <Briefcase size={16} aria-hidden className="text-[#737373]" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-black font-semibold text-[14px] truncate">{application.shiftTitle}</p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <Clock3 size={11} aria-hidden className="text-[#737373] flex-shrink-0" />
+          <p className="text-[#737373] text-[12px] truncate">
+            {application.companyName ?? application.jobType}
+            {application.payRate ? ` · ${application.payRate}/${application.payPeriod}` : ''}
+          </p>
+        </div>
+      </div>
+      <span className={`flex items-center gap-1 h-[26px] px-2.5 rounded-full text-[11px] font-bold border flex-shrink-0 ${className}`}>
+        <Icon size={11} aria-hidden />
+        {label}
+      </span>
+    </motion.button>
+  );
+}
+
+function MyApplicationsSection() {
+  const [, navigate] = useLocation();
+  const { applications, isLoading, error } = useMyApplications();
+
+  if (isLoading) {
+    return (
+      <div className="px-5 mb-6">
+        <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-2.5">My Applications</p>
+        <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
+          {[1, 2].map((n) => (
+            <div key={n} className="flex items-center gap-3 px-4 py-3.5 border-b border-[#DBDBDB] last:border-none">
+              <div className="w-11 h-11 rounded-[10px] bg-[#EFEFEF] animate-pulse flex-shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <div className="w-2/3 h-3.5 rounded bg-[#EFEFEF] animate-pulse" />
+                <div className="w-1/3 h-3 rounded bg-[#EFEFEF] animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) return null; // Non-critical section — fail silently rather than blocking the whole profile
+
+  return (
+    <div className="px-5 mb-6">
+      <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-2.5">My Applications</p>
+      {applications.length > 0 ? (
+        <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
+          {applications.map((app) => (
+            <ApplicationRow key={app.applicationId} application={app} onTap={() => navigate(`/shift/${app.shiftId}`)} />
+          ))}
+        </div>
+      ) : (
+        <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] p-4 flex flex-col items-center gap-1 text-center">
+          <Briefcase size={20} aria-hidden className="text-[#DBDBDB] mb-1" />
+          <p className="text-[#737373] text-[13px] font-medium">No applications yet</p>
+          <p className="text-[#AAAAAA] text-[12px]">Apply to a shift to see its status here.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -292,6 +377,9 @@ export function ProfileScreen() {
           <p className="text-[#AAAAAA] text-[12px]">Reviews from clients will appear here after your first shift.</p>
         </div>
       </div>
+
+      {/* My Applications — worker-only */}
+      {profile.role === 'worker' && <MyApplicationsSection />}
 
       {/* Settings */}
       <div className="px-4 mb-4">

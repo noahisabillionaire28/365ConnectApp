@@ -113,7 +113,7 @@ export function PostShiftStep5Screen() {
         pay_rate:     draft.payRate,
         start_time:   startIso,
         end_time:     endIso,
-        spots:        totalW,
+        spots_available: totalW,
         dress_code:   draft.dressCode     || undefined,
         dress_code_items: dressCodeItems,
         point_of_contact: draft.contactName || undefined,

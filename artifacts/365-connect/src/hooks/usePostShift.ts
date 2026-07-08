@@ -17,7 +17,7 @@ export type PostShiftInput = {
   pay_rate?: number;
   start_time: string;   // ISO datetime string
   end_time: string;     // ISO datetime string
-  spots?: number;
+  spots_available?: number;
   dress_code?: string;
   dress_code_items?: string[];
   point_of_contact?: string;
@@ -40,11 +40,11 @@ export function usePostShift() {
         .from('shifts')
         .insert({
           ...input,
-          pay_period:   'hr',
-          spots:        input.spots ?? 1,
-          spots_filled: 0,
-          status:       'open',
-          ai_match_pct: 85,
+          pay_period:      'hr',
+          spots_available: input.spots_available ?? 1,
+          spots_filled:    0,
+          status:          'open',
+          ai_match_pct:    85,
         })
         .select()
         .single();

@@ -52,7 +52,7 @@ export type ShiftRow = {
   start_time: string;       // ISO timestamptz from DB
   end_time: string;         // ISO timestamptz from DB
   date: string | null;      // optional display-date override; usually null — derive from start_time
-  spots: number;            // total slots posted
+  spots_available: number;  // total slots posted (despite the name, this is the total, not the remainder — remainder = spots_available - spots_filled)
   spots_filled: number;
   status: 'open' | 'filled' | 'cancelled' | 'completed';
   created_at: string;
@@ -236,7 +236,7 @@ export function shiftRowToMockShift(
   const primaryType    = row.job_type || row.job_types?.[0] || 'Event Staff';
   const lat            = row.lat  ?? MIAMI_BEACH.lat;
   const lng            = row.lng  ?? MIAMI_BEACH.lng;
-  const spotsAvailable = Math.max(0, (row.spots ?? 1) - (row.spots_filled ?? 0));
+  const spotsAvailable = Math.max(0, (row.spots_available ?? 1) - (row.spots_filled ?? 0));
 
   return {
     id:             row.id,
@@ -252,7 +252,7 @@ export function shiftRowToMockShift(
     startTimeISO:   row.start_time,
     distanceMiles:  Math.round(haversineMiles(refCoords.lat, refCoords.lng, lat, lng) * 10) / 10,
     spotsAvailable,
-    spotsTotal:     row.spots ?? 1,
+    spotsTotal:     row.spots_available ?? 1,
     location:       row.location        ?? 'Miami, FL',
     aiMatchPct:     row.ai_match_pct    ?? 85,
     description:    row.description     ?? '',
