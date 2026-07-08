@@ -883,19 +883,41 @@ CREATE OR REPLACE FUNCTION public.handle_shift_request_decision()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_shift_title TEXT;
+  v_prev_status TEXT;
+  v_filled      BOOLEAN;
 BEGIN
   IF NEW.status = OLD.status THEN RETURN NEW; END IF;
   SELECT title INTO v_shift_title FROM public.shifts WHERE id = NEW.shift_id;
 
   IF NEW.status = 'accepted' THEN
+    -- Tell the applications-table triggers (notify_application_status_changed,
+    -- handle_application_assigned) to skip their own spots_filled/notify side
+    -- effects below — this function already performs them itself.
+    PERFORM set_config('app.via_shift_request_decision', 'true', true);
+
+    SELECT status INTO v_prev_status
+    FROM public.applications WHERE shift_id = NEW.shift_id AND worker_id = NEW.worker_id;
+
+    -- Only count/require a fill if the application row wasn't already accepted
+    -- (e.g. a staffer had already assigned this worker directly) — otherwise
+    -- this would double-count the same worker's spot.
+    IF v_prev_status IS DISTINCT FROM 'accepted' THEN
+      -- Atomic, concurrency-safe capacity check: the conditional WHERE means
+      -- only one concurrent acceptance can win the last open spot.
+      UPDATE public.shifts
+      SET spots_filled = spots_filled + 1,
+          status       = CASE WHEN spots_filled + 1 >= spots_available THEN 'filled' ELSE status END
+      WHERE id = NEW.shift_id AND spots_filled < spots_available
+      RETURNING true INTO v_filled;
+
+      IF v_filled IS NOT TRUE THEN
+        RAISE EXCEPTION 'This shift is already fully booked';
+      END IF;
+    END IF;
+
     INSERT INTO public.applications (shift_id, worker_id, status)
     VALUES (NEW.shift_id, NEW.worker_id, 'accepted')
     ON CONFLICT (shift_id, worker_id) DO UPDATE SET status = 'accepted';
-
-    UPDATE public.shifts
-    SET spots_filled = LEAST(spots_filled + 1, spots_available),
-        status       = CASE WHEN spots_filled + 1 >= spots_available THEN 'filled' ELSE status END
-    WHERE id = NEW.shift_id;
 
     INSERT INTO public.notifications (user_id, type, title, body, shift_id, from_user_id)
     VALUES (
@@ -967,6 +989,157 @@ DROP TRIGGER IF EXISTS trg_notify_new_shift_match ON public.shifts;
 CREATE TRIGGER trg_notify_new_shift_match
   AFTER INSERT ON public.shifts
   FOR EACH ROW EXECUTE FUNCTION public.notify_new_shift_match();
+
+-- ============================================================
+-- Phase 8: Staffer Roster + Assign Workers (Section 8)
+-- Run in Supabase SQL Editor if upgrading an existing DB.
+-- Roster membership reuses the existing `follows` table (a staffer's roster
+-- is simply the set of workers they follow) — no new table is introduced.
+-- Adds: the ability for a shift's owner (client/staffer) to directly insert
+-- an *already-accepted* `applications` row for a worker (the "Assign" action,
+-- distinct from the normal apply-then-review flow), with matching
+-- spots-filled bookkeeping and a worker-facing notification.
+-- ============================================================
+
+-- Allow the shift owner to directly insert a pre-accepted application row
+-- (assigning a worker from their roster), in addition to a worker inserting
+-- their own (normally pending) application.
+DROP POLICY IF EXISTS "applications_insert" ON public.applications;
+CREATE POLICY "applications_insert" ON public.applications FOR INSERT
+  WITH CHECK (
+    -- A worker may only insert their own application, and only as 'pending' —
+    -- self-accepting is not allowed; only the shift owner can accept (below).
+    (auth.uid() = worker_id AND status = 'pending')
+    OR (
+      auth.uid() = (SELECT client_id FROM public.shifts WHERE id = shift_id)
+      AND status = 'accepted'
+      -- Direct-assign is restricted to workers on the staffer/client's own
+      -- roster (who they follow) — enforced here, not just in the UI's list.
+      AND EXISTS (
+        SELECT 1 FROM public.follows f
+        WHERE f.follower_id = auth.uid() AND f.following_id = worker_id
+      )
+    )
+  );
+
+-- The "someone applied" notification only makes sense for the normal
+-- worker-initiated apply flow — an owner directly assigning a worker inserts
+-- the row already `accepted`, and is handled by handle_application_assigned below.
+CREATE OR REPLACE FUNCTION public.notify_application_created()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_client_id   UUID;
+  v_shift_title TEXT;
+BEGIN
+  IF NEW.status <> 'pending' THEN RETURN NEW; END IF;
+  SELECT client_id, title INTO v_client_id, v_shift_title FROM public.shifts WHERE id = NEW.shift_id;
+  IF v_client_id IS NOT NULL THEN
+    INSERT INTO public.notifications (user_id, type, title, body, shift_id, from_user_id)
+    VALUES (
+      v_client_id, 'application_received', 'New applicant',
+      'Someone applied to your ' || COALESCE(v_shift_title, 'shift') || '.',
+      NEW.shift_id, NEW.worker_id
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- Fill the spots-filled bookkeeping gap on the normal pending→accepted
+-- decision path too (previously only the Section 7 shift-request decision
+-- path incremented it), so Applicants-approve and Assign agree on fill count.
+CREATE OR REPLACE FUNCTION public.notify_application_status_changed()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_shift_title TEXT;
+  v_filled      BOOLEAN;
+BEGIN
+  IF NEW.status = OLD.status THEN RETURN NEW; END IF;
+  SELECT title INTO v_shift_title FROM public.shifts WHERE id = NEW.shift_id;
+
+  IF NEW.status = 'accepted' THEN
+    -- Skip the increment when this UPDATE was driven by handle_shift_request_decision
+    -- (Section 7) — that function already increments spots_filled itself, and this
+    -- trigger still fires on top of its INSERT ... ON CONFLICT DO UPDATE.
+    IF COALESCE(current_setting('app.via_shift_request_decision', true), '') <> 'true' THEN
+      -- Atomic, concurrency-safe capacity check: the conditional WHERE means
+      -- only one concurrent acceptance can win the last open spot.
+      UPDATE public.shifts
+      SET spots_filled = spots_filled + 1,
+          status       = CASE WHEN spots_filled + 1 >= spots_available THEN 'filled' ELSE status END
+      WHERE id = NEW.shift_id AND spots_filled < spots_available
+      RETURNING true INTO v_filled;
+
+      IF v_filled IS NOT TRUE THEN
+        RAISE EXCEPTION 'This shift is already fully booked';
+      END IF;
+    END IF;
+
+    INSERT INTO public.notifications (user_id, type, title, body, shift_id, from_user_id)
+    SELECT
+      NEW.worker_id, 'application_accepted', 'Application approved',
+      'You''re confirmed for ' || COALESCE(v_shift_title, 'the shift') || '. Clock in is now unlocked.',
+      NEW.shift_id, s.client_id
+    FROM public.shifts s WHERE s.id = NEW.shift_id;
+  ELSIF NEW.status = 'declined' THEN
+    INSERT INTO public.notifications (user_id, type, title, body, shift_id, from_user_id)
+    SELECT
+      NEW.worker_id, 'application_declined', 'Application update',
+      'You were not selected for ' || COALESCE(v_shift_title, 'the shift') || '.',
+      NEW.shift_id, s.client_id
+    FROM public.shifts s WHERE s.id = NEW.shift_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- ─── Trigger: staffer/client directly assigns a roster worker to their shift ────
+-- Fires only when a brand-new `applications` row is inserted already `accepted`
+-- (the Assign flow) — the normal apply-then-review flow always inserts `pending`
+-- and is handled by notify_application_created + notify_application_status_changed.
+CREATE OR REPLACE FUNCTION public.handle_application_assigned()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_shift_title TEXT;
+  v_client_id   UUID;
+  v_filled      BOOLEAN;
+BEGIN
+  -- handle_shift_request_decision (Section 7) already does its own insert,
+  -- spots_filled increment, and notification for this row — skip here.
+  IF COALESCE(current_setting('app.via_shift_request_decision', true), '') = 'true' THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT title, client_id INTO v_shift_title, v_client_id
+  FROM public.shifts WHERE id = NEW.shift_id;
+
+  -- Atomic, concurrency-safe capacity check: the conditional WHERE means only
+  -- one concurrent assignment can win the last open spot.
+  UPDATE public.shifts
+  SET spots_filled = spots_filled + 1,
+      status       = CASE WHEN spots_filled + 1 >= spots_available THEN 'filled' ELSE status END
+  WHERE id = NEW.shift_id AND spots_filled < spots_available
+  RETURNING true INTO v_filled;
+
+  IF v_filled IS NOT TRUE THEN
+    RAISE EXCEPTION 'This shift is already fully booked';
+  END IF;
+
+  INSERT INTO public.notifications (user_id, type, title, body, shift_id, from_user_id)
+  VALUES (
+    NEW.worker_id, 'application_accepted', 'You were assigned to a shift',
+    'You''ve been added to ' || COALESCE(v_shift_title, 'a shift') || '. Clock in is now unlocked.',
+    NEW.shift_id, v_client_id
+  );
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_handle_application_assigned ON public.applications;
+CREATE TRIGGER trg_handle_application_assigned
+  AFTER INSERT ON public.applications
+  FOR EACH ROW WHEN (NEW.status = 'accepted')
+  EXECUTE FUNCTION public.handle_application_assigned();
 
 -- ─── Scheduled: notify workers a confirmed shift starts in ~2 hours ─────────────
 -- Requires the `pg_cron` extension (Supabase Dashboard → Database →

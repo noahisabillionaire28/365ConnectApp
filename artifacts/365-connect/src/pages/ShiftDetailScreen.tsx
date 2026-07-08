@@ -4,7 +4,7 @@ import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
-  MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, Star,
+  MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, Star, UserPlus,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -532,6 +532,16 @@ export function ShiftDetailScreen() {
             <CheckCircle2 size={18} aria-hidden className="text-emerald-500" />
             <span className="text-emerald-600 font-bold text-[15px]">Completed</span>
           </div>
+        )}
+
+        {isOwner && profile.role === 'staffer' && (
+          <motion.button type="button" whileTap={{ scale: 0.97 }}
+            onClick={() => navigate(`/shift/${shiftId}/assign`)}
+            aria-label="Assign workers from your roster"
+            className="w-full h-[46px] mb-2 rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[14px] tracking-wide flex items-center justify-center gap-2">
+            <UserPlus size={16} aria-hidden />
+            Assign Workers
+          </motion.button>
         )}
 
         {isOwner && (

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Star, ChevronRight, Settings,
   CreditCard, Bell, Shield, HelpCircle, LogOut,
-  Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass,
+  Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useAuth } from '@/contexts/AuthContext';
@@ -380,6 +380,16 @@ export function ProfileScreen() {
 
       {/* My Applications — worker-only */}
       {profile.role === 'worker' && <MyApplicationsSection />}
+
+      {/* Workforce — staffer-only */}
+      {profile.role === 'staffer' && (
+        <div className="px-4 mb-4">
+          <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Workforce</p>
+          <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
+            <SettingRow icon={Users} label="My Roster" onTap={() => navigate('/roster')} />
+          </div>
+        </div>
+      )}
 
       {/* Settings */}
       <div className="px-4 mb-4">
