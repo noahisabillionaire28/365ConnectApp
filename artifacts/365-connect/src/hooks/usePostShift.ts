@@ -14,7 +14,7 @@ export type PostShiftInput = {
   lng?: number;
   unit_info?: string;
   parking_notes?: string;
-  hourly_rate?: number;
+  pay_rate?: number;
   start_time: string;   // ISO datetime string
   end_time: string;     // ISO datetime string
   spots?: number;

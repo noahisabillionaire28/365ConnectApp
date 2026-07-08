@@ -69,7 +69,7 @@ export function StafferPostStep7Screen() {
         location:         draft.location      || undefined,
         lat:              draft.lat           || undefined,
         lng:              draft.lng           || undefined,
-        hourly_rate:      draft.payRate,
+        pay_rate:         draft.payRate,
         start_time:       startIso,
         end_time:         endIso,
         spots:            draft.workersNeeded,

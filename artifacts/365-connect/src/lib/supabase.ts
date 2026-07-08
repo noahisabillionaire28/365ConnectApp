@@ -47,10 +47,11 @@ export type ShiftRow = {
   location: string | null;
   job_type: string;
   job_types: string[];
-  hourly_rate: number | null;
+  pay_rate: number | null;
   pay_period: string;
   start_time: string;       // ISO timestamptz from DB
   end_time: string;         // ISO timestamptz from DB
+  date: string | null;      // optional display-date override; usually null — derive from start_time
   spots: number;            // total slots posted
   spots_filled: number;
   status: 'open' | 'filled' | 'cancelled' | 'completed';
@@ -243,9 +244,9 @@ export function shiftRowToMockShift(
     jobTypes:       row.job_types?.length ? row.job_types : [primaryType],
     companyName:    row.company_name    ?? 'Private Client',
     coverImage:     row.cover_image     ?? COVER_FALLBACKS[primaryType] ?? COVER_FALLBACKS.default,
-    payRate:        Number(row.hourly_rate ?? 0),
+    payRate:        Number(row.pay_rate ?? 0),
     payPeriod:      (row.pay_period as 'hr' | 'day' | 'event') ?? 'hr',
-    date:           friendlyDate(row.start_time),
+    date:           row.date ?? friendlyDate(row.start_time),
     startTime:      formatTime(row.start_time),
     endTime:        formatTime(row.end_time),
     startTimeISO:   row.start_time,
