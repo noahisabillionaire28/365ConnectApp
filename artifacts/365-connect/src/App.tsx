@@ -7,27 +7,32 @@ import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { AuthProvider } from '@/contexts/AuthContext';
+import { RoleProvider } from '@/contexts/RoleContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { MobileContainer } from '@/components/MobileContainer';
-import { SplashScreen } from '@/pages/SplashScreen';
-import { HomeScreen } from '@/pages/HomeScreen';
-import { JobsScreen } from '@/pages/JobsScreen';
-import { MessagesScreen } from '@/pages/MessagesScreen';
-import { NotificationsScreen } from '@/pages/NotificationsScreen';
-import { ProfileScreen } from '@/pages/ProfileScreen';
-import { SignUpScreen } from '@/pages/SignUpScreen';
-import { RoleSelectScreen } from '@/pages/RoleSelectScreen';
-import { OnboardingScreen } from '@/pages/OnboardingScreen';
-import { LoginScreen } from '@/pages/LoginScreen';
-import { ProfileSetupScreen } from '@/pages/ProfileSetupScreen';
-import { WorkerProfileScreen } from '@/pages/WorkerProfileScreen';
-import { ResetPasswordScreen } from '@/pages/ResetPasswordScreen';
-import { ShiftDetailScreen } from '@/pages/ShiftDetailScreen';
-import { PostShiftStep1Screen } from '@/pages/PostShiftStep1Screen';
-import { PostShiftStep2Screen } from '@/pages/PostShiftStep2Screen';
-import { PostShiftStep3Screen } from '@/pages/PostShiftStep3Screen';
-import { PostShiftStep4Screen } from '@/pages/PostShiftStep4Screen';
-import { PostShiftStep5Screen } from '@/pages/PostShiftStep5Screen';
+import { AdminNav } from '@/components/AdminNav';
+
+// Mobile screens
+import { SplashScreen }          from '@/pages/SplashScreen';
+import { HomeScreen }            from '@/pages/HomeScreen';
+import { JobsScreen }            from '@/pages/JobsScreen';
+import { ExploreScreen }         from '@/pages/ExploreScreen';
+import { MessagesScreen }        from '@/pages/MessagesScreen';
+import { NotificationsScreen }   from '@/pages/NotificationsScreen';
+import { ProfileScreen }         from '@/pages/ProfileScreen';
+import { SignUpScreen }          from '@/pages/SignUpScreen';
+import { RoleSelectScreen }      from '@/pages/RoleSelectScreen';
+import { OnboardingScreen }      from '@/pages/OnboardingScreen';
+import { LoginScreen }           from '@/pages/LoginScreen';
+import { ProfileSetupScreen }    from '@/pages/ProfileSetupScreen';
+import { WorkerProfileScreen }   from '@/pages/WorkerProfileScreen';
+import { ResetPasswordScreen }   from '@/pages/ResetPasswordScreen';
+import { ShiftDetailScreen }     from '@/pages/ShiftDetailScreen';
+import { PostShiftStep1Screen }  from '@/pages/PostShiftStep1Screen';
+import { PostShiftStep2Screen }  from '@/pages/PostShiftStep2Screen';
+import { PostShiftStep3Screen }  from '@/pages/PostShiftStep3Screen';
+import { PostShiftStep4Screen }  from '@/pages/PostShiftStep4Screen';
+import { PostShiftStep5Screen }  from '@/pages/PostShiftStep5Screen';
 import { StafferPostStep1Screen } from '@/pages/StafferPostStep1Screen';
 import { StafferPostStep2Screen } from '@/pages/StafferPostStep2Screen';
 import { StafferPostStep3Screen } from '@/pages/StafferPostStep3Screen';
@@ -35,27 +40,31 @@ import { StafferPostStep4Screen } from '@/pages/StafferPostStep4Screen';
 import { StafferPostStep5Screen } from '@/pages/StafferPostStep5Screen';
 import { StafferPostStep6Screen } from '@/pages/StafferPostStep6Screen';
 import { StafferPostStep7Screen } from '@/pages/StafferPostStep7Screen';
-import { ClockInScreen } from '@/pages/ClockInScreen';
-import { PhoneAuthScreen } from '@/pages/PhoneAuthScreen';
-import { AuthCallbackScreen } from '@/pages/AuthCallbackScreen';
-import { AdminLogin } from '@/pages/admin/AdminLogin';
+import { ClockInScreen }         from '@/pages/ClockInScreen';
+import { PhoneAuthScreen }       from '@/pages/PhoneAuthScreen';
+import { AuthCallbackScreen }    from '@/pages/AuthCallbackScreen';
+
+// Admin screens
+import { AdminLogin }     from '@/pages/admin/AdminLogin';
 import { AdminDashboard } from '@/pages/admin/AdminDashboard';
-import { AdminUsers } from '@/pages/admin/AdminUsers';
-import { AdminShifts } from '@/pages/admin/AdminShifts';
-import { AdminDisputes } from '@/pages/admin/AdminDisputes';
+import { AdminUsers }     from '@/pages/admin/AdminUsers';
+import { AdminShifts }    from '@/pages/admin/AdminShifts';
+import { AdminDisputes }  from '@/pages/admin/AdminDisputes';
+import { AdminRevenue }   from '@/pages/admin/AdminRevenue';
+import { AdminSettings }  from '@/pages/admin/AdminSettings';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime:            30_000,       // 30s before a query is considered stale
-      gcTime:               5 * 60_000,   // 5 min before inactive data is garbage collected
+      staleTime:            30_000,
+      gcTime:               5 * 60_000,
       retry:                2,
-      refetchOnWindowFocus: false,        // prevents re-fetch on every tab switch
+      refetchOnWindowFocus: false,
     },
   },
 });
 
-/** Worker-facing mobile app routes (wrapped in 390px MobileContainer) */
+/** Worker / client / staffer mobile app — 390 px MobileContainer */
 function MobileRouter() {
   const [location] = useLocation();
   return (
@@ -70,20 +79,38 @@ function MobileRouter() {
           style={{ width: '100%' }}
         >
           <Switch>
-            <Route path="/" component={SplashScreen} />
-            <Route path="/signup" component={SignUpScreen} />
-            <Route path="/role-select" component={RoleSelectScreen} />
-            <Route path="/onboarding" component={OnboardingScreen} />
-            <Route path="/login" component={LoginScreen} />
-            <Route path="/profile-setup" component={ProfileSetupScreen} />
-            <Route path="/worker/:username" component={WorkerProfileScreen} />
+            {/* Auth / onboarding */}
+            <Route path="/"               component={SplashScreen}       />
+            <Route path="/signup"         component={SignUpScreen}        />
+            <Route path="/role-select"    component={RoleSelectScreen}    />
+            <Route path="/onboarding"     component={OnboardingScreen}    />
+            <Route path="/login"          component={LoginScreen}         />
+            <Route path="/profile-setup"  component={ProfileSetupScreen}  />
             <Route path="/reset-password" component={ResetPasswordScreen} />
-            <Route path="/shift/:id" component={ShiftDetailScreen} />
+            <Route path="/phone-auth"     component={PhoneAuthScreen}     />
+            <Route path="/auth/callback"  component={AuthCallbackScreen}  />
+
+            {/* Main tabs */}
+            <Route path="/home"     component={HomeScreen}     />
+            <Route path="/jobs"     component={JobsScreen}     />
+            <Route path="/explore"  component={ExploreScreen}  />
+            <Route path="/messages" component={MessagesScreen} />
+            <Route path="/profile"  component={ProfileScreen}  />
+
+            {/* Misc */}
+            <Route path="/notifications"    component={NotificationsScreen}  />
+            <Route path="/worker/:username" component={WorkerProfileScreen}  />
+            <Route path="/shift/:id"        component={ShiftDetailScreen}    />
+            <Route path="/clock/:id"        component={ClockInScreen}        />
+
+            {/* Client post-shift wizard */}
             <Route path="/post-shift/step1" component={PostShiftStep1Screen} />
             <Route path="/post-shift/step2" component={PostShiftStep2Screen} />
             <Route path="/post-shift/step3" component={PostShiftStep3Screen} />
             <Route path="/post-shift/step4" component={PostShiftStep4Screen} />
             <Route path="/post-shift/step5" component={PostShiftStep5Screen} />
+
+            {/* Staffer post-shift wizard */}
             <Route path="/staffer-shift/step1" component={StafferPostStep1Screen} />
             <Route path="/staffer-shift/step2" component={StafferPostStep2Screen} />
             <Route path="/staffer-shift/step3" component={StafferPostStep3Screen} />
@@ -91,14 +118,7 @@ function MobileRouter() {
             <Route path="/staffer-shift/step5" component={StafferPostStep5Screen} />
             <Route path="/staffer-shift/step6" component={StafferPostStep6Screen} />
             <Route path="/staffer-shift/step7" component={StafferPostStep7Screen} />
-            <Route path="/clock/:id" component={ClockInScreen} />
-            <Route path="/phone-auth" component={PhoneAuthScreen} />
-            <Route path="/auth/callback" component={AuthCallbackScreen} />
-            <Route path="/home" component={HomeScreen} />
-            <Route path="/jobs" component={JobsScreen} />
-            <Route path="/messages" component={MessagesScreen} />
-            <Route path="/notifications" component={NotificationsScreen} />
-            <Route path="/profile" component={ProfileScreen} />
+
             <Route component={NotFound} />
           </Switch>
         </motion.div>
@@ -107,21 +127,41 @@ function MobileRouter() {
   );
 }
 
-/** Admin panel routes (full-width, bypasses MobileContainer) */
+/**
+ * Admin panel — full-width, dark navy left sidebar + white content area.
+ * The login page hides the sidebar.
+ */
 function AdminRouter() {
+  const [location] = useLocation();
+  const showSidebar = location !== '/admin/login' && location !== '/admin';
+
   return (
-    <div className="min-h-[100dvh] bg-black" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-      <Switch>
-        <Route path="/admin/login"    component={AdminLogin}     />
-        <Route path="/admin/dashboard" component={AdminDashboard} />
-        <Route path="/admin/users"    component={AdminUsers}     />
-        <Route path="/admin/shifts"   component={AdminShifts}    />
-        <Route path="/admin/disputes" component={AdminDisputes}  />
-        {/* /admin → redirect to login */}
-        <Route path="/admin">
-          {() => { window.location.replace(window.location.pathname.replace(/\/admin\/?$/, '/admin/login')); return null; }}
-        </Route>
-      </Switch>
+    <div
+      className="min-h-[100dvh] flex"
+      style={{ fontFamily: "'Space Grotesk', sans-serif", background: '#0A1628' }}
+    >
+      {showSidebar && <AdminNav />}
+
+      <main className="flex-1 bg-white overflow-auto min-h-[100dvh]">
+        <Switch>
+          <Route path="/admin/login"     component={AdminLogin}     />
+          <Route path="/admin/dashboard" component={AdminDashboard} />
+          <Route path="/admin/users"     component={AdminUsers}     />
+          <Route path="/admin/shifts"    component={AdminShifts}    />
+          <Route path="/admin/disputes"  component={AdminDisputes}  />
+          <Route path="/admin/revenue"   component={AdminRevenue}   />
+          <Route path="/admin/settings"  component={AdminSettings}  />
+          {/* /admin bare → redirect to login */}
+          <Route path="/admin">
+            {() => {
+              window.location.replace(
+                window.location.pathname.replace(/\/admin\/?$/, '/admin/login'),
+              );
+              return null;
+            }}
+          </Route>
+        </Switch>
+      </main>
     </div>
   );
 }
@@ -138,14 +178,16 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? ''} libraries={['places']}>
         <AuthProvider>
-          <TooltipProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-              <ErrorBoundary>
-                <AppRouter />
-              </ErrorBoundary>
-            </WouterRouter>
-            <Toaster />
-          </TooltipProvider>
+          <RoleProvider>
+            <TooltipProvider>
+              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+                <ErrorBoundary>
+                  <AppRouter />
+                </ErrorBoundary>
+              </WouterRouter>
+              <Toaster />
+            </TooltipProvider>
+          </RoleProvider>
         </AuthProvider>
       </APIProvider>
     </QueryClientProvider>

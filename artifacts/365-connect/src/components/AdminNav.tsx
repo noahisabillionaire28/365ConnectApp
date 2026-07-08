@@ -1,12 +1,28 @@
+/**
+ * Admin left sidebar — full-height dark navy #0A1628.
+ * Items: Dashboard | Users | Shifts | Disputes | Revenue | Settings
+ * Active item background: #1E3A5F
+ * All text/icons: white (dimmed when inactive)
+ */
 import { Link, useLocation } from 'wouter';
-import { LayoutDashboard, Users, Briefcase, AlertTriangle, LogOut, ShieldCheck } from 'lucide-react';
+import {
+  LayoutDashboard, Users, Briefcase, AlertTriangle,
+  DollarSign, Settings, LogOut, ShieldCheck,
+} from 'lucide-react';
 import { adminLogout } from '@/store/adminStore';
 
-const TABS = [
+const NAVY   = '#0A1628';
+const ACTIVE = '#1E3A5F';
+const WHITE  = '#FFFFFF';
+const DIM    = 'rgba(255,255,255,0.55)';
+
+const NAV_ITEMS = [
   { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/admin/users',     icon: Users,           label: 'Users'     },
   { path: '/admin/shifts',    icon: Briefcase,       label: 'Shifts'    },
   { path: '/admin/disputes',  icon: AlertTriangle,   label: 'Disputes'  },
+  { path: '/admin/revenue',   icon: DollarSign,      label: 'Revenue'   },
+  { path: '/admin/settings',  icon: Settings,        label: 'Settings'  },
 ];
 
 export function AdminNav() {
@@ -18,43 +34,78 @@ export function AdminNav() {
   }
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-[#DBDBDB]">
-      {/* Brand row */}
-      <div className="flex items-center justify-between px-4 h-12 border-b border-[#DBDBDB]">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-[5px] bg-black flex items-center justify-center">
-            <ShieldCheck size={13} aria-hidden className="text-white" />
-          </div>
-          <span className="text-black font-bold text-[14px] tracking-tight">
-            365 <span className="text-[#737373]">Admin</span>
-          </span>
+    <aside
+      className="flex flex-col h-screen w-[220px] flex-shrink-0 sticky top-0"
+      style={{ background: NAVY, fontFamily: "'Space Grotesk', sans-serif" }}
+      aria-label="Admin sidebar"
+    >
+      {/* Brand */}
+      <div
+        className="flex items-center gap-3 px-5 h-[64px] flex-shrink-0"
+        style={{ borderBottom: `1px solid ${ACTIVE}` }}
+      >
+        <div
+          className="w-8 h-8 rounded-[8px] flex items-center justify-center flex-shrink-0"
+          style={{ background: ACTIVE }}
+        >
+          <ShieldCheck size={16} style={{ color: WHITE }} aria-hidden />
         </div>
-        <button type="button" aria-label="Log out of admin panel" onClick={handleLogout}
-          className="flex items-center gap-1.5 text-[#737373] text-[12px] font-medium active:text-black transition-colors">
-          <LogOut size={13} aria-hidden />
-          Logout
-        </button>
+        <div className="min-w-0">
+          <div className="font-bold text-[15px] leading-tight truncate" style={{ color: WHITE }}>
+            365 Connect
+          </div>
+          <div className="text-[11px] font-medium" style={{ color: DIM }}>
+            Admin Panel
+          </div>
+        </div>
       </div>
 
-      {/* Tab row */}
-      <nav aria-label="Admin navigation" className="flex bg-white">
-        {TABS.map(({ path, icon: Icon, label }) => {
-          const active = location === path || location.startsWith(path);
+      {/* Navigation */}
+      <nav className="flex-1 flex flex-col gap-1 px-3 py-4 overflow-y-auto" aria-label="Admin navigation">
+        {NAV_ITEMS.map(({ path, icon: Icon, label }) => {
+          const active = location === path || location.startsWith(path + '/');
           return (
-            <Link key={path} href={path} aria-label={`Go to ${label}`}
+            <Link
+              key={path}
+              href={path}
+              className="flex items-center gap-3 px-3 h-[44px] rounded-[8px] transition-colors"
+              style={{ background: active ? ACTIVE : 'transparent' }}
+              aria-label={label}
               aria-current={active ? 'page' : undefined}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 h-12 relative transition-colors ${
-                active ? 'text-black' : 'text-[#AAAAAA] hover:text-[#737373]'
-              }`}>
-              {active && (
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-[2px] bg-black rounded-t-full" />
-              )}
-              <Icon size={17} aria-hidden />
-              <span className="text-[10px] font-semibold uppercase tracking-wide">{label}</span>
+            >
+              <Icon
+                size={18}
+                aria-hidden
+                style={{ color: active ? WHITE : DIM, flexShrink: 0 }}
+              />
+              <span
+                className="text-[14px] font-semibold truncate"
+                style={{ color: active ? WHITE : DIM }}
+              >
+                {label}
+              </span>
             </Link>
           );
         })}
       </nav>
-    </header>
+
+      {/* Logout */}
+      <div className="px-3 py-4 flex-shrink-0" style={{ borderTop: `1px solid ${ACTIVE}` }}>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-3 h-[44px] w-full rounded-[8px] transition-colors"
+          style={{ background: 'transparent' }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = ACTIVE)}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          aria-label="Log out of admin panel"
+        >
+          <LogOut size={18} aria-hidden style={{ color: DIM, flexShrink: 0 }} />
+          <span className="text-[14px] font-semibold" style={{ color: DIM }}>
+            Log out
+          </span>
+        </button>
+      </div>
+    </aside>
   );
 }
