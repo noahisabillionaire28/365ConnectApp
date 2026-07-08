@@ -1,9 +1,11 @@
-import { useParams } from 'wouter';
+import { useParams, useLocation } from 'wouter';
 import { BadgeCheck, Star, ChevronLeft, Heart } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { friendlyDate } from '@/lib/supabase';
 import { useFollow } from '@/hooks/useFollow';
+import { useAuth } from '@/contexts/AuthContext';
+import { getOrCreateDirectConversation } from '@/hooks/useConversations';
 import { ProfileSkeleton } from '@/components/skeletons/ProfileSkeleton';
 
 type PublicUserRow = {
@@ -93,9 +95,12 @@ function FollowButton({ profileId }: { profileId: string }) {
 
 export function WorkerProfileScreen() {
   const params = useParams<{ username: string }>();
+  const [, navigate] = useLocation();
+  const { user: authUser } = useAuth();
   const [profile, setProfile] = useState<WorkerProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [isStartingChat, setStartingChat] = useState(false);
 
   const { followerCount } = useFollow(profile?.id ?? '');
 
@@ -151,6 +156,14 @@ export function WorkerProfileScreen() {
 
     fetchProfile();
   }, [params.username]);
+
+  async function handleMessage() {
+    if (!authUser?.id || !profile || isStartingChat) return;
+    setStartingChat(true);
+    const conversationId = await getOrCreateDirectConversation(authUser.id, profile.id);
+    setStartingChat(false);
+    if (conversationId) navigate(`/messages/${conversationId}`);
+  }
 
   if (loading) return <ProfileSkeleton />;
 
@@ -246,10 +259,12 @@ export function WorkerProfileScreen() {
         {/* Action buttons */}
         <div className="flex gap-3 mb-8">
           <FollowButton profileId={profile.id} />
-          <button type="button"
-            className="flex-1 bg-white border border-[#DBDBDB] text-black font-bold text-[14px] py-[14px] rounded-[8px] active:scale-[0.98] transition-transform">
-            Message
-          </button>
+          {authUser?.id !== profile.id && (
+            <button type="button" onClick={() => void handleMessage()} disabled={isStartingChat}
+              className="flex-1 bg-white border border-[#DBDBDB] text-black font-bold text-[14px] py-[14px] rounded-[8px] active:scale-[0.98] transition-transform disabled:opacity-50">
+              {isStartingChat ? 'Opening…' : 'Message'}
+            </button>
+          )}
           <button type="button" aria-label="More options"
             className="w-[52px] bg-white border border-[#DBDBDB] text-black font-bold py-[14px] rounded-[8px] active:scale-[0.98] transition-transform flex items-center justify-center">
             <span className="text-[16px] leading-none tracking-widest">···</span>

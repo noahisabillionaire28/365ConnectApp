@@ -1,22 +1,33 @@
 import { motion } from 'framer-motion';
-import { MapPin, CheckCheck, XCircle, Bell } from 'lucide-react';
+import {
+  MapPin, CheckCheck, XCircle, Bell, DollarSign, Star, UserPlus, Send, AlarmClock, Ban,
+} from 'lucide-react';
 import { useLocation } from 'wouter';
 import { BottomTabNav } from '@/components/BottomTabNav';
-import { useNotifications, relativeTime } from '@/hooks/useNotifications';
+import { useNotifications, relativeTime, notificationDeepLink } from '@/hooks/useNotifications';
 import type { NotificationRow as NotificationRowType } from '@/lib/supabase';
 
-type IconColor = 'blue' | 'green' | 'red';
+type IconColor = 'blue' | 'green' | 'red' | 'gold' | 'navy';
 
 const ICON_META: Record<string, { icon: React.ComponentType<{ size?: number; className?: string }>; color: IconColor }> = {
-  application_received: { icon: MapPin,     color: 'blue'  },
-  application_accepted: { icon: CheckCheck, color: 'green' },
-  application_declined: { icon: XCircle,    color: 'red'   },
+  application_received:  { icon: MapPin,      color: 'blue'  },
+  application_accepted:  { icon: CheckCheck,  color: 'green' },
+  application_declined:  { icon: XCircle,     color: 'red'   },
+  new_shift_match:       { icon: MapPin,      color: 'navy'  },
+  payment_received:      { icon: DollarSign,  color: 'green' },
+  new_review:            { icon: Star,        color: 'gold'  },
+  new_follower:          { icon: UserPlus,    color: 'navy'  },
+  direct_shift_request:  { icon: Send,        color: 'navy'  },
+  shift_cancelled:       { icon: Ban,         color: 'red'   },
+  shift_starting_soon:   { icon: AlarmClock,  color: 'blue'  },
 };
 
 const COLOR_CLASSES: Record<IconColor, { bg: string; icon: string }> = {
   blue:  { bg: 'bg-blue-50 border-blue-200',       icon: 'text-[#0095F6]' },
   green: { bg: 'bg-emerald-50 border-emerald-200', icon: 'text-emerald-600' },
   red:   { bg: 'bg-red-50 border-red-200',         icon: 'text-[#EF4444]' },
+  gold:  { bg: 'bg-amber-50 border-amber-200',     icon: 'text-amber-500' },
+  navy:  { bg: 'bg-slate-50 border-[#DBDBDB]',     icon: 'text-[#0A1628]' },
 };
 
 function SystemAvatar({ type }: { type: string }) {
@@ -30,24 +41,32 @@ function SystemAvatar({ type }: { type: string }) {
   );
 }
 
+function formatUsd(amount: number): string {
+  return `$${amount.toFixed(2)}`;
+}
+
 function NotificationCard({ item, index, onOpen }: { item: NotificationRowType; index: number; onOpen: () => void }) {
+  const isUnread = !item.read_at;
   return (
     <motion.button
       type="button" onClick={onOpen}
       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, delay: index * 0.04, ease: 'easeOut' }}
       className={`w-full flex items-start gap-3 px-4 py-3.5 border-b border-[#DBDBDB] text-left transition-colors ${
-        item.read ? 'bg-white' : 'bg-[#F0F7FF]'
+        isUnread ? 'bg-[#F0F4FA]' : 'bg-white'
       }`}
       role="listitem" aria-label={item.title}
     >
       <div className="w-2 flex-shrink-0 flex items-center justify-center self-center">
-        {!item.read && <div aria-label="Unread" className="w-2 h-2 rounded-full bg-[#0095F6]" />}
+        {isUnread && <div aria-label="Unread" className="w-2 h-2 rounded-full bg-[#0A1628]" />}
       </div>
       <SystemAvatar type={item.type} />
       <div className="flex-1 min-w-0">
         <p className="text-black font-semibold text-[14px] leading-[1.4]">{item.title}</p>
         {item.body && <p className="text-[#737373] text-[13px] leading-[1.4] mt-0.5">{item.body}</p>}
+        {item.type === 'payment_received' && item.amount != null && (
+          <p className="text-emerald-600 font-bold text-[14px] mt-1">{formatUsd(item.amount)}</p>
+        )}
         <p className="text-[#AAAAAA] text-[12px] font-medium mt-1">{relativeTime(item.created_at)}</p>
       </div>
     </motion.button>
@@ -62,7 +81,7 @@ function SectionHeader({ label, showMarkRead, onMarkRead }: {
       <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em]">{label}</p>
       {showMarkRead && (
         <button type="button" aria-label="Mark all notifications as read" onClick={onMarkRead}
-          className="text-[#0095F6] text-[12px] font-semibold active:opacity-60 transition-opacity">
+          className="text-[#0A1628] text-[12px] font-semibold active:opacity-60 transition-opacity">
           Mark all as read
         </button>
       )}
@@ -93,13 +112,15 @@ function isThisWeek(iso: string): boolean {
 
 export function NotificationsScreen() {
   const [, navigate] = useLocation();
-  const { items, isLoading, unreadCount, markAllRead } = useNotifications();
+  const { items, usernames, isLoading, unreadCount, markRead, markAllRead } = useNotifications();
 
   const today = items.filter((n) => !isThisWeek(n.created_at));
   const week  = items.filter((n) => isThisWeek(n.created_at));
 
   function handleOpen(item: NotificationRowType) {
-    if (item.related_shift_id) navigate(`/shift/${item.related_shift_id}`);
+    if (!item.read_at) void markRead(item.id);
+    const link = notificationDeepLink(item, usernames);
+    if (link) navigate(link);
   }
 
   return (
@@ -111,7 +132,7 @@ export function NotificationsScreen() {
             <h1 className="text-black font-bold text-[22px] tracking-tight">Notifications</h1>
             {unreadCount > 0 && (
               <span aria-label={`${unreadCount} unread notifications`}
-                className="min-w-[20px] h-5 rounded-full bg-[#0095F6] flex items-center justify-center px-1.5">
+                className="min-w-[20px] h-5 rounded-full bg-[#0A1628] flex items-center justify-center px-1.5">
                 <span className="text-white text-[11px] font-bold leading-none">{unreadCount}</span>
               </span>
             )}
@@ -134,7 +155,7 @@ export function NotificationsScreen() {
             </div>
             <p className="text-black font-semibold text-[16px]">No notifications yet</p>
             <p className="text-[#737373] text-[13px]">
-              You'll see updates here when someone messages you or reviews your applications.
+              You'll see updates here about applications, payments, reviews and more.
             </p>
           </div>
         ) : (

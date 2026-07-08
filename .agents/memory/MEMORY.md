@@ -7,3 +7,5 @@
 - [Cross-user writes need SECURITY DEFINER triggers](supabase-cross-user-writes.md) — RLS blocks direct client-side inserts into another user's rows (e.g. notifications)
 - [Column-level privacy needs a definer view, not RLS](supabase-column-masking-view.md) — RLS can't mask individual columns; use a plain (non-invoker) view + revoke base SELECT
 - [Verify Supabase SQL migrations actually applied](supabase-verify-migration-applied.md) — check live via PostgREST, don't trust "user ran it"; dollar-quoting typos silently break only part of a multi-statement script
+- [Edit tool corrupts $ in SQL dollar-quoting](edit-tool-dollar-quote-corruption.md) — Edit can collapse "$" to "$" in PL/pgSQL; always apply schema.sql against a scratch Postgres before trusting it
+- [Storage RLS must bind to the resource, not the uploader](supabase-storage-path-scoping.md) — namespace private-media object paths by conversation/thread id, not user id, or membership overlap leaks unrelated media

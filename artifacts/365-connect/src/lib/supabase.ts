@@ -82,15 +82,29 @@ export type ApplicationRow = {
   created_at: string;
 };
 
+export type NotificationType =
+  | 'application_received'
+  | 'application_accepted'
+  | 'application_declined'
+  | 'new_shift_match'
+  | 'payment_received'
+  | 'new_review'
+  | 'new_follower'
+  | 'direct_shift_request'
+  | 'shift_cancelled'
+  | 'shift_starting_soon';
+
+/** Matches the live `notifications` table exactly (read_at, not a boolean `read`). */
 export type NotificationRow = {
   id: string;
   user_id: string;
-  type: 'application_received' | 'application_accepted' | 'application_declined' | string;
+  type: NotificationType | string;
   title: string;
   body: string | null;
-  related_shift_id: string | null;
-  related_user_id: string | null;
-  read: boolean;
+  shift_id: string | null;
+  from_user_id: string | null;
+  amount: number | null;
+  read_at: string | null;
   created_at: string;
 };
 
@@ -118,12 +132,25 @@ export type PaymentRow = {
   created_at: string;
 };
 
+export type ConversationRow = {
+  id: string;
+  participant_a_id: string;
+  participant_b_id: string;
+  shift_id: string | null;
+  last_message: string | null;
+  last_message_at: string | null;
+  created_at: string;
+};
+
 export type MessageRow = {
   id: string;
+  conversation_id: string;
   sender_id: string;
-  recipient_id: string;
-  body: string;
-  read: boolean;
+  text: string | null;
+  image_url: string | null;
+  video_url: string | null;
+  voice_url: string | null;
+  read_at: string | null;
   created_at: string;
 };
 
@@ -266,4 +293,53 @@ export async function uploadPostPhoto(userId: string, file: File): Promise<strin
     return null;
   }
   return supabase.storage.from('post-photos').getPublicUrl(path).data.publicUrl;
+}
+
+/**
+ * Chat attachments live in a PRIVATE bucket (unlike public avatars/post-photos),
+ * so these return the storage PATH, not a public URL — resolve to a viewable
+ * URL at render time with `getSignedChatMediaUrl`.
+ *
+ * Paths are namespaced by CONVERSATION, not by uploader: `${conversationId}/kind/file`.
+ * That lets the storage RLS policy check "is this requester a participant of
+ * THIS conversation" directly, instead of "does the requester share *some*
+ * conversation with the uploader" — the latter would let a user who shares
+ * one thread with someone read that person's media from unrelated threads too.
+ */
+async function uploadChatMedia(
+  conversationId: string, file: Blob, kind: 'images' | 'videos' | 'voice', ext: string, contentType: string,
+): Promise<string | null> {
+  const path = `${conversationId}/${kind}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await supabase.storage
+    .from('chat-media')
+    .upload(path, file, { upsert: false, contentType });
+  if (error) {
+    console.error(`[Supabase Storage] Chat ${kind} upload failed:`, error.message);
+    return null;
+  }
+  return path;
+}
+
+export async function uploadChatImage(conversationId: string, file: File): Promise<string | null> {
+  const ext = file.name.split('.').pop() ?? 'jpg';
+  return uploadChatMedia(conversationId, file, 'images', ext, file.type);
+}
+
+export async function uploadChatVideo(conversationId: string, file: File): Promise<string | null> {
+  const ext = file.name.split('.').pop() ?? 'mp4';
+  return uploadChatMedia(conversationId, file, 'videos', ext, file.type);
+}
+
+export async function uploadChatVoice(conversationId: string, blob: Blob): Promise<string | null> {
+  return uploadChatMedia(conversationId, blob, 'voice', 'webm', blob.type || 'audio/webm');
+}
+
+/** Resolves a chat-media storage path to a short-lived viewable URL (1 hour). */
+export async function getSignedChatMediaUrl(path: string): Promise<string | null> {
+  const { data, error } = await supabase.storage.from('chat-media').createSignedUrl(path, 3600);
+  if (error) {
+    console.error('[Supabase Storage] Signed URL failed:', error.message);
+    return null;
+  }
+  return data.signedUrl;
 }

@@ -15,11 +15,28 @@ export function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-/** Real notifications for the current user, populated by DB triggers on `applications`. */
+/** Notification types whose deep link should go to the sender's public profile. */
+const PROFILE_LINK_TYPES = new Set(['new_review', 'new_follower']);
+/** Notification types that should route to the "who applied" screen instead of plain shift detail. */
+const APPLICANTS_LINK_TYPES = new Set(['application_received', 'direct_shift_request']);
+
+/** Resolves where tapping a notification should navigate to, given a username lookup map. */
+export function notificationDeepLink(item: NotificationRow, usernames: Map<string, string>): string | null {
+  if (PROFILE_LINK_TYPES.has(item.type) && item.from_user_id) {
+    const username = usernames.get(item.from_user_id);
+    return username ? `/worker/${username}` : null;
+  }
+  if (item.shift_id && APPLICANTS_LINK_TYPES.has(item.type)) return `/shift/${item.shift_id}/applicants`;
+  if (item.shift_id) return `/shift/${item.shift_id}`;
+  return null;
+}
+
+/** Real notifications for the current user, populated by DB triggers. */
 export function useNotifications() {
   const { user } = useAuth();
-  const [items, setItems]       = useState<NotificationRow[]>([]);
-  const [isLoading, setLoading] = useState(true);
+  const [items, setItems]         = useState<NotificationRow[]>([]);
+  const [usernames, setUsernames] = useState<Map<string, string>>(new Map());
+  const [isLoading, setLoading]   = useState(true);
 
   const load = useCallback(async () => {
     if (!user?.id) { setItems([]); setLoading(false); return; }
@@ -33,8 +50,16 @@ export function useNotifications() {
     if (error) {
       console.error('[useNotifications] fetch failed:', error.message);
       setItems([]);
-    } else {
-      setItems((data ?? []) as NotificationRow[]);
+      setLoading(false);
+      return;
+    }
+    const rows = (data ?? []) as NotificationRow[];
+    setItems(rows);
+
+    const fromIds = [...new Set(rows.map((n) => n.from_user_id).filter((id): id is string => !!id))];
+    if (fromIds.length > 0) {
+      const { data: users } = await supabase.from('users').select('id, username').in('id', fromIds);
+      setUsernames(new Map((users ?? []).filter((u) => u.username).map((u) => [u.id, u.username as string])));
     }
     setLoading(false);
   }, [user?.id]);
@@ -54,14 +79,21 @@ export function useNotifications() {
     return () => { void supabase.removeChannel(channel); };
   }, [user?.id]);
 
-  const unreadCount = items.filter((n) => !n.read).length;
+  const unreadCount = items.filter((n) => !n.read_at).length;
+
+  async function markRead(id: string) {
+    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: n.read_at ?? new Date().toISOString() } : n)));
+    const { error } = await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id).is('read_at', null);
+    if (error) console.error('[useNotifications] markRead failed:', error.message);
+  }
 
   async function markAllRead() {
     if (!user?.id || unreadCount === 0) return;
-    setItems((prev) => prev.map((n) => ({ ...n, read: true })));
-    const { error } = await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
+    const nowIso = new Date().toISOString();
+    setItems((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? nowIso })));
+    const { error } = await supabase.from('notifications').update({ read_at: nowIso }).eq('user_id', user.id).is('read_at', null);
     if (error) console.error('[useNotifications] markAllRead failed:', error.message);
   }
 
-  return { items, isLoading, unreadCount, markAllRead, refetch: load };
+  return { items, usernames, isLoading, unreadCount, markRead, markAllRead, refetch: load };
 }

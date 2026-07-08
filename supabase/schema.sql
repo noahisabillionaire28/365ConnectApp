@@ -419,7 +419,7 @@ DECLARE
 BEGIN
   SELECT client_id, title INTO v_client_id, v_shift_title FROM public.shifts WHERE id = NEW.shift_id;
   IF v_client_id IS NOT NULL THEN
-    INSERT INTO public.notifications (user_id, type, title, body, related_shift_id, related_user_id)
+    INSERT INTO public.notifications (user_id, type, title, body, shift_id, from_user_id)
     VALUES (
       v_client_id, 'application_received', 'New applicant',
       'Someone applied to your ' || COALESCE(v_shift_title, 'shift') || '.',
@@ -445,19 +445,19 @@ BEGIN
   SELECT title INTO v_shift_title FROM public.shifts WHERE id = NEW.shift_id;
 
   IF NEW.status = 'accepted' THEN
-    INSERT INTO public.notifications (user_id, type, title, body, related_shift_id)
-    VALUES (
+    INSERT INTO public.notifications (user_id, type, title, body, shift_id, from_user_id)
+    SELECT
       NEW.worker_id, 'application_accepted', 'Application approved',
       'You''re confirmed for ' || COALESCE(v_shift_title, 'the shift') || '. Clock in is now unlocked.',
-      NEW.shift_id
-    );
+      NEW.shift_id, s.client_id
+    FROM public.shifts s WHERE s.id = NEW.shift_id;
   ELSIF NEW.status = 'declined' THEN
-    INSERT INTO public.notifications (user_id, type, title, body, related_shift_id)
-    VALUES (
+    INSERT INTO public.notifications (user_id, type, title, body, shift_id, from_user_id)
+    SELECT
       NEW.worker_id, 'application_declined', 'Application update',
       'You were not selected for ' || COALESCE(v_shift_title, 'the shift') || '.',
-      NEW.shift_id
-    );
+      NEW.shift_id, s.client_id
+    FROM public.shifts s WHERE s.id = NEW.shift_id;
   END IF;
   RETURN NEW;
 END;
@@ -467,3 +467,374 @@ DROP TRIGGER IF EXISTS trg_notify_application_status_changed ON public.applicati
 CREATE TRIGGER trg_notify_application_status_changed
   AFTER UPDATE ON public.applications
   FOR EACH ROW EXECUTE FUNCTION public.notify_application_status_changed();
+
+-- ============================================================
+-- Phase 6: Messaging & Notifications (Section 6)
+-- Run in Supabase SQL Editor if upgrading an existing DB.
+-- Adds: conversations, messages (conversation-based, media), full
+--       notification type coverage, chat-media storage bucket.
+--
+-- IMPORTANT: the live `notifications` table already exists with columns
+-- (id, user_id, type, title, body, shift_id, from_user_id, amount,
+-- read_at, created_at) and RLS disabled — this migration matches that
+-- exact shape (NOT the related_shift_id/related_user_id/read names used
+-- by the original Phase 5 draft above) and turns RLS on.
+-- ============================================================
+
+-- ─── Notifications: align to live schema + enable RLS ───────────────────────────
+ALTER TABLE public.notifications
+  ADD COLUMN IF NOT EXISTS shift_id     UUID REFERENCES public.shifts(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS from_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS amount       NUMERIC(10,2),
+  ADD COLUMN IF NOT EXISTS read_at      TIMESTAMPTZ;
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "notifications_select" ON public.notifications;
+DROP POLICY IF EXISTS "notifications_update" ON public.notifications;
+
+CREATE POLICY "notifications_select" ON public.notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "notifications_update" ON public.notifications FOR UPDATE USING (auth.uid() = user_id);
+-- No client-side INSERT policy — rows are created only by SECURITY DEFINER
+-- triggers, so one user can generate a notification for another without
+-- needing direct write access to their notifications row.
+
+-- ─── Conversations ────────────────────────────────────────────────────────────
+-- Every conversation is exactly 2 participants — either an open DM (shift_id
+-- IS NULL) or the auto-created chat for a confirmed shift (shift_id set).
+CREATE TABLE IF NOT EXISTS public.conversations (
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  participant_a_id UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  participant_b_id UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  shift_id         UUID        REFERENCES public.shifts(id) ON DELETE SET NULL,
+  last_message     TEXT,
+  last_message_at  TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT conversations_distinct_participants CHECK (participant_a_id <> participant_b_id)
+);
+
+-- At most one open DM per unordered pair, and at most one conversation per
+-- (shift, pair) — prevents duplicate threads when either side re-opens/re-taps.
+CREATE UNIQUE INDEX IF NOT EXISTS conversations_unique_dm
+  ON public.conversations (LEAST(participant_a_id, participant_b_id), GREATEST(participant_a_id, participant_b_id))
+  WHERE shift_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS conversations_unique_shift_pair
+  ON public.conversations (shift_id, LEAST(participant_a_id, participant_b_id), GREATEST(participant_a_id, participant_b_id))
+  WHERE shift_id IS NOT NULL;
+
+ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "conversations_select" ON public.conversations;
+DROP POLICY IF EXISTS "conversations_insert" ON public.conversations;
+DROP POLICY IF EXISTS "conversations_update" ON public.conversations;
+
+CREATE POLICY "conversations_select" ON public.conversations FOR SELECT
+  USING (auth.uid() IN (participant_a_id, participant_b_id));
+CREATE POLICY "conversations_insert" ON public.conversations FOR INSERT
+  WITH CHECK (auth.uid() IN (participant_a_id, participant_b_id));
+-- No client-side UPDATE policy: participant_a_id/participant_b_id/shift_id must
+-- never be reassignable by either party (that would let a user hijack another
+-- conversation's identity), and last_message/last_message_at are only ever
+-- written by the SECURITY DEFINER trg_touch_conversation_on_message trigger.
+
+-- ─── Messages: rebuild around conversation_id + media ───────────────────────────
+-- The original Phase-1 `messages` table was sender/recipient-pair based with a
+-- single `body` column. Widen it in place rather than dropping, in case any
+-- rows already exist.
+ALTER TABLE public.messages ALTER COLUMN recipient_id DROP NOT NULL;
+ALTER TABLE public.messages ALTER COLUMN body DROP NOT NULL;
+ALTER TABLE public.messages
+  ADD COLUMN IF NOT EXISTS conversation_id UUID REFERENCES public.conversations(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS text            TEXT,
+  ADD COLUMN IF NOT EXISTS image_url       TEXT,
+  ADD COLUMN IF NOT EXISTS video_url       TEXT,
+  ADD COLUMN IF NOT EXISTS voice_url       TEXT,
+  ADD COLUMN IF NOT EXISTS read_at         TIMESTAMPTZ;
+
+UPDATE public.messages SET text = body WHERE text IS NULL AND body IS NOT NULL;
+
+DROP POLICY IF EXISTS "messages_select" ON public.messages;
+DROP POLICY IF EXISTS "messages_insert" ON public.messages;
+DROP POLICY IF EXISTS "messages_update" ON public.messages;
+
+CREATE POLICY "messages_select" ON public.messages FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.conversations c
+      WHERE c.id = messages.conversation_id
+        AND auth.uid() IN (c.participant_a_id, c.participant_b_id)
+    )
+  );
+CREATE POLICY "messages_insert" ON public.messages FOR INSERT
+  WITH CHECK (
+    auth.uid() = sender_id AND
+    EXISTS (
+      SELECT 1 FROM public.conversations c
+      WHERE c.id = messages.conversation_id
+        AND auth.uid() IN (c.participant_a_id, c.participant_b_id)
+    )
+  );
+-- Only the RECEIVING participant may UPDATE a message (to stamp read_at),
+-- never the sender — this stops a sender from rewriting their own message
+-- content/attachments after the fact via a bare UPDATE.
+CREATE POLICY "messages_update" ON public.messages FOR UPDATE
+  USING (
+    auth.uid() <> sender_id AND
+    EXISTS (
+      SELECT 1 FROM public.conversations c
+      WHERE c.id = messages.conversation_id
+        AND auth.uid() IN (c.participant_a_id, c.participant_b_id)
+    )
+  )
+  WITH CHECK (
+    auth.uid() <> sender_id AND
+    EXISTS (
+      SELECT 1 FROM public.conversations c
+      WHERE c.id = messages.conversation_id
+        AND auth.uid() IN (c.participant_a_id, c.participant_b_id)
+    )
+  );
+
+-- Belt-and-braces: RLS alone can't stop the receiving participant's UPDATE
+-- from also rewriting message content/attachments/conversation_id — only
+-- read_at may change on any UPDATE.
+CREATE OR REPLACE FUNCTION public.enforce_message_read_only_update()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.conversation_id IS DISTINCT FROM OLD.conversation_id
+     OR NEW.sender_id     IS DISTINCT FROM OLD.sender_id
+     OR NEW.text          IS DISTINCT FROM OLD.text
+     OR NEW.image_url     IS DISTINCT FROM OLD.image_url
+     OR NEW.video_url     IS DISTINCT FROM OLD.video_url
+     OR NEW.voice_url     IS DISTINCT FROM OLD.voice_url
+     OR NEW.created_at    IS DISTINCT FROM OLD.created_at
+  THEN
+    RAISE EXCEPTION 'Only read_at may be updated on an existing message';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_enforce_message_read_only_update ON public.messages;
+CREATE TRIGGER trg_enforce_message_read_only_update
+  BEFORE UPDATE ON public.messages
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_message_read_only_update();
+
+-- ─── Trigger: keep conversations.last_message / last_message_at fresh ──────────
+CREATE OR REPLACE FUNCTION public.touch_conversation_on_message()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE public.conversations
+  SET    last_message    = COALESCE(NEW.text, CASE
+           WHEN NEW.image_url IS NOT NULL THEN '📷 Photo'
+           WHEN NEW.video_url IS NOT NULL THEN '🎥 Video'
+           WHEN NEW.voice_url IS NOT NULL THEN '🎤 Voice message'
+           ELSE ''
+         END),
+         last_message_at = NEW.created_at
+  WHERE  id = NEW.conversation_id;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_touch_conversation_on_message ON public.messages;
+CREATE TRIGGER trg_touch_conversation_on_message
+  AFTER INSERT ON public.messages
+  FOR EACH ROW EXECUTE FUNCTION public.touch_conversation_on_message();
+
+-- ─── Trigger: auto-create the shift group chat when a worker is confirmed ──────
+CREATE OR REPLACE FUNCTION public.create_shift_conversation()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_client_id UUID;
+BEGIN
+  IF NEW.status = 'accepted' AND (OLD.status IS DISTINCT FROM 'accepted') THEN
+    SELECT client_id INTO v_client_id FROM public.shifts WHERE id = NEW.shift_id;
+    IF v_client_id IS NOT NULL THEN
+      INSERT INTO public.conversations (participant_a_id, participant_b_id, shift_id)
+      VALUES (NEW.worker_id, v_client_id, NEW.shift_id)
+      ON CONFLICT DO NOTHING;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_create_shift_conversation ON public.applications;
+CREATE TRIGGER trg_create_shift_conversation
+  AFTER UPDATE ON public.applications
+  FOR EACH ROW EXECUTE FUNCTION public.create_shift_conversation();
+
+-- ─── Trigger: notify on payment received ────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.notify_payment_received()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  INSERT INTO public.notifications (user_id, type, title, body, shift_id, amount)
+  VALUES (
+    NEW.worker_id, 'payment_received', 'Payment received',
+    'Your payout has been deposited.', NEW.shift_id, NEW.net_amount
+  );
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_notify_payment_received ON public.payments;
+CREATE TRIGGER trg_notify_payment_received
+  AFTER INSERT ON public.payments
+  FOR EACH ROW EXECUTE FUNCTION public.notify_payment_received();
+
+-- ─── Trigger: notify on new review ───────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.notify_new_review()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  INSERT INTO public.notifications (user_id, type, title, body, shift_id, from_user_id)
+  VALUES (
+    NEW.reviewee_id, 'new_review', 'New review',
+    'You received a ' || NEW.rating || '-star review.', NEW.shift_id, NEW.reviewer_id
+  );
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_notify_new_review ON public.reviews;
+CREATE TRIGGER trg_notify_new_review
+  AFTER INSERT ON public.reviews
+  FOR EACH ROW EXECUTE FUNCTION public.notify_new_review();
+
+-- ─── Trigger: notify on new follower ─────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.notify_new_follower()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_username TEXT;
+BEGIN
+  SELECT username INTO v_username FROM public.users WHERE id = NEW.follower_id;
+  INSERT INTO public.notifications (user_id, type, title, body, from_user_id)
+  VALUES (
+    NEW.following_id, 'new_follower', 'New follower',
+    '@' || COALESCE(v_username, 'Someone') || ' started following you.', NEW.follower_id
+  );
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_notify_new_follower ON public.follows;
+CREATE TRIGGER trg_notify_new_follower
+  AFTER INSERT ON public.follows
+  FOR EACH ROW EXECUTE FUNCTION public.notify_new_follower();
+
+-- ─── Trigger: notify accepted workers when a client cancels a shift ─────────────
+CREATE OR REPLACE FUNCTION public.notify_shift_cancelled()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NEW.status = 'cancelled' AND OLD.status IS DISTINCT FROM 'cancelled' THEN
+    INSERT INTO public.notifications (user_id, type, title, body, shift_id, from_user_id)
+    SELECT a.worker_id, 'shift_cancelled', 'Shift cancelled',
+           COALESCE(NEW.title, 'A shift') || ' was cancelled by the client.',
+           NEW.id, NEW.client_id
+    FROM public.applications a
+    WHERE a.shift_id = NEW.id AND a.status = 'accepted';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_notify_shift_cancelled ON public.shifts;
+CREATE TRIGGER trg_notify_shift_cancelled
+  AFTER UPDATE ON public.shifts
+  FOR EACH ROW EXECUTE FUNCTION public.notify_shift_cancelled();
+
+-- ─── Trigger: notify workers of a newly posted shift matching their job types ──
+-- Matches on job_types overlap and a 25-mile radius from the worker's lat/lng
+-- (workers without saved coordinates are skipped rather than guessed).
+CREATE OR REPLACE FUNCTION public.notify_new_shift_match()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NEW.status = 'open' THEN
+    INSERT INTO public.notifications (user_id, type, title, body, shift_id)
+    SELECT u.id, 'new_shift_match', 'New shift near you',
+           COALESCE(NEW.title, 'A new shift') || ' matches your job type.',
+           NEW.id
+    FROM public.users u
+    WHERE u.role = 'worker'
+      AND u.job_types && NEW.job_types
+      AND u.lat IS NOT NULL AND u.lng IS NOT NULL
+      AND NEW.lat IS NOT NULL AND NEW.lng IS NOT NULL
+      AND (
+        3958.8 * 2 * ASIN(SQRT(
+          POWER(SIN(RADIANS(NEW.lat - u.lat) / 2), 2) +
+          COS(RADIANS(u.lat)) * COS(RADIANS(NEW.lat)) *
+          POWER(SIN(RADIANS(NEW.lng - u.lng) / 2), 2)
+        ))
+      ) <= 25;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_notify_new_shift_match ON public.shifts;
+CREATE TRIGGER trg_notify_new_shift_match
+  AFTER INSERT ON public.shifts
+  FOR EACH ROW EXECUTE FUNCTION public.notify_new_shift_match();
+
+-- ─── Scheduled: notify workers a confirmed shift starts in ~2 hours ─────────────
+-- Requires the `pg_cron` extension (Supabase Dashboard → Database →
+-- Extensions → enable "pg_cron"), then run the `cron.schedule(...)` call at
+-- the bottom of this block once. Safe to re-run — it dedupes against
+-- existing 'shift_starting_soon' notifications for the same user+shift.
+CREATE OR REPLACE FUNCTION public.notify_shifts_starting_soon()
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  INSERT INTO public.notifications (user_id, type, title, body, shift_id)
+  SELECT a.worker_id, 'shift_starting_soon', 'Shift starting soon',
+         COALESCE(s.title, 'Your shift') || ' starts in about 2 hours.',
+         s.id
+  FROM public.shifts s
+  JOIN public.applications a ON a.shift_id = s.id AND a.status = 'accepted'
+  WHERE s.start_time BETWEEN NOW() + INTERVAL '110 minutes' AND NOW() + INTERVAL '130 minutes'
+    AND NOT EXISTS (
+      SELECT 1 FROM public.notifications n
+      WHERE n.user_id = a.worker_id AND n.shift_id = s.id AND n.type = 'shift_starting_soon'
+    );
+END;
+$$;
+
+-- Run this once (after enabling the pg_cron extension) to schedule the job
+-- every 15 minutes:
+-- SELECT cron.schedule('notify-shifts-starting-soon', '*/15 * * * *',
+--   $$SELECT public.notify_shifts_starting_soon();$$);
+
+-- ─── Storage: chat media bucket (photos, videos, voice notes) ───────────────────
+-- PRIVATE bucket (unlike the public avatars/post-photos buckets) — chat
+-- attachments are only ever meant to be visible to the two conversation
+-- participants, so the app fetches them via short-lived signed URLs
+-- (see getSignedChatMediaUrl in src/lib/supabase.ts) rather than public URLs.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('chat-media', 'chat-media', false)
+ON CONFLICT (id) DO UPDATE SET public = false;
+
+DROP POLICY IF EXISTS "chat_media_read" ON storage.objects;
+DROP POLICY IF EXISTS "chat_media_insert" ON storage.objects;
+
+-- Object paths are `${conversationId}/kind/file.ext` (namespaced by CONVERSATION,
+-- not by uploader) — see uploadChatImage/Video/Voice in src/lib/supabase.ts.
+-- (storage.foldername(name))[1] is therefore the conversation id, so this
+-- checks "is the requester a participant of THIS SPECIFIC conversation",
+-- not "does the requester share *some* conversation with the uploader" —
+-- the latter would let sharing one thread with someone leak their media
+-- from unrelated threads too.
+CREATE POLICY "chat_media_read" ON storage.objects FOR SELECT
+  USING (
+    bucket_id = 'chat-media' AND EXISTS (
+      SELECT 1 FROM public.conversations c
+      WHERE c.id = (storage.foldername(name))[1]::uuid
+        AND auth.uid() IN (c.participant_a_id, c.participant_b_id)
+    )
+  );
+CREATE POLICY "chat_media_insert" ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'chat-media' AND EXISTS (
+      SELECT 1 FROM public.conversations c
+      WHERE c.id = (storage.foldername(name))[1]::uuid
+        AND auth.uid() IN (c.participant_a_id, c.participant_b_id)
+    )
+  );

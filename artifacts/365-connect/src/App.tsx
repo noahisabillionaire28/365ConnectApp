@@ -31,6 +31,7 @@ import { HomeScreen }            from '@/pages/HomeScreen';
 import { JobsScreen }            from '@/pages/JobsScreen';
 import { ExploreScreen }         from '@/pages/ExploreScreen';
 import { MessagesScreen }        from '@/pages/MessagesScreen';
+import { ChatScreen }            from '@/pages/ChatScreen';
 import { NotificationsScreen }   from '@/pages/NotificationsScreen';
 import { ProfileScreen }         from '@/pages/ProfileScreen';
 
@@ -112,6 +113,7 @@ function MobileRouter() {
             <Route path="/jobs"          component={JobsScreen}          />
             <Route path="/explore"       component={ExploreScreen}       />
             <Route path="/messages"      component={MessagesScreen}      />
+            <Route path="/messages/:conversationId" component={ChatScreen} />
             <Route path="/notifications" component={NotificationsScreen} />
             <Route path="/profile"       component={ProfileScreen}       />
 
