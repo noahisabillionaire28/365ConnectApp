@@ -1238,3 +1238,99 @@ CREATE POLICY "payments_select" ON public.payments FOR SELECT
 
 -- Insert policy is unchanged: any user can insert rows where worker_id = their own id.
 -- (Covers both clock-out payouts and Pro subscription self-charges.)
+
+-- ============================================================
+-- Phase 11: Full Admin Panel (Section 11)
+-- Run in Supabase SQL Editor on existing databases.
+-- Changes:
+--   1. Add `status` column to users (active/suspended/flagged)
+--   2. Create `disputes` table with full RLS
+--   3. Admin-role SELECT policies on users, shifts, payments,
+--      applications so the admin API (service-role key) can
+--      read all rows regardless of auth.uid().
+-- ============================================================
+
+-- 1. User moderation status
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+
+-- Constrain values
+DO $$ BEGIN
+  ALTER TABLE public.users
+    ADD CONSTRAINT users_status_check CHECK (status IN ('active', 'suspended', 'flagged'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 2. Disputes table
+CREATE TABLE IF NOT EXISTS public.disputes (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  type                TEXT        NOT NULL,   -- 'no-show' | 'late-cancel' | 'fake-review' | 'dress-code' | 'payment' | 'harassment'
+  reported_user_id    UUID        REFERENCES public.users(id) ON DELETE SET NULL,
+  reported_by_user_id UUID        REFERENCES public.users(id) ON DELETE SET NULL,
+  reason              TEXT        NOT NULL,
+  status              TEXT        NOT NULL DEFAULT 'open',  -- 'open' | 'resolved' | 'warned' | 'banned'
+  resolution_note     TEXT,
+  resolved_at         TIMESTAMPTZ,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.disputes ENABLE ROW LEVEL SECURITY;
+
+-- Only admin-role users (or the service-role key bypassing RLS) may access disputes
+DO $ BEGIN
+  CREATE POLICY "disputes_admin_all" ON public.disputes FOR ALL
+    USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $;
+
+-- 3. Allow admin-role users to SELECT across all core tables
+--    (The API server uses the service-role key which bypasses RLS anyway,
+--     but these policies cover direct Supabase admin logins too.)
+
+-- users_admin_select
+DO $$ BEGIN
+  CREATE POLICY "users_admin_select" ON public.users FOR SELECT
+    USING (
+      auth.uid() = id
+      OR EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+    );
+EXCEPTION WHEN duplicate_object THEN
+  -- policy already exists from an earlier phase; skip
+  NULL;
+END $$;
+
+-- shifts_admin_select
+DO $$ BEGIN
+  CREATE POLICY "shifts_admin_select" ON public.shifts FOR SELECT
+    USING (
+      auth.uid() = client_id
+      OR EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- payments_admin_select (supplements the Phase 10 policy)
+DO $$ BEGIN
+  CREATE POLICY "payments_admin_select" ON public.payments FOR SELECT
+    USING (
+      auth.uid() = worker_id
+      OR (shift_id IS NOT NULL AND auth.uid() = (SELECT client_id FROM public.shifts WHERE id = shift_id))
+      OR EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- applications_admin_select
+DO $$ BEGIN
+  CREATE POLICY "applications_admin_select" ON public.applications FOR SELECT
+    USING (
+      auth.uid() = worker_id
+      OR auth.uid() = (SELECT client_id FROM public.shifts WHERE id = shift_id)
+      OR EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 4. Allow admin-role users to UPDATE user status/role
+DO $$ BEGIN
+  CREATE POLICY "users_admin_update" ON public.users FOR UPDATE
+    USING (
+      auth.uid() = id
+      OR EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

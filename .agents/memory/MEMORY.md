@@ -12,3 +12,5 @@
 - [Messaging data layer](messaging-data-layer.md) — conversations table (not raw sender/recipient pairs) backs DMs; getOrCreateDirectConversation finds-or-creates a thread before navigating to ChatScreen
 - [Shifts pay/spots column names](shifts-pay-spots-columns.md) — live `shifts` table uses `pay_rate`/`spots_available`, not the `hourly_rate`/`spots` names schema.sql and older code assumed
 - [Live Supabase DB unreachable from sandbox](supabase-no-direct-db-access.md) — direct/pooler psql fails; hand user SQL to run in dashboard, verify live via PostgREST after
+- [Admin API pre-migration fallbacks](admin-api-fallbacks.md) — admin endpoints must fallback gracefully when Phase 11 columns/tables aren't migrated yet; pattern: catch code 42703 (column) or PGRST205/42P01 (table), re-query without them, default values
+- [CREATE POLICY IF NOT EXISTS invalid in Postgres](supabase-policy-if-not-exists.md) — use DO/EXCEPTION WHEN duplicate_object THEN NULL pattern for idempotent policy creation in schema.sql

@@ -160,37 +160,35 @@ function MobileRouter() {
   );
 }
 
-// ── Admin router — full-width left-sidebar layout ────────────────────────────
+// ── Admin router — fixed top-bar nav + content ────────────────────────────────
 function AdminRouter() {
   const [location] = useLocation();
-  const showSidebar = location !== '/admin/login' && location !== '/admin';
+  const showNav = location !== '/admin/login' && location !== '/admin';
 
   return (
     <div
-      className="min-h-[100dvh] flex"
-      style={{ fontFamily: "'Space Grotesk', sans-serif", background: '#0A1628' }}
+      className="min-h-[100dvh] bg-[#FAFAFA]"
+      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
     >
-      {showSidebar && <AdminNav />}
+      {showNav && <AdminNav />}
 
-      <main className="flex-1 bg-white overflow-auto min-h-[100dvh]">
-        <Switch>
-          <Route path="/admin/login"     component={AdminLogin}     />
-          <Route path="/admin/dashboard" component={AdminDashboard} />
-          <Route path="/admin/users"     component={AdminUsers}     />
-          <Route path="/admin/shifts"    component={AdminShifts}    />
-          <Route path="/admin/disputes"  component={AdminDisputes}  />
-          <Route path="/admin/revenue"   component={AdminRevenue}   />
-          <Route path="/admin/settings"  component={AdminSettings}  />
-          <Route path="/admin">
-            {() => {
-              window.location.replace(
-                window.location.pathname.replace(/\/admin\/?$/, '/admin/login'),
-              );
-              return null;
-            }}
-          </Route>
-        </Switch>
-      </main>
+      <Switch>
+        <Route path="/admin/login"     component={AdminLogin}     />
+        <Route path="/admin/dashboard" component={AdminDashboard} />
+        <Route path="/admin/users"     component={AdminUsers}     />
+        <Route path="/admin/shifts"    component={AdminShifts}    />
+        <Route path="/admin/disputes"  component={AdminDisputes}  />
+        <Route path="/admin/revenue"   component={AdminRevenue}   />
+        <Route path="/admin/settings"  component={AdminSettings}  />
+        <Route path="/admin">
+          {() => {
+            window.location.replace(
+              window.location.pathname.replace(/\/admin\/?$/, '/admin/login'),
+            );
+            return null;
+          }}
+        </Route>
+      </Switch>
     </div>
   );
 }

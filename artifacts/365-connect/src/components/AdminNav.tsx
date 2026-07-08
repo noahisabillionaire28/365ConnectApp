@@ -1,20 +1,18 @@
 /**
- * Admin left sidebar — full-height dark navy #0A1628.
- * Items: Dashboard | Users | Shifts | Disputes | Revenue | Settings
- * Active item background: #1E3A5F
- * All text/icons: white (dimmed when inactive)
+ * Admin navigation — fixed top bar (60 px) + slide-out drawer on mobile.
+ * Designed for 390 px mobile; works the same on wider viewports.
  */
+import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   LayoutDashboard, Users, Briefcase, AlertTriangle,
-  DollarSign, Settings, LogOut, ShieldCheck,
+  DollarSign, Settings, LogOut, ShieldCheck, Menu, X,
 } from 'lucide-react';
 import { adminLogout } from '@/store/adminStore';
 
 const NAVY   = '#0A1628';
 const ACTIVE = '#1E3A5F';
-const WHITE  = '#FFFFFF';
-const DIM    = 'rgba(255,255,255,0.55)';
 
 const NAV_ITEMS = [
   { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -27,85 +25,136 @@ const NAV_ITEMS = [
 
 export function AdminNav() {
   const [location, navigate] = useLocation();
+  const [open, setOpen]      = useState(false);
 
   function handleLogout() {
+    setOpen(false);
     adminLogout();
     navigate('/admin/login');
   }
 
   return (
-    <aside
-      className="flex flex-col h-screen w-[220px] flex-shrink-0 sticky top-0"
-      style={{ background: NAVY, fontFamily: "'Space Grotesk', sans-serif" }}
-      aria-label="Admin sidebar"
-    >
-      {/* Brand */}
-      <div
-        className="flex items-center gap-3 px-5 h-[64px] flex-shrink-0"
-        style={{ borderBottom: `1px solid ${ACTIVE}` }}
+    <>
+      {/* ── Fixed top bar ────────────────────────────────────────────────── */}
+      <header
+        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4"
+        style={{ height: 60, background: NAVY }}
       >
-        <div
-          className="w-8 h-8 rounded-[8px] flex items-center justify-center flex-shrink-0"
-          style={{ background: ACTIVE }}
-        >
-          <ShieldCheck size={16} style={{ color: WHITE }} aria-hidden />
-        </div>
-        <div className="min-w-0">
-          <div className="font-bold text-[15px] leading-tight truncate" style={{ color: WHITE }}>
-            365 Connect
+        {/* Brand */}
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-8 h-8 rounded-[8px] flex items-center justify-center flex-shrink-0"
+            style={{ background: ACTIVE }}
+          >
+            <ShieldCheck size={15} className="text-white" aria-hidden />
           </div>
-          <div className="text-[11px] font-medium" style={{ color: DIM }}>
-            Admin Panel
+          <div>
+            <p className="text-white font-bold text-[14px] leading-tight tracking-tight">365 Connect</p>
+            <p className="text-white/50 text-[10px] font-medium uppercase tracking-[0.14em]">Admin Panel</p>
           </div>
         </div>
-      </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 flex flex-col gap-1 px-3 py-4 overflow-y-auto" aria-label="Admin navigation">
-        {NAV_ITEMS.map(({ path, icon: Icon, label }) => {
-          const active = location === path || location.startsWith(path + '/');
-          return (
-            <Link
-              key={path}
-              href={path}
-              className="flex items-center gap-3 px-3 h-[44px] rounded-[8px] transition-colors"
-              style={{ background: active ? ACTIVE : 'transparent' }}
-              aria-label={label}
-              aria-current={active ? 'page' : undefined}
-            >
-              <Icon
-                size={18}
-                aria-hidden
-                style={{ color: active ? WHITE : DIM, flexShrink: 0 }}
-              />
-              <span
-                className="text-[14px] font-semibold truncate"
-                style={{ color: active ? WHITE : DIM }}
-              >
-                {label}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Logout */}
-      <div className="px-3 py-4 flex-shrink-0" style={{ borderTop: `1px solid ${ACTIVE}` }}>
+        {/* Hamburger */}
         <button
           type="button"
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-3 h-[44px] w-full rounded-[8px] transition-colors"
-          style={{ background: 'transparent' }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = ACTIVE)}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-          aria-label="Log out of admin panel"
+          aria-label={open ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          className="w-10 h-10 rounded-[8px] flex items-center justify-center transition-colors"
+          style={{ background: open ? ACTIVE : 'transparent' }}
         >
-          <LogOut size={18} aria-hidden style={{ color: DIM, flexShrink: 0 }} />
-          <span className="text-[14px] font-semibold" style={{ color: DIM }}>
-            Log out
-          </span>
+          {open
+            ? <X    size={20} className="text-white" aria-hidden />
+            : <Menu size={20} className="text-white" aria-hidden />}
         </button>
-      </div>
-    </aside>
+      </header>
+
+      {/* ── Slide-out drawer ──────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {open && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+              aria-hidden
+              onClick={() => setOpen(false)}
+            />
+
+            {/* Drawer panel */}
+            <motion.nav
+              initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
+              transition={{ type: 'spring', stiffness: 340, damping: 36 }}
+              className="fixed top-0 left-0 bottom-0 z-50 flex flex-col w-[280px]"
+              style={{ background: NAVY }}
+              aria-label="Admin navigation"
+            >
+              {/* Drawer header */}
+              <div
+                className="flex items-center justify-between px-5 flex-shrink-0"
+                style={{ height: 60, borderBottom: `1px solid ${ACTIVE}` }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-[8px] flex items-center justify-center" style={{ background: ACTIVE }}>
+                    <ShieldCheck size={15} className="text-white" aria-hidden />
+                  </div>
+                  <p className="text-white font-bold text-[14px]">365 Connect</p>
+                </div>
+                <button
+                  type="button" aria-label="Close menu" onClick={() => setOpen(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ background: ACTIVE }}
+                >
+                  <X size={14} className="text-white" aria-hidden />
+                </button>
+              </div>
+
+              {/* Nav items */}
+              <div className="flex-1 flex flex-col gap-1 px-3 py-4 overflow-y-auto">
+                {NAV_ITEMS.map(({ path, icon: Icon, label }) => {
+                  const active = location === path || location.startsWith(path + '/');
+                  return (
+                    <Link
+                      key={path} href={path}
+                      onClick={() => setOpen(false)}
+                      aria-label={label}
+                      aria-current={active ? 'page' : undefined}
+                      className="flex items-center gap-3 px-3 h-[48px] rounded-[10px] transition-colors"
+                      style={{ background: active ? ACTIVE : 'transparent' }}
+                    >
+                      <Icon
+                        size={18} aria-hidden
+                        style={{ color: active ? '#FFFFFF' : 'rgba(255,255,255,0.55)', flexShrink: 0 }}
+                      />
+                      <span
+                        className="text-[15px] font-semibold"
+                        style={{ color: active ? '#FFFFFF' : 'rgba(255,255,255,0.55)' }}
+                      >
+                        {label}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* Logout */}
+              <div className="px-3 py-4 flex-shrink-0" style={{ borderTop: `1px solid ${ACTIVE}` }}>
+                <button
+                  type="button" aria-label="Log out" onClick={handleLogout}
+                  className="flex items-center gap-3 px-3 h-[48px] w-full rounded-[10px] transition-colors"
+                  style={{ background: 'transparent' }}
+                >
+                  <LogOut size={18} aria-hidden style={{ color: 'rgba(255,255,255,0.55)', flexShrink: 0 }} />
+                  <span className="text-[15px] font-semibold" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                    Log out
+                  </span>
+                </button>
+              </div>
+            </motion.nav>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

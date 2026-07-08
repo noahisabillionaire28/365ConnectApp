@@ -36,6 +36,8 @@ export type UserRow = {
   lat: number | null;
   lng: number | null;
   is_pro: boolean;
+  /** Phase 11 — admin moderation status. 'active' | 'suspended' | 'flagged' */
+  status: 'active' | 'suspended' | 'flagged' | null;
 };
 
 /** Matches the actual `shifts` table after Phase 2 additions */

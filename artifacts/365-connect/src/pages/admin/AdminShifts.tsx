@@ -1,22 +1,24 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Users, DollarSign, Calendar, XCircle, RefreshCw } from 'lucide-react';
+import { Search, X, Users, DollarSign, Calendar, XCircle, AlertCircle } from 'lucide-react';
 import { isAdminAuthenticated } from '@/store/adminStore';
-import { AdminNav } from '@/components/AdminNav';
-import { ADMIN_SHIFTS, ADMIN_USERS, type AdminShift, type ShiftStatus } from '@/data/mockAdmin';
+import { useAdminShifts, useCancelShift } from '@/hooks/useAdminData';
+import type { AdminShiftRow } from '@/lib/adminApi';
 
 /* ── Status badge ────────────────────────────────────────────────────────── */
+type ShiftStatus = AdminShiftRow['status'];
+
 const STATUS_META: Record<ShiftStatus, { label: string; cls: string }> = {
-  'open':        { label: 'Open',        cls: 'bg-black/5     border-black/15    text-black'       },
-  'filled':      { label: 'Filled',      cls: 'bg-blue-50     border-blue-200    text-blue-600'    },
-  'in-progress': { label: 'In Progress', cls: 'bg-amber-50    border-amber-200   text-amber-600'   },
-  'completed':   { label: 'Completed',   cls: 'bg-emerald-50  border-emerald-200 text-emerald-600' },
-  'cancelled':   { label: 'Cancelled',   cls: 'bg-red-50      border-red-200     text-red-600'     },
+  open:      { label: 'Open',      cls: 'bg-black/5     border-black/15    text-black'       },
+  filled:    { label: 'Filled',    cls: 'bg-blue-50     border-blue-200    text-blue-600'    },
+  completed: { label: 'Completed', cls: 'bg-emerald-50  border-emerald-200 text-emerald-600' },
+  cancelled: { label: 'Cancelled', cls: 'bg-red-50      border-red-200     text-red-600'     },
 };
 
-function ShiftStatusBadge({ status }: { status: ShiftStatus }) {
-  const { label, cls } = STATUS_META[status];
+function StatusBadge({ status }: { status: ShiftStatus }) {
+  const { label, cls } = STATUS_META[status] ?? STATUS_META.open;
   return (
     <span className={`text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full border flex-shrink-0 ${cls}`}>
       {label}
@@ -24,191 +26,171 @@ function ShiftStatusBadge({ status }: { status: ShiftStatus }) {
   );
 }
 
-/* ── Applicants sheet ────────────────────────────────────────────────────── */
-function ApplicantsSheet({ shift, onClose }: { shift: AdminShift; onClose: () => void }) {
+/* ── Skeleton card ───────────────────────────────────────────────────────── */
+function SkeletonCard() {
   return (
-    <>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" onClick={onClose} aria-hidden />
-      <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={{ type: 'spring', stiffness: 360, damping: 38 }}
-        className="fixed bottom-0 left-0 right-0 max-h-[80dvh] bg-white border-t border-[#DBDBDB] rounded-t-[24px] z-50 flex flex-col"
-        role="dialog" aria-modal="true" aria-label={`Applicants for ${shift.jobType}`}>
-
-        <div aria-hidden className="w-10 h-1 rounded-full bg-[#DBDBDB] mx-auto mt-3 mb-4 flex-shrink-0" />
-        <div className="px-5 pb-6 overflow-y-auto flex-1">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h2 className="text-black font-bold text-[18px]">{shift.jobType}</h2>
-              <p className="text-[#737373] text-[13px]">{shift.companyName} · {shift.date}</p>
-            </div>
-            <button type="button" aria-label="Close applicants panel" onClick={onClose}
-              className="w-8 h-8 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
-              <X size={14} aria-hidden className="text-[#737373]" />
-            </button>
-          </div>
-
-          <p className="text-[#737373] text-[11px] font-bold uppercase tracking-wider mb-3">
-            {shift.applicants.length} Applicant{shift.applicants.length !== 1 ? 's' : ''}
-          </p>
-
-          {shift.applicants.length === 0 ? (
-            <p className="text-[#AAAAAA] text-[14px] text-center py-8">No applicants yet.</p>
-          ) : (
-            <div className="flex flex-col gap-2.5" role="list" aria-label="Applicants">
-              {shift.applicants.map((a) => {
-                const user = ADMIN_USERS.find((u) => u.id === a.id);
-                return (
-                  <div key={a.id} role="listitem"
-                    className="flex items-center gap-3 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-3">
-                    <img src={a.photoUrl} alt={a.name} loading="lazy" decoding="async"
-                      className="w-10 h-10 rounded-full object-cover border border-[#DBDBDB] flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-black text-[14px] font-semibold truncate">{a.name}</p>
-                      <p className="text-[#737373] text-[12px]">
-                        {user ? `${user.shiftsCompleted} shifts · ★${user.rating}` : ''}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span className="text-black font-bold text-[14px]">{a.matchPct}%</span>
-                      <span className="text-[#737373] text-[10px]">match</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+    <div className="bg-white border border-[#DBDBDB] rounded-[12px] p-4 mb-3 animate-pulse">
+      <div className="flex items-start justify-between mb-2.5">
+        <div className="flex-1 flex flex-col gap-1.5 pr-2">
+          <div className="h-3.5 w-32 bg-[#E5E7EB] rounded-full" />
+          <div className="h-2.5 w-24 bg-[#E5E7EB] rounded-full" />
         </div>
-      </motion.div>
-    </>
+        <div className="h-5 w-16 bg-[#E5E7EB] rounded-full" />
+      </div>
+      <div className="flex items-center gap-4 mb-3.5">
+        <div className="h-2.5 w-20 bg-[#E5E7EB] rounded-full" />
+        <div className="h-2.5 w-14 bg-[#E5E7EB] rounded-full" />
+        <div className="h-2.5 w-16 bg-[#E5E7EB] rounded-full" />
+      </div>
+      <div className="h-[38px] bg-[#E5E7EB] rounded-[8px]" />
+    </div>
   );
 }
 
 /* ── Shift card ──────────────────────────────────────────────────────────── */
-function ShiftCard({ shift, onCancel, onViewApplicants }: {
-  shift: AdminShift; onCancel: (id: string) => void; onViewApplicants: (s: AdminShift) => void;
-}) {
+function ShiftCard({ shift }: { shift: AdminShiftRow }) {
+  const cancelShift = useCancelShift();
+  const [confirm, setConfirm] = useState(false);
+
   const canCancel = shift.status !== 'cancelled' && shift.status !== 'completed';
+
+  const displayDate = shift.date
+    ? shift.date
+    : new Date(shift.start_time).toLocaleDateString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric',
+      });
+
+  const spotsLeft = Math.max(0, shift.spots_available - shift.spots_filled);
+  const gross     = (shift.pay_rate ?? 0) * shift.spots_available;
+  const fee       = Math.round(gross * 0.08 * 100) / 100;
+
+  function handleCancel() {
+    cancelShift.mutate(shift.id);
+    setConfirm(false);
+  }
 
   return (
     <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97 }} transition={{ duration: 0.22 }}
-      className="bg-white border border-[#DBDBDB] rounded-[12px] p-4 mb-3">
-
+      className="bg-white border border-[#DBDBDB] rounded-[12px] p-4 mb-3"
+    >
       <div className="flex items-start justify-between mb-2.5">
         <div className="flex-1 min-w-0 pr-2">
-          <p className="text-black font-bold text-[15px] leading-tight">{shift.jobType}</p>
-          <p className="text-[#737373] text-[13px] mt-0.5">{shift.companyName}</p>
+          <p className="text-black font-bold text-[15px] leading-tight truncate">
+            {shift.job_type || shift.title}
+          </p>
+          <p className="text-[#737373] text-[13px] mt-0.5 truncate">
+            {shift.company_name ?? 'Private Client'}
+          </p>
         </div>
-        <ShiftStatusBadge status={shift.status} />
+        <StatusBadge status={shift.status} />
       </div>
 
-      <div className="flex items-center gap-4 text-[12px] text-[#737373] mb-3.5">
+      <div className="flex items-center gap-4 text-[12px] text-[#737373] mb-3.5 flex-wrap">
         <span className="flex items-center gap-1">
           <Calendar size={11} aria-hidden className="text-[#AAAAAA]" />
-          {shift.date}
+          {displayDate}
         </span>
-        <span className="flex items-center gap-1">
-          <DollarSign size={11} aria-hidden className="text-[#AAAAAA]" />
-          ${shift.payRate}/hr
-        </span>
+        {(shift.pay_rate ?? 0) > 0 && (
+          <span className="flex items-center gap-1">
+            <DollarSign size={11} aria-hidden className="text-[#AAAAAA]" />
+            ${shift.pay_rate}/hr
+          </span>
+        )}
         <span className="flex items-center gap-1">
           <Users size={11} aria-hidden className="text-[#AAAAAA]" />
-          {shift.workersNeeded} needed
+          {spotsLeft} of {shift.spots_available} open
         </span>
       </div>
 
-      {shift.platformFee > 0 && (
+      {fee > 0 && (
         <div className="flex items-center justify-between mb-3.5 pb-3.5 border-b border-[#DBDBDB]">
-          <p className="text-[#737373] text-[12px]">Platform fee (8%)</p>
-          <p className="text-black font-bold text-[13px]">${shift.platformFee}</p>
+          <p className="text-[#737373] text-[12px]">Est. platform fee (8%)</p>
+          <p className="text-black font-bold text-[13px]">${fee.toFixed(2)}</p>
         </div>
       )}
 
-      <div className="flex gap-2">
-        <button type="button" aria-label={`View ${shift.applicants.length} applicants for ${shift.jobType}`}
-          onClick={() => onViewApplicants(shift)}
-          className="flex-1 h-[38px] rounded-[8px] bg-white border border-[#DBDBDB] text-black text-[12px] font-semibold flex items-center justify-center gap-1.5">
-          <Users size={13} aria-hidden />
-          {shift.applicants.length} Applicants
-        </button>
-        {canCancel && (
-          <button type="button" aria-label={`Cancel ${shift.jobType} shift`} onClick={() => onCancel(shift.id)}
-            className="h-[38px] px-3.5 rounded-[8px] bg-red-50 border border-red-200 text-red-600 text-[12px] font-semibold flex items-center justify-center gap-1">
-            <XCircle size={13} aria-hidden />
-            Cancel
+      {canCancel && (
+        confirm ? (
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setConfirm(false)}
+              aria-label="Cancel — go back"
+              className="flex-1 h-[38px] rounded-[8px] bg-white border border-[#DBDBDB] text-[#737373] text-[12px] font-semibold">
+              Go Back
+            </button>
+            <button type="button" disabled={cancelShift.isPending}
+              onClick={handleCancel} aria-label="Confirm shift cancellation"
+              className="flex-1 h-[38px] rounded-[8px] bg-red-500 text-white text-[12px] font-bold flex items-center justify-center gap-1">
+              {cancelShift.isPending ? (
+                <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              ) : (
+                <><XCircle size={13} aria-hidden />Confirm Cancel</>
+              )}
+            </button>
+          </div>
+        ) : (
+          <button type="button" aria-label={`Cancel ${shift.job_type} shift`}
+            onClick={() => setConfirm(true)}
+            className="w-full h-[38px] rounded-[8px] bg-red-50 border border-red-200 text-red-600 text-[12px] font-semibold flex items-center justify-center gap-1.5">
+            <XCircle size={13} aria-hidden /> Cancel Shift
           </button>
-        )}
-        {shift.status === 'open' && (
-          <button type="button" aria-label={`Reassign ${shift.jobType} shift`}
-            className="h-[38px] px-3.5 rounded-[8px] bg-blue-50 border border-blue-200 text-blue-600 text-[12px] font-semibold flex items-center justify-center gap-1">
-            <RefreshCw size={12} aria-hidden />
-            Reassign
-          </button>
-        )}
-      </div>
+        )
+      )}
     </motion.div>
   );
 }
 
-/* ── AdminShifts ─────────────────────────────────────────────────────────── */
+/* ── Filter types ────────────────────────────────────────────────────────── */
 type ShiftFilter = 'all' | ShiftStatus;
 
-const SHIFT_FILTERS: { key: ShiftFilter; label: string }[] = [
-  { key: 'all',         label: 'All'         },
-  { key: 'open',        label: 'Open'        },
-  { key: 'filled',      label: 'Filled'      },
-  { key: 'in-progress', label: 'In Progress' },
-  { key: 'completed',   label: 'Completed'   },
-  { key: 'cancelled',   label: 'Cancelled'   },
+const FILTERS: { key: ShiftFilter; label: string }[] = [
+  { key: 'all',       label: 'All'       },
+  { key: 'open',      label: 'Open'      },
+  { key: 'filled',    label: 'Filled'    },
+  { key: 'completed', label: 'Completed' },
+  { key: 'cancelled', label: 'Cancelled' },
 ];
 
+/* ── AdminShifts ─────────────────────────────────────────────────────────── */
 export function AdminShifts() {
   const [, navigate] = useLocation();
+  const [filter, setFilter] = useState<ShiftFilter>('all');
+  const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    if (!isAdminAuthenticated()) navigate('/admin/login');
-  }, [navigate]);
+  useEffect(() => { if (!isAdminAuthenticated()) navigate('/admin/login'); }, [navigate]);
 
-  const [shifts,          setShifts]          = useState<AdminShift[]>(ADMIN_SHIFTS);
-  const [filter,          setFilter]          = useState<ShiftFilter>('all');
-  const [search,          setSearch]          = useState('');
-  const [applicantsShift, setApplicantsShift] = useState<AdminShift | null>(null);
+  const { data: shifts = [], isLoading, isError } = useAdminShifts();
 
   const filtered = useMemo(() => shifts.filter((s) => {
     const matchFilter = filter === 'all' || s.status === filter;
     const matchSearch = !search.trim() ||
-      s.jobType.toLowerCase().includes(search.toLowerCase()) ||
-      s.companyName.toLowerCase().includes(search.toLowerCase());
+      (s.job_type ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      (s.company_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      (s.title ?? '').toLowerCase().includes(search.toLowerCase());
     return matchFilter && matchSearch;
   }), [shifts, filter, search]);
-
-  function handleCancel(id: string) {
-    setShifts((prev) => prev.map((s) => s.id === id ? { ...s, status: 'cancelled' } : s));
-  }
 
   if (!isAdminAuthenticated()) return null;
 
   return (
-    <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col">
-      <AdminNav />
+    <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col pt-[60px]">
 
-      <div className="sticky top-[96px] z-30 bg-white border-b border-[#DBDBDB] px-4 pt-4 pb-3">
+      <div className="sticky top-[60px] z-30 bg-white border-b border-[#DBDBDB] px-4 pt-4 pb-3">
         <div className="flex items-center gap-2 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[8px] px-3 h-[40px] mb-3">
           <Search size={14} aria-hidden className="text-[#737373] flex-shrink-0" />
           <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search shifts…" aria-label="Search shifts by role or venue"
+            placeholder="Search by role or venue…" aria-label="Search shifts"
             className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] focus:outline-none" />
           {search && (
-            <button type="button" aria-label="Clear search" onClick={() => setSearch('')}>
+            <button type="button" aria-label="Clear" onClick={() => setSearch('')}>
               <X size={13} aria-hidden className="text-[#737373]" />
             </button>
           )}
         </div>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar" role="group" aria-label="Filter shifts by status">
-          {SHIFT_FILTERS.map(({ key, label }) => (
+        <div className="flex gap-2 overflow-x-auto no-scrollbar" role="group" aria-label="Filter shifts">
+          {FILTERS.map(({ key, label }) => (
             <button key={key} type="button" aria-pressed={filter === key}
-              aria-label={`Filter shifts by ${label}`} onClick={() => setFilter(key)}
+              onClick={() => setFilter(key)}
               className={`flex-shrink-0 h-[32px] px-3.5 rounded-full text-[12px] font-semibold border transition-all ${
                 filter === key ? 'bg-black text-white border-black' : 'bg-white border-[#DBDBDB] text-[#737373]'
               }`}>
@@ -216,31 +198,41 @@ export function AdminShifts() {
             </button>
           ))}
         </div>
-        <p className="text-[#737373] text-[11px] font-medium mt-2">
-          {filtered.length} shift{filtered.length !== 1 ? 's' : ''}
-        </p>
+        {!isLoading && (
+          <p className="text-[#737373] text-[11px] font-medium mt-2">
+            {filtered.length} of {shifts.length} shift{shifts.length !== 1 ? 's' : ''}
+          </p>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-12" role="list" aria-label="Shift list">
-        <AnimatePresence>
-          {filtered.map((shift) => (
-            <div key={shift.id} role="listitem">
-              <ShiftCard shift={shift} onCancel={handleCancel} onViewApplicants={setApplicantsShift} />
-            </div>
-          ))}
-        </AnimatePresence>
-        {filtered.length === 0 && (
+        {isLoading && Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}
+
+        {isError && (
+          <div className="flex flex-col items-center justify-center py-20 gap-3 px-8">
+            <AlertCircle size={32} aria-hidden className="text-red-400" />
+            <p className="text-[#737373] text-[14px] text-center">
+              Could not load shifts. Check API server connection.
+            </p>
+          </div>
+        )}
+
+        {!isLoading && !isError && (
+          <AnimatePresence>
+            {filtered.map((shift) => (
+              <div key={shift.id} role="listitem">
+                <ShiftCard shift={shift} />
+              </div>
+            ))}
+          </AnimatePresence>
+        )}
+
+        {!isLoading && !isError && filtered.length === 0 && (
           <div className="flex items-center justify-center py-20">
             <p className="text-[#AAAAAA] text-[14px]">No shifts match this filter.</p>
           </div>
         )}
       </div>
-
-      <AnimatePresence>
-        {applicantsShift && (
-          <ApplicantsSheet key={applicantsShift.id} shift={applicantsShift} onClose={() => setApplicantsShift(null)} />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
