@@ -1,12 +1,15 @@
 import { useParams, useLocation } from 'wouter';
-import { BadgeCheck, Star, ChevronLeft, Heart } from 'lucide-react';
+import { BadgeCheck, Star, ChevronLeft, Heart, CalendarPlus, X, CheckCircle2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { friendlyDate } from '@/lib/supabase';
 import { useFollow } from '@/hooks/useFollow';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRole } from '@/contexts/RoleContext';
 import { getOrCreateDirectConversation } from '@/hooks/useConversations';
 import { ProfileSkeleton } from '@/components/skeletons/ProfileSkeleton';
+import { useMyPostedShifts } from '@/hooks/useMyPostedShifts';
+import { createShiftRequest } from '@/hooks/useShiftRequests';
 
 type PublicUserRow = {
   id: string;
@@ -69,6 +72,93 @@ function StatItem({ value, label }: { value: string | number; label: string }) {
   );
 }
 
+/** Bottom sheet listing the viewer's own open shifts to invite this worker to. */
+function RequestShiftSheet({ workerId, workerUsername, onClose }: {
+  workerId: string; workerUsername: string | null; onClose: () => void;
+}) {
+  const { user: authUser } = useAuth();
+  const { shifts, isLoading } = useMyPostedShifts();
+  const openShifts = shifts.filter((s) => s.status === 'open');
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sentId, setSentId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  async function handleRequest(shiftId: string) {
+    if (!authUser?.id || sendingId) return;
+    setSendingId(shiftId);
+    setErrorMessage(null);
+    const result = await createShiftRequest(authUser.id, workerId, shiftId);
+    setSendingId(null);
+    if (result.ok) setSentId(shiftId);
+    else setErrorMessage(result.message);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true"
+      aria-label={`Request ${workerUsername ? '@' + workerUsername : 'this worker'} for a shift`}>
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-[390px] bg-white rounded-t-[20px] max-h-[75vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#DBDBDB] flex-shrink-0">
+          <div>
+            <h2 className="text-black font-bold text-[17px]">Request for shift</h2>
+            <p className="text-[#737373] text-[12px] mt-[2px]">
+              Invite {workerUsername ? `@${workerUsername}` : 'this worker'} to one of your open shifts
+            </p>
+          </div>
+          <button type="button" aria-label="Close" onClick={onClose}
+            className="w-8 h-8 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+            <X size={16} className="text-black" />
+          </button>
+        </div>
+
+        {errorMessage && (
+          <p className="px-5 pt-3 text-[#EF4444] text-[12px] font-medium">{errorMessage}</p>
+        )}
+
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {isLoading ? (
+            <div className="flex flex-col gap-3">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="h-[68px] rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] animate-pulse" />
+              ))}
+            </div>
+          ) : openShifts.length === 0 ? (
+            <div className="text-center py-10">
+              <p className="text-black font-semibold text-[14px]">No open shifts</p>
+              <p className="text-[#737373] text-[12px] mt-1">Post a shift first, then invite workers directly.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {openShifts.map((shift) => {
+                const isSending = sendingId === shift.id;
+                const isSent    = sentId === shift.id;
+                return (
+                  <div key={shift.id}
+                    className="flex items-center justify-between gap-3 rounded-[12px] border border-[#DBDBDB] px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="text-black font-semibold text-[14px] truncate">{shift.jobType}</p>
+                      <p className="text-[#737373] text-[12px] mt-[2px]">
+                        ${shift.payRate}/{shift.payPeriod} · {shift.date} {shift.startTime}
+                      </p>
+                    </div>
+                    <button type="button" disabled={isSending || isSent}
+                      onClick={() => void handleRequest(shift.id)}
+                      className={`flex-shrink-0 px-4 py-[9px] rounded-[8px] text-[13px] font-bold flex items-center gap-1.5 transition-colors ${
+                        isSent ? 'bg-[#10B981]/10 text-[#10B981]' : 'bg-black text-white disabled:opacity-50'
+                      }`}>
+                      {isSent ? (<><CheckCircle2 size={14} /> Sent</>) : isSending ? 'Sending…' : 'Request'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FollowButton({ profileId }: { profileId: string }) {
   const { isFollowing, followerCount: _count, follow, unfollow, isFollowPending } = useFollow(profileId);
 
@@ -97,12 +187,17 @@ export function WorkerProfileScreen() {
   const params = useParams<{ username: string }>();
   const [, navigate] = useLocation();
   const { user: authUser } = useAuth();
+  const { role } = useRole();
   const [profile, setProfile] = useState<WorkerProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [isStartingChat, setStartingChat] = useState(false);
+  const [showRequestSheet, setShowRequestSheet] = useState(false);
 
   const { followerCount } = useFollow(profile?.id ?? '');
+  const canRequestShift =
+    !!authUser && !!profile && authUser.id !== profile.id &&
+    (role === 'client' || role === 'staffer') && profile.role === 'worker';
 
   useEffect(() => {
     if (!params.username) return;
@@ -257,7 +352,7 @@ export function WorkerProfileScreen() {
         </div>
 
         {/* Action buttons */}
-        <div className="flex gap-3 mb-8">
+        <div className="flex gap-3 mb-3">
           <FollowButton profileId={profile.id} />
           {authUser?.id !== profile.id && (
             <button type="button" onClick={() => void handleMessage()} disabled={isStartingChat}
@@ -270,6 +365,15 @@ export function WorkerProfileScreen() {
             <span className="text-[16px] leading-none tracking-widest">···</span>
           </button>
         </div>
+
+        {canRequestShift && (
+          <button type="button" onClick={() => setShowRequestSheet(true)}
+            className="w-full flex items-center justify-center gap-2 bg-[#0095F6] text-white font-bold text-[14px] py-[14px] rounded-[8px] active:scale-[0.98] transition-transform mb-8">
+            <CalendarPlus size={16} aria-hidden />
+            Request for shift
+          </button>
+        )}
+        {!canRequestShift && <div className="mb-8" />}
 
         {/* Certifications */}
         {profile.certifications.length > 0 && (
@@ -325,6 +429,14 @@ export function WorkerProfileScreen() {
 
         <div className="h-8" />
       </div>
+
+      {showRequestSheet && (
+        <RequestShiftSheet
+          workerId={profile.id}
+          workerUsername={profile.username}
+          onClose={() => setShowRequestSheet(false)}
+        />
+      )}
     </div>
   );
 }

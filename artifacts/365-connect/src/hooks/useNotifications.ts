@@ -18,7 +18,7 @@ export function relativeTime(iso: string): string {
 /** Notification types whose deep link should go to the sender's public profile. */
 const PROFILE_LINK_TYPES = new Set(['new_review', 'new_follower']);
 /** Notification types that should route to the "who applied" screen instead of plain shift detail. */
-const APPLICANTS_LINK_TYPES = new Set(['application_received', 'direct_shift_request']);
+const APPLICANTS_LINK_TYPES = new Set(['application_received']);
 
 /** Resolves where tapping a notification should navigate to, given a username lookup map. */
 export function notificationDeepLink(item: NotificationRow, usernames: Map<string, string>): string | null {
@@ -26,6 +26,9 @@ export function notificationDeepLink(item: NotificationRow, usernames: Map<strin
     const username = usernames.get(item.from_user_id);
     return username ? `/worker/${username}` : null;
   }
+  // A worker was personally requested for a shift — they respond from the requests list,
+  // since they could have several pending requests at once (not just this one shift).
+  if (item.type === 'direct_shift_request') return '/requests';
   if (item.shift_id && APPLICANTS_LINK_TYPES.has(item.type)) return `/shift/${item.shift_id}/applicants`;
   if (item.shift_id) return `/shift/${item.shift_id}`;
   return null;

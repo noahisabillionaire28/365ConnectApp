@@ -174,6 +174,16 @@ export type FollowRow = {
   created_at: string;
 };
 
+/** A client/staffer's direct invite to a specific worker for one of their open shifts. */
+export type ShiftRequestRow = {
+  id: string;
+  shift_id: string;
+  client_id: string;
+  worker_id: string;
+  status: 'pending' | 'accepted' | 'declined';
+  created_at: string;
+};
+
 // ─── Date / time helpers ──────────────────────────────────────────────────────
 
 /** "9:00 PM" format from an ISO timestamptz string */

@@ -776,6 +776,193 @@ CREATE TRIGGER trg_notify_new_shift_match
   AFTER INSERT ON public.shifts
   FOR EACH ROW EXECUTE FUNCTION public.notify_new_shift_match();
 
+-- ============================================================
+-- Phase 7: Shift Requests (Nowsta-style) + AI Match Notifications (Section 7)
+-- Run in Supabase SQL Editor if upgrading an existing DB.
+-- Adds: shift_requests table, its notify/decision triggers, and rewrites
+-- notify_new_shift_match to also require an availability-day match and to
+-- word the notification body using the shift's real pay_rate/pay_period.
+-- ============================================================
+
+-- ─── Shift requests: client/staffer personally invites a worker to a shift ──────
+CREATE TABLE IF NOT EXISTS public.shift_requests (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_id    UUID        NOT NULL REFERENCES public.shifts(id) ON DELETE CASCADE,
+  client_id   UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  worker_id   UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  status      TEXT        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (shift_id, worker_id)
+);
+
+ALTER TABLE public.shift_requests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "shift_requests_select" ON public.shift_requests;
+DROP POLICY IF EXISTS "shift_requests_insert" ON public.shift_requests;
+DROP POLICY IF EXISTS "shift_requests_update" ON public.shift_requests;
+
+-- Either side of the request can read it.
+CREATE POLICY "shift_requests_select" ON public.shift_requests FOR SELECT
+  USING (auth.uid() = client_id OR auth.uid() = worker_id);
+-- Only the shift's owning client/staffer may request a worker, and only for their own shift.
+CREATE POLICY "shift_requests_insert" ON public.shift_requests FOR INSERT
+  WITH CHECK (
+    auth.uid() = client_id AND
+    auth.uid() = (SELECT client_id FROM public.shifts WHERE id = shift_id)
+  );
+-- Only the requested worker may accept/decline — the client cannot flip their own request.
+-- Note: RLS WITH CHECK alone can't compare NEW against OLD (e.g. "shift_id must not
+-- change"), so shift_id/client_id/worker_id/pending→accepted-or-declined immutability
+-- is enforced below by a BEFORE UPDATE trigger, not by the policy itself.
+CREATE POLICY "shift_requests_update" ON public.shift_requests FOR UPDATE
+  USING (auth.uid() = worker_id)
+  WITH CHECK (auth.uid() = worker_id AND status IN ('accepted', 'declined'));
+
+-- ─── Trigger: lock down what a decision update is allowed to change ─────────────
+-- Without this, a worker's UPDATE (permitted by the RLS policy above on `status`)
+-- could smuggle in changes to shift_id/client_id/worker_id, or flip status back
+-- and forth between accepted/declined/pending — either of which would let
+-- handle_shift_request_decision below apply its side effects (accepted
+-- application + spots_filled increment) against the wrong shift, or more than once.
+CREATE OR REPLACE FUNCTION public.enforce_shift_request_decision_only()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NEW.shift_id <> OLD.shift_id OR NEW.client_id <> OLD.client_id OR NEW.worker_id <> OLD.worker_id THEN
+    RAISE EXCEPTION 'shift_requests: shift_id, client_id, and worker_id cannot be changed';
+  END IF;
+  IF OLD.status <> 'pending' THEN
+    RAISE EXCEPTION 'shift_requests: this request has already been decided';
+  END IF;
+  IF NEW.status NOT IN ('accepted', 'declined') THEN
+    RAISE EXCEPTION 'shift_requests: status may only move from pending to accepted or declined';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_enforce_shift_request_decision_only ON public.shift_requests;
+CREATE TRIGGER trg_enforce_shift_request_decision_only
+  BEFORE UPDATE ON public.shift_requests
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_shift_request_decision_only();
+
+-- ─── Trigger: notify the worker when a client personally requests them ──────────
+CREATE OR REPLACE FUNCTION public.notify_shift_request_created()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_shift_title TEXT;
+BEGIN
+  SELECT title INTO v_shift_title FROM public.shifts WHERE id = NEW.shift_id;
+  INSERT INTO public.notifications (user_id, type, title, body, shift_id, from_user_id)
+  VALUES (
+    NEW.worker_id, 'direct_shift_request', 'You were requested for a shift',
+    'A client wants you for ' || COALESCE(v_shift_title, 'a shift') || '. Review and respond.',
+    NEW.shift_id, NEW.client_id
+  );
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_notify_shift_request_created ON public.shift_requests;
+CREATE TRIGGER trg_notify_shift_request_created
+  AFTER INSERT ON public.shift_requests
+  FOR EACH ROW EXECUTE FUNCTION public.notify_shift_request_created();
+
+-- ─── Trigger: worker's Accept/Decline decision on a shift request ───────────────
+-- Accept skips the normal pending-application review: it writes (or upserts)
+-- a *confirmed* `applications` row directly, so the existing Shift Detail CTA
+-- logic (applicationStatus === 'accepted' → Clock In) unlocks immediately.
+-- Note: on this table, `spots_available` is the TOTAL slots posted (not the
+-- remainder) — the remaining count is spots_available - spots_filled, so an
+-- accepted request increments spots_filled, it never decrements spots_available.
+CREATE OR REPLACE FUNCTION public.handle_shift_request_decision()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_shift_title TEXT;
+BEGIN
+  IF NEW.status = OLD.status THEN RETURN NEW; END IF;
+  SELECT title INTO v_shift_title FROM public.shifts WHERE id = NEW.shift_id;
+
+  IF NEW.status = 'accepted' THEN
+    INSERT INTO public.applications (shift_id, worker_id, status)
+    VALUES (NEW.shift_id, NEW.worker_id, 'accepted')
+    ON CONFLICT (shift_id, worker_id) DO UPDATE SET status = 'accepted';
+
+    UPDATE public.shifts
+    SET spots_filled = LEAST(spots_filled + 1, spots_available),
+        status       = CASE WHEN spots_filled + 1 >= spots_available THEN 'filled' ELSE status END
+    WHERE id = NEW.shift_id;
+
+    INSERT INTO public.notifications (user_id, type, title, body, shift_id, from_user_id)
+    VALUES (
+      NEW.client_id, 'application_accepted', 'Shift request accepted',
+      'Your request for ' || COALESCE(v_shift_title, 'the shift') || ' was accepted.',
+      NEW.shift_id, NEW.worker_id
+    );
+  ELSIF NEW.status = 'declined' THEN
+    INSERT INTO public.notifications (user_id, type, title, body, shift_id, from_user_id)
+    VALUES (
+      NEW.client_id, 'application_declined', 'Shift request declined',
+      'Your request for ' || COALESCE(v_shift_title, 'the shift') || ' was declined.',
+      NEW.shift_id, NEW.worker_id
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_handle_shift_request_decision ON public.shift_requests;
+CREATE TRIGGER trg_handle_shift_request_decision
+  AFTER UPDATE ON public.shift_requests
+  FOR EACH ROW EXECUTE FUNCTION public.handle_shift_request_decision();
+
+-- ─── Rewrite: AI-matching notification now also requires an availability match ──
+-- (job-type match AND the worker's availability[day-of-week] is true), and the
+-- body uses the shift's real pay_rate/pay_period + day name, e.g.
+-- "New Bartender shift matches your availability — $28/hr Saturday night".
+CREATE OR REPLACE FUNCTION public.notify_new_shift_match()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_day_key   TEXT;
+  v_day_label TEXT;
+  v_daypart   TEXT;
+  v_price     TEXT;
+BEGIN
+  IF NEW.status <> 'open' THEN RETURN NEW; END IF;
+
+  v_day_key   := (ARRAY['sun','mon','tue','wed','thu','fri','sat'])[EXTRACT(DOW FROM NEW.start_time)::int + 1];
+  v_day_label := TRIM(TO_CHAR(NEW.start_time, 'FMDay'));
+  v_daypart   := CASE
+    WHEN EXTRACT(HOUR FROM NEW.start_time) < 12 THEN 'morning'
+    WHEN EXTRACT(HOUR FROM NEW.start_time) < 17 THEN 'afternoon'
+    ELSE 'night'
+  END;
+  v_price := chr(36) || TRIM(TO_CHAR(NEW.pay_rate, 'FM999999990.00'));
+
+  INSERT INTO public.notifications (user_id, type, title, body, shift_id)
+  SELECT u.id, 'new_shift_match', 'New shift matches your availability',
+         'New ' || COALESCE(NEW.job_type, 'shift') || ' shift matches your availability -- ' ||
+           v_price || '/' || COALESCE(NEW.pay_period, 'hr') ||
+           ' ' || v_day_label || ' ' || v_daypart || '.',
+         NEW.id
+  FROM public.users u
+  WHERE u.role = 'worker'
+    AND (
+      u.primary_job_type = NEW.job_type
+      OR NEW.job_type = ANY(u.secondary_job_types)
+      OR u.job_types && NEW.job_types
+    )
+    AND u.availability IS NOT NULL
+    AND COALESCE((u.availability ->> v_day_key)::boolean, false) = true;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_notify_new_shift_match ON public.shifts;
+CREATE TRIGGER trg_notify_new_shift_match
+  AFTER INSERT ON public.shifts
+  FOR EACH ROW EXECUTE FUNCTION public.notify_new_shift_match();
+
 -- ─── Scheduled: notify workers a confirmed shift starts in ~2 hours ─────────────
 -- Requires the `pg_cron` extension (Supabase Dashboard → Database →
 -- Extensions → enable "pg_cron"), then run the `cron.schedule(...)` call at
