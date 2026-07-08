@@ -58,6 +58,8 @@ file the frontend never parses.
  unique-tagged dollar-quoting or WriteFile-based full-file rewrites over
 Edit-tool patches when adding many `$`-quoted functions in one pass, to sidestep the bug entirely.
 
+Recurrence confirmed a third time in a later session (this time on the *same* `notify_shift_request_created` function body, just from an unrelated Edit to its content) — this is a recurring hazard on this file, not a one-off, expect it on essentially any Edit-tool touch to `$`-quoted SQL.
+
 Recurrence confirmed in a later session: it struck again on a single new `Edit` call adding one
 new `$`-quoted function (not just large multi-function edits), and separately, on a different
 edit in the same file, a literal `---

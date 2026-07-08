@@ -11,6 +11,7 @@ export type ShiftRequestCard = {
   payRate: number | null;
   payPeriod: string;
   startTime: string;
+  message: string | null;
   createdAt: string;
 };
 
@@ -34,7 +35,7 @@ export function useShiftRequests(workerId: string | undefined) {
     const { data, error: fetchError } = await supabase
       .from('shift_requests')
       .select(`
-        id, shift_id, client_id, created_at,
+        id, shift_id, client_id, message, created_at,
         shift:shifts ( title, pay_rate, pay_period, start_time ),
         client:users!shift_requests_client_id_fkey ( username, photo_url )
       `)
@@ -51,7 +52,7 @@ export function useShiftRequests(workerId: string | undefined) {
     }
 
     type Row = {
-      id: string; shift_id: string; client_id: string; created_at: string;
+      id: string; shift_id: string; client_id: string; message: string | null; created_at: string;
       shift: { title: string; pay_rate: number | null; pay_period: string; start_time: string } | null;
       client: { username: string | null; photo_url: string | null } | null;
     };
@@ -67,6 +68,7 @@ export function useShiftRequests(workerId: string | undefined) {
         payRate:        r.shift?.pay_rate ?? null,
         payPeriod:      r.shift?.pay_period ?? 'hr',
         startTime:      r.shift?.start_time ?? r.created_at,
+        message:        r.message,
         createdAt:      r.created_at,
       })),
     );
@@ -108,11 +110,16 @@ export function useShiftRequests(workerId: string | undefined) {
  * surfaces the friendliest error message for the UI to show.
  */
 export async function createShiftRequest(
-  clientId: string, workerId: string, shiftId: string,
+  clientId: string, workerId: string, shiftId: string, message?: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { error } = await supabase
     .from('shift_requests')
-    .insert({ client_id: clientId, worker_id: workerId, shift_id: shiftId });
+    .insert({
+      client_id: clientId,
+      worker_id: workerId,
+      shift_id: shiftId,
+      message: message?.trim() ? message.trim() : null,
+    });
 
   if (error) {
     if (error.code === '23505') return { ok: false, message: 'You already requested this worker for this shift.' };

@@ -82,12 +82,15 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentId, setSentId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const NOTE_MAX = 240;
+  const noteTooLong = note.length > NOTE_MAX;
 
   async function handleRequest(shiftId: string) {
-    if (!authUser?.id || sendingId) return;
+    if (!authUser?.id || sendingId || noteTooLong) return;
     setSendingId(shiftId);
     setErrorMessage(null);
-    const result = await createShiftRequest(authUser.id, workerId, shiftId);
+    const result = await createShiftRequest(authUser.id, workerId, shiftId, note);
     setSendingId(null);
     if (result.ok) setSentId(shiftId);
     else setErrorMessage(result.message);
@@ -115,7 +118,35 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
           <p className="px-5 pt-3 text-[#EF4444] text-[12px] font-medium">{errorMessage}</p>
         )}
 
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="px-5 pt-4">
+          <label htmlFor="request-note" className="block text-black font-semibold text-[13px] mb-1.5">
+            Message <span className="text-[#737373] font-normal">(optional)</span>
+          </label>
+          <textarea
+            id="request-note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            placeholder="Let them know why you're a good fit…"
+            aria-invalid={noteTooLong}
+            aria-describedby={noteTooLong ? 'request-note-error' : undefined}
+            className={`w-full border rounded-[10px] px-3 py-2.5 text-[13px] text-black resize-none outline-none transition-colors ${
+              noteTooLong ? 'border-[#EF4444] focus:border-[#EF4444]' : 'border-[#DBDBDB] focus:border-black'
+            }`}
+          />
+          <div className="flex items-center justify-between mt-1">
+            {noteTooLong ? (
+              <p id="request-note-error" className="text-[#EF4444] text-[11px] font-medium">
+                Keep it under {NOTE_MAX} characters.
+              </p>
+            ) : <span />}
+            <p className={`text-[11px] font-medium ${noteTooLong ? 'text-[#EF4444]' : 'text-[#AAAAAA]'}`}>
+              {note.length}/{NOTE_MAX}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 pb-4">
           {isLoading ? (
             <div className="flex flex-col gap-3">
               {[1, 2, 3].map((n) => (
@@ -141,7 +172,8 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
                         ${shift.payRate}/{shift.payPeriod} · {shift.date} {shift.startTime}
                       </p>
                     </div>
-                    <button type="button" disabled={isSending || isSent}
+                    <button type="button" disabled={isSending || isSent || noteTooLong}
+                      aria-disabled={isSending || isSent || noteTooLong}
                       onClick={() => void handleRequest(shift.id)}
                       className={`flex-shrink-0 px-4 py-[9px] rounded-[8px] text-[13px] font-bold flex items-center gap-1.5 transition-colors ${
                         isSent ? 'bg-[#10B981]/10 text-[#10B981]' : 'bg-black text-white disabled:opacity-50'

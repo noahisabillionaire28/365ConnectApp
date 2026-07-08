@@ -791,9 +791,13 @@ CREATE TABLE IF NOT EXISTS public.shift_requests (
   client_id   UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   worker_id   UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   status      TEXT        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+  message     TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (shift_id, worker_id)
 );
+
+-- Idempotent for upgrading a DB where shift_requests already exists without `message`.
+ALTER TABLE public.shift_requests ADD COLUMN IF NOT EXISTS message TEXT;
 
 ALTER TABLE public.shift_requests ENABLE ROW LEVEL SECURITY;
 
@@ -855,7 +859,8 @@ BEGIN
   INSERT INTO public.notifications (user_id, type, title, body, shift_id, from_user_id)
   VALUES (
     NEW.worker_id, 'direct_shift_request', 'You were requested for a shift',
-    'A client wants you for ' || COALESCE(v_shift_title, 'a shift') || '. Review and respond.',
+    'A client wants you for ' || COALESCE(v_shift_title, 'a shift') || '.' ||
+      CASE WHEN NEW.message IS NOT NULL AND NEW.message <> '' THEN ' "' || NEW.message || '"' ELSE ' Review and respond.' END,
     NEW.shift_id, NEW.client_id
   );
   RETURN NEW;

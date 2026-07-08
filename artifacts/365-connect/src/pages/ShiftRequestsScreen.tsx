@@ -1,8 +1,9 @@
 import { useLocation } from 'wouter';
-import { ChevronLeft, Check, X, Inbox } from 'lucide-react';
+import { ChevronLeft, Check, X, Inbox, MessageSquareText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useShiftRequests } from '@/hooks/useShiftRequests';
 import { friendlyDate, formatTime } from '@/lib/supabase';
+import { BottomTabNav } from '@/components/BottomTabNav';
 
 function RequestSkeleton() {
   return (
@@ -43,7 +44,7 @@ export function ShiftRequestsScreen() {
         <h1 className="text-black font-bold text-[18px] leading-tight">Shift Requests</h1>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 pt-5 pb-8">
+      <div className="flex-1 overflow-y-auto px-5 pt-5 pb-[80px]">
         {error && (
           <p className="text-[#EF4444] text-[12px] font-medium mb-3 bg-red-50 border border-[#EF4444]/20 rounded-[8px] px-3 py-2">
             {error}
@@ -83,11 +84,18 @@ export function ShiftRequestsScreen() {
                       </p>
                       <p className="text-black font-bold text-[15px] truncate">{r.shiftTitle}</p>
                       <p className="text-[#737373] text-[12px] mt-[2px]">
-                        {r.payRate != null ? `$${r.payRate}/${r.payPeriod} · ` : ''}
+                        {r.payRate != null ? `${r.payRate}/${r.payPeriod} · ` : ''}
                         {friendlyDate(r.startTime)} · {formatTime(r.startTime)}
                       </p>
                     </div>
                   </div>
+
+                  {r.message && (
+                    <div className="flex items-start gap-2 mt-3 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[10px] px-3 py-2.5">
+                      <MessageSquareText size={14} aria-hidden className="text-[#737373] flex-shrink-0 mt-[1px]" />
+                      <p className="text-black text-[13px] leading-snug">{r.message}</p>
+                    </div>
+                  )}
 
                   <div className="flex gap-2 mt-4">
                     <button type="button" onClick={() => void decline(r.id)}
@@ -107,6 +115,8 @@ export function ShiftRequestsScreen() {
           </div>
         )}
       </div>
+
+      <BottomTabNav />
     </div>
   );
 }
