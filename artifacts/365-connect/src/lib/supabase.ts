@@ -124,8 +124,11 @@ export type TimeEntryRow = {
 
 export type PaymentRow = {
   id: string;
-  shift_id: string;
+  /** null for non-shift payments (e.g. Pro subscription). */
+  shift_id: string | null;
   worker_id: string;
+  /** 'shift_payment' | 'pro_subscription' — added Phase 10 */
+  payment_type: string;
   amount: number;
   fee: number;
   net_amount: number;

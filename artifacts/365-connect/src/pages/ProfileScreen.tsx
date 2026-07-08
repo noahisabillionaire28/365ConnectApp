@@ -5,6 +5,7 @@ import {
   Star, ChevronRight, Settings,
   CreditCard, Bell, Shield, HelpCircle, LogOut,
   Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
+  BadgeCheck, Zap,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useAuth } from '@/contexts/AuthContext';
@@ -281,7 +282,12 @@ export function ProfileScreen() {
 
       {/* Name / meta */}
       <div className="px-5 mt-[52px] mb-4">
-        <h1 className="text-black font-bold text-[22px] tracking-tight mb-0.5">{displayName}</h1>
+        <div className="flex items-center gap-2 mb-0.5">
+          <h1 className="text-black font-bold text-[22px] tracking-tight">{displayName}</h1>
+          {profile.isPro && (
+            <BadgeCheck size={20} aria-label="Pro verified" className="text-[#FFD700] flex-shrink-0" />
+          )}
+        </div>
 
         <p className="text-[#737373] text-[13px] mb-2">
           {username ? `@${username}` : <span className="italic text-[#AAAAAA]">No username set</span>}
@@ -378,6 +384,27 @@ export function ProfileScreen() {
         </div>
       </div>
 
+      {/* Go Pro CTA — shown when not yet Pro */}
+      {!profile.isPro && (
+        <div className="px-4 mb-5">
+          <motion.button
+            type="button" whileTap={{ scale: 0.98 }}
+            onClick={() => navigate('/pro-upgrade')}
+            aria-label="Upgrade to Pro plan"
+            className="w-full bg-gradient-to-r from-[#0A1628] to-[#1E3A5F] rounded-[14px] px-5 py-4 flex items-center gap-4"
+          >
+            <div className="w-10 h-10 rounded-[10px] bg-[#FFD700]/20 border border-[#FFD700]/30 flex items-center justify-center flex-shrink-0">
+              <Zap size={18} aria-hidden className="text-[#FFD700]" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-white font-bold text-[15px]">Upgrade to Pro</p>
+              <p className="text-white/60 text-[12px]">$17/mo · Priority applications + Pro badge</p>
+            </div>
+            <ChevronRight size={16} aria-hidden className="text-white/40" />
+          </motion.button>
+        </div>
+      )}
+
       {/* My Applications — worker-only */}
       {profile.role === 'worker' && <MyApplicationsSection />}
 
@@ -396,7 +423,7 @@ export function ProfileScreen() {
         <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Account</p>
         <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
           <SettingRow icon={Settings}    label="Account Settings"    onTap={() => setComingSoon('Account Settings')} />
-          <SettingRow icon={CreditCard}  label="Payments & Earnings"  onTap={() => setComingSoon('Payments & Earnings')} />
+          <SettingRow icon={CreditCard}  label="Payments & Earnings"  onTap={() => navigate('/earnings')} />
           <SettingRow icon={Bell}        label="Notifications"         onTap={() => navigate('/notifications')} />
           <SettingRow icon={Shield}      label="Privacy & Safety"      onTap={() => setComingSoon('Privacy & Safety')} />
           <SettingRow icon={HelpCircle}  label="Help & Support"        onTap={() => setComingSoon('Help & Support')} />

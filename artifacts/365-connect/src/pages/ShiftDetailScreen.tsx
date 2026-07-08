@@ -20,20 +20,28 @@ import { hasCompletedTimeEntry } from '@/hooks/useTimeEntry';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
 import { useAcceptedWorkers } from '@/hooks/useAcceptedWorkers';
 
+function parseDisplayMinutes(t: string): number {
+  const [time, mer] = t.split(' ');
+  let [h, m] = time.split(':').map(Number);
+  if (mer === 'PM' && h !== 12) h += 12;
+  if (mer === 'AM' && h === 12) h = 0;
+  return h * 60 + m;
+}
+
 function calcDuration(start: string, end: string): string {
-  const parse = (t: string) => {
-    const [time, mer] = t.split(' ');
-    let [h, m] = time.split(':').map(Number);
-    if (mer === 'PM' && h !== 12) h += 12;
-    if (mer === 'AM' && h === 12) h = 0;
-    return h * 60 + m;
-  };
-  let s = parse(start), e = parse(end);
+  let s = parseDisplayMinutes(start), e = parseDisplayMinutes(end);
   if (e <= s) e += 24 * 60;
   const diff = e - s;
   const hrs  = Math.floor(diff / 60);
   const mins = diff % 60;
   return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+}
+
+/** Returns decimal hours (e.g. 4.5 for 4h30m). Used for cost breakdown. */
+function calcDurationHours(start: string, end: string): number {
+  let s = parseDisplayMinutes(start), e = parseDisplayMinutes(end);
+  if (e <= s) e += 24 * 60;
+  return (e - s) / 60;
 }
 
 /* ─── Loading skeleton ───────────────────────────────────────────────────── */
@@ -434,6 +442,42 @@ export function ShiftDetailScreen() {
             </p>
           )}
         </div>
+
+        {/* Cost breakdown — owner-only, shows gross / 8% fee / total estimate */}
+        {isOwner && shift.payRate > 0 && (
+          <div className="px-5 pb-6">
+            <SectionHeading>Cost Estimate</SectionHeading>
+            {(() => {
+              const durHrs  = calcDurationHours(shift.startTime, shift.endTime);
+              const gross   = shift.payRate * shift.spotsTotal * durHrs;
+              const fee     = gross * 0.08;
+              const total   = gross + fee;
+              const fmtUsd  = (n: number) =>
+                n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+              return (
+                <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-4">
+                  <div className="flex justify-between items-center py-2 border-b border-[#EFEFEF]">
+                    <p className="text-[#737373] text-[13px]">
+                      {shift.spotsTotal} worker{shift.spotsTotal !== 1 ? 's' : ''} × {durHrs.toFixed(1)}h × ${shift.payRate}/hr
+                    </p>
+                    <p className="text-black font-semibold text-[14px]">{fmtUsd(gross)}</p>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-[#EFEFEF]">
+                    <p className="text-[#737373] text-[13px]">Platform fee (8%)</p>
+                    <p className="text-black font-semibold text-[14px]">{fmtUsd(fee)}</p>
+                  </div>
+                  <div className="flex justify-between items-center pt-2.5">
+                    <p className="text-black font-bold text-[14px]">Total Estimate</p>
+                    <p className="text-black font-bold text-[18px]">{fmtUsd(total)}</p>
+                  </div>
+                  <p className="text-[#AAAAAA] text-[11px] mt-3 leading-relaxed">
+                    Estimated total based on listed hours and all spots filled. Final cost depends on actual clock-out times.
+                  </p>
+                </div>
+              );
+            })()}
+          </div>
+        )}
 
         {/* Accepted workers — owner-only, rate once each worker has clocked out */}
         {isOwner && acceptedWorkers.length > 0 && (

@@ -1203,3 +1203,38 @@ CREATE POLICY "chat_media_insert" ON storage.objects FOR INSERT
         AND auth.uid() IN (c.participant_a_id, c.participant_b_id)
     )
   );
+
+-- ============================================================
+-- Phase 10: Monetization Display (Section 10)
+-- Run in Supabase SQL Editor if upgrading an existing DB.
+-- Changes:
+--   1. payments.shift_id made nullable (Pro subscription rows have no shift).
+--   2. payments.payment_type column added to distinguish shift earnings
+--      from Pro subscription charges.
+--   3. RLS payments_select updated to handle null shift_id gracefully.
+-- ============================================================
+
+-- 1. Allow shift_id to be null for non-shift payments (e.g. Pro subscriptions)
+ALTER TABLE public.payments
+  ALTER COLUMN shift_id DROP NOT NULL;
+
+-- 2. Add payment_type column ('shift_payment' | 'pro_subscription')
+ALTER TABLE public.payments
+  ADD COLUMN IF NOT EXISTS payment_type TEXT NOT NULL DEFAULT 'shift_payment';
+
+-- 3. Refresh RLS select policy to handle null shift_id
+--    (null comparisons return NULL/false in SQL, so the OR clause
+--    is simply skipped for subscription rows — auth.uid() = worker_id
+--    is the effective check in that case.)
+DROP POLICY IF EXISTS "payments_select" ON public.payments;
+CREATE POLICY "payments_select" ON public.payments FOR SELECT
+  USING (
+    auth.uid() = worker_id
+    OR (
+      shift_id IS NOT NULL
+      AND auth.uid() = (SELECT client_id FROM public.shifts WHERE id = shift_id)
+    )
+  );
+
+-- Insert policy is unchanged: any user can insert rows where worker_id = their own id.
+-- (Covers both clock-out payouts and Pro subscription self-charges.)

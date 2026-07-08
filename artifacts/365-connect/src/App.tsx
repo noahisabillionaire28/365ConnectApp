@@ -58,6 +58,8 @@ import { StafferPostStep4Screen } from '@/pages/StafferPostStep4Screen';
 import { StafferPostStep5Screen } from '@/pages/StafferPostStep5Screen';
 import { StafferPostStep6Screen } from '@/pages/StafferPostStep6Screen';
 import { StafferPostStep7Screen } from '@/pages/StafferPostStep7Screen';
+import { ProUpgradeScreen }       from '@/pages/ProUpgradeScreen';
+import { EarningsScreen }         from '@/pages/EarningsScreen';
 
 // ── Admin screens ──────────────────────────────────────────────────────────────
 import { AdminLogin }     from '@/pages/admin/AdminLogin';
@@ -127,6 +129,8 @@ function MobileRouter() {
             <Route path="/worker/:username" component={WorkerProfileScreen}  />
             <Route path="/clock/:id"        component={ClockInScreen}        />
             <Route path="/review/:shiftId/:toUserId" component={ReviewScreen} />
+            <Route path="/pro-upgrade"              component={ProUpgradeScreen} />
+            <Route path="/earnings"                 component={EarningsScreen} />
 
             {/* ── Staffer: roster + assign workers ──────────────────── */}
             <Route path="/roster"           component={RosterScreen}         />
