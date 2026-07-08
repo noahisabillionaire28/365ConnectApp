@@ -81,7 +81,7 @@ export function useApplications() {
   // appliedShiftIds is in the dep array so the closure always sees the latest
   // set — this is correct and intentional. inFlight is a ref so it's excluded.
   const submitApplication = useCallback(                                // hook 7
-    async (shiftId: string): Promise<void> => {
+    async (shiftId: string, matchScore?: number): Promise<void> => {
       if (!user?.id) return;
       // Idempotency: skip if already applied or if this shift's insert is live
       if (appliedShiftIds.has(shiftId) || inFlight.current.has(shiftId)) return;
@@ -91,9 +91,10 @@ export function useApplications() {
       setAppliedShiftIds((prev) => new Set([...prev, shiftId]));
 
       const { error } = await supabase.from('applications').insert({
-        shift_id:  shiftId,
-        worker_id: user.id,
-        status:    'pending',
+        shift_id:    shiftId,
+        worker_id:   user.id,
+        status:      'pending',
+        match_score: typeof matchScore === 'number' ? Math.round(matchScore) : null,
       });
 
       inFlight.current.delete(shiftId);

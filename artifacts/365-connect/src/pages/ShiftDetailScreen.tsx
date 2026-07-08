@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Map, Marker } from '@vis.gl/react-google-maps';
 import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
-  MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil,
+  MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, Star,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -16,6 +16,9 @@ import { useMyLocation } from '@/hooks/useMyLocation';
 import { computeMatchScore } from '@/lib/matchScore';
 import { haversineMiles, supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { hasCompletedTimeEntry } from '@/hooks/useTimeEntry';
+import { useShiftApplicants } from '@/hooks/useShiftApplicants';
+import { useAcceptedWorkers } from '@/hooks/useAcceptedWorkers';
 
 function calcDuration(start: string, end: string): string {
   const parse = (t: string) => {
@@ -110,7 +113,21 @@ export function ShiftDetailScreen() {
   const { data: shift, isLoading, error } = useShiftById(id, myCoords);
   const [dressCodeDraft, setDressCodeDraft] = useState<string | null>(null);
   const [savingDressCode, setSavingDressCode] = useState(false);
+  const [hasCompleted, setHasCompleted] = useState(false);
+  const isOwnerForHooks = !!user?.id && !!shift && user.id === shift.clientId;
+  const { applicants: pendingApplicants } = useShiftApplicants(isOwnerForHooks ? id : undefined);
+  const { workers: acceptedWorkers } = useAcceptedWorkers(
+    isOwnerForHooks ? id : undefined,
+    isOwnerForHooks ? user?.id : undefined,
+  );
   // ── No more hooks below this line ────────────────────────────────────────────
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!shift || !user?.id) return;
+    void hasCompletedTimeEntry(shift.id, user.id).then((done) => { if (!cancelled) setHasCompleted(done); });
+    return () => { cancelled = true; };
+  }, [shift?.id, user?.id]);
 
   if (isLoading) return <ShiftDetailSkeleton />;
 
@@ -163,19 +180,23 @@ export function ShiftDetailScreen() {
   const distanceFromShift = haversineMiles(myCoords.lat, myCoords.lng, shift.lat, shift.lng);
   const withinClockInRange = distanceFromShift <= 1;
 
-  // Real CTA states, per applications.status + shifts.status (spec E):
-  //   no row → apply | pending → Pending Approval | accepted+open → Clock In (gold, 1mi gate)
-  //   accepted+completed → Completed
-  type CtaState = 'apply' | 'pending' | 'clock-in' | 'completed';
+  // Real CTA states, per applications.status + time_entries completion:
+  //   no row → apply | pending → Pending Approval | declined → Not Selected
+  //   accepted+not clocked out → Clock In (gold, 1mi gate) | accepted+clocked out → Completed
+  // Completion is tracked per-worker via time_entries.clock_out rather than
+  // shifts.status, since RLS only lets the shift's client owner update shifts.
+  type CtaState = 'apply' | 'pending' | 'declined' | 'clock-in' | 'completed';
   const ctaState: CtaState =
     applicationStatus === 'accepted'
-      ? (shift.status === 'completed' ? 'completed' : 'clock-in')
+      ? (hasCompleted ? 'completed' : 'clock-in')
       : applicationStatus === 'pending'
       ? 'pending'
+      : applicationStatus === 'declined'
+      ? 'declined'
       : 'apply';
 
   function handleCta() {
-    if (ctaState === 'apply')    void submitApplication(shiftId);
+    if (ctaState === 'apply')    void submitApplication(shiftId, matchScore ?? undefined);
     if (ctaState === 'clock-in' && withinClockInRange) navigate(`/clock/${shiftId}`);
   }
 
@@ -413,6 +434,45 @@ export function ShiftDetailScreen() {
             </p>
           )}
         </div>
+
+        {/* Accepted workers — owner-only, rate once each worker has clocked out */}
+        {isOwner && acceptedWorkers.length > 0 && (
+          <div className="px-5 pb-6">
+            <SectionHeading>Accepted Workers</SectionHeading>
+            <div className="flex flex-col gap-2.5">
+              {acceptedWorkers.map((w) => (
+                <div key={w.workerId} className="flex items-center gap-3 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-3">
+                  <div className="w-10 h-10 rounded-full bg-white border border-[#DBDBDB] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {w.photoUrl
+                      ? <img src={w.photoUrl} alt={w.username ?? 'Worker'} className="w-full h-full object-cover" />
+                      : <span className="text-black font-bold text-[13px]">{(w.username ?? 'W').slice(0, 2).toUpperCase()}</span>}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-black font-semibold text-[14px] truncate">{w.username ? `@${w.username}` : 'Worker'}</p>
+                    <p className="text-[#737373] text-[12px]">
+                      {w.completed ? 'Shift completed' : 'In progress'}
+                    </p>
+                  </div>
+                  {w.completed && !w.alreadyReviewed && (
+                    <motion.button type="button" whileTap={{ scale: 0.95 }}
+                      onClick={() => navigate(`/review/${shiftId}/${w.workerId}`)}
+                      aria-label={`Rate ${w.username ?? 'this worker'}`}
+                      className="bg-[#0A1628] text-white text-[12px] font-semibold px-3.5 py-2 rounded-[8px] flex items-center gap-1.5 flex-shrink-0">
+                      <Star size={13} aria-hidden className="fill-white" />
+                      Rate
+                    </motion.button>
+                  )}
+                  {w.completed && w.alreadyReviewed && (
+                    <span className="text-emerald-600 text-[12px] font-semibold flex items-center gap-1 flex-shrink-0">
+                      <CheckCircle2 size={13} aria-hidden />
+                      Rated
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Fixed CTA */}
@@ -426,10 +486,10 @@ export function ShiftDetailScreen() {
           )}
         </AnimatePresence>
 
-        {ctaState === 'apply' && (
+        {ctaState === 'apply' && !isOwner && (
           <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleCta}
             aria-label={`Apply to ${shift.companyName}`}
-            className="w-full h-[52px] rounded-[8px] bg-black text-white font-bold text-[16px] tracking-wide">
+            className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] tracking-wide">
             Apply Now
           </motion.button>
         )}
@@ -444,6 +504,12 @@ export function ShiftDetailScreen() {
               <CheckCircle2 size={18} aria-hidden className="text-emerald-500" />
               <span className="text-[#737373] font-semibold text-[15px]">Applied</span>
             </button>
+          </div>
+        )}
+
+        {ctaState === 'declined' && (
+          <div className="w-full h-[52px] rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center gap-2.5">
+            <span className="text-[#737373] font-semibold text-[15px]">Not Selected for This Shift</span>
           </div>
         )}
 
@@ -466,6 +532,21 @@ export function ShiftDetailScreen() {
             <CheckCircle2 size={18} aria-hidden className="text-emerald-500" />
             <span className="text-emerald-600 font-bold text-[15px]">Completed</span>
           </div>
+        )}
+
+        {isOwner && (
+          <motion.button type="button" whileTap={{ scale: 0.97 }}
+            onClick={() => navigate(`/shift/${shiftId}/applicants`)}
+            aria-label={`View applicants${pendingApplicants.length > 0 ? `, ${pendingApplicants.length} pending` : ''}`}
+            className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] tracking-wide flex items-center justify-center gap-2.5">
+            <Users size={18} aria-hidden />
+            View Applicants
+            {pendingApplicants.length > 0 && (
+              <span className="bg-white/20 text-white text-[12px] font-bold px-2 py-0.5 rounded-full">
+                {pendingApplicants.length}
+              </span>
+            )}
+          </motion.button>
         )}
       </div>
     </div>

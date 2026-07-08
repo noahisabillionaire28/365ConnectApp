@@ -81,10 +81,17 @@ CREATE POLICY "applications_select" ON public.applications FOR SELECT
     auth.uid() = (SELECT client_id FROM public.shifts WHERE id = shift_id)
   );
 CREATE POLICY "applications_insert" ON public.applications FOR INSERT WITH CHECK (auth.uid() = worker_id);
+-- Workers may only withdraw their own application; only the shift's client/owner
+-- may move an application to accepted/declined/pending (the applicant-review flow).
+-- This prevents a worker from self-accepting or self-declining their own application.
 CREATE POLICY "applications_update" ON public.applications FOR UPDATE
   USING (
     auth.uid() = worker_id OR
     auth.uid() = (SELECT client_id FROM public.shifts WHERE id = shift_id)
+  )
+  WITH CHECK (
+    (auth.uid() = worker_id AND status = 'withdrawn') OR
+    (auth.uid() = (SELECT client_id FROM public.shifts WHERE id = shift_id) AND status IN ('pending', 'accepted', 'declined'))
   );
 
 -- ─── Messages ─────────────────────────────────────────────────────────────────
@@ -271,3 +278,192 @@ DROP POLICY IF EXISTS "posts_insert" ON public.posts;
 
 CREATE POLICY "posts_select" ON public.posts FOR SELECT USING (true);
 CREATE POLICY "posts_insert" ON public.posts FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- ============================================================
+-- Phase 5: Applications, Clock In/Out & Reviews (Section 5)
+-- Run in Supabase SQL Editor if upgrading an existing DB.
+-- Adds: applications.match_score, applications 'declined' status,
+--       notifications, time_entries, payments, reviews tag arrays.
+-- ============================================================
+
+-- ─── Applications: match score + widened status ────────────────────────────────
+ALTER TABLE public.applications
+  ADD COLUMN IF NOT EXISTS match_score INT;
+
+ALTER TABLE public.applications DROP CONSTRAINT IF EXISTS applications_status_check;
+ALTER TABLE public.applications
+  ADD CONSTRAINT applications_status_check
+  CHECK (status IN ('pending', 'accepted', 'rejected', 'declined', 'withdrawn'));
+
+-- ─── Notifications ──────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  type             TEXT        NOT NULL,
+  title            TEXT        NOT NULL,
+  body             TEXT,
+  related_shift_id UUID        REFERENCES public.shifts(id) ON DELETE CASCADE,
+  related_user_id  UUID        REFERENCES public.users(id) ON DELETE SET NULL,
+  read             BOOLEAN     NOT NULL DEFAULT false,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "notifications_select" ON public.notifications;
+DROP POLICY IF EXISTS "notifications_update" ON public.notifications;
+
+CREATE POLICY "notifications_select" ON public.notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "notifications_update" ON public.notifications FOR UPDATE USING (auth.uid() = user_id);
+-- No client-side INSERT policy — rows are created only by the SECURITY DEFINER
+-- triggers below, so a worker can create a notification for a client (and
+-- vice versa) without needing direct write access to each other's rows.
+
+-- ─── Time entries (Clock In / Clock Out) ────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.time_entries (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_id      UUID        NOT NULL REFERENCES public.shifts(id) ON DELETE CASCADE,
+  worker_id     UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  clock_in      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  clock_out     TIMESTAMPTZ,
+  break_minutes INT         NOT NULL DEFAULT 0,
+  total_hours   NUMERIC(6,2),
+  total_pay     NUMERIC(10,2),
+  fee           NUMERIC(10,2),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (shift_id, worker_id)
+);
+
+ALTER TABLE public.time_entries ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "time_entries_select" ON public.time_entries;
+DROP POLICY IF EXISTS "time_entries_insert" ON public.time_entries;
+DROP POLICY IF EXISTS "time_entries_update" ON public.time_entries;
+
+CREATE POLICY "time_entries_select" ON public.time_entries FOR SELECT
+  USING (auth.uid() = worker_id OR auth.uid() = (SELECT client_id FROM public.shifts WHERE id = shift_id));
+CREATE POLICY "time_entries_insert" ON public.time_entries FOR INSERT WITH CHECK (auth.uid() = worker_id);
+CREATE POLICY "time_entries_update" ON public.time_entries FOR UPDATE USING (auth.uid() = worker_id);
+
+-- ─── Payments (simulated instant transfer ledger) ───────────────────────────────
+CREATE TABLE IF NOT EXISTS public.payments (
+  id         UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_id   UUID          NOT NULL REFERENCES public.shifts(id) ON DELETE CASCADE,
+  worker_id  UUID          NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  amount     NUMERIC(10,2) NOT NULL,
+  fee        NUMERIC(10,2) NOT NULL DEFAULT 0,
+  net_amount NUMERIC(10,2) NOT NULL,
+  status     TEXT          NOT NULL DEFAULT 'completed',
+  created_at TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "payments_select" ON public.payments;
+DROP POLICY IF EXISTS "payments_insert" ON public.payments;
+
+CREATE POLICY "payments_select" ON public.payments FOR SELECT
+  USING (auth.uid() = worker_id OR auth.uid() = (SELECT client_id FROM public.shifts WHERE id = shift_id));
+CREATE POLICY "payments_insert" ON public.payments FOR INSERT WITH CHECK (auth.uid() = worker_id);
+
+-- ─── Reviews: tag arrays + two-way eligibility ──────────────────────────────────
+ALTER TABLE public.reviews
+  ADD COLUMN IF NOT EXISTS positive_tags TEXT[] NOT NULL DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS negative_tags TEXT[] NOT NULL DEFAULT '{}';
+
+-- Widen insert policy so EITHER side of an accepted application can review
+-- the other (worker → client, or client/staffer → worker).
+DROP POLICY IF EXISTS "reviews_insert" ON public.reviews;
+CREATE POLICY "reviews_insert" ON public.reviews FOR INSERT
+  WITH CHECK (
+    auth.uid() = reviewer_id AND
+    EXISTS (
+      SELECT 1 FROM public.applications a
+      JOIN public.shifts s ON s.id = a.shift_id
+      WHERE a.shift_id = reviews.shift_id
+        AND a.status = 'accepted'
+        AND (
+          (a.worker_id = reviews.reviewer_id AND s.client_id = reviews.reviewee_id) OR
+          (s.client_id  = reviews.reviewer_id AND a.worker_id = reviews.reviewee_id)
+        )
+    )
+  );
+
+-- Negative tags must never be readable by workers, even via a direct API call
+-- with an explicit `select=negative_tags` — row-level security alone cannot
+-- mask individual columns, so reads go through this view instead of the base
+-- table. This is intentionally a standard (definer-privilege) view, NOT
+-- security_invoker: SELECT on the base table is revoked from authenticated/anon
+-- below, so the view must run with the owner's privileges to read the
+-- underlying rows at all and apply the masking logic itself.
+CREATE OR REPLACE VIEW public.reviews_visible AS
+SELECT
+  r.id, r.shift_id, r.reviewer_id, r.reviewee_id, r.rating, r.comment, r.positive_tags, r.created_at,
+  CASE
+    WHEN EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role IN ('client', 'staffer'))
+      THEN r.negative_tags
+    ELSE '{}'::TEXT[]
+  END AS negative_tags
+FROM public.reviews r;
+
+GRANT SELECT ON public.reviews_visible TO authenticated, anon;
+REVOKE SELECT ON public.reviews FROM authenticated, anon;
+GRANT INSERT ON public.reviews TO authenticated;
+
+-- ─── Trigger: notify the client when a worker applies ───────────────────────────
+CREATE OR REPLACE FUNCTION public.notify_application_created()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_client_id   UUID;
+  v_shift_title TEXT;
+BEGIN
+  SELECT client_id, title INTO v_client_id, v_shift_title FROM public.shifts WHERE id = NEW.shift_id;
+  IF v_client_id IS NOT NULL THEN
+    INSERT INTO public.notifications (user_id, type, title, body, related_shift_id, related_user_id)
+    VALUES (
+      v_client_id, 'application_received', 'New applicant',
+      'Someone applied to your ' || COALESCE(v_shift_title, 'shift') || '.',
+      NEW.shift_id, NEW.worker_id
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_notify_application_created ON public.applications;
+CREATE TRIGGER trg_notify_application_created
+  AFTER INSERT ON public.applications
+  FOR EACH ROW EXECUTE FUNCTION public.notify_application_created();
+
+-- ─── Trigger: notify the worker when their application is accepted/declined ────
+CREATE OR REPLACE FUNCTION public.notify_application_status_changed()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_shift_title TEXT;
+BEGIN
+  IF NEW.status = OLD.status THEN RETURN NEW; END IF;
+  SELECT title INTO v_shift_title FROM public.shifts WHERE id = NEW.shift_id;
+
+  IF NEW.status = 'accepted' THEN
+    INSERT INTO public.notifications (user_id, type, title, body, related_shift_id)
+    VALUES (
+      NEW.worker_id, 'application_accepted', 'Application approved',
+      'You''re confirmed for ' || COALESCE(v_shift_title, 'the shift') || '. Clock in is now unlocked.',
+      NEW.shift_id
+    );
+  ELSIF NEW.status = 'declined' THEN
+    INSERT INTO public.notifications (user_id, type, title, body, related_shift_id)
+    VALUES (
+      NEW.worker_id, 'application_declined', 'Application update',
+      'You were not selected for ' || COALESCE(v_shift_title, 'the shift') || '.',
+      NEW.shift_id
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_notify_application_status_changed ON public.applications;
+CREATE TRIGGER trg_notify_application_status_changed
+  AFTER UPDATE ON public.applications
+  FOR EACH ROW EXECUTE FUNCTION public.notify_application_status_changed();

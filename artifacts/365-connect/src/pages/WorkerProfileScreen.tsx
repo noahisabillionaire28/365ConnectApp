@@ -119,7 +119,7 @@ export function WorkerProfileScreen() {
       }
 
       const { data: reviewData } = await supabase
-        .from('reviews')
+        .from('reviews_visible')
         .select(`
           id,
           rating,

@@ -4,3 +4,6 @@
 - [schema.sql can drift from the live DB](schema-sql-drift.md) — always verify columns exist via a live query before trusting the DDL file
 - [AI match score formula](ai-match-score-formula.md) — 40/30/20/10 weighting for job-type/availability/rating/distance; distance must use viewer's real coords
 - [Location resolution fallback chain](location-fallback-chain.md) — DB coords → browser geolocation → static fallback, used for distance/match-score/geofencing
+- [Cross-user writes need SECURITY DEFINER triggers](supabase-cross-user-writes.md) — RLS blocks direct client-side inserts into another user's rows (e.g. notifications)
+- [Column-level privacy needs a definer view, not RLS](supabase-column-masking-view.md) — RLS can't mask individual columns; use a plain (non-invoker) view + revoke base SELECT
+- [Verify Supabase SQL migrations actually applied](supabase-verify-migration-applied.md) — check live via PostgREST, don't trust "user ran it"; dollar-quoting typos silently break only part of a multi-statement script

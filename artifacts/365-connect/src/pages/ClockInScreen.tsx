@@ -1,13 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MapPin, CheckCircle2, XCircle, Coffee,
-  Square, Star, ChevronLeft, AlarmClock,
+  Square, Star, ChevronLeft, AlarmClock, ArrowUpRight, AlertTriangle,
 } from 'lucide-react';
 import type { MockShift } from '@/data/mockFeed';
 import { markClockedIn } from '@/store/feedStore';
 import { useShiftById } from '@/hooks/useShifts';
+import { useAuth } from '@/contexts/AuthContext';
+import { haversineMiles, supabase } from '@/lib/supabase';
+import { useTimeEntry } from '@/hooks/useTimeEntry';
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 function fmtHMS(secs: number): string {
@@ -29,10 +32,11 @@ function fmtHM(secs: number): string {
 function fmtMoney(n: number): string { return `$${n.toFixed(2)}`; }
 
 /* ── Phase types ─────────────────────────────────────────────────────────── */
-type Phase = 'geo-check' | 'geo-success' | 'geo-fail' | 'active' | 'on-break' | 'summary' | 'review';
+type Phase = 'geo-check' | 'geo-success' | 'geo-fail' | 'active' | 'on-break' | 'transfer' | 'summary' | 'already-done' | 'end-error';
+type GeoFailReason = 'too-far' | 'denied' | 'unavailable';
 
 /* ── Geo-check ───────────────────────────────────────────────────────────── */
-function GeoCheckScreen({ onSimulateFail }: { onSimulateFail: () => void }) {
+function GeoCheckScreen() {
   return (
     <motion.div key="geo-check" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.2 }}
@@ -50,25 +54,19 @@ function GeoCheckScreen({ onSimulateFail }: { onSimulateFail: () => void }) {
         </div>
       </div>
 
-      <div className="w-7 h-7 rounded-full border-[2.5px] border-[#DBDBDB] border-t-black animate-spin"
-        role="status" aria-label="Checking location" />
+      <div className="w-7 h-7 rounded-full border-[2.5px] border-[#DBDBDB] border-t-[#0A1628] animate-spin"
+        role="status" aria-label="Verifying location" />
 
       <div className="text-center">
-        <p className="text-black font-semibold text-[18px]">Verifying your location…</p>
-        <p className="text-[#737373] text-[13px] mt-1.5">GPS signal detected · checking distance</p>
+        <p className="text-black font-semibold text-[18px]">Verifying location…</p>
+        <p className="text-[#737373] text-[13px] mt-1.5">Checking your distance from the venue</p>
       </div>
-
-      <button type="button" aria-label="Demo: simulate out-of-range geofence failure"
-        onClick={onSimulateFail}
-        className="text-[#AAAAAA] text-[11px] underline underline-offset-2 mt-12 active:text-[#737373]">
-        Demo: simulate out-of-range →
-      </button>
     </motion.div>
   );
 }
 
 /* ── Geo-success ──────────────────────────────────────────────────────────── */
-function GeoSuccessScreen() {
+function GeoSuccessScreen({ locationLabel }: { locationLabel: string }) {
   return (
     <motion.div key="geo-success" initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 280, damping: 22 }}
@@ -76,58 +74,67 @@ function GeoSuccessScreen() {
 
       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
         transition={{ type: 'spring', stiffness: 320, damping: 18, delay: 0.08 }}
-        className="w-24 h-24 rounded-full bg-emerald-50 border-2 border-emerald-300 flex items-center justify-center">
-        <CheckCircle2 size={44} aria-hidden className="text-emerald-500" />
+        className="w-24 h-24 rounded-full bg-emerald-50 border-2 border-[#10B981] flex items-center justify-center">
+        <CheckCircle2 size={44} aria-hidden className="text-[#10B981]" />
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.18 }} className="text-center">
-        <p className="text-emerald-600 font-bold text-[26px]">You're on-site!</p>
+        <p className="text-[#10B981] font-bold text-[26px]">You're on-site!</p>
         <p className="text-[#737373] text-[15px] mt-1.5">Clock in confirmed</p>
       </motion.div>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
         className="bg-emerald-50 border border-emerald-200 rounded-[12px] px-5 py-3 flex items-center gap-2.5">
-        <MapPin size={14} aria-hidden className="text-emerald-500 flex-shrink-0" />
-        <p className="text-emerald-600 text-[13px] font-medium">Location verified · Miami Beach, FL</p>
+        <MapPin size={14} aria-hidden className="text-[#10B981] flex-shrink-0" />
+        <p className="text-[#10B981] text-[13px] font-medium">Location verified · {locationLabel}</p>
       </motion.div>
     </motion.div>
   );
 }
 
 /* ── Geo-fail ─────────────────────────────────────────────────────────────── */
-function GeoFailScreen({ onRetry }: { onRetry: () => void }) {
+const FAIL_COPY: Record<GeoFailReason, { title: string; body: string }> = {
+  'too-far':     { title: "You're too far from the venue", body: 'You appear to be more than 1 mile away from the shift location.' },
+  'denied':      { title: 'Location permission needed', body: 'Enable location access for this site, then try again to clock in.' },
+  'unavailable': { title: "Couldn't verify location", body: "Your device didn't return a GPS signal. Try again outdoors or near a window." },
+};
+
+function GeoFailScreen({ reason, distance, shiftLocation, onRetry }: {
+  reason: GeoFailReason; distance: number | null; shiftLocation: string; onRetry: () => void;
+}) {
+  const copy = FAIL_COPY[reason];
   return (
     <motion.div key="geo-fail" initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 280, damping: 22 }}
       className="flex-1 flex flex-col items-center justify-center gap-5 px-8 min-h-[100dvh] text-center">
 
-      <div className="w-24 h-24 rounded-full bg-red-50 border-2 border-red-200 flex items-center justify-center">
-        <XCircle size={44} aria-hidden className="text-red-500" />
+      <div className="w-24 h-24 rounded-full bg-red-50 border-2 border-[#EF4444]/30 flex items-center justify-center">
+        <XCircle size={44} aria-hidden className="text-[#EF4444]" />
       </div>
 
       <div>
-        <p className="text-red-500 font-bold text-[22px]">Out of range</p>
-        <p className="text-[#737373] text-[14px] mt-2 leading-relaxed">
-          You appear to be more than 1 mile away from the shift location.
-        </p>
+        <p className="text-[#EF4444] font-bold text-[22px]">{copy.title}</p>
+        <p className="text-[#737373] text-[14px] mt-2 leading-relaxed">{copy.body}</p>
       </div>
 
       <div className="w-full bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-4 text-left flex flex-col gap-4">
         <div>
           <p className="text-[#737373] text-[11px] font-semibold uppercase tracking-widest mb-1">Required</p>
           <div className="flex items-center gap-2">
-            <MapPin size={13} aria-hidden className="text-emerald-500 flex-shrink-0" />
-            <p className="text-black text-[14px] font-medium">Miami Beach, FL</p>
+            <MapPin size={13} aria-hidden className="text-[#10B981] flex-shrink-0" />
+            <p className="text-black text-[14px] font-medium">{shiftLocation}</p>
           </div>
         </div>
-        <div>
-          <p className="text-[#737373] text-[11px] font-semibold uppercase tracking-widest mb-1">Your location</p>
-          <div className="flex items-center gap-2">
-            <MapPin size={13} aria-hidden className="text-red-500 flex-shrink-0" />
-            <p className="text-red-500 text-[14px] font-medium">Coral Gables, FL · 1.8 mi away</p>
+        {reason === 'too-far' && distance !== null && (
+          <div>
+            <p className="text-[#737373] text-[11px] font-semibold uppercase tracking-widest mb-1">Your distance</p>
+            <div className="flex items-center gap-2">
+              <MapPin size={13} aria-hidden className="text-[#EF4444] flex-shrink-0" />
+              <p className="text-[#EF4444] text-[14px] font-medium">{distance.toFixed(1)} mi away</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="w-full flex flex-col gap-3 mt-2">
@@ -206,9 +213,9 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
           isBreak ? 'bg-blue-50 border-blue-200' : 'bg-emerald-50 border-emerald-200'
         }`} aria-label={isBreak ? 'Status: On Break' : 'Status: On Shift'}>
           <motion.div animate={{ opacity: [1, 0.25, 1] }} transition={{ repeat: Infinity, duration: 1.6 }}
-            className={`w-2 h-2 rounded-full flex-shrink-0 ${isBreak ? 'bg-[#0095F6]' : 'bg-emerald-500'}`} />
+            className={`w-2 h-2 rounded-full flex-shrink-0 ${isBreak ? 'bg-[#0095F6]' : 'bg-[#10B981]'}`} />
           <span className={`text-[13px] font-bold uppercase tracking-[0.14em] ${
-            isBreak ? 'text-[#0095F6]' : 'text-emerald-600'
+            isBreak ? 'text-[#0095F6]' : 'text-[#10B981]'
           }`}>
             {isBreak ? 'On Break' : 'On Shift'}
           </span>
@@ -220,7 +227,7 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
         {isBreak ? (
           <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={onEndBreak}
             aria-label="End break and resume shift"
-            className="w-full h-[52px] rounded-[8px] bg-black text-white font-bold text-[16px] flex items-center justify-center gap-2.5">
+            className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] flex items-center justify-center gap-2.5">
             <AlarmClock size={18} aria-hidden />
             End Break
           </motion.button>
@@ -234,8 +241,8 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
             </motion.button>
             <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={onEndShift}
               aria-label="End shift"
-              className="w-full h-[52px] rounded-[8px] border border-red-200 bg-red-50 text-red-500 font-semibold text-[15px] flex items-center justify-center gap-2.5">
-              <Square size={13} aria-hidden className="text-red-500 fill-red-500" />
+              className="w-full h-[52px] rounded-[8px] border border-[#EF4444]/30 bg-red-50 text-[#EF4444] font-semibold text-[15px] flex items-center justify-center gap-2.5">
+              <Square size={13} aria-hidden className="text-[#EF4444] fill-[#EF4444]" />
               End Shift
             </motion.button>
           </>
@@ -266,7 +273,7 @@ function ConfirmEndOverlay({ companyName, onConfirm, onCancel }: {
         </p>
         <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={onConfirm}
           aria-label="Confirm end shift"
-          className="w-full h-[52px] rounded-[8px] bg-red-500 text-white font-bold text-[15px] mb-3">
+          className="w-full h-[52px] rounded-[8px] bg-[#EF4444] text-white font-bold text-[15px] mb-3">
           End Shift
         </motion.button>
         <button type="button" aria-label="Cancel and continue working" onClick={onCancel}
@@ -274,6 +281,33 @@ function ConfirmEndOverlay({ companyName, onConfirm, onCancel }: {
           Continue working
         </button>
       </motion.div>
+    </motion.div>
+  );
+}
+
+/* ── Transfer screen (simulated instant payout) ───────────────────────────── */
+function TransferScreen({ netPay, onDone }: { netPay: number; onDone: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2000);
+    return () => clearTimeout(t);
+  }, [onDone]);
+
+  return (
+    <motion.div key="transfer" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }} className="flex-1 flex flex-col items-center justify-center gap-6 px-8 min-h-[100dvh]">
+      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+        className="w-24 h-24 rounded-full bg-emerald-50 border-2 border-[#10B981] flex items-center justify-center">
+        <motion.div animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 1.1 }}>
+          <ArrowUpRight size={40} aria-hidden className="text-[#10B981]" />
+        </motion.div>
+      </motion.div>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+        className="text-center">
+        <p className="text-[#737373] text-[13px] font-semibold uppercase tracking-widest mb-1.5">Sending instant transfer</p>
+        <p className="text-[#10B981] font-bold" style={{ fontSize: 40 }}>{fmtMoney(netPay)}</p>
+      </motion.div>
+      <div className="w-6 h-6 rounded-full border-2 border-[#DBDBDB] border-t-[#10B981] animate-spin" role="status" aria-label="Processing transfer" />
     </motion.div>
   );
 }
@@ -305,8 +339,8 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
       <div className="text-center mb-8">
         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.1 }}
-          className="w-20 h-20 rounded-full bg-emerald-50 border-2 border-emerald-300 flex items-center justify-center mx-auto mb-5">
-          <CheckCircle2 size={38} aria-hidden className="text-emerald-500" />
+          className="w-20 h-20 rounded-full bg-emerald-50 border-2 border-[#10B981] flex items-center justify-center mx-auto mb-5">
+          <CheckCircle2 size={38} aria-hidden className="text-[#10B981]" />
         </motion.div>
         <h1 className="text-black font-bold text-[28px] tracking-tight">Shift Complete</h1>
         <p className="text-[#737373] text-[14px] mt-1.5 font-medium">
@@ -341,8 +375,8 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
         transition={{ delay: 0.35 }}
         className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-[12px] px-4 py-3.5 mb-8"
         role="status" aria-label="Timesheet submitted">
-        <CheckCircle2 size={18} aria-hidden className="text-emerald-500 flex-shrink-0" />
-        <p className="text-emerald-600 text-[14px] font-medium">
+        <CheckCircle2 size={18} aria-hidden className="text-[#10B981] flex-shrink-0" />
+        <p className="text-[#10B981] text-[14px] font-medium">
           Timesheet sent to {shift.companyName}
         </p>
       </motion.div>
@@ -350,7 +384,7 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
       {/* CTA */}
       <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={onRate}
         aria-label="Rate this shift"
-        className="w-full h-[52px] rounded-[8px] bg-black text-white font-bold text-[16px] flex items-center justify-center gap-2.5 mt-auto">
+        className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] flex items-center justify-center gap-2.5 mt-auto">
         <Star size={18} aria-hidden className="fill-white" />
         Rate this Shift
       </motion.button>
@@ -358,105 +392,46 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
   );
 }
 
-/* ── Review screen ───────────────────────────────────────────────────────── */
-const REVIEW_TAGS = [
-  'Great Venue', 'Clear Instructions', 'Paid on Time', 'Would Return',
-  'Professional Staff', 'Great Team', 'Late Start', 'Poor Communication', 'Disorganized',
-];
-
-const RATING_LABELS = ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent!'];
-
-function ReviewScreen({ shift, onSubmit }: { shift: MockShift; onSubmit: () => void }) {
-  const [rating,       setRating]       = useState(0);
-  const [hoverRating,  setHoverRating]  = useState(0);
-  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
-  const [comment,      setComment]      = useState('');
-
-  const displayRating = hoverRating || rating;
-
-  function toggleTag(tag: string) {
-    setSelectedTags((prev) => {
-      const next = new Set(prev);
-      if (next.has(tag)) next.delete(tag); else next.add(tag);
-      return next;
-    });
-  }
-
+/* ── Already-completed screen ─────────────────────────────────────────────── */
+function AlreadyDoneScreen({ shift, netPay, onDone }: { shift: MockShift; netPay: number | null; onDone: () => void }) {
   return (
-    <motion.div key="review" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0 }} transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="flex-1 flex flex-col min-h-[100dvh] px-5 pt-10 pb-12 overflow-y-auto">
-
-      <div className="text-center mb-8">
-        <h1 className="text-black font-bold text-[24px] tracking-tight">Rate Your Experience</h1>
-        <p className="text-[#737373] text-[14px] mt-1.5">{shift.companyName} · {shift.jobType}</p>
+    <motion.div key="already-done" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+      className="flex-1 flex flex-col items-center justify-center gap-5 px-8 min-h-[100dvh] text-center">
+      <div className="w-20 h-20 rounded-full bg-emerald-50 border-2 border-[#10B981] flex items-center justify-center">
+        <CheckCircle2 size={36} aria-hidden className="text-[#10B981]" />
       </div>
-
-      {/* Star row */}
-      <div className="flex items-center justify-center gap-3 mb-2" role="group" aria-label="Star rating">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <motion.button key={i} type="button"
-            aria-label={`${i} star${i !== 1 ? 's' : ''}`} aria-pressed={rating === i}
-            whileTap={{ scale: 0.82 }} onClick={() => setRating(i)}
-            onMouseEnter={() => setHoverRating(i)} onMouseLeave={() => setHoverRating(0)}>
-            <Star size={42} aria-hidden
-              className={displayRating >= i
-                ? 'text-amber-400 fill-amber-400'
-                : 'text-[#DBDBDB] fill-[#DBDBDB]'} />
-          </motion.button>
-        ))}
+      <div>
+        <p className="text-black font-bold text-[20px]">This shift is already complete</p>
+        <p className="text-[#737373] text-[14px] mt-2">
+          You clocked out of {shift.companyName}{netPay !== null ? ` · net pay ${fmtMoney(netPay)}` : ''}.
+        </p>
       </div>
+      <button type="button" onClick={onDone}
+        className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px]">
+        Back to Shift
+      </button>
+    </motion.div>
+  );
+}
 
-      <div className="h-6 flex items-center justify-center mb-6">
-        <AnimatePresence mode="wait">
-          {displayRating > 0 && (
-            <motion.p key={displayRating} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }} className="text-[#737373] text-[14px] font-medium">
-              {RATING_LABELS[displayRating]}
-            </motion.p>
-          )}
-        </AnimatePresence>
+/* ── End-shift error screen ──────────────────────────────────────────────── */
+function EndShiftErrorScreen({ message, onRetry, onBack }: { message: string | null; onRetry: () => void; onBack: () => void }) {
+  return (
+    <motion.div key="end-error" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+      className="flex-1 flex flex-col items-center justify-center gap-5 px-8 min-h-[100dvh] text-center">
+      <div className="w-20 h-20 rounded-full bg-red-50 border-2 border-[#EF4444] flex items-center justify-center">
+        <AlertTriangle size={36} aria-hidden className="text-[#EF4444]" />
       </div>
-
-      {/* Tags */}
-      <p className="text-[#737373] text-[11px] font-bold uppercase tracking-widest mb-3">How was it?</p>
-      <div className="flex flex-wrap gap-2 mb-6" role="group" aria-label="Review tags">
-        {REVIEW_TAGS.map((tag) => {
-          const on = selectedTags.has(tag);
-          return (
-            <motion.button key={tag} type="button" aria-pressed={on} whileTap={{ scale: 0.94 }}
-              onClick={() => toggleTag(tag)}
-              className={`rounded-full px-4 py-2 text-[13px] font-medium border transition-all duration-150 ${
-                on ? 'bg-black/5 border-black/20 text-black' : 'bg-white border-[#DBDBDB] text-[#737373]'
-              }`}>
-              {tag}
-            </motion.button>
-          );
-        })}
+      <div>
+        <p className="text-black font-bold text-[20px]">We hit a snag</p>
+        <p className="text-[#737373] text-[14px] mt-2">{message ?? 'Something went wrong ending your shift.'}</p>
       </div>
-
-      {/* Comment */}
-      <p className="text-[#737373] text-[11px] font-bold uppercase tracking-widest mb-2">
-        Add a comment <span className="normal-case text-[#AAAAAA]">(optional)</span>
-      </p>
-      <textarea value={comment} onChange={(e) => setComment(e.target.value)}
-        placeholder="Share your experience with this client…" rows={3}
-        aria-label="Optional review comment"
-        className="w-full bg-white border border-[#DBDBDB] rounded-[12px] px-4 py-3 text-black text-[14px] placeholder:text-[#AAAAAA] focus:outline-none focus:border-black resize-none mb-6 leading-relaxed" />
-
-      {/* Submit */}
-      <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={onSubmit}
-        disabled={rating === 0}
-        aria-label={rating === 0 ? 'Select a star rating to submit' : 'Submit review'}
-        aria-disabled={rating === 0}
-        className={`w-full h-[52px] rounded-[8px] font-bold text-[16px] transition-all duration-200 ${
-          rating > 0 ? 'bg-black text-white' : 'bg-[#EFEFEF] text-[#AAAAAA] cursor-not-allowed border border-[#DBDBDB]'
-        }`}>
-        Submit Review
-      </motion.button>
-      <button type="button" aria-label="Skip review and return to home" onClick={onSubmit}
-        className="w-full h-[42px] text-[#AAAAAA] text-[13px] font-medium underline underline-offset-2 active:text-[#737373]">
-        Skip for now
+      <button type="button" onClick={onRetry}
+        className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px]">
+        Try Again
+      </button>
+      <button type="button" onClick={onBack} className="text-[#0095F6] font-semibold text-[14px]">
+        Back to Shift
       </button>
     </motion.div>
   );
@@ -466,19 +441,87 @@ function ReviewScreen({ shift, onSubmit }: { shift: MockShift; onSubmit: () => v
 export function ClockInScreen() {
   const { id }             = useParams<{ id: string }>();
   const [, navigate]       = useLocation();
+  const { user }            = useAuth();
   const { data: shift, isLoading, error } = useShiftById(id);
+  const { startOrResume, completeEntry } = useTimeEntry();
+
   const [phase,      setPhase]      = useState<Phase>('geo-check');
+  const [failReason, setFailReason] = useState<GeoFailReason>('too-far');
+  const [failDistance, setFailDistance] = useState<number | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [shiftSecs,  setShiftSecs]  = useState(0);
   const [breakSecs,  setBreakSecs]  = useState(0);
+  const [entryId,    setEntryId]    = useState<string | null>(null);
+  const [priorEntry, setPriorEntry] = useState<{ netPay: number | null } | null>(null);
+  const [endShiftError, setEndShiftError] = useState<string | null>(null);
   const shiftRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const breakRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startedRef = useRef(false);
+
+  const runGeoCheck = useCallback(() => {
+    if (!shift || !user?.id) return;
+    setPhase('geo-check');
+    const MIN_SPINNER_MS = 1200;
+    const startedAt = Date.now();
+
+    const finish = (result: { ok: true } | { ok: false; reason: GeoFailReason; distance: number | null }) => {
+      const elapsed = Date.now() - startedAt;
+      const wait = Math.max(0, MIN_SPINNER_MS - elapsed);
+      setTimeout(async () => {
+        if (!result.ok) {
+          setFailReason(result.reason);
+          setFailDistance(result.distance);
+          setPhase('geo-fail');
+          return;
+        }
+        try {
+          const entry = await startOrResume(shift.id, user.id);
+          if (entry.alreadyCompleted) {
+            setEntryId(entry.id);
+            const priorNet = entry.totalPay !== null && entry.fee !== null ? entry.totalPay - entry.fee : null;
+            setPriorEntry({ netPay: priorNet });
+            setPhase('already-done');
+            return;
+          }
+          setEntryId(entry.id);
+          if (entry.resumed) {
+            const elapsedSinceClockIn = Math.max(0, Math.floor((Date.now() - new Date(entry.clockInISO).getTime()) / 1000));
+            setShiftSecs(elapsedSinceClockIn);
+            setBreakSecs(entry.breakMinutes * 60);
+          }
+          setPhase('geo-success');
+        } catch (e) {
+          console.error('[ClockIn] failed to start time entry:', e);
+          setFailReason('unavailable');
+          setFailDistance(null);
+          setPhase('geo-fail');
+        }
+      }, wait);
+    };
+
+    if (!navigator.geolocation) {
+      finish({ ok: false, reason: 'unavailable', distance: null });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const distance = haversineMiles(pos.coords.latitude, pos.coords.longitude, shift.lat, shift.lng);
+        if (distance <= 1) finish({ ok: true });
+        else finish({ ok: false, reason: 'too-far', distance });
+      },
+      (geoError) => {
+        finish({ ok: false, reason: geoError.code === geoError.PERMISSION_DENIED ? 'denied' : 'unavailable', distance: null });
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+    );
+  }, [shift, user?.id, startOrResume]);
 
   useEffect(() => {
-    if (phase !== 'geo-check') return;
-    const t = setTimeout(() => setPhase('geo-success'), 2200);
-    return () => clearTimeout(t);
-  }, [phase]);
+    if (startedRef.current || !shift || !user?.id) return;
+    startedRef.current = true;
+    runGeoCheck();
+  }, [shift, user?.id, runGeoCheck]);
 
   useEffect(() => {
     if (phase !== 'geo-success') return;
@@ -508,24 +551,62 @@ export function ClockInScreen() {
     setPhase('active');
   }
 
-  function handleEndShift() {
-    if (shiftRef.current) { clearInterval(shiftRef.current); shiftRef.current = null; }
-    if (breakRef.current) { clearInterval(breakRef.current); breakRef.current = null; }
-    if (id) markClockedIn(id);
-    setConfirmEnd(false);
-    setPhase('summary');
-  }
-
   const billedSecs  = Math.max(0, shiftSecs - breakSecs);
   const billedHours = billedSecs / 3600;
   const grossPay    = billedHours * (shift?.payRate ?? 0);
   const serviceFee  = grossPay * 0.08;
   const netPay      = grossPay - serviceFee;
 
+  async function handleEndShift() {
+    if (shiftRef.current) { clearInterval(shiftRef.current); shiftRef.current = null; }
+    if (breakRef.current) { clearInterval(breakRef.current); breakRef.current = null; }
+    setConfirmEnd(false);
+
+    if (!entryId || !user?.id || !shift) {
+      setEndShiftError('Missing shift or session data — please go back and try again.');
+      setPhase('end-error');
+      return;
+    }
+
+    const { error: completeError } = await completeEntry(entryId, {
+      clockOutISO: new Date().toISOString(),
+      breakMinutes: breakSecs / 60,
+      totalHours: billedHours,
+      totalPay: grossPay,
+      fee: serviceFee,
+    });
+    if (completeError) {
+      console.error('[ClockIn] failed to complete time entry:', completeError);
+      setEndShiftError("We couldn't save your timesheet. Please try ending your shift again.");
+      setPhase('end-error');
+      // restart timers so the user isn't stuck mid-shift with dead clocks
+      shiftRef.current = setInterval(() => setShiftSecs((s) => s + 1), 1000);
+      return;
+    }
+
+    const { error: paymentError } = await supabase.from('payments').insert({
+      shift_id:   shift.id,
+      worker_id:  user.id,
+      amount:     Math.round(grossPay * 100) / 100,
+      fee:        Math.round(serviceFee * 100) / 100,
+      net_amount: Math.round(netPay * 100) / 100,
+      status:     'completed',
+    });
+    if (paymentError) {
+      console.error('[ClockIn] failed to record payment:', paymentError.message);
+      setEndShiftError("Your timesheet was saved, but the payout couldn't be processed. It will be retried shortly.");
+      setPhase('end-error');
+      return;
+    }
+
+    if (id) markClockedIn(id);
+    setPhase('transfer');
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-[100dvh] bg-white flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-[#DBDBDB] border-t-black animate-spin"
+        <div className="w-8 h-8 rounded-full border-2 border-[#DBDBDB] border-t-[#0A1628] animate-spin"
           role="status" aria-label="Loading shift" />
       </div>
     );
@@ -558,22 +639,31 @@ export function ClockInScreen() {
       </AnimatePresence>
 
       <AnimatePresence mode="wait">
-        {phase === 'geo-check' && <GeoCheckScreen key="geo-check" onSimulateFail={() => setPhase('geo-fail')} />}
-        {phase === 'geo-success' && <GeoSuccessScreen key="geo-success" />}
-        {phase === 'geo-fail' && <GeoFailScreen key="geo-fail" onRetry={() => setPhase('geo-check')} />}
+        {phase === 'geo-check' && <GeoCheckScreen key="geo-check" />}
+        {phase === 'geo-success' && <GeoSuccessScreen key="geo-success" locationLabel={shift.location} />}
+        {phase === 'geo-fail' && (
+          <GeoFailScreen key="geo-fail" reason={failReason} distance={failDistance}
+            shiftLocation={shift.location} onRetry={runGeoCheck} />
+        )}
         {(phase === 'active' || phase === 'on-break') && (
           <ActiveScreen key="active" shift={shift} phase={phase}
             shiftSecs={shiftSecs} breakSecs={breakSecs}
             onTakeBreak={handleTakeBreak} onEndBreak={handleEndBreak}
             onEndShift={() => setConfirmEnd(true)} />
         )}
+        {phase === 'transfer' && <TransferScreen key="transfer" netPay={netPay} onDone={() => setPhase('summary')} />}
         {phase === 'summary' && (
           <SummaryScreen key="summary" shift={shift} shiftSecs={shiftSecs} breakSecs={breakSecs}
             billedSecs={billedSecs} grossPay={grossPay} serviceFee={serviceFee} netPay={netPay}
-            onRate={() => setPhase('review')} />
+            onRate={() => navigate(`/review/${shift.id}/${shift.clientId}`)} />
         )}
-        {phase === 'review' && (
-          <ReviewScreen key="review" shift={shift} onSubmit={() => navigate('/home')} />
+        {phase === 'already-done' && (
+          <AlreadyDoneScreen key="already-done" shift={shift} netPay={priorEntry?.netPay ?? null}
+            onDone={() => navigate(`/shift/${shift.id}`)} />
+        )}
+        {phase === 'end-error' && (
+          <EndShiftErrorScreen key="end-error" message={endShiftError}
+            onRetry={handleEndShift} onBack={() => navigate(`/shift/${shift.id}`)} />
         )}
       </AnimatePresence>
 

@@ -1,60 +1,27 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-  MapPin, AlarmClock, DollarSign, Star,
-  CheckCheck, UserPlus, Bell,
-} from 'lucide-react';
+import { MapPin, CheckCheck, XCircle, Bell } from 'lucide-react';
+import { useLocation } from 'wouter';
 import { BottomTabNav } from '@/components/BottomTabNav';
-import {
-  MOCK_NOTIFICATIONS,
-  type NotificationItem,
-  type Segment,
-  type NotificationType,
-} from '@/data/mockNotifications';
+import { useNotifications, relativeTime } from '@/hooks/useNotifications';
+import type { NotificationRow as NotificationRowType } from '@/lib/supabase';
 
-/* ── Rich text renderer ────────────────────────────────────────────────────── */
-function RichDescription({ segments }: { segments: Segment[] }) {
-  return (
-    <span>
-      {segments.map((seg, i) => {
-        if (seg.mention) {
-          return <span key={i} className="text-[#0095F6] font-semibold">{seg.text}</span>;
-        }
-        if (seg.strong) {
-          return <span key={i} className="text-black font-bold">{seg.text}</span>;
-        }
-        return <span key={i} className="text-[#737373]">{seg.text}</span>;
-      })}
-    </span>
-  );
-}
+type IconColor = 'blue' | 'green' | 'red';
 
-/* ── Icon avatar ────────────────────────────────────────────────────────────── */
-type IconColor = 'amber' | 'green' | 'gold' | 'blue';
-
-const ICON_META: Record<
-  NotificationType,
-  { icon: React.ComponentType<{ size?: number; className?: string }>; color: IconColor }
-> = {
-  'new-shift':      { icon: MapPin,     color: 'gold'  },
-  'shift-accepted': { icon: CheckCheck, color: 'green' },
-  'shift-applied':  { icon: UserPlus,   color: 'blue'  },
-  'shift-reminder': { icon: AlarmClock, color: 'amber' },
-  'payment':        { icon: DollarSign, color: 'green' },
-  'review':         { icon: Star,       color: 'gold'  },
+const ICON_META: Record<string, { icon: React.ComponentType<{ size?: number; className?: string }>; color: IconColor }> = {
+  application_received: { icon: MapPin,     color: 'blue'  },
+  application_accepted: { icon: CheckCheck, color: 'green' },
+  application_declined: { icon: XCircle,    color: 'red'   },
 };
 
 const COLOR_CLASSES: Record<IconColor, { bg: string; icon: string }> = {
-  amber: { bg: 'bg-amber-50  border-amber-200',  icon: 'text-amber-500'   },
+  blue:  { bg: 'bg-blue-50 border-blue-200',       icon: 'text-[#0095F6]' },
   green: { bg: 'bg-emerald-50 border-emerald-200', icon: 'text-emerald-600' },
-  gold:  { bg: 'bg-black/5   border-black/10',    icon: 'text-black'       },
-  blue:  { bg: 'bg-blue-50   border-blue-200',    icon: 'text-[#0095F6]'   },
+  red:   { bg: 'bg-red-50 border-red-200',         icon: 'text-[#EF4444]' },
 };
 
-function SystemAvatar({ type, colorOverride }: { type: NotificationType; colorOverride?: string }) {
-  const meta   = ICON_META[type];
-  const color  = (colorOverride as IconColor) ?? meta.color;
-  const styles = COLOR_CLASSES[color] ?? COLOR_CLASSES.gold;
+function SystemAvatar({ type }: { type: string }) {
+  const meta   = ICON_META[type] ?? ICON_META.application_received;
+  const styles = COLOR_CLASSES[meta.color];
   const Icon   = meta.icon;
   return (
     <div className={`w-11 h-11 rounded-full border flex items-center justify-center flex-shrink-0 ${styles.bg}`} aria-hidden>
@@ -63,72 +30,30 @@ function SystemAvatar({ type, colorOverride }: { type: NotificationType; colorOv
   );
 }
 
-function PersonAvatar({ url, alt }: { url: string; alt: string }) {
+function NotificationCard({ item, index, onOpen }: { item: NotificationRowType; index: number; onOpen: () => void }) {
   return (
-    <img src={url} alt={alt} loading="lazy" decoding="async"
-      className="w-11 h-11 rounded-full object-cover border border-[#DBDBDB] flex-shrink-0" />
-  );
-}
-
-/* ── Star strip ─────────────────────────────────────────────────────────────── */
-function StarStrip({ count }: { count: number }) {
-  return (
-    <div className="flex gap-0.5 flex-shrink-0" aria-label={`${count} stars`}>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Star key={i} size={11} aria-hidden
-          className={i < count ? 'text-amber-400 fill-amber-400' : 'text-[#DBDBDB] fill-[#DBDBDB]'} />
-      ))}
-    </div>
-  );
-}
-
-/* ── Notification row ───────────────────────────────────────────────────────── */
-function NotificationRow({ item, index }: { item: NotificationItem; index: number }) {
-  const hasPerson = !!item.actorPhoto;
-  const hasThumb  = !!item.shiftThumb;
-  const hasStars  = typeof item.stars === 'number';
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
+    <motion.button
+      type="button" onClick={onOpen}
+      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, delay: index * 0.04, ease: 'easeOut' }}
-      className={`flex items-start gap-3 px-4 py-3.5 border-b border-[#DBDBDB] transition-colors ${
-        item.unread ? 'bg-[#F0F7FF]' : 'bg-white'
+      className={`w-full flex items-start gap-3 px-4 py-3.5 border-b border-[#DBDBDB] text-left transition-colors ${
+        item.read ? 'bg-white' : 'bg-[#F0F7FF]'
       }`}
-      role="listitem"
-      aria-label={item.segments.map((s) => s.text).join('')}
+      role="listitem" aria-label={item.title}
     >
-      {/* Unread dot */}
       <div className="w-2 flex-shrink-0 flex items-center justify-center self-center">
-        {item.unread && <div aria-label="Unread" className="w-2 h-2 rounded-full bg-[#0095F6]" />}
+        {!item.read && <div aria-label="Unread" className="w-2 h-2 rounded-full bg-[#0095F6]" />}
       </div>
-
-      {hasPerson
-        ? <PersonAvatar url={item.actorPhoto!} alt="Sender" />
-        : <SystemAvatar type={item.type} colorOverride={item.iconColor} />}
-
+      <SystemAvatar type={item.type} />
       <div className="flex-1 min-w-0">
-        <p className="text-[14px] leading-[1.5]">
-          <RichDescription segments={item.segments} />
-        </p>
-        <p className="text-[#737373] text-[12px] font-medium mt-1">{item.timestamp}</p>
-        {hasStars && (
-          <div className="mt-1.5"><StarStrip count={item.stars!} /></div>
-        )}
+        <p className="text-black font-semibold text-[14px] leading-[1.4]">{item.title}</p>
+        {item.body && <p className="text-[#737373] text-[13px] leading-[1.4] mt-0.5">{item.body}</p>}
+        <p className="text-[#AAAAAA] text-[12px] font-medium mt-1">{relativeTime(item.created_at)}</p>
       </div>
-
-      {hasThumb && (
-        <div className="flex-shrink-0 w-[52px] h-[52px] rounded-[8px] overflow-hidden border border-[#DBDBDB]">
-          <img src={item.shiftThumb} alt="Shift venue" loading="lazy" decoding="async"
-            className="w-full h-full object-cover" />
-        </div>
-      )}
-    </motion.div>
+    </motion.button>
   );
 }
 
-/* ── Section header ─────────────────────────────────────────────────────────── */
 function SectionHeader({ label, showMarkRead, onMarkRead }: {
   label: string; showMarkRead?: boolean; onMarkRead?: () => void;
 }) {
@@ -145,18 +70,36 @@ function SectionHeader({ label, showMarkRead, onMarkRead }: {
   );
 }
 
-/* ── NotificationsScreen ────────────────────────────────────────────────────── */
+function NotificationsSkeleton() {
+  return (
+    <div className="flex flex-col gap-0" aria-hidden>
+      {[1, 2, 3, 4].map((n) => (
+        <div key={n} className="flex items-start gap-3 px-4 py-3.5 border-b border-[#DBDBDB]">
+          <div className="w-11 h-11 rounded-full bg-[#EFEFEF] animate-pulse flex-shrink-0" />
+          <div className="flex-1 flex flex-col gap-2 pt-1">
+            <div className="w-3/4 h-3.5 rounded bg-[#EFEFEF] animate-pulse" />
+            <div className="w-1/3 h-3 rounded bg-[#EFEFEF] animate-pulse" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function isThisWeek(iso: string): boolean {
+  const days = (Date.now() - new Date(iso).getTime()) / 86_400_000;
+  return days >= 1;
+}
+
 export function NotificationsScreen() {
-  const [readAll, setReadAll] = useState(false);
+  const [, navigate] = useLocation();
+  const { items, isLoading, unreadCount, markAllRead } = useNotifications();
 
-  const today = MOCK_NOTIFICATIONS.filter((n) => n.section === 'today');
-  const week  = MOCK_NOTIFICATIONS.filter((n) => n.section === 'week');
+  const today = items.filter((n) => !isThisWeek(n.created_at));
+  const week  = items.filter((n) => isThisWeek(n.created_at));
 
-  const todayUnread = !readAll && today.some((n) => n.unread);
-  const totalUnread = readAll ? 0 : MOCK_NOTIFICATIONS.filter((n) => n.unread).length;
-
-  function withReadState(item: NotificationItem): NotificationItem {
-    return readAll ? { ...item, unread: false } : item;
+  function handleOpen(item: NotificationRowType) {
+    if (item.related_shift_id) navigate(`/shift/${item.related_shift_id}`);
   }
 
   return (
@@ -166,10 +109,10 @@ export function NotificationsScreen() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-black font-bold text-[22px] tracking-tight">Notifications</h1>
-            {totalUnread > 0 && (
-              <span aria-label={`${totalUnread} unread notifications`}
+            {unreadCount > 0 && (
+              <span aria-label={`${unreadCount} unread notifications`}
                 className="min-w-[20px] h-5 rounded-full bg-[#0095F6] flex items-center justify-center px-1.5">
-                <span className="text-white text-[11px] font-bold leading-none">{totalUnread}</span>
+                <span className="text-white text-[11px] font-bold leading-none">{unreadCount}</span>
               </span>
             )}
           </div>
@@ -182,15 +125,38 @@ export function NotificationsScreen() {
 
       {/* Feed */}
       <div className="flex-1 overflow-y-auto pb-[64px]" role="list" aria-label="Notifications">
-        <SectionHeader label="Today" showMarkRead={todayUnread} onMarkRead={() => setReadAll(true)} />
-        {today.map((item, i) => (
-          <NotificationRow key={item.id} item={withReadState(item)} index={i} />
-        ))}
-
-        <SectionHeader label="This Week" />
-        {week.map((item, i) => (
-          <NotificationRow key={item.id} item={withReadState(item)} index={today.length + i} />
-        ))}
+        {isLoading ? (
+          <NotificationsSkeleton />
+        ) : items.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 py-20 text-center">
+            <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+              <Bell size={26} aria-hidden className="text-[#737373]" />
+            </div>
+            <p className="text-black font-semibold text-[16px]">No notifications yet</p>
+            <p className="text-[#737373] text-[13px]">
+              You'll see updates here when someone messages you or reviews your applications.
+            </p>
+          </div>
+        ) : (
+          <>
+            {today.length > 0 && (
+              <>
+                <SectionHeader label="Today" showMarkRead={unreadCount > 0} onMarkRead={markAllRead} />
+                {today.map((item, i) => (
+                  <NotificationCard key={item.id} item={item} index={i} onOpen={() => handleOpen(item)} />
+                ))}
+              </>
+            )}
+            {week.length > 0 && (
+              <>
+                <SectionHeader label="This Week" showMarkRead={today.length === 0 && unreadCount > 0} onMarkRead={markAllRead} />
+                {week.map((item, i) => (
+                  <NotificationCard key={item.id} item={item} index={today.length + i} onOpen={() => handleOpen(item)} />
+                ))}
+              </>
+            )}
+          </>
+        )}
       </div>
 
       <BottomTabNav />

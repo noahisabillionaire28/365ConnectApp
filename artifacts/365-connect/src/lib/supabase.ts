@@ -76,8 +76,45 @@ export type ApplicationRow = {
   id: string;
   shift_id: string;
   worker_id: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+  status: 'pending' | 'accepted' | 'declined' | 'rejected' | 'withdrawn';
   message: string | null;
+  match_score: number | null;
+  created_at: string;
+};
+
+export type NotificationRow = {
+  id: string;
+  user_id: string;
+  type: 'application_received' | 'application_accepted' | 'application_declined' | string;
+  title: string;
+  body: string | null;
+  related_shift_id: string | null;
+  related_user_id: string | null;
+  read: boolean;
+  created_at: string;
+};
+
+export type TimeEntryRow = {
+  id: string;
+  shift_id: string;
+  worker_id: string;
+  clock_in: string;
+  clock_out: string | null;
+  break_minutes: number;
+  total_hours: number | null;
+  total_pay: number | null;
+  fee: number | null;
+  created_at: string;
+};
+
+export type PaymentRow = {
+  id: string;
+  shift_id: string;
+  worker_id: string;
+  amount: number;
+  fee: number;
+  net_amount: number;
+  status: string;
   created_at: string;
 };
 
@@ -97,6 +134,8 @@ export type ReviewRow = {
   reviewee_id: string;
   rating: number;
   comment: string | null;
+  positive_tags: string[];
+  negative_tags: string[];
   created_at: string;
 };
 

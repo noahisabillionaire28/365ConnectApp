@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
-export type ApplicationStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn' | null;
+export type ApplicationStatus = 'pending' | 'accepted' | 'declined' | 'rejected' | 'withdrawn' | null;
 
 /** The current worker's application status for a single shift (Shift Detail CTA). */
 export function useApplicationStatus(shiftId: string | undefined) {

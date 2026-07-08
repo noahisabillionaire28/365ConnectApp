@@ -38,6 +38,8 @@ import { ProfileScreen }         from '@/pages/ProfileScreen';
 import { ShiftDetailScreen }     from '@/pages/ShiftDetailScreen';
 import { WorkerProfileScreen }   from '@/pages/WorkerProfileScreen';
 import { ClockInScreen }         from '@/pages/ClockInScreen';
+import { ApplicantsScreen }      from '@/pages/ApplicantsScreen';
+import { ReviewScreen }          from '@/pages/ReviewScreen';
 
 // Wizards (post-shift builders)
 import { PostShiftStep1Screen }  from '@/pages/PostShiftStep1Screen';
@@ -115,8 +117,10 @@ function MobileRouter() {
 
             {/* ── Detail & misc ─────────────────────────────────────── */}
             <Route path="/shift/:id"        component={ShiftDetailScreen}   />
+            <Route path="/shift/:id/applicants" component={ApplicantsScreen} />
             <Route path="/worker/:username" component={WorkerProfileScreen}  />
             <Route path="/clock/:id"        component={ClockInScreen}        />
+            <Route path="/review/:shiftId/:toUserId" component={ReviewScreen} />
 
             {/* ── Client post-shift wizard ──────────────────────────── */}
             <Route path="/post-shift/step1" component={PostShiftStep1Screen} />
