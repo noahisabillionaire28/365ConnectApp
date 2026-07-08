@@ -12,22 +12,34 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { MobileContainer } from '@/components/MobileContainer';
 import { AdminNav } from '@/components/AdminNav';
 
-// Mobile screens
-import { SplashScreen }          from '@/pages/SplashScreen';
+// ── Mobile screens ─────────────────────────────────────────────────────────────
+// Auth / onboarding
+import { SplashScreen }         from '@/pages/SplashScreen';
+import { SignUpScreen }          from '@/pages/SignUpScreen';
+import { LoginScreen }           from '@/pages/LoginScreen';
+import { RoleSelectScreen }      from '@/pages/RoleSelectScreen';
+import { OnboardingScreen }      from '@/pages/OnboardingScreen';
+import { WorkerSetupScreen }     from '@/pages/WorkerSetupScreen';
+import { ClientSetupScreen }     from '@/pages/ClientSetupScreen';
+import { StafferSetupScreen }    from '@/pages/StafferSetupScreen';
+import { PhoneAuthScreen }       from '@/pages/PhoneAuthScreen';
+import { AuthCallbackScreen }    from '@/pages/AuthCallbackScreen';
+import { ResetPasswordScreen }   from '@/pages/ResetPasswordScreen';
+
+// Main app tabs
 import { HomeScreen }            from '@/pages/HomeScreen';
 import { JobsScreen }            from '@/pages/JobsScreen';
 import { ExploreScreen }         from '@/pages/ExploreScreen';
 import { MessagesScreen }        from '@/pages/MessagesScreen';
 import { NotificationsScreen }   from '@/pages/NotificationsScreen';
 import { ProfileScreen }         from '@/pages/ProfileScreen';
-import { SignUpScreen }          from '@/pages/SignUpScreen';
-import { RoleSelectScreen }      from '@/pages/RoleSelectScreen';
-import { OnboardingScreen }      from '@/pages/OnboardingScreen';
-import { LoginScreen }           from '@/pages/LoginScreen';
-import { ProfileSetupScreen }    from '@/pages/ProfileSetupScreen';
-import { WorkerProfileScreen }   from '@/pages/WorkerProfileScreen';
-import { ResetPasswordScreen }   from '@/pages/ResetPasswordScreen';
+
+// Detail screens
 import { ShiftDetailScreen }     from '@/pages/ShiftDetailScreen';
+import { WorkerProfileScreen }   from '@/pages/WorkerProfileScreen';
+import { ClockInScreen }         from '@/pages/ClockInScreen';
+
+// Wizards (post-shift builders)
 import { PostShiftStep1Screen }  from '@/pages/PostShiftStep1Screen';
 import { PostShiftStep2Screen }  from '@/pages/PostShiftStep2Screen';
 import { PostShiftStep3Screen }  from '@/pages/PostShiftStep3Screen';
@@ -40,11 +52,8 @@ import { StafferPostStep4Screen } from '@/pages/StafferPostStep4Screen';
 import { StafferPostStep5Screen } from '@/pages/StafferPostStep5Screen';
 import { StafferPostStep6Screen } from '@/pages/StafferPostStep6Screen';
 import { StafferPostStep7Screen } from '@/pages/StafferPostStep7Screen';
-import { ClockInScreen }         from '@/pages/ClockInScreen';
-import { PhoneAuthScreen }       from '@/pages/PhoneAuthScreen';
-import { AuthCallbackScreen }    from '@/pages/AuthCallbackScreen';
 
-// Admin screens
+// ── Admin screens ──────────────────────────────────────────────────────────────
 import { AdminLogin }     from '@/pages/admin/AdminLogin';
 import { AdminDashboard } from '@/pages/admin/AdminDashboard';
 import { AdminUsers }     from '@/pages/admin/AdminUsers';
@@ -53,6 +62,7 @@ import { AdminDisputes }  from '@/pages/admin/AdminDisputes';
 import { AdminRevenue }   from '@/pages/admin/AdminRevenue';
 import { AdminSettings }  from '@/pages/admin/AdminSettings';
 
+// ── Query client ──────────────────────────────────────────────────────────────
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -64,7 +74,7 @@ const queryClient = new QueryClient({
   },
 });
 
-/** Worker / client / staffer mobile app — 390 px MobileContainer */
+// ── Mobile router — 390 px centred column ─────────────────────────────────────
 function MobileRouter() {
   const [location] = useLocation();
   return (
@@ -79,38 +89,43 @@ function MobileRouter() {
           style={{ width: '100%' }}
         >
           <Switch>
-            {/* Auth / onboarding */}
-            <Route path="/"               component={SplashScreen}       />
-            <Route path="/signup"         component={SignUpScreen}        />
-            <Route path="/role-select"    component={RoleSelectScreen}    />
-            <Route path="/onboarding"     component={OnboardingScreen}    />
-            <Route path="/login"          component={LoginScreen}         />
-            <Route path="/profile-setup"  component={ProfileSetupScreen}  />
+            {/* ── Auth / onboarding ─────────────────────────────────── */}
+            <Route path="/"              component={SplashScreen}       />
+            <Route path="/signup"        component={SignUpScreen}        />
+            <Route path="/login"         component={LoginScreen}         />
+            <Route path="/role-select"   component={RoleSelectScreen}    />
+            <Route path="/onboarding"    component={OnboardingScreen}    />
+            <Route path="/worker-setup"  component={WorkerSetupScreen}   />
+            <Route path="/client-setup"  component={ClientSetupScreen}   />
+            <Route path="/staffer-setup" component={StafferSetupScreen}  />
+            <Route path="/phone-auth"    component={PhoneAuthScreen}     />
+            <Route path="/auth/callback" component={AuthCallbackScreen}  />
             <Route path="/reset-password" component={ResetPasswordScreen} />
-            <Route path="/phone-auth"     component={PhoneAuthScreen}     />
-            <Route path="/auth/callback"  component={AuthCallbackScreen}  />
 
-            {/* Main tabs */}
-            <Route path="/home"     component={HomeScreen}     />
-            <Route path="/jobs"     component={JobsScreen}     />
-            <Route path="/explore"  component={ExploreScreen}  />
-            <Route path="/messages" component={MessagesScreen} />
-            <Route path="/profile"  component={ProfileScreen}  />
+            {/* Legacy alias so any saved links still work */}
+            <Route path="/profile-setup" component={WorkerSetupScreen}   />
 
-            {/* Misc */}
-            <Route path="/notifications"    component={NotificationsScreen}  />
+            {/* ── Main tabs ─────────────────────────────────────────── */}
+            <Route path="/home"          component={HomeScreen}          />
+            <Route path="/jobs"          component={JobsScreen}          />
+            <Route path="/explore"       component={ExploreScreen}       />
+            <Route path="/messages"      component={MessagesScreen}      />
+            <Route path="/notifications" component={NotificationsScreen} />
+            <Route path="/profile"       component={ProfileScreen}       />
+
+            {/* ── Detail & misc ─────────────────────────────────────── */}
+            <Route path="/shift/:id"        component={ShiftDetailScreen}   />
             <Route path="/worker/:username" component={WorkerProfileScreen}  />
-            <Route path="/shift/:id"        component={ShiftDetailScreen}    />
             <Route path="/clock/:id"        component={ClockInScreen}        />
 
-            {/* Client post-shift wizard */}
+            {/* ── Client post-shift wizard ──────────────────────────── */}
             <Route path="/post-shift/step1" component={PostShiftStep1Screen} />
             <Route path="/post-shift/step2" component={PostShiftStep2Screen} />
             <Route path="/post-shift/step3" component={PostShiftStep3Screen} />
             <Route path="/post-shift/step4" component={PostShiftStep4Screen} />
             <Route path="/post-shift/step5" component={PostShiftStep5Screen} />
 
-            {/* Staffer post-shift wizard */}
+            {/* ── Staffer post-shift wizard ─────────────────────────── */}
             <Route path="/staffer-shift/step1" component={StafferPostStep1Screen} />
             <Route path="/staffer-shift/step2" component={StafferPostStep2Screen} />
             <Route path="/staffer-shift/step3" component={StafferPostStep3Screen} />
@@ -127,10 +142,7 @@ function MobileRouter() {
   );
 }
 
-/**
- * Admin panel — full-width, dark navy left sidebar + white content area.
- * The login page hides the sidebar.
- */
+// ── Admin router — full-width left-sidebar layout ────────────────────────────
 function AdminRouter() {
   const [location] = useLocation();
   const showSidebar = location !== '/admin/login' && location !== '/admin';
@@ -151,7 +163,6 @@ function AdminRouter() {
           <Route path="/admin/disputes"  component={AdminDisputes}  />
           <Route path="/admin/revenue"   component={AdminRevenue}   />
           <Route path="/admin/settings"  component={AdminSettings}  />
-          {/* /admin bare → redirect to login */}
           <Route path="/admin">
             {() => {
               window.location.replace(
@@ -166,13 +177,14 @@ function AdminRouter() {
   );
 }
 
-/** Top-level router — splits admin vs. mobile paths */
+// ── Root splitter ─────────────────────────────────────────────────────────────
 function AppRouter() {
   const [location] = useLocation();
   const isAdmin = location === '/admin' || location.startsWith('/admin/');
   return isAdmin ? <AdminRouter /> : <MobileRouter />;
 }
 
+// ── App root ──────────────────────────────────────────────────────────────────
 function App() {
   return (
     <QueryClientProvider client={queryClient}>

@@ -3,45 +3,56 @@
  * and makes it available app-wide via useRole().
  *
  * Must be rendered inside <AuthProvider>.
+ * Exposes refetchRole() so RoleSelectScreen can force a re-read after
+ * writing the new role to DB.
  */
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext, useContext, useCallback, useEffect, useState, type ReactNode,
+} from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
 export type UserRole = 'worker' | 'client' | 'staffer' | 'admin' | null;
 
 type RoleContextType = {
-  role: UserRole;
+  role:        UserRole;
   roleLoading: boolean;
+  /** Re-queries the users table. Returns a Promise so callers can await it. */
+  refetchRole: () => Promise<void>;
 };
 
-const RoleContext = createContext<RoleContextType>({ role: null, roleLoading: true });
+const RoleContext = createContext<RoleContextType>({
+  role:        null,
+  roleLoading: true,
+  refetchRole: async () => {},
+});
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  const [role, setRole]               = useState<UserRole>(null);
-  const [roleLoading, setRoleLoading] = useState(true);
+  const { user }                          = useAuth();
+  const [role, setRole]                   = useState<UserRole>(null);
+  const [roleLoading, setRoleLoading]     = useState(true);
 
-  useEffect(() => {
+  const fetchRole = useCallback(async () => {
     if (!user) {
       setRole(null);
       setRoleLoading(false);
       return;
     }
     setRoleLoading(true);
-    supabase
+    const { data } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        setRole((data?.role as UserRole) ?? null);
-        setRoleLoading(false);
-      });
-  }, [user?.id]);
+      .maybeSingle();
+    setRole((data?.role as UserRole) ?? null);
+    setRoleLoading(false);
+  }, [user?.id]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch on mount + whenever auth user changes
+  useEffect(() => { fetchRole(); }, [fetchRole]);
 
   return (
-    <RoleContext.Provider value={{ role, roleLoading }}>
+    <RoleContext.Provider value={{ role, roleLoading, refetchRole: fetchRole }}>
       {children}
     </RoleContext.Provider>
   );

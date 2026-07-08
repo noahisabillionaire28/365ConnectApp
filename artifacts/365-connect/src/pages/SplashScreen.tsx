@@ -1,34 +1,74 @@
-import { Link } from 'wouter';
+/**
+ * SplashScreen — /
+ * Entry point for logged-out users.
+ * Logged-in users with a complete profile are redirected to /home.
+ */
+import { useEffect } from 'react';
+import { useLocation } from 'wouter';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { resolveSetupRoute } from '@/lib/setupRoute';
+
+const NAVY   = '#0A1628';
+const BORDER = '#E5E7EB';
+const MUTED  = '#6B7280';
 
 export function SplashScreen() {
+  const [, navigate] = useLocation();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (loading || !user) return;
+    // Already logged in — check setup completion and route accordingly
+    supabase.from('users').select('username, role, availability')
+      .eq('id', user.id).maybeSingle()
+      .then(async ({ data }) => {
+        navigate(await resolveSetupRoute(user.id, data ?? null));
+      });
+  }, [user, loading]);
+
+  if (loading) {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-white">
+        <div className="w-8 h-8 rounded-full border-[2.5px] border-t-transparent animate-spin"
+          style={{ borderColor: `${NAVY} transparent ${NAVY} ${NAVY}` }} />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col items-center justify-between min-h-[100dvh] px-6 py-12 bg-white">
-      <div className="flex-1 flex flex-col items-center justify-center w-full">
-        {/* Wordmark */}
-        <div className="flex items-center gap-1.5 mb-4">
-          <span className="text-black font-bold text-[42px] leading-none tracking-tight">365</span>
-          <span className="text-black font-bold text-[42px] leading-none tracking-tight">CONNECT</span>
-        </div>
-        <p className="text-[#737373] text-[15px] tracking-wide font-medium">
+    <div className="min-h-[100dvh] flex flex-col bg-white px-6">
+      {/* Wordmark + tagline centred */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-3">
+        <h1
+          className="font-extrabold leading-none tracking-[-2px] text-[52px] select-none"
+          style={{ color: NAVY }}
+        >
+          365 CONNECT
+        </h1>
+        <p className="text-[15px] font-medium" style={{ color: MUTED }}>
           Staff smarter. Work better.
         </p>
       </div>
 
-      <div className="w-full flex flex-col gap-3">
-        <Link
-          href="/signup"
-          className="w-full bg-black text-white font-bold text-center py-[16px] rounded-[8px] hover:bg-black/90 transition-colors active:scale-[0.98] text-[15px]"
-          data-testid="button-signup"
+      {/* CTA buttons */}
+      <div className="flex flex-col gap-3 pb-14">
+        <button
+          onClick={() => navigate('/signup')}
+          className="w-full text-white font-bold text-[16px] h-[52px] rounded-[12px] active:scale-[0.98] transition-transform"
+          style={{ background: NAVY }}
+          data-testid="btn-splash-signup"
         >
           Sign Up
-        </Link>
-        <Link
-          href="/login"
-          className="w-full bg-white text-black border border-[#DBDBDB] font-bold text-center py-[16px] rounded-[8px] hover:bg-[#FAFAFA] transition-colors active:scale-[0.98] text-[15px]"
-          data-testid="button-login"
+        </button>
+        <button
+          onClick={() => navigate('/login')}
+          className="w-full font-bold text-[16px] h-[52px] rounded-[12px] active:scale-[0.98] transition-transform bg-white"
+          style={{ border: `1px solid ${BORDER}`, color: NAVY }}
+          data-testid="btn-splash-login"
         >
           Log In
-        </Link>
+        </button>
       </div>
     </div>
   );
