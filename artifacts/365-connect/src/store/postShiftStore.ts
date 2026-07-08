@@ -1,109 +1,119 @@
 /**
- * Module-level store for the 5-step shift-posting wizard.
- * Holds draft state between steps; reset clears everything.
+ * Module-level store for the unified 5-step Post Shift wizard.
+ * Used by both client and staffer roles.
+ * State persists across step navigations; call resetDraft() on wizard entry.
  */
 
 export type PostShiftDraft = {
-  // ── Step 1: Who ──────────────────────────────────────────────────────────
-  jobTypes:     string[];                  // multi-selected job type labels
-  workerCounts: Record<string, number>;    // { "Bartender": 2, "Server": 4 }
+  // ── Step 1: Job type + title ─────────────────────────────────────────────
+  job_type: string;   // single primary type from the canonical 14
+  title:    string;
 
-  // ── Step 2: When ─────────────────────────────────────────────────────────
-  date:      string;    // YYYY-MM-DD
-  startTime: string;    // HH:MM  (24-hour)
-  endTime:   string;    // HH:MM  (24-hour)
-  repeat:    'once' | 'weekly' | 'custom';
+  // ── Step 2: Location ─────────────────────────────────────────────────────
+  location:  string;
+  lat:       number;
+  lng:       number;
+  unit_info: string;  // suite/floor/unit (optional)
 
-  // ── Step 3: Where ────────────────────────────────────────────────────────
-  location:     string;
-  lat:          number;
-  lng:          number;
-  unit:         string;   // suite / floor / unit
-  parkingNotes: string;
+  // ── Step 3: Schedule + headcount ─────────────────────────────────────────
+  date:            string; // YYYY-MM-DD
+  start_time:      string; // HH:MM (24-hour)
+  end_time:        string; // HH:MM (24-hour)
+  spots_available: number;
 
-  // ── Step 4: Details ──────────────────────────────────────────────────────
-  payRate:            number;
-  dressCode:          string;
-  description:        string;
-  contactName:        string;
-  contactPhone:       string;
-  specialInstructions: string;
+  // ── Step 4: Compensation + details ───────────────────────────────────────
+  pay_rate:     number;
+  description:  string;
+  requirements: string[]; // one requirement per line → string[]
 };
 
-// ─── Empty draft factory ──────────────────────────────────────────────────────
-function emptyDraft(): PostShiftDraft {
+// ─── Empty draft ─────────────────────────────────────────────────────────────
+function empty(): PostShiftDraft {
   return {
-    jobTypes:            [],
-    workerCounts:        {},
-    date:                '',
-    startTime:           '18:00',
-    endTime:             '23:00',
-    repeat:              'once',
-    location:            '',
-    lat:                 25.7825,
-    lng:                 -80.1298,
-    unit:                '',
-    parkingNotes:        '',
-    payRate:             0,
-    dressCode:           '',
-    description:         '',
-    contactName:         '',
-    contactPhone:        '',
-    specialInstructions: '',
+    job_type:        '',
+    title:           '',
+    location:        '',
+    lat:             25.7825,
+    lng:             -80.1298,
+    unit_info:       '',
+    date:            '',
+    start_time:      '18:00',
+    end_time:        '23:00',
+    spots_available: 1,
+    pay_rate:        0,
+    description:     '',
+    requirements:    [],
   };
 }
 
-// ─── Module-level singleton ───────────────────────────────────────────────────
-let draft: PostShiftDraft = emptyDraft();
+// ─── Singleton ────────────────────────────────────────────────────────────────
+let draft: PostShiftDraft = empty();
 
 // ─── Public API ───────────────────────────────────────────────────────────────
-export function getDraft(): PostShiftDraft       { return { ...draft, workerCounts: { ...draft.workerCounts } }; }
-export function setDraft(updates: Partial<PostShiftDraft>) { draft = { ...draft, ...updates }; }
-export function resetDraft()                     { draft = emptyDraft(); }
+export function getDraft(): PostShiftDraft {
+  return { ...draft, requirements: [...draft.requirements] };
+}
+export function setDraft(updates: Partial<PostShiftDraft>): void {
+  draft = { ...draft, ...updates };
+}
+export function resetDraft(): void {
+  draft = empty();
+}
 
 // ─── Derived helpers ──────────────────────────────────────────────────────────
 
-/** Total number of workers across all selected job types */
-export function totalWorkers(wc: Record<string, number>): number {
-  return Object.values(wc).reduce((a, b) => a + b, 0);
-}
-
-/** Duration in decimal hours between two HH:MM strings (handles overnight) */
+/** Duration in decimal hours between two HH:MM strings (handles overnight). */
 export function durationHours(start: string, end: string): number {
   if (!start || !end) return 0;
   const [sh, sm] = start.split(':').map(Number);
   const [eh, em] = end.split(':').map(Number);
-  let startMins = sh * 60 + sm;
-  let endMins   = eh * 60 + em;
-  if (endMins <= startMins) endMins += 24 * 60;
-  return (endMins - startMins) / 60;
+  let s = sh * 60 + sm;
+  let e = eh * 60 + em;
+  if (e <= s) e += 24 * 60; // crosses midnight
+  return (e - s) / 60;
 }
 
-/** Duration as a human-readable string e.g. "6h" or "6h 30m" */
+/** Duration as a human-readable string, e.g. "6h" or "6h 30m". */
 export function durationLabel(start: string, end: string): string {
-  const hrs  = durationHours(start, end);
+  const hrs = durationHours(start, end);
   if (hrs === 0) return '—';
   const h = Math.floor(hrs);
   const m = Math.round((hrs - h) * 60);
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-/** Build ISO datetime strings from date + time */
-export function buildIsoDateTimes(date: string, startTime: string, endTime: string): {
-  startIso: string;
-  endIso: string;
-} {
-  if (!date || !startTime || !endTime) return { startIso: '', endIso: '' };
-  const startIso = `${date}T${startTime}:00`;
-  // If end ≤ start → next calendar day
-  const [sh, sm] = startTime.split(':').map(Number);
-  const [eh, em] = endTime.split(':').map(Number);
-  const crossesMidnight = eh * 60 + em <= sh * 60 + sm;
-  let endDate = date;
-  if (crossesMidnight) {
-    const d = new Date(`${date}T00:00:00`);
-    d.setDate(d.getDate() + 1);
-    endDate = d.toISOString().split('T')[0];
+/**
+ * Build an ISO datetime string from a date and HH:MM time.
+ * If refTime is provided and time ≤ refTime, adds one day (handles midnight crossings).
+ */
+export function buildIso(date: string, time: string, refTime?: string): string {
+  if (!date || !time) return '';
+  let d = date;
+  if (refTime) {
+    const [rh, rm] = refTime.split(':').map(Number);
+    const [th, tm] = time.split(':').map(Number);
+    if (th * 60 + tm <= rh * 60 + rm) {
+      const dt = new Date(`${date}T00:00:00`);
+      dt.setDate(dt.getDate() + 1);
+      d = dt.toISOString().split('T')[0];
+    }
   }
-  return { startIso, endIso: `${endDate}T${endTime}:00` };
+  return `${d}T${time}:00`;
+}
+
+/** Format HH:MM to 12-hour "7:00 PM" display. */
+export function fmt12h(hhmm: string): string {
+  if (!hhmm) return '';
+  const [h, m] = hhmm.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12  = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+/** Format YYYY-MM-DD to "Fri, Jan 10" display. */
+export function fmtDate(iso: string): string {
+  if (!iso) return '';
+  return new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric',
+  });
 }

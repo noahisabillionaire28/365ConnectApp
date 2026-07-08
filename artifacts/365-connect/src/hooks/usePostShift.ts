@@ -3,33 +3,26 @@ import { supabase } from '@/lib/supabase';
 import { SHIFTS_QUERY_KEY } from './useShifts';
 
 export type PostShiftInput = {
-  client_id: string;
-  title: string;
-  job_type: string;
-  job_types: string[];
-  company_name?: string;
-  description?: string;
-  location?: string;
-  lat?: number;
-  lng?: number;
-  unit_info?: string;
-  parking_notes?: string;
-  pay_rate?: number;
-  start_time: string;   // ISO datetime string
-  end_time: string;     // ISO datetime string
-  spots_available?: number;
-  dress_code?: string;
-  dress_code_items?: string[];
-  point_of_contact?: string;
-  contact_phone?: string;
-  special_instructions?: string;
-  repeat_type?: string;
-  cover_image?: string;
+  client_id:       string;
+  title:           string;
+  job_type:        string;
+  job_types:       string[];
+  description?:    string;
+  requirements?:   string[];
+  location?:       string;
+  lat?:            number;
+  lng?:            number;
+  unit_info?:      string;
+  pay_rate?:       number;
+  start_time:      string;  // ISO datetime string
+  end_time:        string;  // ISO datetime string
+  spots_available: number;
 };
 
 /**
  * Mutation that inserts a new shift row.
- * Invalidates the shifts cache on success so the feed updates in real time.
+ * Invalidates the shifts cache on success so feeds update in real time.
+ * Returns the newly-inserted ShiftRow on success.
  */
 export function usePostShift() {
   const queryClient = useQueryClient();
@@ -39,9 +32,21 @@ export function usePostShift() {
       const { data, error } = await supabase
         .from('shifts')
         .insert({
-          ...input,
+          client_id:       input.client_id,
+          title:           input.title,
+          job_type:        input.job_type,
+          job_types:       input.job_types,
+          description:     input.description   ?? null,
+          requirements:    input.requirements  ?? [],
+          location:        input.location      ?? null,
+          lat:             input.lat           ?? null,
+          lng:             input.lng           ?? null,
+          unit_info:       input.unit_info     ?? null,
+          pay_rate:        input.pay_rate      ?? null,
           pay_period:      'hr',
-          spots_available: input.spots_available ?? 1,
+          start_time:      input.start_time,
+          end_time:        input.end_time,
+          spots_available: input.spots_available,
           spots_filled:    0,
           status:          'open',
           ai_match_pct:    85,

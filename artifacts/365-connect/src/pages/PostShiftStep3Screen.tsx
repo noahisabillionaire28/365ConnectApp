@@ -1,187 +1,256 @@
-import { Map, Marker, useMapsLibrary } from '@vis.gl/react-google-maps';
-import { useState, useEffect, useRef } from 'react';
+/**
+ * Step 3 of 5 — Schedule & Headcount
+ * Date, start time, end time, duration preview, and spots_available stepper.
+ */
+import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
-import { ChevronLeft, MapPin, ParkingCircle, Building2 } from 'lucide-react';
-import { getDraft, setDraft } from '@/store/postShiftStore';
-import { LIGHT_MAP_STYLES, blackPinUrl } from '@/lib/mapStyles';
+import { ChevronLeft, Calendar, Clock, Users, Minus, Plus } from 'lucide-react';
+import {
+  getDraft, setDraft,
+  durationLabel, durationHours, fmt12h, fmtDate,
+} from '@/store/postShiftStore';
+import { BottomTabNav } from '@/components/BottomTabNav';
 
+// ─── Wizard primitives ────────────────────────────────────────────────────────
 function StepBar({ current, total }: { current: number; total: number }) {
   return (
-    <div className="flex items-center gap-1.5" role="progressbar"
+    <div className="flex gap-1.5" role="progressbar"
       aria-valuenow={current} aria-valuemin={1} aria-valuemax={total}
       aria-valuetext={`Step ${current} of ${total}`}>
       {Array.from({ length: total }).map((_, i) => (
         <div key={i} className={`h-[3px] rounded-full flex-1 transition-all duration-300 ${
-          i < current ? 'bg-black' : 'bg-[#DBDBDB]'
+          i < current ? 'bg-[#0A1628]' : 'bg-[#E5E7EB]'
         }`} />
       ))}
     </div>
   );
 }
 
-function FormLabel({ children }: { children: React.ReactNode }) {
-  return <p className="text-[#737373] text-[11px] font-semibold uppercase tracking-wider mb-1.5">{children}</p>;
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider mb-1.5">
+      {children}
+    </p>
+  );
 }
 
-function FormSection({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+const INPUT_CLS =
+  'w-full bg-white border border-[#E5E7EB] rounded-[10px] px-3 h-[46px] ' +
+  'text-[#111827] text-[14px] font-medium placeholder:text-[#9CA3AF] ' +
+  'focus:outline-none focus:border-[#0A1628] transition-colors';
+
+// ─── Spots stepper ────────────────────────────────────────────────────────────
+function SpotsStepper({
+  count, onIncrement, onDecrement,
+}: { count: number; onIncrement: () => void; onDecrement: () => void }) {
   return (
-    <div className="mb-6">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-6 h-6 rounded-[7px] bg-[#F5F5F5] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
-          {icon}
-        </div>
-        <h2 className="text-black font-bold tFeature 1 - Applied checkmark on the Jobs tab and shift detail. Schema (confirmed): table 'applications' has columns id, shift_id (uuid), worker_id (uuid), status (text). The logged-in user's id is in users.id. Please: (1) For the logged-in worker, query the applications table for all rows where worker_id = current user id to get the set of shift_ids they have already applied to. (2) On the Jobs tab, for every shift card whose id is in that applied set, show a small GREEN circular checkmark badge in the TOP-RIGHT corner of the card. (3) On the shift DETAIL screen, if the user has already applied to that shift, replace the 'Apply Now' button with a disabled/gray 'Applied' button. (4) When the user taps Apply and it succeeds (a row is inserted into applications), update the UI in real time so the badge and the 'Applied' state appear immediately without a full reload - use a Supabase realtime subscription on the applications table OR optimistically update local state and refetch. Keep everything scoped to Jobs tab + shift detail. Report which files you changed.ext-[15px]">{title}</h2>
+    <div className="flex items-center justify-between py-1">
+      <div>
+        <p className="text-[#111827] text-[14px] font-semibold">
+          {count} {count === 1 ? 'spot' : 'spots'}
+        </p>
+        <p className="text-[#9CA3AF] text-[11px]">workers needed</p>
       </div>
-      <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-4 flex flex-col gap-4">
-        {children}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          aria-label="Decrease spots"
+          onClick={onDecrement}
+          disabled={count <= 1}
+          className="w-9 h-9 rounded-[10px] bg-white border border-[#E5E7EB] flex items-center justify-center
+            disabled:opacity-40 active:border-[#0A1628] transition-colors"
+        >
+          <Minus size={14} aria-hidden className="text-[#6B7280]" />
+        </button>
+        <span
+          className="text-[#0A1628] font-bold text-[20px] w-8 text-center tabular-nums"
+          aria-live="polite"
+        >
+          {count}
+        </span>
+        <button
+          type="button"
+          aria-label="Increase spots"
+          onClick={onIncrement}
+          disabled={count >= 50}
+          className="w-9 h-9 rounded-[10px] bg-white border border-[#E5E7EB] flex items-center justify-center
+            disabled:opacity-40 active:border-[#0A1628] transition-colors"
+        >
+          <Plus size={14} aria-hidden className="text-[#0A1628]" />
+        </button>
       </div>
     </div>
   );
 }
 
-const INPUT_CLS = `
-  w-full bg-white border border-[#DBDBDB] rounded-[8px] px-3 h-[44px]
-  text-black text-[14px] font-medium placeholder:text-[#AAAAAA]
-  focus:outline-none focus:border-black transition-colors
-`;
-
-const TEXTAREA_CLS = `
-  w-full bg-white border border-[#DBDBDB] rounded-[8px] px-3 py-3
-  text-black text-[14px] font-medium placeholder:text-[#AAAAAA]
-  focus:outline-none focus:border-black transition-colors
-  resize-none leading-relaxed
-`;
-
-const DEFAULT_COORDS = { lat: 25.7825, lng: -80.1298 };
-
-function LocationAutocomplete({ value, onChange, onPlacePicked, error }: {
-  value: string; onChange: (v: string) => void;
-  onPlacePicked: (coords: { lat: number; lng: number }) => void; error?: string;
-}) {
-  const placesLib = useMapsLibrary('places');
-  const inputRef  = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!placesLib || !inputRef.current) return;
-    const ac = new placesLib.Autocomplete(inputRef.current, {
-      types: ['establishment', 'geocode'],
-      componentRestrictions: { country: 'us' },
-      fields: ['name', 'formatted_address', 'geometry'],
-    });
-    const listener = ac.addListener('place_changed', () => {
-      const place = ac.getPlace();
-      if (!place) return;
-      const display = place.name && place.formatted_address
-        ? `${place.name}, ${place.formatted_address}`
-        : place.formatted_address ?? place.name ?? '';
-      onChange(display);
-      if (place.geometry?.location) {
-        onPlacePicked({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng() });
-      }
-    });
-    return () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).google?.maps?.event?.removeListener(listener);
-    };
-  }, [placesLib]);
-
-  return (
-    <div>
-      <input ref={inputRef} type="text" defaultValue={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="e.g. 1 Hotel South Beach, Miami FL"
-        aria-label="Shift location address" aria-invalid={!!error} aria-autocomplete="list"
-        className={INPUT_CLS + (error ? ' border-red-400' : '')} />
-      {error && <p className="text-red-500 text-[11px] mt-1">{error}</p>}
-    </div>
-  );
-}
-
+// ─── Screen ───────────────────────────────────────────────────────────────────
 export function PostShiftStep3Screen() {
-  const [, navigate] = useLocation();
-  const initial = getDraft();
+  const [, navigate]  = useLocation();
+  const initial       = getDraft();
 
-  const [location,     setLocation]     = useState(initial.location || '');
-  const [mapCoords,    setMapCoords]    = useState({ lat: initial.lat || DEFAULT_COORDS.lat, lng: initial.lng || DEFAULT_COORDS.lng });
-  const [unit,         setUnit]         = useState(initial.unit || '');
-  const [parkingNotes, setParkingNotes] = useState(initial.parkingNotes || '');
-  const [errors,       setErrors]       = useState<Record<string, string>>({});
+  const today = new Date().toISOString().split('T')[0];
+
+  const [date,      setDate]      = useState(initial.date || today);
+  const [startTime, setStartTime] = useState(initial.start_time);
+  const [endTime,   setEndTime]   = useState(initial.end_time);
+  const [spots,     setSpots]     = useState(initial.spots_available);
+  const [errors,    setErrors]    = useState<Record<string, string>>({});
+
+  const durLabel = durationLabel(startTime, endTime);
+  const durHrs   = durationHours(startTime, endTime);
 
   function validate() {
     const e: Record<string, string> = {};
-    if (!location.trim()) e.location = 'Location is required';
+    if (!date)      e.date      = 'Please select a date';
+    if (!startTime) e.startTime = 'Please set a start time';
+    if (!endTime)   e.endTime   = 'Please set an end time';
+    if (durHrs < 0.5) e.endTime = 'Shift must be at least 30 minutes';
+    if (durHrs > 24)  e.endTime = 'Shift cannot exceed 24 hours';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
   function handleContinue() {
     if (!validate()) return;
-    setDraft({ location, lat: mapCoords.lat, lng: mapCoords.lng, unit, parkingNotes });
+    setDraft({ date, start_time: startTime, end_time: endTime, spots_available: spots });
     navigate('/post-shift/step4');
   }
 
   return (
-    <div className="min-h-[100dvh] bg-white flex flex-col">
-      <div className="px-5 pt-5 pb-4 border-b border-[#DBDBDB]">
+    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[72px]">
+
+      {/* Header */}
+      <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
         <div className="flex items-center gap-3 mb-4">
-          <button type="button" aria-label="Back to schedule" onClick={() => navigate('/post-shift/step2')}
-            className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
-            <ChevronLeft size={18} aria-hidden className="text-black" />
+          <button
+            type="button" aria-label="Back to location"
+            onClick={() => navigate('/post-shift/step2')}
+            className="w-9 h-9 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
+          >
+            <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
           <div className="flex-1"><StepBar current={3} total={5} /></div>
-          <span className="text-[#737373] text-[12px] font-medium flex-shrink-0">3 of 5</span>
+          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">3 of 5</span>
         </div>
-        <h1 className="text-black font-bold text-[22px] tracking-tight">Where is it?</h1>
-        <p className="text-[#737373] text-[13px] mt-1">Add the venue address and any arrival notes</p>
+        <h1 className="text-[#111827] font-bold text-[22px] tracking-tight">When & how many?</h1>
+        <p className="text-[#6B7280] text-[13px] mt-0.5">Set the date, times, and headcount</p>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 pt-5 pb-36">
-        <FormSection icon={<MapPin size={13} aria-hidden className="text-black" />} title="Venue Address">
-          <div>
-            <FormLabel>Address or venue name</FormLabel>
-            <LocationAutocomplete value={location}
-              onChange={(v) => { setLocation(v); setErrors((p) => ({ ...p, location: '' })); }}
-              onPlacePicked={(coords) => setMapCoords(coords)}
-              error={errors.location} />
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto px-4 pt-5 pb-36">
+
+        {/* Date */}
+        <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-6 h-6 rounded-[7px] bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center">
+              <Calendar size={13} aria-hidden className="text-[#0A1628]" />
+            </div>
+            <h2 className="text-[#111827] font-bold text-[15px]">Date</h2>
           </div>
-          <div>
-            <FormLabel>Map preview</FormLabel>
-            <div className="rounded-[8px] overflow-hidden border border-[#DBDBDB]" style={{ height: 150 }}>
-              <Map center={mapCoords} zoom={14} styles={LIGHT_MAP_STYLES} disableDefaultUI
-                gestureHandling="none" backgroundColor="#f5f5f5" style={{ width: '100%', height: '100%' }}>
-                <Marker position={mapCoords} icon={blackPinUrl(true)} />
-              </Map>
+          <FieldLabel>
+            Shift date <span className="normal-case text-[#EF4444]">*</span>
+          </FieldLabel>
+          <input
+            type="date"
+            value={date}
+            min={today}
+            onChange={(e) => { setDate(e.target.value); setErrors((p) => ({ ...p, date: '' })); }}
+            aria-label="Shift date"
+            aria-invalid={!!errors.date}
+            className={INPUT_CLS + (errors.date ? ' border-[#EF4444]' : '')}
+          />
+          {errors.date && <p className="text-[#EF4444] text-[11px] mt-1.5">{errors.date}</p>}
+          {date && (
+            <p className="text-[#6B7280] text-[12px] mt-1.5 font-medium">{fmtDate(date)}</p>
+          )}
+        </div>
+
+        {/* Times */}
+        <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-6 h-6 rounded-[7px] bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center">
+              <Clock size={13} aria-hidden className="text-[#0A1628]" />
+            </div>
+            <h2 className="text-[#111827] font-bold text-[15px]">Times</h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <FieldLabel>
+                Start time <span className="normal-case text-[#EF4444]">*</span>
+              </FieldLabel>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => { setStartTime(e.target.value); setErrors((p) => ({ ...p, startTime: '' })); }}
+                aria-label="Start time"
+                aria-invalid={!!errors.startTime}
+                className={INPUT_CLS + (errors.startTime ? ' border-[#EF4444]' : '')}
+              />
+              {errors.startTime && <p className="text-[#EF4444] text-[11px] mt-1">{errors.startTime}</p>}
+            </div>
+            <div>
+              <FieldLabel>
+                End time <span className="normal-case text-[#EF4444]">*</span>
+              </FieldLabel>
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => { setEndTime(e.target.value); setErrors((p) => ({ ...p, endTime: '' })); }}
+                aria-label="End time"
+                aria-invalid={!!errors.endTime}
+                className={INPUT_CLS + (errors.endTime ? ' border-[#EF4444]' : '')}
+              />
+              {errors.endTime && <p className="text-[#EF4444] text-[11px] mt-1">{errors.endTime}</p>}
             </div>
           </div>
-        </FormSection>
 
-        <FormSection icon={<Building2 size={13} aria-hidden className="text-black" />} title="Unit / Floor / Suite">
-          <div>
-            <FormLabel>Optional — e.g. "Suite 400" or "Rooftop Level"</FormLabel>
-            <input type="text" value={unit} onChange={(e) => setUnit(e.target.value)}
-              placeholder="Suite, floor, or entrance details…" aria-label="Unit or floor details"
-              className={INPUT_CLS} />
-          </div>
-        </FormSection>
+          {/* Duration pill */}
+          {durHrs > 0 && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+              className="flex items-center justify-between bg-[#F0F4FF] border border-[#D1D9F0] rounded-[10px] px-3 py-2"
+            >
+              <span className="text-[#0A1628] text-[13px] font-medium">
+                {fmt12h(startTime)} → {fmt12h(endTime)}
+              </span>
+              <span className="text-[#0A1628] font-bold text-[14px]">{durLabel}</span>
+            </motion.div>
+          )}
+        </div>
 
-        <FormSection icon={<ParkingCircle size={13} aria-hidden className="text-black" />} title="Parking & Arrival">
-          <div>
-            <FormLabel>Optional — parking, entrance, or arrival instructions</FormLabel>
-            <textarea value={parkingNotes} onChange={(e) => setParkingNotes(e.target.value)}
-              placeholder="e.g. 'Use valet on Collins Ave, enter through staff entrance on rear of building…'"
-              aria-label="Parking and arrival notes" rows={4} className={TEXTAREA_CLS} />
+        {/* Headcount */}
+        <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-6 h-6 rounded-[7px] bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center">
+              <Users size={13} aria-hidden className="text-[#0A1628]" />
+            </div>
+            <h2 className="text-[#111827] font-bold text-[15px]">Spots Available</h2>
           </div>
-        </FormSection>
+          <SpotsStepper
+            count={spots}
+            onIncrement={() => setSpots((n) => Math.min(50, n + 1))}
+            onDecrement={() => setSpots((n) => Math.max(1, n - 1))}
+          />
+        </div>
+
       </div>
 
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] px-5 pb-9 pt-4 bg-gradient-to-t from-white via-white/95 to-transparent z-10 border-t border-[#DBDBDB]">
-        <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleContinue}
-          aria-label="Continue to shift details"
-          className="w-full h-[52px] rounded-[8px] bg-black text-white font-bold text-[16px]">
+      {/* Fixed CTA */}
+      <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-[390px] px-5 pb-4 pt-4
+        bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
+        <motion.button
+          type="button" whileTap={{ scale: 0.97 }}
+          onClick={handleContinue}
+          aria-label="Continue to pay and details"
+          className="w-full h-[52px] rounded-[12px] bg-[#0A1628] text-white font-bold text-[16px]"
+        >
           Continue
         </motion.button>
       </div>
+
+      <BottomTabNav />
     </div>
   );
 }

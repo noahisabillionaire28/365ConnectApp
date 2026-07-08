@@ -1,229 +1,300 @@
+/**
+ * Step 5 of 5 — Review & Post
+ * Summary of all wizard data, platform fee breakdown, and the Post Shift button
+ * that writes a real row to the shifts table and navigates to the new shift detail.
+ */
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
-  ChevronLeft, Briefcase, Calendar, MapPin, DollarSign,
-  Users, Clock, Shirt, User, CheckCircle2, Repeat2,
+  ChevronLeft, Briefcase, MapPin, Calendar, Clock,
+  Users, DollarSign, FileText, CheckCircle2, AlertCircle,
 } from 'lucide-react';
-import { getDraft, resetDraft, totalWorkers, durationHours, durationLabel, buildIsoDateTimes } from '@/store/postShiftStore';
+import {
+  getDraft, resetDraft,
+  durationHours, durationLabel, fmt12h, fmtDate, buildIso,
+} from '@/store/postShiftStore';
 import { usePostShift } from '@/hooks/usePostShift';
 import { supabase } from '@/lib/supabase';
-import { JOB_TEMPLATES } from '@/data/postShiftTemplates';
+import { BottomTabNav } from '@/components/BottomTabNav';
 
+// ─── Wizard primitives ────────────────────────────────────────────────────────
 function StepBar({ current, total }: { current: number; total: number }) {
   return (
-    <div className="flex items-center gap-1.5" role="progressbar"
+    <div className="flex gap-1.5" role="progressbar"
       aria-valuenow={current} aria-valuemin={1} aria-valuemax={total}
       aria-valuetext={`Step ${current} of ${total}`}>
       {Array.from({ length: total }).map((_, i) => (
         <div key={i} className={`h-[3px] rounded-full flex-1 transition-all duration-300 ${
-          i < current ? 'bg-black' : 'bg-[#DBDBDB]'
+          i < current ? 'bg-[#0A1628]' : 'bg-[#E5E7EB]'
         }`} />
       ))}
     </div>
   );
 }
 
-function SectionRow({ icon, label, value, sub }: {
+// ─── Summary row ──────────────────────────────────────────────────────────────
+function SummaryRow({
+  icon, label, value, sub,
+}: {
   icon: React.ReactNode; label: string; value: string; sub?: string;
 }) {
   return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-[#DBDBDB] last:border-0">
-      <div className="w-7 h-7 rounded-[8px] bg-[#F5F5F5] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0 mt-0.5">
+    <div className="flex items-start gap-3 py-3 border-b border-[#F3F4F6] last:border-0">
+      <div className="w-8 h-8 rounded-[9px] bg-[#F0F4FF] flex items-center justify-center flex-shrink-0 mt-0.5">
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[#737373] text-[11px] font-semibold uppercase tracking-wider mb-0.5">{label}</p>
-        <p className="text-black text-[14px] font-medium leading-snug">{value}</p>
-        {sub && <p className="text-[#737373] text-[12px] mt-0.5">{sub}</p>}
+        <p className="text-[#9CA3AF] text-[11px] font-semibold uppercase tracking-wider mb-0.5">{label}</p>
+        <p className="text-[#111827] text-[14px] font-semibold leading-snug break-words">{value}</p>
+        {sub && <p className="text-[#6B7280] text-[12px] mt-0.5">{sub}</p>}
       </div>
     </div>
   );
 }
 
-function CostRow({ label, value, highlight, sub }: { label: string; value: string; highlight?: boolean; sub?: boolean }) {
+// ─── Cost row ─────────────────────────────────────────────────────────────────
+function CostRow({
+  label, value, highlight, muted,
+}: {
+  label: string; value: string; highlight?: boolean; muted?: boolean;
+}) {
   return (
-    <div className={`flex items-center justify-between ${sub ? 'opacity-60' : ''}`}>
-      <p className={`text-[${sub ? '12' : '14'}px] ${highlight ? 'text-black font-bold text-[16px]' : 'text-[#737373]'}`}>
+    <div className={`flex items-center justify-between py-1.5 ${muted ? 'opacity-60' : ''}`}>
+      <p className={`text-[14px] ${highlight ? 'text-[#111827] font-bold' : 'text-[#6B7280]'}`}>
         {label}
       </p>
-      <p className={`font-${highlight ? 'bold' : 'medium'} text-[${highlight ? '20' : '14'}px] ${highlight ? 'text-black' : 'text-[#737373]'}`}>
+      <p className={`font-bold tabular-nums ${
+        highlight ? 'text-[#0A1628] text-[20px]' : 'text-[#6B7280] text-[14px]'
+      }`}>
         {value}
       </p>
     </div>
   );
 }
 
+// ─── Readiness check item ─────────────────────────────────────────────────────
+function ReadinessItem({ label, done }: { label: string; done: boolean }) {
+  return (
+    <div className="flex items-center gap-2.5 py-1.5">
+      {done
+        ? <CheckCircle2 size={15} aria-hidden className="text-[#10B981] flex-shrink-0" />
+        : <AlertCircle  size={15} aria-hidden className="text-[#9CA3AF] flex-shrink-0" />}
+      <span className={`text-[13px] ${done ? 'text-[#374151]' : 'text-[#9CA3AF]'}`}>{label}</span>
+    </div>
+  );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 export function PostShiftStep5Screen() {
   const [, navigate]      = useLocation();
   const draft             = getDraft();
-  const postShiftMutation = usePostShift();
+  const postMutation      = usePostShift();
   const [postError, setPostError] = useState<string | null>(null);
 
-  const totalW      = totalWorkers(draft.workerCounts);
-  const durHours    = durationHours(draft.startTime, draft.endTime);
-  const durLabel    = durationLabel(draft.startTime, draft.endTime);
-  const grossCost   = draft.payRate * totalW * durHours;
-  const platformFee = grossCost * 0.08;
-  const totalCost   = grossCost + platformFee;
+  // ── Derived ──────────────────────────────────────────────────────────────────
+  const durHrs   = durationHours(draft.start_time, draft.end_time);
+  const durLabel = durationLabel(draft.start_time, draft.end_time);
+  const grossCost    = draft.pay_rate * draft.spots_available * durHrs;
+  const platformFee  = grossCost * 0.08;
+  const totalCost    = grossCost + platformFee;
 
-  function fmtTime(hhmm: string) {
-    if (!hhmm) return '';
-    const [h, m] = hhmm.split(':').map(Number);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12  = h % 12 || 12;
-    return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
-  }
+  const readiness = [
+    { label: 'Job type selected',    done: !!draft.job_type },
+    { label: 'Shift title entered',  done: draft.title.trim().length >= 3 },
+    { label: 'Location provided',    done: !!draft.location.trim() },
+    { label: 'Date set',             done: !!draft.date },
+    { label: 'Times set',            done: !!draft.start_time && !!draft.end_time && durHrs >= 0.5 },
+    { label: 'Pay rate entered',     done: draft.pay_rate > 0 },
+  ];
+  const allReady = readiness.every((r) => r.done);
 
-  function fmtDate(iso: string) {
-    if (!iso) return '';
-    const d = new Date(`${iso}T12:00:00`);
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  }
-
-  const repeatLabel: Record<string, string> = { once: 'One-time', weekly: 'Weekly', custom: 'Custom' };
-
+  // ── Post shift ───────────────────────────────────────────────────────────────
   async function handlePost() {
     setPostError(null);
+
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setPostError('You must be signed in to post a shift.'); return; }
+    if (!user) {
+      setPostError('You must be signed in to post a shift.');
+      return;
+    }
 
-    const { startIso, endIso } = buildIsoDateTimes(draft.date, draft.startTime, draft.endTime);
-    if (!startIso || !endIso) { setPostError('Invalid date or time — please go back and fix Step 2.'); return; }
+    const start_time = buildIso(draft.date, draft.start_time);
+    const end_time   = buildIso(draft.date, draft.end_time, draft.start_time);
 
-    const primaryType    = draft.jobTypes[0] ?? 'Event Staff';
-    const template       = JOB_TEMPLATES.find((t) => t.label === primaryType);
-    const dressCodeItems = template?.dressCodeItems ?? [];
+    if (!start_time || !end_time) {
+      setPostError('Invalid date or time — please go back and fix Step 3.');
+      return;
+    }
 
     try {
-      await postShiftMutation.mutateAsync({
-        client_id:   user.id,
-        title:       draft.jobTypes.length === 1
-          ? `${primaryType}${draft.location ? ` — ${draft.location.split(',')[0]}` : ''}`
-          : `${draft.jobTypes.join(' + ')} — ${draft.location.split(',')[0] || 'Event'}`,
-        job_type:    primaryType,
-        job_types:   draft.jobTypes,
-        company_name: undefined,
-        description:  draft.description   || undefined,
-        location:     draft.location      || undefined,
-        lat:          draft.lat           || undefined,
-        lng:          draft.lng           || undefined,
-        unit_info:    draft.unit          || undefined,
-        parking_notes: draft.parkingNotes || undefined,
-        pay_rate:     draft.payRate,
-        start_time:   startIso,
-        end_time:     endIso,
-        spots_available: totalW,
-        dress_code:   draft.dressCode     || undefined,
-        dress_code_items: dressCodeItems,
-        point_of_contact: draft.contactName || undefined,
-        contact_phone: draft.contactPhone  || undefined,
-        special_instructions: draft.specialInstructions || undefined,
-        repeat_type:  draft.repeat,
+      const data = await postMutation.mutateAsync({
+        client_id:       user.id,
+        title:           draft.title,
+        job_type:        draft.job_type,
+        job_types:       [draft.job_type],
+        location:        draft.location  || undefined,
+        lat:             draft.lat       || undefined,
+        lng:             draft.lng       || undefined,
+        unit_info:       draft.unit_info || undefined,
+        start_time,
+        end_time,
+        spots_available: draft.spots_available,
+        pay_rate:        draft.pay_rate,
+        description:     draft.description || undefined,
+        requirements:    draft.requirements.length ? draft.requirements : undefined,
       });
+
       resetDraft();
-      navigate('/jobs');
-    } catch (err) {
-      setPostError(err instanceof Error ? err.message : 'Failed to post shift. Try again.');
+      navigate(`/shift/${data.id}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+      setPostError(msg);
     }
   }
 
   return (
-    <div className="min-h-[100dvh] bg-white flex flex-col">
-      <div className="px-5 pt-5 pb-4 border-b border-[#DBDBDB]">
+    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[72px]">
+
+      {/* Header */}
+      <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
         <div className="flex items-center gap-3 mb-4">
-          <button type="button" aria-label="Back to shift details" onClick={() => navigate('/post-shift/step4')}
-            className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
-            <ChevronLeft size={18} aria-hidden className="text-black" />
+          <button
+            type="button" aria-label="Back to pay and details"
+            onClick={() => navigate('/post-shift/step4')}
+            className="w-9 h-9 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
+          >
+            <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
           <div className="flex-1"><StepBar current={5} total={5} /></div>
-          <span className="text-[#737373] text-[12px] font-medium flex-shrink-0">5 of 5</span>
+          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">5 of 5</span>
         </div>
-        <h1 className="text-black font-bold text-[22px] tracking-tight">Review & Post</h1>
-        <p className="text-[#737373] text-[13px] mt-1">Confirm your shift details before going live</p>
+        <h1 className="text-[#111827] font-bold text-[22px] tracking-tight">Review &amp; post</h1>
+        <p className="text-[#6B7280] text-[13px] mt-0.5">Confirm your shift details before going live</p>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 pt-5 pb-36">
-        {/* Shift summary card */}
-        <section className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-2 mb-5" aria-label="Shift summary">
-          <SectionRow icon={<Briefcase size={13} aria-hidden className="text-[#737373]" />} label="Roles"
-            value={draft.jobTypes.join(' · ') || '—'}
-            sub={Object.entries(draft.workerCounts).map(([t, n]) => `${n}× ${t}`).join('  ') || undefined} />
-          <SectionRow icon={<Calendar size={13} aria-hidden className="text-[#737373]" />} label="Date"
-            value={draft.date ? fmtDate(draft.date) : '—'} />
-          <SectionRow icon={<Clock size={13} aria-hidden className="text-[#737373]" />} label="Time"
-            value={draft.startTime ? `${fmtTime(draft.startTime)} – ${fmtTime(draft.endTime)}` : '—'}
-            sub={durLabel !== '—' ? `${durLabel} shift` : undefined} />
-          <SectionRow icon={<Repeat2 size={13} aria-hidden className="text-[#737373]" />} label="Repeat"
-            value={repeatLabel[draft.repeat] ?? 'One-time'} />
-          <SectionRow icon={<MapPin size={13} aria-hidden className="text-[#737373]" />} label="Location"
-            value={draft.location || '—'} sub={draft.unit || undefined} />
-          <SectionRow icon={<DollarSign size={13} aria-hidden className="text-[#737373]" />} label="Pay Rate"
-            value={draft.payRate ? `$${draft.payRate}/hr` : '—'} />
-          <SectionRow icon={<Users size={13} aria-hidden className="text-[#737373]" />} label="Total Workers"
-            value={String(totalW)} />
-          {draft.dressCode && (
-            <SectionRow icon={<Shirt size={13} aria-hidden className="text-[#737373]" />} label="Dress Code"
-              value={draft.dressCode} />
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto px-4 pt-5 pb-40">
+
+        {/* Summary card */}
+        <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-1 mb-4">
+          <SummaryRow
+            icon={<Briefcase size={15} aria-hidden className="text-[#0A1628]" />}
+            label="Job type"
+            value={draft.job_type || '—'}
+            sub={draft.title || undefined}
+          />
+          <SummaryRow
+            icon={<MapPin size={15} aria-hidden className="text-[#0A1628]" />}
+            label="Location"
+            value={draft.location || '—'}
+            sub={draft.unit_info || undefined}
+          />
+          <SummaryRow
+            icon={<Calendar size={15} aria-hidden className="text-[#0A1628]" />}
+            label="Date"
+            value={draft.date ? fmtDate(draft.date) : '—'}
+          />
+          <SummaryRow
+            icon={<Clock size={15} aria-hidden className="text-[#0A1628]" />}
+            label="Time"
+            value={draft.start_time && draft.end_time
+              ? `${fmt12h(draft.start_time)} – ${fmt12h(draft.end_time)}`
+              : '—'}
+            sub={durHrs > 0 ? durLabel : undefined}
+          />
+          <SummaryRow
+            icon={<Users size={15} aria-hidden className="text-[#0A1628]" />}
+            label="Spots available"
+            value={String(draft.spots_available)}
+          />
+          <SummaryRow
+            icon={<DollarSign size={15} aria-hidden className="text-[#0A1628]" />}
+            label="Pay rate"
+            value={draft.pay_rate > 0 ? `$${draft.pay_rate.toFixed(2)}/hr` : '—'}
+          />
+          {draft.description && (
+            <SummaryRow
+              icon={<FileText size={15} aria-hidden className="text-[#6B7280]" />}
+              label="Description"
+              value={draft.description.length > 120
+                ? draft.description.slice(0, 120) + '…'
+                : draft.description}
+            />
           )}
-          <SectionRow icon={<User size={13} aria-hidden className="text-[#737373]" />} label="Contact"
-            value={draft.contactName || '—'} sub={draft.contactPhone || undefined} />
-        </section>
+        </div>
 
-        {/* Cost breakdown */}
-        <section className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-5 py-4 mb-5" aria-label="Estimated cost">
-          <p className="text-[#737373] text-[10px] font-bold uppercase tracking-[0.2em] mb-4">Estimated Cost</p>
-          <div className="flex flex-col gap-3">
-            <CostRow label={`$${draft.payRate}/hr × ${totalW} worker${totalW !== 1 ? 's' : ''} × ${durLabel}`}
-              value={`$${grossCost.toFixed(2)}`} />
-            <CostRow label="365 Platform Fee (8%)" value={`+$${platformFee.toFixed(2)}`} sub />
-            <div className="h-px bg-[#DBDBDB] my-1" />
+        {/* Cost estimate */}
+        {grossCost > 0 && (
+          <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-4 mb-4">
+            <p className="text-[#111827] font-bold text-[15px] mb-3">Estimated Cost</p>
+            <CostRow
+              label={`${draft.spots_available} worker${draft.spots_available !== 1 ? 's' : ''} × ${durLabel} × $${draft.pay_rate}/hr`}
+              value={`$${grossCost.toFixed(2)}`}
+              muted
+            />
+            <CostRow label="Platform fee (8%)" value={`$${platformFee.toFixed(2)}`} muted />
+            <div className="border-t border-[#E5E7EB] my-2" />
             <CostRow label="Total Estimated Cost" value={`$${totalCost.toFixed(2)}`} highlight />
-          </div>
-          <p className="text-[#AAAAAA] text-[11px] mt-4 leading-relaxed">
-            Final cost may vary if shift hours change. Workers are paid after successful clock-out confirmation.
-          </p>
-        </section>
-
-        {/* Readiness checklist */}
-        <section className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-5 py-4 mb-6" aria-label="Readiness checklist">
-          {[
-            { label: 'Job type(s) selected',  done: draft.jobTypes.length > 0 },
-            { label: 'Date and time set',      done: !!draft.date && !!draft.startTime },
-            { label: 'Location provided',      done: !!draft.location.trim() },
-            { label: 'Pay rate entered',       done: draft.payRate > 0 },
-            { label: 'Contact name provided',  done: !!draft.contactName.trim() },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center gap-3 py-1.5">
-              <CheckCircle2 size={15} aria-hidden
-                className={item.done ? 'text-emerald-500' : 'text-[#DBDBDB]'} />
-              <span className={`text-[13px] ${item.done ? 'text-[#737373]' : 'text-[#AAAAAA]'}`}>
-                {item.label}
-              </span>
-            </div>
-          ))}
-        </section>
-
-        {postError && (
-          <div className="mb-4 bg-red-50 border border-red-200 rounded-[12px] px-4 py-3" role="alert">
-            <p className="text-red-600 text-[13px] font-medium">{postError}</p>
+            <p className="text-[#9CA3AF] text-[11px] mt-3 leading-relaxed">
+              Estimated total based on listed hours. Final cost may vary if shift hours change.
+              Workers are paid after successful clock-out confirmation.
+            </p>
           </div>
         )}
+
+        {/* Readiness checklist */}
+        <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-3 mb-4">
+          <p className="text-[#111827] font-bold text-[14px] mb-1">Checklist</p>
+          {readiness.map((r) => (
+            <ReadinessItem key={r.label} label={r.label} done={r.done} />
+          ))}
+        </div>
+
+        {/* Error */}
+        {postError && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+            className="mb-4 bg-red-50 border border-red-200 rounded-[12px] px-4 py-3"
+            role="alert"
+          >
+            <p className="text-[#EF4444] text-[13px] font-medium">{postError}</p>
+          </motion.div>
+        )}
+
       </div>
 
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] px-5 pb-9 pt-4 bg-gradient-to-t from-white via-white/95 to-transparent z-10 border-t border-[#DBDBDB]">
-        <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handlePost}
-          disabled={postShiftMutation.isPending}
-          aria-label="Post shift and make it live" aria-busy={postShiftMutation.isPending}
-          className={`w-full h-[52px] rounded-[8px] font-bold text-[16px] transition-all flex items-center justify-center gap-2.5 ${
-            postShiftMutation.isPending ? 'bg-black/40 text-white/60 cursor-not-allowed' : 'bg-black text-white'
-          }`}>
-          {postShiftMutation.isPending ? (
-            <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" aria-hidden />Posting…</>
-          ) : 'Post Shift →'}
+      {/* Fixed CTA */}
+      <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-[390px] px-5 pb-4 pt-4
+        bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
+        <motion.button
+          type="button" whileTap={{ scale: 0.97 }}
+          onClick={handlePost}
+          disabled={postMutation.isPending || !allReady}
+          aria-disabled={postMutation.isPending || !allReady}
+          aria-label="Post this shift and make it live"
+          aria-busy={postMutation.isPending}
+          className={`w-full h-[52px] rounded-[12px] font-bold text-[16px] transition-all flex items-center justify-center gap-2.5 ${
+            postMutation.isPending || !allReady
+              ? 'bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed'
+              : 'bg-[#0A1628] text-white'
+          }`}
+        >
+          {postMutation.isPending ? (
+            <>
+              <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" aria-hidden />
+              Posting…
+            </>
+          ) : (
+            'Post Shift →'
+          )}
         </motion.button>
-        <p className="text-center text-[#AAAAAA] text-[11px] mt-2">Your shift goes live immediately</p>
+        <p className="text-center text-[#9CA3AF] text-[11px] mt-2">
+          Your shift goes live immediately
+        </p>
       </div>
+
+      <BottomTabNav />
     </div>
   );
 }
