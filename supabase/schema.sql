@@ -231,3 +231,43 @@ ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE public.users
   ADD CONSTRAINT users_role_check
   CHECK (role IN ('worker', 'client', 'admin', 'staffer'));
+
+-- ============================================================
+-- Phase 4: feeds, discovery, map, shift detail (Section 3)
+-- Run in Supabase SQL Editor if upgrading an existing DB
+-- (schema.sql above already reflects these columns/tables)
+-- ============================================================
+
+-- ─── Users: profile-setup + feed/discovery columns ────────────────────────────
+-- (primary_job_type / secondary_job_types / availability are written by the
+--  worker/client/staffer setup screens; lat/lng/is_pro power Section 3 feeds)
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS primary_job_type    TEXT,
+  ADD COLUMN IF NOT EXISTS secondary_job_types TEXT[]  NOT NULL DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS availability        JSONB,
+  ADD COLUMN IF NOT EXISTS lat                 FLOAT8,
+  ADD COLUMN IF NOT EXISTS lng                 FLOAT8,
+  ADD COLUMN IF NOT EXISTS is_pro              BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS company_name        TEXT,
+  ADD COLUMN IF NOT EXISTS billing_ref         TEXT;
+
+-- ─── Shifts: multi job-type support (worker feed job-type intersection) ──────
+ALTER TABLE public.shifts
+  ADD COLUMN IF NOT EXISTS job_types TEXT[] NOT NULL DEFAULT '{}';
+
+-- ─── Posts (worker setup step 8 "first post") ─────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.posts (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  image_url  TEXT,
+  caption    TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "posts_select" ON public.posts;
+DROP POLICY IF EXISTS "posts_insert" ON public.posts;
+
+CREATE POLICY "posts_select" ON public.posts FOR SELECT USING (true);
+CREATE POLICY "posts_insert" ON public.posts FOR INSERT WITH CHECK (auth.uid() = user_id);

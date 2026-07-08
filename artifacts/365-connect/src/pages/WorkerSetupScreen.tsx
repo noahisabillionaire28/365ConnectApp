@@ -19,6 +19,7 @@ import { ChevronLeft, Camera, Plus, X, Check, AlertCircle, CheckCircle2 } from '
 import { supabase, uploadAvatar, uploadPostPhoto } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasCompletedFirstPost } from '@/lib/setupRoute';
+import { JOB_TYPES } from '@/lib/jobTypes';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const NAVY   = '#0A1628';
@@ -30,13 +31,6 @@ const RED    = '#EF4444';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const TOTAL_STEPS = 8;
-
-const JOB_TYPES = [
-  'Bartender', 'Server', 'DJ', 'Caterer',
-  'Security', 'Hostess', 'Promotional Model', 'Brand Ambassador',
-  'Captain', 'Manager', 'House Manager', 'Cleaner',
-  'Housekeeper', 'Busser',
-] as const;
 
 const DAYS: { key: string; label: string }[] = [
   { key: 'mon', label: 'Mon' },

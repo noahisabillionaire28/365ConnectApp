@@ -1,3 +1,6 @@
 - [Worker profile setup flow](worker-profile-setup.md) — 6-step onboarding at /profile-setup; completes to /home after DB save
 - [Supabase integration](supabase-integration.md) — credentials in Replit Secrets; schema in supabase/schema.sql; must run SQL manually in dashboard
 - [Shifts data layer](shifts-data-layer.md) — ShiftRow→MockShift adapter pattern; Phase 2 SQL required in Supabase before seed/data works
+- [schema.sql can drift from the live DB](schema-sql-drift.md) — always verify columns exist via a live query before trusting the DDL file
+- [AI match score formula](ai-match-score-formula.md) — 40/30/20/10 weighting for job-type/availability/rating/distance; distance must use viewer's real coords
+- [Location resolution fallback chain](location-fallback-chain.md) — DB coords → browser geolocation → static fallback, used for distance/match-score/geofencing

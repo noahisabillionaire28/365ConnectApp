@@ -5,14 +5,20 @@ import { useAuth } from '@/contexts/AuthContext';
 
 /* ── DB row shape (subset we select) ─────────────────────────────────────── */
 type UserProfileRow = {
-  username:       string | null;
-  photo_url:      string | null;
-  bio:            string | null;
-  job_types:      string[];
-  certifications: string[];
-  rating:         number;
-  created_at:     string;
-  role:           'worker' | 'client' | 'admin' | 'staffer';
+  username:            string | null;
+  photo_url:           string | null;
+  bio:                 string | null;
+  job_types:           string[];
+  certifications:      string[];
+  rating:              number;
+  created_at:          string;
+  role:                'worker' | 'client' | 'admin' | 'staffer';
+  primary_job_type:    string | null;
+  secondary_job_types: string[];
+  availability:        Record<string, boolean> | null;
+  lat:                 number | null;
+  lng:                 number | null;
+  is_pro:              boolean;
 };
 
 /* ── Display-name derivation ─────────────────────────────────────────────── */
@@ -50,6 +56,12 @@ export type ProfileResult = {
   memberSince:    string;   // e.g. "Jan 2026"
   email:          string | null;
   role:           UserProfileRow['role'] | null;
+  primaryJobType: string | null;
+  secondaryJobTypes: string[];
+  availability:   Record<string, boolean> | null;
+  lat:            number | null;
+  lng:            number | null;
+  isPro:          boolean;
 };
 
 /* ── Hook ────────────────────────────────────────────────────────────────── */
@@ -63,11 +75,24 @@ export function useProfile(): ProfileResult {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('users')
-        .select('username, photo_url, bio, job_types, certifications, rating, created_at, role')
+        .select(
+          'username, photo_url, bio, job_types, certifications, rating, created_at, role, ' +
+          'primary_job_type, secondary_job_types, availability, lat, lng, is_pro',
+        )
         .eq('id', user!.id)
         .maybeSingle();
 
       if (error) {
+        // Phase 4 columns may not exist yet if the migration hasn't been run —
+        // fall back gracefully instead of crashing the whole profile fetch.
+        if (error.code === '42703') {
+          const fallback = await supabase
+            .from('users')
+            .select('username, photo_url, bio, job_types, certifications, rating, created_at, role')
+            .eq('id', user!.id)
+            .maybeSingle();
+          return (fallback.data as UserProfileRow | null) ?? null;
+        }
         console.error('[useProfile] fetch error:', error.message);
         return null;
       }
@@ -102,5 +127,11 @@ export function useProfile(): ProfileResult {
     memberSince,
     email:          user?.email         ?? null,
     role:           row?.role           ?? null,
+    primaryJobType: row?.primary_job_type    ?? null,
+    secondaryJobTypes: row?.secondary_job_types ?? [],
+    availability:   row?.availability   ?? null,
+    lat:            row?.lat            ?? null,
+    lng:            row?.lng            ?? null,
+    isPro:          row?.is_pro         ?? false,
   };
 }

@@ -29,6 +29,13 @@ export type UserRow = {
   certifications: string[];
   rating: number;
   created_at: string;
+  // Phase 4 additions (feeds / discovery / map)
+  primary_job_type: string | null;
+  secondary_job_types: string[];
+  availability: Record<string, boolean> | null;
+  lat: number | null;
+  lng: number | null;
+  is_pro: boolean;
 };
 
 /** Matches the actual `shifts` table after Phase 2 additions */
@@ -138,10 +145,10 @@ const COVER_FALLBACKS: Record<string, string> = {
   default:            'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop&q=80',
 };
 
-// Miami Beach center — used for distance approximation when user location is unavailable
-const MIAMI_BEACH = { lat: 25.7913, lng: -80.145 };
+// Miami Beach center — used for distance approximation when a real location is unavailable
+export const MIAMI_BEACH = { lat: 25.7913, lng: -80.145 };
 
-function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
+export function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R    = 3958.8;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
@@ -155,7 +162,10 @@ function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number):
 
 // ─── Adapter: ShiftRow (DB) → MockShift (UI) ─────────────────────────────────
 
-export function shiftRowToMockShift(row: ShiftRow): MockShift {
+export function shiftRowToMockShift(
+  row: ShiftRow,
+  refCoords: { lat: number; lng: number } = MIAMI_BEACH,
+): MockShift {
   const primaryType    = row.job_type || row.job_types?.[0] || 'Event Staff';
   const lat            = row.lat  ?? MIAMI_BEACH.lat;
   const lng            = row.lng  ?? MIAMI_BEACH.lng;
@@ -164,6 +174,7 @@ export function shiftRowToMockShift(row: ShiftRow): MockShift {
   return {
     id:             row.id,
     jobType:        primaryType,
+    jobTypes:       row.job_types?.length ? row.job_types : [primaryType],
     companyName:    row.company_name    ?? 'Private Client',
     coverImage:     row.cover_image     ?? COVER_FALLBACKS[primaryType] ?? COVER_FALLBACKS.default,
     payRate:        Number(row.hourly_rate ?? 0),
@@ -171,7 +182,8 @@ export function shiftRowToMockShift(row: ShiftRow): MockShift {
     date:           friendlyDate(row.start_time),
     startTime:      formatTime(row.start_time),
     endTime:        formatTime(row.end_time),
-    distanceMiles:  Math.round(haversineMiles(MIAMI_BEACH.lat, MIAMI_BEACH.lng, lat, lng) * 10) / 10,
+    startTimeISO:   row.start_time,
+    distanceMiles:  Math.round(haversineMiles(refCoords.lat, refCoords.lng, lat, lng) * 10) / 10,
     spotsAvailable,
     spotsTotal:     row.spots ?? 1,
     location:       row.location        ?? 'Miami, FL',
@@ -184,6 +196,8 @@ export function shiftRowToMockShift(row: ShiftRow): MockShift {
     contactPhone:   row.contact_phone   ?? '',
     lat,
     lng,
+    clientId:       row.client_id,
+    status:         row.status,
   };
 }
 

@@ -2,16 +2,18 @@ import { Map, Marker, useMap } from '@vis.gl/react-google-maps';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion, useMotionValue, animate, type PanInfo } from 'framer-motion';
-import { Search, SlidersHorizontal, Heart, MapPin, Clock, Users, Sparkles, WifiOff, CheckCircle2, Plus } from 'lucide-react';
+import { Search, SlidersHorizontal, Heart, MapPin, Clock, Users, WifiOff, CheckCircle2, Plus } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { type MockShift } from '@/data/mockFeed';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
-import { LIGHT_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
+import { LIGHT_MAP_STYLES, navyPinUrl } from '@/lib/mapStyles';
 import { useShifts } from '@/hooks/useShifts';
+import { useMyPostedShifts } from '@/hooks/useMyPostedShifts';
 import { useApplications } from '@/hooks/useApplications';
 import { useProfile } from '@/hooks/useProfile';
 import { resetStafferDraft } from '@/store/stafferPostShiftStore';
 import { resetDraft } from '@/store/postShiftStore';
+import { JOB_TYPES } from '@/lib/jobTypes';
 
 /* ── API key — resolved once at module load ─────────────────────────────── */
 const API_KEY: string = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
@@ -39,14 +41,13 @@ function MapController({ shift }: { shift: MockShift | null }) {
 }
 
 /* ── Filter logic ────────────────────────────────────────────────────────── */
-type FilterKey = 'all' | 'pay30' | 'near3' | 'tonight' | 'vip';
+type FilterKey = 'all' | 'pay30' | 'near3' | 'tonight';
 
 const FILTER_PILLS: { key: FilterKey; label: string }[] = [
-  { key: 'all',     label: 'All Jobs'         },
-  { key: 'pay30',   label: '$30+/hr'          },
-  { key: 'near3',   label: '< 3 mi'           },
-  { key: 'tonight', label: 'Tonight'          },
-  { key: 'vip',     label: 'VIP / Fine Dining' },
+  { key: 'all',     label: 'All Jobs'   },
+  { key: 'pay30',   label: 'Pay Rate: $30+/hr' },
+  { key: 'near3',   label: 'Distance: < 3 mi'  },
+  { key: 'tonight', label: 'Date: Tonight'     },
 ];
 
 function applyFilter(shifts: MockShift[], f: FilterKey): MockShift[] {
@@ -54,8 +55,6 @@ function applyFilter(shifts: MockShift[], f: FilterKey): MockShift[] {
     case 'pay30':   return shifts.filter((s) => s.payRate >= 30);
     case 'near3':   return shifts.filter((s) => s.distanceMiles < 3);
     case 'tonight': return shifts.filter((s) => s.date === 'Tonight');
-    case 'vip':     return shifts.filter((s) =>
-      ['VIP Server', 'Catering Lead', 'Cocktail Server'].includes(s.jobType));
     default:        return shifts;
   }
 }
@@ -107,13 +106,6 @@ function SheetCard({ shift, selected, onTap, applied }: {
 
         <div className="absolute bottom-2 left-2.5 right-8">
           <p className="text-white font-bold text-[13px] leading-tight truncate drop-shadow-md">{shift.companyName}</p>
-        </div>
-
-        <div className="absolute bottom-2 right-2.5" aria-label={`${shift.aiMatchPct}% AI match`}>
-          <div className="flex items-center gap-1 bg-black/70 backdrop-blur-sm border border-white/20 rounded-full px-2 py-0.5">
-            <Sparkles size={9} aria-hidden className="text-white" />
-            <span className="text-white text-[10px] font-bold">{shift.aiMatchPct}%</span>
-          </div>
         </div>
       </div>
 
@@ -262,6 +254,7 @@ export function JobsScreen() {
   const [, navigate]    = useLocation();
   const [query, setQuery]               = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
+  const [jobTypeFilter, setJobTypeFilter] = useState<string | null>(null);
   const [selectedId, setSelectedId]     = useState<string | null>(null);
 
   // Role-gated FAB: visible only for staffer / client
@@ -286,7 +279,12 @@ export function JobsScreen() {
   const containerRef  = useRef<HTMLDivElement>(null);
   const [mapHeight, setMapHeight] = useState(0);
 
-  const { shifts, isLoading } = useShifts();
+  // Workers browse all open shifts; clients/staffers see only their own posted shifts.
+  const openShifts   = useShifts();
+  const postedShifts = useMyPostedShifts();
+  const isWorkerRole = role === 'worker' || role === null;
+  const shifts    = isWorkerRole ? openShifts.shifts   : postedShifts.shifts;
+  const isLoading = isWorkerRole ? openShifts.isLoading : postedShifts.isLoading;
   const { appliedShiftIds }   = useApplications();
 
   // ── 1. Log API-key presence on mount (never log the full key) ──
@@ -343,7 +341,10 @@ export function JobsScreen() {
       f.toLowerCase().includes(query.toLowerCase()),
     ),
   );
-  const visibleShifts = applyFilter(textFiltered, activeFilter);
+  const jobTypeFiltered = jobTypeFilter
+    ? textFiltered.filter((s) => s.jobTypes.includes(jobTypeFilter))
+    : textFiltered;
+  const visibleShifts = applyFilter(jobTypeFiltered, activeFilter);
   const selectedShift = visibleShifts.find((s) => s.id === selectedId) ?? null;
 
   function handleSelectShift(shift: MockShift) { setSelectedId(shift.id); navigate(`/shift/${shift.id}`); }
@@ -381,7 +382,7 @@ export function JobsScreen() {
                   <Marker
                     key={shift.id}
                     position={{ lat: shift.lat, lng: shift.lng }}
-                    icon={goldPinUrl(selectedId === shift.id)}
+                    icon={navyPinUrl(selectedId === shift.id)}
                     onClick={() => handlePinClick(shift)}
                   />
                 ))}
@@ -435,7 +436,7 @@ export function JobsScreen() {
                 <Search size={16} aria-hidden className="text-[#737373] flex-shrink-0" />
                 <input
                   type="search"
-                  placeholder="Search shifts, job types, locations…"
+                  placeholder="Search by job type, pay rate, distance, date…"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   aria-label="Search shifts"
@@ -457,6 +458,15 @@ export function JobsScreen() {
               role="radiogroup" aria-label="Filter shifts"
               style={{ WebkitOverflowScrolling: 'touch' }}
             >
+              <select
+                value={jobTypeFilter ?? ''}
+                onChange={(e) => { setJobTypeFilter(e.target.value || null); setSelectedId(null); }}
+                aria-label="Filter by job type"
+                className={`flex-shrink-0 h-[34px] px-3 rounded-full text-[12px] font-semibold shadow-sm outline-none whitespace-nowrap
+                  ${jobTypeFilter ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
+                <option value="">Job Type: All</option>
+                {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
               {FILTER_PILLS.map((pill) => {
                 const active = activeFilter === pill.key;
                 return (

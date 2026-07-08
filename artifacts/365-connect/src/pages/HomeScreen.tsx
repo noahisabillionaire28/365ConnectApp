@@ -1,241 +1,37 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MapPin, Clock, Sparkles, Bell, Search, Users, PlusCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Bell, Search, PlusCircle, SlidersHorizontal } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
-import { type MockShift } from '@/data/mockFeed';
-import { useFeedStore, toggleSaved } from '@/store/feedStore';
-import { useShifts } from '@/hooks/useShifts';
-import { useWorkers, type WorkerStory } from '@/hooks/useWorkers';
+import { ShiftListCard, ShiftListCardSkeleton } from '@/components/home/ShiftListCard';
+import { PeopleCard, PeopleCardSkeleton } from '@/components/home/PeopleCard';
+import { useWorkerHomeShifts } from '@/hooks/useWorkerHomeShifts';
+import { usePeopleFeed } from '@/hooks/usePeopleFeed';
+import { useApplications } from '@/hooks/useApplications';
+import { useRole } from '@/contexts/RoleContext';
+import { JOB_TYPES } from '@/lib/jobTypes';
 
-/* ─── Stories Row ─────────────────────────────────────────────────────────── */
-
-function StoryBubbleSkeleton() {
-  return (
-    <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
-      <div className="w-[63px] h-[63px] rounded-full bg-[#EFEFEF] animate-pulse" />
-      <div className="w-10 h-2.5 rounded-full bg-[#EFEFEF] animate-pulse" />
-    </div>
-  );
-}
-
-function WorkerAvatar({ username, photoUrl }: { username: string; photoUrl: string | null }) {
-  const initials = username.slice(0, 2).toUpperCase();
-  if (photoUrl) {
-    return (
-      <img src={photoUrl} alt="" aria-hidden="true" loading="lazy" decoding="async"
-        className="w-[58px] h-[58px] rounded-full object-cover" />
-    );
-  }
-  return (
-    <div className="w-[58px] h-[58px] rounded-full bg-[#EFEFEF] flex items-center justify-center">
-      <span className="text-[#737373] text-[16px] font-bold">{initials}</span>
-    </div>
-  );
-}
-
-function StoryBubble({ worker }: { worker: WorkerStory }) {
-  const [tapped, setTapped] = useState(false);
-  const [, navigate] = useLocation();
-
-  return (
-    <button type="button" aria-label={`View ${worker.username}'s profile`}
-      onClick={() => { setTapped(true); navigate(`/worker/${worker.username}`); }}
-      className="flex flex-col items-center gap-1.5 flex-shrink-0 active:scale-95 transition-transform">
-      <div className={`p-[2.5px] rounded-full ${
-        worker.isPremium
-          ? 'bg-gradient-to-br from-[#0095F6] via-[#00B4FF] to-[#0095F6]'
-          : tapped
-          ? 'bg-[#DBDBDB]'
-          : 'bg-[#DBDBDB]'
-      }`}>
-        <div className="p-[2px] rounded-full bg-white">
-          <WorkerAvatar username={worker.username} photoUrl={worker.photoUrl} />
-        </div>
-      </div>
-      <span className="text-[#737373] text-[11px] font-medium max-w-[66px] truncate">
-        {worker.username}
-      </span>
-    </button>
-  );
-}
-
-function StoriesRow() {
-  const { workers, isLoading } = useWorkers();
-
-  return (
-    <div className="py-3">
-      <div role="list" aria-label="Available workers nearby"
-        className="flex gap-4 px-4 overflow-x-auto scrollbar-none"
-        style={{ WebkitOverflowScrolling: 'touch' }}>
-        {isLoading
-          ? Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} role="listitem"><StoryBubbleSkeleton /></div>
-            ))
-          : workers.length > 0
-          ? workers.map((w) => (
-              <div key={w.id} role="listitem"><StoryBubble worker={w} /></div>
-            ))
-          : (
-              <div role="listitem" className="flex items-center px-1 py-3">
-                <p className="text-[#737373] text-[12px]">No workers available nearby yet.</p>
-              </div>
-            )}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Shift Card skeleton ─────────────────────────────────────────────────── */
-
-function ShiftCardSkeleton() {
-  return (
-    <div className="mx-4 rounded-[12px] overflow-hidden bg-[#FAFAFA] border border-[#DBDBDB]">
-      <div className="w-full h-[220px] bg-[#EFEFEF] animate-pulse" />
-      <div className="px-4 pt-3.5 pb-4 flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div className="w-16 h-7 rounded-[8px] bg-[#EFEFEF] animate-pulse" />
-          <div className="w-32 h-7 rounded-full bg-[#EFEFEF] animate-pulse" />
-        </div>
-        <div className="flex gap-2">
-          <div className="w-20 h-6 rounded-full bg-[#EFEFEF] animate-pulse" />
-          <div className="w-16 h-6 rounded-full bg-[#EFEFEF] animate-pulse" />
-          <div className="w-20 h-6 rounded-full bg-[#EFEFEF] animate-pulse" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Shift Card ──────────────────────────────────────────────────────────── */
-
-function ShiftCard({ shift, onTap }: { shift: MockShift; onTap: () => void }) {
-  const store    = useFeedStore();
-  const saved    = store.isSaved(shift.id);
-  const spotsLow = shift.spotsAvailable < 3;
-
-  function handleSave(e: React.MouseEvent) {
-    e.stopPropagation();
-    toggleSaved(shift.id);
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTap(); }
-  }
-
-  return (
-    <div role="article"
-      aria-label={`${shift.jobType} shift at ${shift.companyName}, $${shift.payRate} per ${shift.payPeriod}`}
-      tabIndex={0} onClick={onTap} onKeyDown={handleKeyDown}
-      className="mx-4 rounded-[12px] overflow-hidden bg-white border border-[#DBDBDB] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-black active:opacity-90">
-
-      {/* Cover photo */}
-      <div className="relative w-full h-[220px] overflow-hidden">
-        <img src={shift.coverImage} alt={`${shift.jobType} at ${shift.companyName}`}
-          loading="lazy" decoding="async" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/30" />
-
-        {/* Job type pill */}
-        <div className="absolute top-3 left-3">
-          <span className="bg-black text-white text-[11px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wide shadow-lg">
-            {shift.jobType}
-          </span>
-        </div>
-
-        {/* Save button */}
-        <button type="button"
-          aria-label={saved ? `Remove ${shift.companyName} from saved` : `Save ${shift.companyName} shift`}
-          aria-pressed={saved} onClick={handleSave}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 flex items-center justify-center">
-          <AnimatePresence mode="wait">
-            <motion.span key={saved ? 'saved' : 'unsaved'}
-              initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.5, opacity: 0 }} transition={{ duration: 0.15 }}>
-              <Heart size={15} aria-hidden
-                className={saved ? 'text-white fill-white' : 'text-white fill-transparent'} />
-            </motion.span>
-          </AnimatePresence>
-        </button>
-
-        {/* Company name overlay */}
-        <div className="absolute bottom-3 left-3 right-16">
-          <p className="text-white font-bold text-[16px] leading-tight drop-shadow-md truncate">
-            {shift.companyName}
-          </p>
-          <div className="flex items-center gap-1 mt-0.5">
-            <MapPin size={11} aria-hidden className="text-white/70 flex-shrink-0" />
-            <span className="text-white/70 text-[11px] truncate">{shift.location}</span>
-          </div>
-        </div>
-
-        {/* AI Match badge */}
-        <div className="absolute bottom-3 right-3" aria-label={`${shift.aiMatchPct}% AI match`}>
-          <div className="flex items-center gap-1 bg-black/70 backdrop-blur-sm border border-white/20 rounded-full px-2.5 py-1">
-            <Sparkles size={10} aria-hidden className="text-white" />
-            <span className="text-white text-[11px] font-bold">{shift.aiMatchPct}%</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Card body */}
-      <div className="px-4 pt-3.5 pb-4 bg-white">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-baseline gap-1">
-            <span className="text-black font-bold text-[22px]">${shift.payRate}</span>
-            <span className="text-[#737373] text-[13px] font-medium">/{shift.payPeriod}</span>
-          </div>
-          <div className="flex items-center gap-1.5 bg-[#FAFAFA] border border-[#DBDBDB] rounded-full px-3 py-1.5">
-            <Clock size={12} aria-hidden className="text-[#737373]" />
-            <span className="text-[#737373] text-[12px] font-medium">
-              {shift.startTime} – {shift.endTime}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 bg-[#FAFAFA] border border-[#DBDBDB] rounded-full px-3 py-1.5">
-            <span className="text-[#737373] text-[12px] font-medium">{shift.date}</span>
-          </div>
-          <div className="flex items-center gap-1.5 bg-[#FAFAFA] border border-[#DBDBDB] rounded-full px-3 py-1.5">
-            <MapPin size={11} aria-hidden className="text-[#737373]" />
-            <span className="text-[#737373] text-[12px] font-medium">{shift.distanceMiles} mi</span>
-          </div>
-          <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 border ${
-            spotsLow ? 'bg-red-50 border-red-200' : 'bg-[#FAFAFA] border-[#DBDBDB]'
-          }`}>
-            <Users size={11} aria-hidden className={spotsLow ? 'text-red-500' : 'text-[#737373]'} />
-            <span className={`text-[12px] font-medium ${spotsLow ? 'text-red-500' : 'text-[#737373]'}`}>
-              {shift.spotsAvailable} spot{shift.spotsAvailable !== 1 ? 's' : ''} left
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Header ──────────────────────────────────────────────────────────────── */
-
-function FeedHeader() {
+/* ─── Shared header ───────────────────────────────────────────────────────── */
+function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => void }) {
   const [, navigate] = useLocation();
   return (
     <div className="flex items-center justify-between px-4 pt-4 pb-2">
       <div>
-        <h1 className="text-black font-bold text-[22px] leading-tight">
-          365 Connect
-        </h1>
-        <p className="text-[#737373] text-[12px] font-medium mt-[1px]">Miami Beach, FL</p>
+        <h1 className="text-black font-bold text-[22px] leading-tight">365 Connect</h1>
+        <p className="text-[#737373] text-[12px] font-medium mt-[1px]">{subtitle}</p>
       </div>
       <div className="flex items-center gap-2">
-        <button type="button" aria-label="Post a shift" onClick={() => navigate('/post-shift/step1')}
-          className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
-          <PlusCircle size={16} aria-hidden className="text-black" />
-        </button>
-        <button type="button" aria-label="Search shifts" onClick={() => navigate('/jobs')}
+        {onPost && (
+          <button type="button" aria-label="Post a shift" onClick={onPost}
+            className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+            <PlusCircle size={16} aria-hidden className="text-black" />
+          </button>
+        )}
+        <button type="button" aria-label="Search" onClick={() => navigate('/explore')}
           className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
           <Search size={16} aria-hidden className="text-[#737373]" />
         </button>
-        <button type="button" aria-label="Notifications — 1 unread" onClick={() => navigate('/notifications')}
+        <button type="button" aria-label="Notifications" onClick={() => navigate('/notifications')}
           className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center relative">
           <Bell size={16} aria-hidden className="text-[#737373]" />
           <span aria-hidden className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#0095F6] border-[1.5px] border-white" />
@@ -245,42 +41,23 @@ function FeedHeader() {
   );
 }
 
-function SectionLabel({ title, sub }: { title: string; sub?: string }) {
-  return (
-    <div className="flex items-center justify-between px-4 mb-3">
-      <div>
-        <h2 className="text-black font-bold text-[16px]">{title}</h2>
-        {sub && <p className="text-[#737373] text-[11px] mt-[1px]">{sub}</p>}
-      </div>
-    </div>
-  );
-}
-
-/* ─── HomeScreen ──────────────────────────────────────────────────────────── */
-
-export function HomeScreen() {
-  const [, navigate]          = useLocation();
-  const { shifts, isLoading, error } = useShifts();
+/* ─── (A) Worker Home Feed ────────────────────────────────────────────────── */
+function WorkerHomeFeed() {
+  const [, navigate] = useLocation();
+  const { shifts, isLoading, error } = useWorkerHomeShifts();
+  const { appliedShiftIds } = useApplications();
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
-      {/* Sticky header + stories */}
       <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
-        <FeedHeader />
-        <div className="border-t border-[#DBDBDB] pt-1">
-          <SectionLabel title="Available Nearby" sub="Tap to view profiles" />
-          <StoriesRow />
-        </div>
+        <FeedHeader subtitle="Shifts near you" />
       </div>
 
-      {/* Scrollable feed */}
       <main className="flex-1 overflow-y-auto" aria-label="Shift feed">
         <div className="pt-4 pb-4">
-          <SectionLabel title="Shifts For You" sub="Based on your profile · Miami Beach" />
-
           {isLoading && (
             <div className="flex flex-col gap-4" aria-busy="true" aria-label="Loading shifts">
-              {[1, 2, 3].map((n) => <ShiftCardSkeleton key={n} />)}
+              {[1, 2, 3].map((n) => <ShiftListCardSkeleton key={n} />)}
             </div>
           )}
 
@@ -292,28 +69,21 @@ export function HomeScreen() {
           )}
 
           {!isLoading && !error && (
-            <div className="flex flex-col gap-4" role="feed" aria-label="Available shifts">
+            <div className="flex flex-col gap-4" role="feed" aria-label="Available shifts near you">
               {shifts.map((shift, i) => (
                 <motion.div key={shift.id}
                   initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.055, duration: 0.3, ease: 'easeOut' }}>
-                  <ShiftCard shift={shift} onTap={() => navigate(`/shift/${shift.id}`)} />
+                  transition={{ delay: i * 0.05, duration: 0.3, ease: 'easeOut' }}>
+                  <ShiftListCard shift={shift} applied={appliedShiftIds.has(shift.id)}
+                    onTap={() => navigate(`/shift/${shift.id}`)} />
                 </motion.div>
               ))}
 
               {shifts.length === 0 && (
                 <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-                  <p className="text-[#737373] text-[14px]">No open shifts right now.</p>
-                  <p className="text-[#AAAAAA] text-[12px] mt-1">Check back soon or post a shift.</p>
+                  <p className="text-[#737373] text-[14px]">No shifts near you right now. Check back soon.</p>
                 </div>
               )}
-            </div>
-          )}
-
-          {!isLoading && shifts.length > 0 && (
-            <div className="mt-8 flex flex-col items-center gap-2" aria-hidden="true">
-              <div className="w-8 h-[3px] rounded-full bg-[#EFEFEF]" />
-              <p className="text-[#AAAAAA] text-[12px]">You're all caught up</p>
             </div>
           )}
         </div>
@@ -322,4 +92,105 @@ export function HomeScreen() {
       <BottomTabNav />
     </div>
   );
+}
+
+/* ─── (B) Client / Staffer Home Feed ─────────────────────────────────────── */
+const RATING_FILTERS = ['Any rating', '4.0+', '4.5+'] as const;
+const DISTANCE_FILTERS = ['Any distance', '< 5 mi', '< 15 mi', '< 25 mi'] as const;
+
+function ClientHomeFeed() {
+  const { people, isLoading, error } = usePeopleFeed();
+  const [jobType, setJobType]   = useState<string | null>(null);
+  const [rating, setRating]     = useState<typeof RATING_FILTERS[number]>('Any rating');
+  const [distance, setDistance] = useState<typeof DISTANCE_FILTERS[number]>('Any distance');
+  const [availableOnly, setAvailableOnly] = useState(false);
+
+  const minRating = rating === '4.5+' ? 4.5 : rating === '4.0+' ? 4.0 : 0;
+  const maxDistance = distance === '< 5 mi' ? 5 : distance === '< 15 mi' ? 15 : distance === '< 25 mi' ? 25 : Infinity;
+
+  const filtered = people.filter((p) => {
+    if (jobType && p.primaryJobType !== jobType) return false;
+    if (p.rating < minRating) return false;
+    if (p.distanceMiles > maxDistance) return false;
+    if (availableOnly && !p.availableToday) return false;
+    return true;
+  });
+
+  return (
+    <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
+      <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
+        <FeedHeader subtitle="Discover workers" />
+
+        <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none" role="group" aria-label="Filters"
+          style={{ WebkitOverflowScrolling: 'touch' }}>
+          <select aria-label="Filter by job type" value={jobType ?? ''}
+            onChange={(e) => setJobType(e.target.value || null)}
+            className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+            <option value="">All job types</option>
+            {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select aria-label="Filter by rating" value={rating}
+            onChange={(e) => setRating(e.target.value as typeof rating)}
+            className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+            {RATING_FILTERS.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <select aria-label="Filter by distance" value={distance}
+            onChange={(e) => setDistance(e.target.value as typeof distance)}
+            className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+            {DISTANCE_FILTERS.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <button type="button" role="switch" aria-checked={availableOnly}
+            onClick={() => setAvailableOnly((v) => !v)}
+            className={`h-[32px] px-3 rounded-full text-[12px] font-semibold border flex items-center gap-1.5 flex-shrink-0 ${
+              availableOnly ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'
+            }`}>
+            <SlidersHorizontal size={12} aria-hidden />
+            Available today
+          </button>
+        </div>
+      </div>
+
+      <main className="flex-1 overflow-y-auto" aria-label="Worker feed">
+        <div className="pt-4 pb-4 flex flex-col gap-3">
+          {isLoading && Array.from({ length: 4 }).map((_, i) => <PeopleCardSkeleton key={i} />)}
+
+          {error && !isLoading && (
+            <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
+              <p className="text-[#737373] text-[14px]">Couldn't load workers right now.</p>
+            </div>
+          )}
+
+          {!isLoading && !error && filtered.map((person) => (
+            <PeopleCard key={person.id} person={person} />
+          ))}
+
+          {!isLoading && !error && filtered.length === 0 && (
+            <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
+              <p className="text-[#737373] text-[14px]">No workers found. Try adjusting your filters.</p>
+            </div>
+          )}
+        </div>
+      </main>
+
+      <BottomTabNav />
+    </div>
+  );
+}
+
+/* ─── HomeScreen — role router ────────────────────────────────────────────── */
+export function HomeScreen() {
+  const { role, roleLoading } = useRole();
+
+  if (roleLoading) {
+    return (
+      <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
+        <div className="pt-4 flex flex-col gap-4">
+          {[1, 2, 3].map((n) => <ShiftListCardSkeleton key={n} />)}
+        </div>
+        <BottomTabNav />
+      </div>
+    );
+  }
+
+  return role === 'worker' ? <WorkerHomeFeed /> : <ClientHomeFeed />;
 }

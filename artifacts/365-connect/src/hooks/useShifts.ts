@@ -21,7 +21,7 @@ export function useShifts() {
         .eq('status', 'open')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return (data as ShiftRow[]).map(shiftRowToMockShift);
+      return (data as ShiftRow[]).map((row) => shiftRowToMockShift(row));
     },
     staleTime: 30_000,
   });
@@ -51,10 +51,12 @@ export function useShifts() {
 
 /**
  * Fetches a single shift by UUID — used by ShiftDetailScreen.
+ * Accepts the viewer's own coordinates so `distanceMiles` (and therefore the
+ * AI Match Score's distance component) reflects the real user, not a fallback.
  */
-export function useShiftById(id: string | undefined) {
+export function useShiftById(id: string | undefined, refCoords?: { lat: number; lng: number }) {
   return useQuery<MockShift, Error>({
-    queryKey: ['shift', id],
+    queryKey: ['shift', id, refCoords?.lat, refCoords?.lng],
     queryFn: async () => {
       if (!id) throw new Error('No shift ID provided');
       const { data, error } = await supabase
@@ -63,7 +65,7 @@ export function useShiftById(id: string | undefined) {
         .eq('id', id)
         .single();
       if (error) throw error;
-      return shiftRowToMockShift(data as ShiftRow);
+      return shiftRowToMockShift(data as ShiftRow, refCoords);
     },
     enabled: !!id,
     staleTime: 30_000,

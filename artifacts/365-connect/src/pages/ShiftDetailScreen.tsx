@@ -1,14 +1,21 @@
+import { useState } from 'react';
 import { Map, Marker } from '@vis.gl/react-google-maps';
 import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
-  MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock,
+  MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil,
 } from 'lucide-react';
-import { useFeedStore, toggleSaved, markAccepted } from '@/store/feedStore';
+import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
-import { DARK_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
+import { useApplicationStatus } from '@/hooks/useApplicationStatus';
+import { LIGHT_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
 import { useShiftById } from '@/hooks/useShifts';
+import { useProfile } from '@/hooks/useProfile';
+import { useMyLocation } from '@/hooks/useMyLocation';
+import { computeMatchScore } from '@/lib/matchScore';
+import { haversineMiles, supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 function calcDuration(start: string, end: string): string {
   const parse = (t: string) => {
@@ -91,10 +98,18 @@ export function ShiftDetailScreen() {
   // ── ALL hooks must be declared here, unconditionally, before any early return ──
   const { id }       = useParams<{ id: string }>();
   const [, navigate] = useLocation();
+  const { user }      = useAuth();
   const store        = useFeedStore();
   // useApplications: 7 stable hooks (see hook/useApplications.ts inventory comment)
-  const { appliedShiftIds, submitApplication } = useApplications();
-  const { data: shift, isLoading, error }      = useShiftById(id);
+  const { submitApplication }             = useApplications();
+  const { status: applicationStatus }     = useApplicationStatus(id);
+  const profile                           = useProfile();
+  const { coords: myCoords }              = useMyLocation();
+  // Distance (and therefore the AI Match Score's distance component) is
+  // computed against the real viewer location, not a hardcoded fallback.
+  const { data: shift, isLoading, error } = useShiftById(id, myCoords);
+  const [dressCodeDraft, setDressCodeDraft] = useState<string | null>(null);
+  const [savingDressCode, setSavingDressCode] = useState(false);
   // ── No more hooks below this line ────────────────────────────────────────────
 
   if (isLoading) return <ShiftDetailSkeleton />;
@@ -129,22 +144,50 @@ export function ShiftDetailScreen() {
 
   const shiftId     = shift.id;
   const saved       = store.isSaved(shiftId);
-  // applied comes from the live DB query + optimistic update in useApplications
-  const applied     = appliedShiftIds.has(shiftId);
-  const accepted    = store.isAccepted(shiftId);
-  const clockedIn   = store.isClockedIn(shiftId);
   const spotsLow    = shift.spotsAvailable < 3;
   const duration    = calcDuration(shift.startTime, shift.endTime);
   const spotsFilled = shift.spotsTotal - shift.spotsAvailable;
   const fillPct     = Math.round((spotsFilled / Math.max(shift.spotsTotal, 1)) * 100);
+  const isOwner     = !!user?.id && user.id === shift.clientId;
+  const isWorker    = profile.role === 'worker';
 
-  type CtaState = 'apply' | 'pending' | 'clock-in' | 'clocked-in';
-  const ctaState: CtaState = clockedIn
-    ? 'clocked-in' : accepted ? 'clock-in' : applied ? 'pending' : 'apply';
+  const matchScore = isWorker
+    ? computeMatchScore(shift, {
+        primaryJobType: profile.primaryJobType,
+        secondaryJobTypes: profile.secondaryJobTypes,
+        availability: profile.availability,
+        rating: profile.rating,
+      })
+    : null;
+
+  const distanceFromShift = haversineMiles(myCoords.lat, myCoords.lng, shift.lat, shift.lng);
+  const withinClockInRange = distanceFromShift <= 1;
+
+  // Real CTA states, per applications.status + shifts.status (spec E):
+  //   no row → apply | pending → Pending Approval | accepted+open → Clock In (gold, 1mi gate)
+  //   accepted+completed → Completed
+  type CtaState = 'apply' | 'pending' | 'clock-in' | 'completed';
+  const ctaState: CtaState =
+    applicationStatus === 'accepted'
+      ? (shift.status === 'completed' ? 'completed' : 'clock-in')
+      : applicationStatus === 'pending'
+      ? 'pending'
+      : 'apply';
 
   function handleCta() {
     if (ctaState === 'apply')    void submitApplication(shiftId);
-    if (ctaState === 'clock-in') navigate(`/clock/${shiftId}`);
+    if (ctaState === 'clock-in' && withinClockInRange) navigate(`/clock/${shiftId}`);
+  }
+
+  async function handleSaveDressCode() {
+    if (dressCodeDraft === null) return;
+    setSavingDressCode(true);
+    const { error: saveError } = await supabase
+      .from('shifts')
+      .update({ dress_code: dressCodeDraft })
+      .eq('id', shiftId);
+    setSavingDressCode(false);
+    if (!saveError) setDressCodeDraft(null);
   }
 
   return (
@@ -209,25 +252,50 @@ export function ShiftDetailScreen() {
 
         {/* Dress code */}
         <div className="px-5 pb-6">
-          <SectionHeading>
-            <span className="flex items-center gap-2">
-              <Shirt size={16} aria-hidden className="text-[#737373]" />
-              Dress Code
-            </span>
-          </SectionHeading>
-          <div className="border border-[#DBDBDB] rounded-[12px] p-4" role="list" aria-label="Dress code items">
-            {shift.dressCodeItems.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {shift.dressCodeItems.map((item) => (
-                  <div key={item} role="listitem" className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-full px-3.5 py-1.5">
-                    <span className="text-black text-[13px] font-medium">{item}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-[#737373] text-[14px] leading-relaxed">{shift.dressCode || 'See shift details for dress code requirements.'}</p>
+          <div className="flex items-center justify-between mb-3">
+            <SectionHeading>
+              <span className="flex items-center gap-2 mb-0">
+                <Shirt size={16} aria-hidden className="text-[#737373]" />
+                Dress Code
+              </span>
+            </SectionHeading>
+            {isOwner && dressCodeDraft === null && (
+              <button type="button" aria-label="Edit dress code"
+                onClick={() => setDressCodeDraft(shift.dressCode ?? '')}
+                className="w-7 h-7 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+                <Pencil size={12} aria-hidden className="text-[#737373]" />
+              </button>
             )}
           </div>
+          {dressCodeDraft !== null ? (
+            <div className="flex flex-col gap-2">
+              <textarea value={dressCodeDraft} onChange={(e) => setDressCodeDraft(e.target.value)}
+                rows={3} aria-label="Edit dress code"
+                className="border border-[#DBDBDB] rounded-[12px] p-3 text-[14px] text-black resize-none outline-none focus:border-black" />
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={() => setDressCodeDraft(null)}
+                  className="text-[#737373] text-[13px] font-medium px-3 h-8">Cancel</button>
+                <button type="button" onClick={handleSaveDressCode} disabled={savingDressCode}
+                  className="bg-black text-white text-[13px] font-semibold px-4 h-8 rounded-[8px] disabled:opacity-60">
+                  {savingDressCode ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="border border-[#DBDBDB] rounded-[12px] p-4" role="list" aria-label="Dress code items">
+              {shift.dressCodeItems.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {shift.dressCodeItems.map((item) => (
+                    <div key={item} role="listitem" className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-full px-3.5 py-1.5">
+                      <span className="text-black text-[13px] font-medium">{item}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[#737373] text-[14px] leading-relaxed">{shift.dressCode || 'See shift details for dress code requirements.'}</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Description */}
@@ -282,8 +350,8 @@ export function ShiftDetailScreen() {
           <SectionHeading>Location</SectionHeading>
           <div className="rounded-[12px] overflow-hidden border border-[#DBDBDB]" style={{ height: 180 }}>
             <Map defaultCenter={{ lat: shift.lat, lng: shift.lng }} defaultZoom={15}
-              styles={DARK_MAP_STYLES} disableDefaultUI gestureHandling="none"
-              backgroundColor="#000000" style={{ width: '100%', height: '100%' }}>
+              styles={LIGHT_MAP_STYLES} disableDefaultUI gestureHandling="none"
+              backgroundColor="#f5f5f5" style={{ width: '100%', height: '100%' }}>
               <Marker position={{ lat: shift.lat, lng: shift.lng }} icon={goldPinUrl(true)} />
             </Map>
           </div>
@@ -293,29 +361,33 @@ export function ShiftDetailScreen() {
           </div>
         </div>
 
-        {/* AI match score */}
-        <div className="px-5 pb-6">
-          <div className="bg-[#F0F7FF] border border-[#DBDBDB] rounded-[12px] px-5 py-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-[#0095F6]/10 border border-[#0095F6]/20 flex items-center justify-center flex-shrink-0">
-              <Sparkles size={20} aria-hidden className="text-[#0095F6]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="text-[#0095F6] font-bold text-[22px]">{shift.aiMatchPct}%</span>
-                <span className="bg-[#0095F6]/10 text-[#0095F6] text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide border border-[#0095F6]/20">
-                  Match
-                </span>
+        {/* AI match score — worker-only, computed 40 job-type + 30 availability + 20 rating + 10 distance */}
+        {isWorker && matchScore !== null && (
+          <div className="px-5 pb-6">
+            <div className="bg-[#F0F7FF] border border-[#DBDBDB] rounded-[12px] px-5 py-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-[#0095F6]/10 border border-[#0095F6]/20 flex items-center justify-center flex-shrink-0">
+                <Sparkles size={20} aria-hidden className="text-[#0095F6]" />
               </div>
-              <p className="text-[#737373] text-[13px] leading-snug">
-                {shift.aiMatchPct >= 90
-                  ? 'Your skills align perfectly with this shift'
-                  : shift.aiMatchPct >= 80
-                  ? 'Strong match — you meet most requirements'
-                  : 'Good match — a few areas to strengthen'}
-              </p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[#0095F6] font-bold text-[22px]">{matchScore}%</span>
+                  <span className="bg-[#0095F6]/10 text-[#0095F6] text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide border border-[#0095F6]/20">
+                    AI Match
+                  </span>
+                </div>
+                <p className="text-[#737373] text-[13px] leading-snug">
+                  {matchScore >= 90
+                    ? 'Your skills align perfectly with this shift'
+                    : matchScore >= 80
+                    ? 'Strong match — you meet most requirements'
+                    : matchScore >= 60
+                    ? 'Good match — a few areas to strengthen'
+                    : 'Partial match — check job type and availability'}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Spots remaining */}
         <div className="px-5 pb-6">
@@ -335,20 +407,11 @@ export function ShiftDetailScreen() {
               transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
               className={`h-full rounded-full ${spotsLow ? 'bg-red-500' : 'bg-black'}`} />
           </div>
-          <div className="flex items-center gap-2 mt-3">
-            <div className="flex -space-x-2">
-              {Array.from({ length: Math.min(spotsFilled, 4) }).map((_, i) => (
-                <img key={i} src={`https://i.pravatar.cc/32?img=${10 + i}`} alt=""
-                  aria-hidden loading="lazy" decoding="async"
-                  className="w-7 h-7 rounded-full border-2 border-white object-cover" />
-              ))}
-            </div>
-            {spotsFilled > 0 && (
-              <p className="text-[#737373] text-[12px]">
-                {spotsFilled} worker{spotsFilled !== 1 ? 's' : ''} already booked
-              </p>
-            )}
-          </div>
+          {spotsFilled > 0 && (
+            <p className="text-[#737373] text-[12px] mt-3">
+              {spotsFilled} worker{spotsFilled !== 1 ? 's' : ''} already booked
+            </p>
+          )}
         </div>
       </div>
 
@@ -381,28 +444,27 @@ export function ShiftDetailScreen() {
               <CheckCircle2 size={18} aria-hidden className="text-emerald-500" />
               <span className="text-[#737373] font-semibold text-[15px]">Applied</span>
             </button>
-            <button type="button" onClick={() => markAccepted(shiftId)}
-              className="text-[#737373] text-[11px] underline underline-offset-2">
-              Demo: simulate client acceptance →
-            </button>
           </div>
         )}
 
         {ctaState === 'clock-in' && (
           <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleCta}
-            aria-label="Clock in to your shift"
-            className="w-full h-[52px] rounded-[8px] bg-black text-white font-bold text-[16px] tracking-wide flex items-center justify-center gap-2.5">
-            <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1.6 }}>
+            disabled={!withinClockInRange}
+            aria-label={withinClockInRange ? 'Clock in to your shift' : 'Clock in unavailable — you must be within 1 mile'}
+            className={`w-full h-[52px] rounded-[8px] font-bold text-[16px] tracking-wide flex items-center justify-center gap-2.5 ${
+              withinClockInRange ? 'bg-[#FFD700] text-black' : 'bg-[#F0F0F0] text-[#AAAAAA] cursor-not-allowed'
+            }`}>
+            <motion.div animate={withinClockInRange ? { scale: [1, 1.2, 1] } : {}} transition={{ repeat: Infinity, duration: 1.6 }}>
               <AlarmClock size={20} aria-hidden />
             </motion.div>
-            Clock In
+            {withinClockInRange ? 'Clock In' : 'Get within 1 mi to Clock In'}
           </motion.button>
         )}
 
-        {ctaState === 'clocked-in' && (
+        {ctaState === 'completed' && (
           <div className="w-full h-[52px] rounded-[8px] bg-[#FAFAFA] border border-emerald-200 flex items-center justify-center gap-2.5">
             <CheckCircle2 size={18} aria-hidden className="text-emerald-500" />
-            <span className="text-emerald-600 font-bold text-[15px]">Clocked In</span>
+            <span className="text-emerald-600 font-bold text-[15px]">Completed</span>
           </div>
         )}
       </div>
