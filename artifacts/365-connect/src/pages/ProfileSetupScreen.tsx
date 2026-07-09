@@ -102,7 +102,7 @@ export function ProfileSetupScreen() {
     2: true, 3: true,
     4: selectedJobs.length > 0,
     5: true,
-    6: !!postPhotoPreview && postDescription.trim().length > 0,
+    6: true, // first post is optional
   };
 
   const INPUT_BASE = "bg-white border border-[#DBDBDB] rounded-[12px] focus-within:border-black transition-colors";
@@ -252,7 +252,7 @@ export function ProfileSetupScreen() {
         {step === 6 && (
           <div className="flex flex-col">
             <h1 className="text-[26px] font-bold leading-tight mb-2">Share your first moment</h1>
-            <p className="text-[#737373] text-[14px] mb-8">Upload a photo from a past event to show clients your experience.</p>
+            <p className="text-[#737373] text-[14px] mb-8">Optional — upload a photo from a past event to show clients your experience.</p>
 
             <input ref={postPhotoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePostPhotoChange} />
             <button onClick={() => postPhotoInputRef.current?.click()}
@@ -309,10 +309,18 @@ export function ProfileSetupScreen() {
             )}
           </div>
         ) : (
-          <button onClick={handleComplete} disabled={!canContinue[6] || saving}
-            className="w-full bg-black text-white font-bold text-[16px] py-[18px] rounded-[8px] active:scale-[0.98] transition-transform disabled:opacity-30 disabled:cursor-not-allowed">
-            {saving ? 'Saving profile…' : 'Complete Profile'}
-          </button>
+          <div className="flex flex-col gap-3">
+            <button onClick={handleComplete} disabled={saving}
+              className="w-full bg-black text-white font-bold text-[16px] py-[18px] rounded-[8px] active:scale-[0.98] transition-transform disabled:opacity-30 disabled:cursor-not-allowed">
+              {saving ? 'Saving profile…' : 'Complete Profile'}
+            </button>
+            {!saving && !postPhotoPreview && (
+              <button onClick={handleComplete}
+                className="w-full text-center text-[14px] text-[#737373] font-medium hover:text-black transition-colors py-2">
+                Skip for now — complete without a post
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

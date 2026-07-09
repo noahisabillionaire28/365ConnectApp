@@ -11,14 +11,13 @@
  * Step 5 — Secondary job types (pick up to 2 more)
  * Step 6 — Certifications (optional tags)
  * Step 7 — Weekly availability Mon–Sun
- * Step 8 — First post (photo + caption, saves to `posts` table)
+ * Step 8 — First post (optional photo + caption, saves to `posts` table if provided)
  */
 import { useState, useEffect, useRef } from 'react';
 import { useLocation }                  from 'wouter';
 import { ChevronLeft, Camera, Plus, X, Check, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { supabase, uploadAvatar, uploadPostPhoto } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { hasCompletedFirstPost } from '@/lib/setupRoute';
 import { JOB_TYPES } from '@/lib/jobTypes';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
@@ -151,8 +150,7 @@ export function WorkerSetupScreen() {
 
         // If setup is already complete (incl. step 8 first post), go home
         if (data.username && data.availability) {
-          const postedAlready = await hasCompletedFirstPost(user.id);
-          if (postedAlready) { navigate('/home'); return; }
+          navigate('/home'); return;
         }
 
         // Pre-populate state from saved DB data
@@ -229,15 +227,13 @@ export function WorkerSetupScreen() {
     if (!user) return;
     setSaving(true); setError(null);
     try {
-      let photoUrl = photoPreview; // might already be a remote URL (resume)
+      let photoUrl: string | null = photoPreview ?? null; // might already be a remote URL (resume)
       if (photoFile) {
-        const url = await uploadAvatar(user.id, photoFile);
-        if (!url) throw new Error('Photo upload failed. Please try again.');
-        photoUrl = url;
-        setPhotoPreview(url);
+        photoUrl = await uploadAvatar(user.id, photoFile); // throws with real message on failure
+        setPhotoPreview(photoUrl);
         setPhotoFile(null);
       }
-      if (!photoUrl) { setError('A profile photo is required.'); setSaving(false); return; }
+      // photo is optional — advance with whatever URL we have (may be null)
       await saveAndAdvance(3, { photo_url: photoUrl });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Photo upload failed.');
@@ -271,24 +267,21 @@ export function WorkerSetupScreen() {
 
   async function continueStep8() {
     if (!user) return;
-    if (!postFile && !postPreview) { setError('Upload a photo for your first post.'); return; }
-    if (!postCaption.trim()) { setError('Add a caption for your first post.'); return; }
     setSaving(true); setError(null);
     try {
       let imageUrl: string | null = null;
       if (postFile) {
-        const url = await uploadPostPhoto(user.id, postFile);
-        if (!url) throw new Error('Post photo upload failed.');
-        imageUrl = url;
+        imageUrl = await uploadPostPhoto(user.id, postFile); // throws with real message on failure
       }
-      // Insert post
-      const { error: postErr } = await supabase.from('posts').insert({
-        user_id:   user.id,
-        image_url: imageUrl,
-        caption:   postCaption.trim(),
-      });
-      if (postErr) throw postErr;
-      // Clear localStorage step
+      // Only insert a post when the user has provided at least some content
+      if (imageUrl || postCaption.trim()) {
+        const { error: postErr } = await supabase.from('posts').insert({
+          user_id:   user.id,
+          image_url: imageUrl,
+          caption:   postCaption.trim() || null,
+        });
+        if (postErr) throw postErr;
+      }
       localStorage.removeItem(stepKey(user.id));
       navigate('/home');
     } catch (err) {
@@ -296,6 +289,12 @@ export function WorkerSetupScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function skipStep8() {
+    if (!user) return;
+    localStorage.removeItem(stepKey(user.id));
+    navigate('/home');
   }
 
   function handleBack() {
@@ -378,7 +377,7 @@ export function WorkerSetupScreen() {
           <div className="flex flex-col items-center">
             <h1 className="text-[26px] font-bold leading-tight mb-2 self-start" style={{ color: TEXT }}>Add a profile photo</h1>
             <p className="text-[14px] mb-10 self-start" style={{ color: MUTED }}>
-              Required — clients will see this when reviewing your application.
+              Optional — clients will see this when reviewing your application.
             </p>
             <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={e => {
               const f = e.target.files?.[0];
@@ -652,9 +651,7 @@ export function WorkerSetupScreen() {
           disabled={
             saving ||
             (step === 1 && usernameStatus !== 'valid') ||
-            (step === 2 && !photoPreview) ||
-            (step === 4 && !primaryJob) ||
-            (step === 8 && (!postPreview || !postCaption.trim()))
+            (step === 4 && !primaryJob)
           }
           className="w-full text-white font-bold text-[16px] h-[52px] rounded-[12px] active:scale-[0.98] transition-transform disabled:opacity-30"
           style={{ background: NAVY }}
@@ -664,19 +661,23 @@ export function WorkerSetupScreen() {
         </button>
 
         {/* Optional-step skips */}
-        {(step === 3 || step === 5 || step === 6) && !saving && (
+        {(step === 2 || step === 3 || step === 5 || step === 6 || step === 8) && !saving && (
           <button
             onClick={
+              step === 2 ? continueStep2 :
               step === 3 ? () => continueStep3() :
               step === 5 ? continueStep5 :
-              continueStep6
+              step === 6 ? continueStep6 :
+              skipStep8
             }
             className="w-full text-center py-2 text-[14px] font-medium transition-colors"
             style={{ color: MUTED }}
           >
-            {step === 3 ? 'Skip — add bio later' :
+            {step === 2 ? 'Skip for now' :
+             step === 3 ? 'Skip — add bio later' :
              step === 5 ? 'Skip — no secondary roles' :
-             'Skip — add certifications later'}
+             step === 6 ? 'Skip — add certifications later' :
+             'Skip for now — add a post later'}
           </button>
         )}
       </div>

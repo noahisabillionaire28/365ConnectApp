@@ -328,29 +328,23 @@ export function shiftRowToMockShift(
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
 
-export async function uploadAvatar(userId: string, file: File): Promise<string | null> {
+export async function uploadAvatar(userId: string, file: File): Promise<string> {
   const ext  = file.name.split('.').pop() ?? 'jpg';
   const path = `${userId}/avatar.${ext}`;
   const { error } = await supabase.storage
     .from('avatars')
     .upload(path, file, { upsert: true, contentType: file.type });
-  if (error) {
-    console.error('[Supabase Storage] Avatar upload failed:', error.message);
-    return null;
-  }
+  if (error) throw new Error(`Avatar upload failed: ${error.message}`);
   return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
 }
 
-export async function uploadPostPhoto(userId: string, file: File): Promise<string | null> {
+export async function uploadPostPhoto(userId: string, file: File): Promise<string> {
   const ext  = file.name.split('.').pop() ?? 'jpg';
   const path = `${userId}/${Date.now()}.${ext}`;
   const { error } = await supabase.storage
     .from('post-photos')
-    .upload(path, file, { upsert: false, contentType: file.type });
-  if (error) {
-    console.error('[Supabase Storage] Post photo upload failed:', error.message);
-    return null;
-  }
+    .upload(path, file, { upsert: true, contentType: file.type });
+  if (error) throw new Error(`Post photo upload failed: ${error.message}`);
   return supabase.storage.from('post-photos').getPublicUrl(path).data.publicUrl;
 }
 
