@@ -21,3 +21,11 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.development]
+VITE_APP_ENV = "development"
+VITE_TEST_ADMIN_EMAIL = "admin@365connect.com"
+VITE_TEST_CLIENT_EMAIL = "client.test.qa1@example.com"
+VITE_TEST_WORKER_EMAIL = "worker.test.qa1@example.com"

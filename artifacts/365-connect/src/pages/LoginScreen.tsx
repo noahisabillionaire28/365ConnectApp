@@ -4,6 +4,9 @@
  * Email + password sign-in with Google, Apple, and Phone OTP.
  * After a successful sign-in, routes to the correct setup screen if the user
  * hasn't completed onboarding, or to /home if they have.
+ *
+ * Dev-only: Quick Test Login section is rendered when
+ * import.meta.env.VITE_APP_ENV === 'development'.
  */
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
@@ -33,6 +36,93 @@ function friendlyProviderError(err: unknown): string {
   return msg;
 }
 
+/* ── Quick Test Login (dev-only) ──────────────────────────────────────────── */
+interface QuickLoginAccount {
+  label:     string;
+  emailKey:  keyof ImportMetaEnv;
+  passKey:   keyof ImportMetaEnv;
+}
+
+const QUICK_ACCOUNTS: QuickLoginAccount[] = [
+  {
+    label:    'Login as Worker',
+    emailKey: 'VITE_TEST_WORKER_EMAIL',
+    passKey:  'VITE_TEST_WORKER_PASSWORD',
+  },
+  {
+    label:    'Login as Client',
+    emailKey: 'VITE_TEST_CLIENT_EMAIL',
+    passKey:  'VITE_TEST_CLIENT_PASSWORD',
+  },
+  {
+    label:    'Login as Staffer',
+    emailKey: 'VITE_TEST_STAFFER_EMAIL',
+    passKey:  'VITE_TEST_STAFFER_PASSWORD',
+  },
+  {
+    label:    'Login as Admin',
+    emailKey: 'VITE_TEST_ADMIN_EMAIL',
+    passKey:  'VITE_TEST_ADMIN_PASSWORD',
+  },
+];
+
+function QuickTestLogin({
+  onQuickLogin,
+  quickLoading,
+}: {
+  onQuickLogin: (email: string, password: string) => Promise<void>;
+  quickLoading: boolean;
+}) {
+  if (import.meta.env['VITE_APP_ENV'] !== 'development') return null;
+
+  return (
+    <div className="mt-8 pt-6 border-t" style={{ borderColor: BORDER }}>
+      <p className="text-[11px] font-semibold uppercase tracking-wider mb-3 text-center"
+        style={{ color: MUTED }}>
+        Quick Test Login
+      </p>
+
+      <div className="grid grid-cols-2 gap-2">
+        {QUICK_ACCOUNTS.map(({ label, emailKey, passKey }) => {
+          const email    = import.meta.env[emailKey] as string | undefined;
+          const password = import.meta.env[passKey]  as string | undefined;
+          const disabled = !email || !password || quickLoading;
+
+          return (
+            <button
+              key={label}
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                if (email && password) onQuickLogin(email, password);
+              }}
+              aria-label={label}
+              style={{
+                borderRadius:  '12px',
+                border:        `1px solid ${BORDER}`,
+                background:    '#FFFFFF',
+                color:         disabled ? MUTED : NAVY,
+                fontFamily:    "'Space Grotesk', sans-serif",
+                fontSize:      '12px',
+                fontWeight:    600,
+                padding:       '10px 8px',
+                opacity:       disabled ? 0.45 : 1,
+                cursor:        disabled ? 'not-allowed' : 'pointer',
+                transition:    'opacity 0.15s',
+                lineHeight:    1.3,
+                textAlign:     'center' as const,
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── LoginScreen ─────────────────────────────────────────────────────────── */
 export function LoginScreen() {
   const [, navigate] = useLocation();
 
@@ -43,35 +133,59 @@ export function LoginScreen() {
   const [error,    setError]    = useState<string | null>(null);
   const [info,     setInfo]     = useState<string | null>(null);
 
+  // Separate loading state for quick-login buttons so they don't
+  // conflict with the main form's disabled logic.
+  const [quickLoading, setQuickLoading] = useState(false);
+
   // Per-provider inline errors
   const [googleError, setGoogleError] = useState<string | null>(null);
   const [appleError,  setAppleError]  = useState<string | null>(null);
+
+  async function signInAndRoute(loginEmail: string, loginPassword: string) {
+    const { data, error: authErr } = await supabase.auth.signInWithPassword({
+      email:    loginEmail,
+      password: loginPassword,
+    });
+    if (authErr) throw authErr;
+
+    const { data: profile, error: profileErr } = await supabase
+      .from('users')
+      .select('username, role, availability')
+      .eq('id', data.user.id)
+      .maybeSingle();
+
+    const tableNotFound =
+      profileErr?.message?.toLowerCase().includes('relation') ||
+      profileErr?.message?.toLowerCase().includes('does not exist') ||
+      (profileErr as { code?: string } | null)?.code === '42P01';
+
+    if (profileErr && !tableNotFound)
+      throw new Error(`Could not load profile: ${profileErr.message}`);
+
+    navigate(await resolveSetupRoute(data.user.id, profile));
+  }
 
   async function handleLogin() {
     if (!email || !password) return;
     setLoading(true); setError(null); setInfo(null);
     try {
-      const { data, error: authErr } = await supabase.auth.signInWithPassword({ email, password });
-      if (authErr) throw authErr;
-
-      const { data: profile, error: profileErr } = await supabase
-        .from('users')
-        .select('username, role, availability')
-        .eq('id', data.user.id)
-        .maybeSingle();
-
-      const tableNotFound =
-        profileErr?.message?.toLowerCase().includes('relation') ||
-        profileErr?.message?.toLowerCase().includes('does not exist') ||
-        (profileErr as { code?: string } | null)?.code === '42P01';
-
-      if (profileErr && !tableNotFound) throw new Error(`Could not load profile: ${profileErr.message}`);
-
-      navigate(await resolveSetupRoute(data.user.id, profile));
+      await signInAndRoute(email, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Quick-login handler — password is never stored in state or logged.
+  async function handleQuickLogin(loginEmail: string, loginPassword: string) {
+    setQuickLoading(true); setError(null); setInfo(null);
+    try {
+      await signInAndRoute(loginEmail, loginPassword);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Quick login failed. Check env vars.');
+    } finally {
+      setQuickLoading(false);
     }
   }
 
@@ -257,6 +371,12 @@ export function LoginScreen() {
           </Link>
         </p>
       </div>
+
+      {/* Dev-only quick login — only visible when VITE_APP_ENV === 'development' */}
+      <QuickTestLogin
+        onQuickLogin={handleQuickLogin}
+        quickLoading={quickLoading}
+      />
     </div>
   );
 }

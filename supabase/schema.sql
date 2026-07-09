@@ -991,7 +991,27 @@ CREATE TRIGGER trg_notify_new_shift_match
   FOR EACH ROW EXECUTE FUNCTION public.notify_new_shift_match();
 
 -- ============================================================
--- Phase 8: Staffer Roster + Assign Workers (Section 8)
+-- B. Hardcode the passwords behind dev mode.
+Use environment variables not string literals.
+
+Pull from these env vars:
+VITE_TEST_WORKER_EMAIL=worker.test.qa1@example.com
+VITE_TEST_WORKER_PASSWORD=Test123!
+VITE_TEST_CLIENT_EMAIL=clienttestqa1@example.com
+VITE_TEST_CLIENT_PASSWORD=Test123!
+VITE_TEST_STAFFER_EMAIL=staffer.test@365connect.com
+VITE_TEST_STAFFER_PASSWORD=Test123!
+VITE_TEST_ADMIN_EMAIL=admin@365connect.com
+VITE_TEST_ADMIN_PASSWORD=Admin123!
+
+Add these to Replit Secrets.
+Only show the Quick Test Login buttons 
+when VITE_APP_ENV=development.
+
+Then proceed with everything else.
+Build all 11 screen fixes.
+Run tsc.
+Go. + Assign Workers (Section 8)
 -- Run in Supabase SQL Editor if upgrading an existing DB.
 -- Roster membership reuses the existing `follows` table (a staffer's roster
 -- is simply the set of workers they follow) — no new table is introduced.
