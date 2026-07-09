@@ -5,7 +5,7 @@ import {
   MapPin, CheckCircle2, XCircle, Coffee,
   Square, Star, ChevronLeft, AlarmClock, ArrowUpRight, AlertTriangle,
 } from 'lucide-react';
-import type { MockShift } from '@/data/mockFeed';
+import type { MockShift } from '@/lib/supabase';
 import { markClockedIn } from '@/store/feedStore';
 import { useShiftById } from '@/hooks/useShifts';
 import { useAuth } from '@/contexts/AuthContext';
@@ -585,12 +585,13 @@ export function ClockInScreen() {
     }
 
     const { error: paymentError } = await supabase.from('payments').insert({
-      shift_id:   shift.id,
-      worker_id:  user.id,
-      amount:     Math.round(grossPay * 100) / 100,
-      fee:        Math.round(serviceFee * 100) / 100,
-      net_amount: Math.round(netPay * 100) / 100,
-      status:     'completed',
+      shift_id:     shift.id,
+      worker_id:    user.id,
+      payment_type: 'shift_payment',
+      amount:       Math.round(grossPay * 100) / 100,
+      fee:          Math.round(serviceFee * 100) / 100,
+      net_amount:   Math.round(netPay * 100) / 100,
+      status:       'completed',
     });
     if (paymentError) {
       console.error('[ClockIn] failed to record payment:', paymentError.message);

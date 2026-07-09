@@ -1,5 +1,5 @@
 import { MapPin, Users, CheckCircle2 } from 'lucide-react';
-import type { MockShift } from '@/data/mockFeed';
+import type { MockShift } from '@/lib/supabase';
 
 const NAVY = '#0A1628';
 

@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { motion, useMotionValue, animate, type PanInfo } from 'framer-motion';
 import { Search, SlidersHorizontal, Heart, MapPin, Clock, Users, WifiOff, CheckCircle2, Plus } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
-import { type MockShift } from '@/data/mockFeed';
+import { type MockShift } from '@/lib/supabase';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { LIGHT_MAP_STYLES, navyPinUrl } from '@/lib/mapStyles';
 import { useShifts } from '@/hooks/useShifts';

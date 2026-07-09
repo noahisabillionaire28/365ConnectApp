@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase, shiftRowToMockShift, type ShiftRow } from '@/lib/supabase';
-import type { MockShift } from '@/data/mockFeed';
+import { supabase, shiftRowToMockShift, type ShiftRow, type MockShift } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyLocation } from './useMyLocation';
 

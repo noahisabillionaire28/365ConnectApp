@@ -1,5 +1,45 @@
 import { createClient } from '@supabase/supabase-js';
-import type { MockShift } from '@/data/mockFeed';
+
+// ─── Feed UI types (no mock data — all data comes from Supabase) ──────────────
+
+export type StoryWorker = {
+  id: string;
+  username: string;
+  photoUrl: string;
+  isPremium: boolean;
+  isAvailable: boolean;
+};
+
+export type MockShift = {
+  id: string;
+  jobType: string;
+  /** All job types this shift accepts (job-type intersection filtering, AI match). */
+  jobTypes: string[];
+  companyName: string;
+  coverImage: string;
+  payRate: number;
+  payPeriod: 'hr' | 'day' | 'event';
+  date: string;
+  startTime: string;
+  endTime: string;
+  /** Raw ISO timestamptz for the shift start — used for day-of-week matching, never displayed directly. */
+  startTimeISO: string;
+  distanceMiles: number;
+  spotsAvailable: number;
+  spotsTotal: number;
+  location: string;
+  aiMatchPct: number;
+  description: string;
+  requirements: string[];
+  dressCode: string;
+  dressCodeItems: string[];
+  pointOfContact: string;
+  contactPhone: string;
+  lat: number;
+  lng: number;
+  clientId: string;
+  status: 'open' | 'filled' | 'cancelled' | 'completed';
+};
 
 const supabaseUrl     = import.meta.env.VITE_SUPABASE_URL     as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -38,6 +78,9 @@ export type UserRow = {
   is_pro: boolean;
   /** Phase 11 — admin moderation status. 'active' | 'suspended' | 'flagged' */
   status: 'active' | 'suspended' | 'flagged' | null;
+  is_banned: boolean;
+  followers_count: number;
+  following_count: number;
 };
 
 /** Matches the actual `shifts` table after Phase 2 additions */

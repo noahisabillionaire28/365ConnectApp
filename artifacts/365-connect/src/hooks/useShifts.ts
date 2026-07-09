@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { supabase, shiftRowToMockShift, type ShiftRow } from '@/lib/supabase';
-import type { MockShift } from '@/data/mockFeed';
+import { supabase, shiftRowToMockShift, type ShiftRow, type MockShift } from '@/lib/supabase';
 
 export const SHIFTS_QUERY_KEY = ['shifts'] as const;
 

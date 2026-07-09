@@ -10,6 +10,7 @@ import { usePeopleFeed } from '@/hooks/usePeopleFeed';
 import { useApplications } from '@/hooks/useApplications';
 import { useRole } from '@/contexts/RoleContext';
 import { JOB_TYPES } from '@/lib/jobTypes';
+import { resetStafferDraft } from '@/store/stafferPostShiftStore';
 
 /* ─── Shared header ───────────────────────────────────────────────────────── */
 function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => void }) {
@@ -41,7 +42,7 @@ function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => voi
   );
 }
 
-/* ─── (A) Worker Home Feed ────────────────────────────────────────────────── */
+/* ─── (A) Worker Home Feed — Nowsta-style shift list ─────────────────────── */
 function WorkerHomeFeed() {
   const [, navigate] = useLocation();
   const { shifts, isLoading, error } = useWorkerHomeShifts();
@@ -94,11 +95,11 @@ function WorkerHomeFeed() {
   );
 }
 
-/* ─── (B) Client / Staffer Home Feed ─────────────────────────────────────── */
+/* ─── Shared worker discovery feed body ───────────────────────────────────── */
 const RATING_FILTERS = ['Any rating', '4.0+', '4.5+'] as const;
 const DISTANCE_FILTERS = ['Any distance', '< 5 mi', '< 15 mi', '< 25 mi'] as const;
 
-function ClientHomeFeed() {
+function WorkerDiscoveryBody() {
   const { people, isLoading, error } = usePeopleFeed();
   const [jobType, setJobType]   = useState<string | null>(null);
   const [rating, setRating]     = useState<typeof RATING_FILTERS[number]>('Any rating');
@@ -117,39 +118,37 @@ function ClientHomeFeed() {
   });
 
   return (
-    <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
-      <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
-        <FeedHeader subtitle="Discover workers" />
-
-        <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none" role="group" aria-label="Filters"
-          style={{ WebkitOverflowScrolling: 'touch' }}>
-          <select aria-label="Filter by job type" value={jobType ?? ''}
-            onChange={(e) => setJobType(e.target.value || null)}
-            className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
-            <option value="">All job types</option>
-            {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <select aria-label="Filter by rating" value={rating}
-            onChange={(e) => setRating(e.target.value as typeof rating)}
-            className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
-            {RATING_FILTERS.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
-          <select aria-label="Filter by distance" value={distance}
-            onChange={(e) => setDistance(e.target.value as typeof distance)}
-            className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
-            {DISTANCE_FILTERS.map((d) => <option key={d} value={d}>{d}</option>)}
-          </select>
-          <button type="button" role="switch" aria-checked={availableOnly}
-            onClick={() => setAvailableOnly((v) => !v)}
-            className={`h-[32px] px-3 rounded-full text-[12px] font-semibold border flex items-center gap-1.5 flex-shrink-0 ${
-              availableOnly ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'
-            }`}>
-            <SlidersHorizontal size={12} aria-hidden />
-            Available today
-          </button>
-        </div>
+    <>
+      {/* Filter bar */}
+      <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none" role="group" aria-label="Filters"
+        style={{ WebkitOverflowScrolling: 'touch' }}>
+        <select aria-label="Filter by job type" value={jobType ?? ''}
+          onChange={(e) => setJobType(e.target.value || null)}
+          className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          <option value="">All job types</option>
+          {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <select aria-label="Filter by rating" value={rating}
+          onChange={(e) => setRating(e.target.value as typeof rating)}
+          className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          {RATING_FILTERS.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <select aria-label="Filter by distance" value={distance}
+          onChange={(e) => setDistance(e.target.value as typeof distance)}
+          className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          {DISTANCE_FILTERS.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <button type="button" role="switch" aria-checked={availableOnly}
+          onClick={() => setAvailableOnly((v) => !v)}
+          className={`h-[32px] px-3 rounded-full text-[12px] font-semibold border flex items-center gap-1.5 flex-shrink-0 ${
+            availableOnly ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'
+          }`}>
+          <SlidersHorizontal size={12} aria-hidden />
+          Available today
+        </button>
       </div>
 
+      {/* Worker grid */}
       <main className="flex-1 overflow-y-auto" aria-label="Worker feed">
         <div className="pt-4 pb-4 flex flex-col gap-3">
           {isLoading && Array.from({ length: 4 }).map((_, i) => <PeopleCardSkeleton key={i} />)}
@@ -171,6 +170,53 @@ function ClientHomeFeed() {
           )}
         </div>
       </main>
+    </>
+  );
+}
+
+/* ─── (B) Client Home Feed — worker discovery ─────────────────────────────── */
+function ClientHomeFeed() {
+  return (
+    <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
+      <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
+        <FeedHeader subtitle="Discover workers" />
+      </div>
+      <WorkerDiscoveryBody />
+      <BottomTabNav />
+    </div>
+  );
+}
+
+/* ─── (C) Staffer Home Feed — worker discovery + Post Shift FAB ───────────── */
+function StafferHomeFeed() {
+  const [, navigate] = useLocation();
+
+  function handlePostShift() {
+    resetStafferDraft();
+    navigate('/staffer-shift/step1');
+  }
+
+  return (
+    <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
+      <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
+        <FeedHeader subtitle="Discover workers" onPost={handlePostShift} />
+      </div>
+      <WorkerDiscoveryBody />
+
+      {/* Post Shift FAB — bottom-right, above tab bar */}
+      <motion.button
+        type="button"
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 28, delay: 0.15 }}
+        whileTap={{ scale: 0.93 }}
+        onClick={handlePostShift}
+        aria-label="Post a shift"
+        className="fixed bottom-[80px] right-4 z-50 flex items-center gap-2 h-[44px] px-4 bg-[#0A1628] text-white rounded-full shadow-lg font-bold text-[13px]"
+      >
+        <PlusCircle size={16} aria-hidden className="flex-shrink-0" />
+        Post a Shift
+      </motion.button>
 
       <BottomTabNav />
     </div>
@@ -192,5 +238,7 @@ export function HomeScreen() {
     );
   }
 
-  return role === 'worker' ? <WorkerHomeFeed /> : <ClientHomeFeed />;
+  if (role === 'worker') return <WorkerHomeFeed />;
+  if (role === 'staffer') return <StafferHomeFeed />;
+  return <ClientHomeFeed />;
 }
