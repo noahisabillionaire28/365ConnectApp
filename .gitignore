@@ -47,3 +47,7 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local env files — never commit credentials
+**/.env.*.local
+**/.env.local
