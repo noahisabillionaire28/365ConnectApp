@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DollarSign, TrendingUp, AlertCircle, Zap } from 'lucide-react';
-import { isAdminAuthenticated } from '@/store/adminStore';
+import { isAdminAuthenticated, initAdminSession } from '@/store/adminStore';
 import { useAdminPayments, useAdminStats } from '@/hooks/useAdminData';
 import type { AdminPaymentRow } from '@/lib/adminApi';
 
@@ -105,7 +105,7 @@ export function AdminRevenue() {
   const [, navigate] = useLocation();
   const [filter, setFilter] = useState<RevFilter>('all');
 
-  useEffect(() => { if (!isAdminAuthenticated()) navigate('/admin/login'); }, [navigate]);
+  useEffect(() => { initAdminSession().then((ok) => { if (!ok) navigate('/admin/login'); }); }, [navigate]);
 
   const { data: payments = [], isLoading, isError } = useAdminPayments();
   const { data: stats }                              = useAdminStats();

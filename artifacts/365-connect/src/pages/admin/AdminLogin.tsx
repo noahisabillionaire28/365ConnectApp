@@ -17,10 +17,9 @@ export function AdminLogin() {
     setError('');
     if (!email.trim() || !password.trim()) { setError('Please enter your email and password.'); return; }
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 700));
-    const ok = adminLogin(email.trim(), password);
+    const ok = await adminLogin(email.trim(), password);
     if (ok) { navigate('/admin/dashboard'); }
-    else { setError('Invalid credentials. Check your email and password.'); setLoading(false); }
+    else { setError('Invalid credentials, or this account does not have admin access.'); setLoading(false); }
   }
 
   return (

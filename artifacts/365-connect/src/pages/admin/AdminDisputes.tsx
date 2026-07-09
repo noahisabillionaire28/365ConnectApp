@@ -6,7 +6,7 @@ import {
   AlertTriangle, CheckCircle2, ShieldAlert, Ban, Clock,
   CheckCheck, AlertCircle,
 } from 'lucide-react';
-import { isAdminAuthenticated } from '@/store/adminStore';
+import { isAdminAuthenticated, initAdminSession } from '@/store/adminStore';
 import { useAdminDisputes, useUpdateDispute } from '@/hooks/useAdminData';
 import type { AdminDisputeRow } from '@/lib/adminApi';
 
@@ -218,7 +218,7 @@ export function AdminDisputes() {
   const [, navigate] = useLocation();
   const [filter, setFilter] = useState<DisputeFilter>('all');
 
-  useEffect(() => { if (!isAdminAuthenticated()) navigate('/admin/login'); }, [navigate]);
+  useEffect(() => { initAdminSession().then((ok) => { if (!ok) navigate('/admin/login'); }); }, [navigate]);
 
   const { data: disputes = [], isLoading, isError } = useAdminDisputes();
 

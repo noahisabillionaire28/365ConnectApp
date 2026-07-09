@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Users, DollarSign, Calendar, XCircle, AlertCircle } from 'lucide-react';
-import { isAdminAuthenticated } from '@/store/adminStore';
+import { isAdminAuthenticated, initAdminSession } from '@/store/adminStore';
 import { useAdminShifts, useCancelShift } from '@/hooks/useAdminData';
 import type { AdminShiftRow } from '@/lib/adminApi';
 
@@ -157,7 +157,7 @@ export function AdminShifts() {
   const [filter, setFilter] = useState<ShiftFilter>('all');
   const [search, setSearch] = useState('');
 
-  useEffect(() => { if (!isAdminAuthenticated()) navigate('/admin/login'); }, [navigate]);
+  useEffect(() => { initAdminSession().then((ok) => { if (!ok) navigate('/admin/login'); }); }, [navigate]);
 
   const { data: shifts = [], isLoading, isError } = useAdminShifts();
 

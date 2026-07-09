@@ -29,8 +29,7 @@ export function AdminNav() {
 
   function handleLogout() {
     setOpen(false);
-    adminLogout();
-    navigate('/admin/login');
+    adminLogout().then(() => navigate('/admin/login'));
   }
 
   return (

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Users, Briefcase, DollarSign, TrendingUp, AlertTriangle, FileText,
 } from 'lucide-react';
-import { isAdminAuthenticated } from '@/store/adminStore';
+import { isAdminAuthenticated, initAdminSession } from '@/store/adminStore';
 import { useAdminStats } from '@/hooks/useAdminData';
 
 /* ── Skeleton ────────────────────────────────────────────────────────────── */
@@ -52,7 +52,7 @@ export function AdminDashboard() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (!isAdminAuthenticated()) navigate('/admin/login');
+    initAdminSession().then((ok) => { if (!ok) navigate('/admin/login'); });
   }, [navigate]);
 
   const { data: stats, isLoading, isError } = useAdminStats();

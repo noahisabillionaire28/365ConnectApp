@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { Settings, ShieldCheck, Lock, Bell } from 'lucide-react';
-import { isAdminAuthenticated } from '@/store/adminStore';
+import { isAdminAuthenticated, initAdminSession } from '@/store/adminStore';
 
 function SettingRow({
   icon: Icon, label, value,
@@ -22,7 +22,7 @@ function SettingRow({
 export function AdminSettings() {
   const [, navigate] = useLocation();
 
-  useEffect(() => { if (!isAdminAuthenticated()) navigate('/admin/login'); }, [navigate]);
+  useEffect(() => { initAdminSession().then((ok) => { if (!ok) navigate('/admin/login'); }); }, [navigate]);
   if (!isAdminAuthenticated()) return null;
 
   return (

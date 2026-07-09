@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, X, Ban, Flag, ChevronRight, Star, BadgeCheck, AlertCircle,
 } from 'lucide-react';
-import { isAdminAuthenticated } from '@/store/adminStore';
+import { isAdminAuthenticated, initAdminSession } from '@/store/adminStore';
 import { useAdminUsers, useUpdateUser } from '@/hooks/useAdminData';
 import type { AdminUserRow } from '@/lib/adminApi';
 
@@ -323,7 +323,7 @@ export function AdminUsers() {
   const [filter, setFilter]     = useState<FilterOpt>('all');
   const [detail, setDetail]     = useState<AdminUserRow | null>(null);
 
-  useEffect(() => { if (!isAdminAuthenticated()) navigate('/admin/login'); }, [navigate]);
+  useEffect(() => { initAdminSession().then((ok) => { if (!ok) navigate('/admin/login'); }); }, [navigate]);
 
   const { data: users = [], isLoading, isError } = useAdminUsers();
 

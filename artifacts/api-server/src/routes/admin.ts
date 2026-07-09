@@ -10,23 +10,68 @@ import { adminDb } from '../lib/supabaseAdmin';
 
 const router = Router();
 
-const ADMIN_TOKEN = process.env['ADMIN_TOKEN'] ?? 'Admin123!';
+const SUPABASE_URL     = process.env['VITE_SUPABASE_URL'];
+const SERVICE_ROLE_KEY = process.env['SUPABASE_SERVICE_ROLE_KEY'];
 
-/** Middleware — reject requests without a valid admin token */
-function requireAdminToken(
+/**
+ * Middleware — verifies the Supabase JWT from the Authorization header and
+ * confirms the caller has role='admin' in the users table.
+ * No hardcoded tokens; relies entirely on Supabase's signing secret.
+ */
+async function requireAdminSession(
   req: import('express').Request,
   res: import('express').Response,
   next: import('express').NextFunction,
-) {
-  const token = req.headers['x-admin-token'];
-  if (token !== ADMIN_TOKEN) {
+): Promise<void> {
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+    res.status(503).json({ error: 'Server misconfigured — Supabase credentials not set' });
+    return;
+  }
+
+  const auth = req.headers['authorization'];
+  if (!auth?.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
-  next();
+  const accessToken = auth.slice(7);
+
+  try {
+    // Verify the JWT and get the authenticated user
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: {
+        'apikey':        SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+    if (!userRes.ok) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const user = await userRes.json() as { id: string };
+
+    // Confirm the user has the admin role in the users table
+    const profileRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/users?id=eq.${user.id}&select=role`,
+      {
+        headers: {
+          'apikey':        SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+        },
+      },
+    );
+    const profiles = await profileRes.json() as Array<{ role: string }>;
+    if (!profiles[0] || profiles[0].role !== 'admin') {
+      res.status(403).json({ error: 'Forbidden — admin role required' });
+      return;
+    }
+
+    next();
+  } catch {
+    res.status(500).json({ error: 'Auth check failed' });
+  }
 }
 
-router.use(requireAdminToken);
+router.use(requireAdminSession);
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 function isColumnMissingError(err: unknown): boolean {

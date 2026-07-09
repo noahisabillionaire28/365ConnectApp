@@ -1,25 +1,30 @@
 /**
  * Thin client for the admin API endpoints on the api-server.
  * Calls /api/admin/* — routed by the Replit proxy to the api-server.
- * Sends X-Admin-Token header so the server can authenticate requests.
+ * Authenticates using the current user's Supabase session JWT (Bearer token);
+ * the server verifies the JWT and checks the user has role='admin'.
  */
+import { supabase } from '@/lib/supabase';
 
-const ADMIN_TOKEN = 'Admin123!';
 const BASE = '/api/admin';
 
-function headers(): HeadersInit {
-  return { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN };
+async function headers(): Promise<HeadersInit> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return {
+    'Content-Type':  'application/json',
+    'Authorization': session ? `Bearer ${session.access_token}` : '',
+  };
 }
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { headers: headers() });
+  const res = await fetch(`${BASE}${path}`, { headers: await headers() });
   if (!res.ok) throw new Error(`Admin API ${path} → ${res.status}`);
   return res.json() as Promise<T>;
 }
 
 async function patch<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    method: 'PATCH', headers: headers(), body: JSON.stringify(body),
+    method: 'PATCH', headers: await headers(), body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`Admin API PATCH ${path} → ${res.status}`);
   return res.json() as Promise<T>;
