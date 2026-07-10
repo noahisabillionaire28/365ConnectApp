@@ -307,7 +307,7 @@ export function WorkerProfileScreen() {
   if (notFound || !profile) {
     return (
       <div className="flex flex-col h-full bg-white text-black items-center justify-center px-6">
-        <button type="button" aria-label="Go back" onClick={() => window.history.back()}
+        <button type="button" aria-label="Go back" onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/explore'); }}
           className="absolute top-12 left-4 w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
           <ChevronLeft size={20} className="text-black" />
         </button>
@@ -315,7 +315,7 @@ export function WorkerProfileScreen() {
         <p className="text-[#737373] text-[14px] text-center mb-6">
           @{params.username} doesn't exist on 365 Connect yet.
         </p>
-        <button onClick={() => window.history.back()} className="text-[#0095F6] font-semibold text-[14px]">
+        <button onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/explore'); }} className="text-[#0095F6] font-semibold text-[14px]">
           Go back
         </button>
       </div>
@@ -330,7 +330,7 @@ export function WorkerProfileScreen() {
 
       {/* Hero / Profile photo */}
       <div className="relative">
-        <button type="button" aria-label="Go back" onClick={() => window.history.back()}
+        <button type="button" aria-label="Go back" onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/explore'); }}
           className="absolute top-12 left-4 z-10 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform">
           <ChevronLeft size={20} className="text-white" />
         </button>

@@ -624,7 +624,7 @@ export function ClockInScreen() {
       <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center gap-4">
         <p className="text-[#737373] text-[15px]">{error ? "Couldn't load this shift." : 'Shift not found.'}</p>
         <button type="button"
-          onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/jobs'); }}
+          onClick={() => { if (window.history.length > 1) window.history.back(); else navigate(`/shift/${id ?? ''}`); }}
           className="text-[#0095F6] font-semibold text-[14px]">← Go back</button>
       </div>
     );

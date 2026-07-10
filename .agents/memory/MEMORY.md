@@ -15,3 +15,4 @@
 - [Admin API pre-migration fallbacks](admin-api-fallbacks.md) — admin endpoints must fallback gracefully when Phase 11 columns/tables aren't migrated yet; pattern: catch code 42703 (column) or PGRST205/42P01 (table), re-query without them, default values
 - [CREATE POLICY IF NOT EXISTS invalid in Postgres](supabase-policy-if-not-exists.md) — use DO/EXCEPTION WHEN duplicate_object THEN NULL pattern for idempotent policy creation in schema.sql
 - [Playwright e2e setup](playwright-e2e-setup.md) — magic-link token exchange avoids password + origin-mismatch issues; Nix libs required for Chromium headless
+- [Edit shift store pitfall](edit-shift-store-pitfall.md) — resetDraft() clears editShiftId; mid-wizard callers must save/restore it, and cancel paths must clear it explicitly

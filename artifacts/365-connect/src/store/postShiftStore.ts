@@ -58,7 +58,15 @@ export function setDraft(updates: Partial<PostShiftDraft>): void {
 }
 export function resetDraft(): void {
   draft = empty();
+  editShiftId = null;
 }
+
+// ─── Edit mode ────────────────────────────────────────────────────────────────
+// Kept separate from draft fields — not a form value, just routing metadata.
+// Set by the client when opening an existing shift for editing; cleared on resetDraft().
+let editShiftId: string | null = null;
+export function getEditShiftId(): string | null { return editShiftId; }
+export function setEditShiftId(id: string | null): void { editShiftId = id; }
 
 // ─── Derived helpers ──────────────────────────────────────────────────────────
 

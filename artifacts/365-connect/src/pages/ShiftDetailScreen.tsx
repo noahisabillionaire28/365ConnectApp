@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, Star, UserPlus,
+  Edit3, Trash2,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -16,6 +17,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useMyLocation } from '@/hooks/useMyLocation';
 import { computeMatchScore } from '@/lib/matchScore';
 import { haversineMiles, supabase } from '@/lib/supabase';
+import { resetDraft, setDraft, setEditShiftId } from '@/store/postShiftStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasCompletedTimeEntry } from '@/hooks/useTimeEntry';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
@@ -130,6 +132,9 @@ export function ShiftDetailScreen() {
     isOwnerForHooks ? user?.id : undefined,
   );
   const { showToast } = useToast();
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
   // ── No more hooks below this line ────────────────────────────────────────────
 
   useEffect(() => {
@@ -225,7 +230,90 @@ export function ShiftDetailScreen() {
     if (!saveError) setDressCodeDraft(null);
   }
 
+  async function handleEditShift() {
+    if (!user?.id || editLoading) return;
+    setEditLoading(true);
+    try {
+      const { data: raw } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('id', shiftId)
+        .eq('client_id', user.id)
+        .single();
+      if (!raw) return;
+      const startISO   = raw.start_time as string;
+      const endISO     = raw.end_time   as string;
+      const date       = startISO.split('T')[0] ?? '';
+      const start_time = startISO.split('T')[1]?.slice(0, 5) ?? '18:00';
+      const end_time   = endISO.split('T')[1]?.slice(0, 5)   ?? '23:00';
+      resetDraft();
+      setDraft({
+        job_type:        (raw.job_type        as string)           ?? '',
+        title:           (raw.title           as string)           ?? '',
+        location:        (raw.location        as string | null)    ?? '',
+        lat:             (raw.lat             as number | null)    ?? 25.7825,
+        lng:             (raw.lng             as number | null)    ?? -80.1298,
+        unit_info:       (raw.unit_info       as string | null)    ?? '',
+        date,
+        start_time,
+        end_time,
+        spots_available: (raw.spots_available as number)           ?? 1,
+        pay_rate:        (raw.pay_rate        as number | null)    ?? 0,
+        description:     (raw.description     as string | null)    ?? '',
+        requirements:    (raw.requirements    as string[] | null)  ?? [],
+      });
+      setEditShiftId(shiftId);
+      navigate('/post-shift/step1');
+    } catch (e) {
+      console.error('[ShiftDetail] edit prefill failed:', e);
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
+  async function handleCancelShift() {
+    if (!user?.id || cancelling) return;
+    setCancelling(true);
+    const { error: cancelErr } = await supabase
+      .from('shifts')
+      .update({ status: 'cancelled' })
+      .eq('id', shiftId)
+      .eq('client_id', user.id);
+    setCancelling(false);
+    if (!cancelErr) {
+      setShowCancelConfirm(false);
+      showToast('Shift cancelled.');
+      navigate('/home');
+    } else {
+      console.error('[ShiftDetail] cancel failed:', cancelErr.message);
+    }
+  }
+
   return (
+    <>
+    {/* Cancel confirm overlay */}
+    {showCancelConfirm && (
+      <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 backdrop-blur-sm px-4 pb-8"
+        role="dialog" aria-modal="true" aria-label="Confirm shift cancellation">
+        <div className="w-full max-w-[390px] bg-white rounded-[20px] p-5 shadow-xl">
+          <h2 className="text-[#111827] font-bold text-[18px] mb-2">Cancel this shift?</h2>
+          <p className="text-[#6B7280] text-[14px] leading-relaxed mb-5">
+            Workers who applied will be notified. This cannot be undone.
+          </p>
+          <div className="flex flex-col gap-2">
+            <button type="button" onClick={() => void handleCancelShift()}
+              disabled={cancelling}
+              className="w-full h-[50px] bg-[#EF4444] text-white font-bold text-[15px] rounded-[12px] disabled:opacity-60">
+              {cancelling ? 'Cancelling…' : 'Yes, Cancel Shift'}
+            </button>
+            <button type="button" onClick={() => setShowCancelConfirm(false)}
+              className="w-full h-[50px] border border-[#E5E7EB] text-[#6B7280] font-semibold text-[15px] rounded-[12px]">
+              Keep Shift
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     <div className="min-h-[100dvh] bg-white flex flex-col">
 
       <div className="flex-1 overflow-y-auto pb-[104px]">
@@ -608,7 +696,30 @@ export function ShiftDetailScreen() {
             )}
           </motion.button>
         )}
+
+        {isOwner && (shift.status === 'open' || shift.status === 'filled') && (
+          <div className="flex gap-2 mt-2">
+            <motion.button type="button" whileTap={{ scale: 0.97 }}
+              onClick={() => void handleEditShift()}
+              disabled={editLoading}
+              aria-label="Edit this shift"
+              className="flex-1 h-[44px] rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-60">
+              {editLoading
+                ? <span className="text-[13px]">Loading…</span>
+                : <><Edit3 size={15} aria-hidden />Edit</>
+              }
+            </motion.button>
+            <motion.button type="button" whileTap={{ scale: 0.97 }}
+              onClick={() => setShowCancelConfirm(true)}
+              aria-label="Cancel this shift"
+              className="flex-1 h-[44px] rounded-[8px] border border-[#EF4444] text-[#EF4444] font-bold text-[14px] flex items-center justify-center gap-2">
+              <Trash2 size={15} aria-hidden />
+              Cancel
+            </motion.button>
+          </div>
+        )}
       </div>
     </div>
+    </>
   );
 }

@@ -11,10 +11,11 @@ import {
   Users, DollarSign, FileText, CheckCircle2, AlertCircle,
 } from 'lucide-react';
 import {
-  getDraft, resetDraft,
+  getDraft, resetDraft, getEditShiftId,
   durationHours, durationLabel, fmt12h, fmtDate, buildIso,
 } from '@/store/postShiftStore';
 import { usePostShift } from '@/hooks/usePostShift';
+import { useUpdateShift } from '@/hooks/useUpdateShift';
 import { supabase } from '@/lib/supabase';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useToast } from '@/contexts/ToastContext';
@@ -91,6 +92,9 @@ export function PostShiftStep5Screen() {
   const [, navigate]      = useLocation();
   const draft             = getDraft();
   const postMutation      = usePostShift();
+  const updateMutation    = useUpdateShift();
+  const editId            = getEditShiftId();
+  const isEditing         = !!editId;
   const { showToast }     = useToast();
   const [postError, setPostError] = useState<string | null>(null);
 
@@ -130,26 +134,47 @@ export function PostShiftStep5Screen() {
     }
 
     try {
-      const data = await postMutation.mutateAsync({
-        client_id:       user.id,
-        title:           draft.title,
-        job_type:        draft.job_type,
-        job_types:       [draft.job_type],
-        location:        draft.location  || undefined,
-        lat:             draft.lat       || undefined,
-        lng:             draft.lng       || undefined,
-        unit_info:       draft.unit_info || undefined,
-        start_time,
-        end_time,
-        spots_available: draft.spots_available,
-        pay_rate:        draft.pay_rate,
-        description:     draft.description || undefined,
-        requirements:    draft.requirements.length ? draft.requirements : undefined,
-      });
-
-      resetDraft();
-      showToast('Shift posted! Workers will start applying soon.');
-      navigate(`/shift/${data.id}`);
+      if (isEditing && editId) {
+        await updateMutation.mutateAsync({
+          id:              editId,
+          title:           draft.title,
+          job_type:        draft.job_type,
+          job_types:       [draft.job_type],
+          location:        draft.location  || undefined,
+          lat:             draft.lat       || undefined,
+          lng:             draft.lng       || undefined,
+          unit_info:       draft.unit_info || undefined,
+          start_time,
+          end_time,
+          spots_available: draft.spots_available,
+          pay_rate:        draft.pay_rate,
+          description:     draft.description || undefined,
+          requirements:    draft.requirements.length ? draft.requirements : undefined,
+        });
+        resetDraft();
+        showToast('Shift updated!');
+        navigate(`/shift/${editId}`);
+      } else {
+        const data = await postMutation.mutateAsync({
+          client_id:       user.id,
+          title:           draft.title,
+          job_type:        draft.job_type,
+          job_types:       [draft.job_type],
+          location:        draft.location  || undefined,
+          lat:             draft.lat       || undefined,
+          lng:             draft.lng       || undefined,
+          unit_info:       draft.unit_info || undefined,
+          start_time,
+          end_time,
+          spots_available: draft.spots_available,
+          pay_rate:        draft.pay_rate,
+          description:     draft.description || undefined,
+          requirements:    draft.requirements.length ? draft.requirements : undefined,
+        });
+        resetDraft();
+        showToast('Shift posted! Workers will start applying soon.');
+        navigate(`/shift/${data.id}`);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
       setPostError(msg);
@@ -172,8 +197,12 @@ export function PostShiftStep5Screen() {
           <div className="flex-1"><StepBar current={5} total={5} /></div>
           <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">5 of 5</span>
         </div>
-        <h1 className="text-[#111827] font-bold text-[22px] tracking-tight">Review &amp; post</h1>
-        <p className="text-[#6B7280] text-[13px] mt-0.5">Confirm your shift details before going live</p>
+        <h1 className="text-[#111827] font-bold text-[22px] tracking-tight">
+          {isEditing ? 'Review changes' : 'Review & post'}
+        </h1>
+        <p className="text-[#6B7280] text-[13px] mt-0.5">
+          {isEditing ? 'Confirm your edits before saving' : 'Confirm your shift details before going live'}
+        </p>
       </div>
 
       {/* Body */}
@@ -273,27 +302,27 @@ export function PostShiftStep5Screen() {
         <motion.button
           type="button" whileTap={{ scale: 0.97 }}
           onClick={handlePost}
-          disabled={postMutation.isPending || !allReady}
-          aria-disabled={postMutation.isPending || !allReady}
-          aria-label="Post this shift and make it live"
-          aria-busy={postMutation.isPending}
+          disabled={(isEditing ? updateMutation.isPending : postMutation.isPending) || !allReady}
+          aria-disabled={(isEditing ? updateMutation.isPending : postMutation.isPending) || !allReady}
+          aria-label={isEditing ? 'Save shift changes' : 'Post this shift and make it live'}
+          aria-busy={isEditing ? updateMutation.isPending : postMutation.isPending}
           className={`w-full h-[52px] rounded-[12px] font-bold text-[16px] transition-all flex items-center justify-center gap-2.5 ${
-            postMutation.isPending || !allReady
+            (isEditing ? updateMutation.isPending : postMutation.isPending) || !allReady
               ? 'bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed'
               : 'bg-[#0A1628] text-white'
           }`}
         >
-          {postMutation.isPending ? (
+          {(isEditing ? updateMutation.isPending : postMutation.isPending) ? (
             <>
               <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" aria-hidden />
-              Posting…
+              {isEditing ? 'Saving…' : 'Posting…'}
             </>
           ) : (
-            'Post Shift →'
+            isEditing ? 'Save Changes →' : 'Post Shift →'
           )}
         </motion.button>
         <p className="text-center text-[#9CA3AF] text-[11px] mt-2">
-          Your shift goes live immediately
+          {isEditing ? 'Changes apply immediately' : 'Your shift goes live immediately'}
         </p>
       </div>
 
