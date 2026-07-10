@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
+import { useToast } from '@/contexts/ToastContext';
 import { useApplicationStatus } from '@/hooks/useApplicationStatus';
 import { LIGHT_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
 import { useShiftById } from '@/hooks/useShifts';
@@ -128,6 +129,7 @@ export function ShiftDetailScreen() {
     isOwnerForHooks ? id : undefined,
     isOwnerForHooks ? user?.id : undefined,
   );
+  const { showToast } = useToast();
   // ── No more hooks below this line ────────────────────────────────────────────
 
   useEffect(() => {
@@ -204,7 +206,11 @@ export function ShiftDetailScreen() {
       : 'apply';
 
   function handleCta() {
-    if (ctaState === 'apply')    void submitApplication(shiftId, matchScore ?? undefined);
+    if (ctaState === 'apply') {
+      void submitApplication(shiftId, matchScore ?? undefined, () => {
+        showToast('Applied! The client will review your application.');
+      });
+    }
     if (ctaState === 'clock-in' && withinClockInRange) navigate(`/clock/${shiftId}`);
   }
 
@@ -237,7 +243,7 @@ export function ShiftDetailScreen() {
           </button>
 
           <button type="button" aria-label={saved ? 'Remove from saved' : 'Save this shift'}
-            aria-pressed={saved} onClick={() => toggleSaved(shiftId)}
+            aria-pressed={saved} onClick={() => { if (!saved) showToast('Shift saved to your list.'); toggleSaved(shiftId); }}
             className="absolute top-5 right-4 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 flex items-center justify-center">
             <AnimatePresence mode="wait">
               <motion.span key={saved ? 'on' : 'off'}

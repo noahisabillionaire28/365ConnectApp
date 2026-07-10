@@ -81,7 +81,7 @@ export function useApplications() {
   // appliedShiftIds is in the dep array so the closure always sees the latest
   // set — this is correct and intentional. inFlight is a ref so it's excluded.
   const submitApplication = useCallback(                                // hook 7
-    async (shiftId: string, matchScore?: number): Promise<void> => {
+    async (shiftId: string, matchScore?: number, onSuccess?: () => void): Promise<void> => {
       if (!user?.id) return;
       // Idempotency: skip if already applied or if this shift's insert is live
       if (appliedShiftIds.has(shiftId) || inFlight.current.has(shiftId)) return;
@@ -112,7 +112,11 @@ export function useApplications() {
           next.delete(shiftId);
           return next;
         });
+        return; // do not fire onSuccess on failure
       }
+
+      // Real new insert succeeded
+      onSuccess?.();
     },
     [user?.id, appliedShiftIds],
   );

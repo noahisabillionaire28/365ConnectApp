@@ -10,6 +10,7 @@ import { getOrCreateDirectConversation } from '@/hooks/useConversations';
 import { ProfileSkeleton } from '@/components/skeletons/ProfileSkeleton';
 import { useMyPostedShifts } from '@/hooks/useMyPostedShifts';
 import { createShiftRequest } from '@/hooks/useShiftRequests';
+import { useToast } from '@/contexts/ToastContext';
 
 type PublicUserRow = {
   id: string;
@@ -78,6 +79,7 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
 }) {
   const { user: authUser } = useAuth();
   const { shifts, isLoading } = useMyPostedShifts();
+  const { showToast } = useToast();
   const openShifts = shifts.filter((s) => s.status === 'open');
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentId, setSentId] = useState<string | null>(null);
@@ -92,8 +94,12 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
     setErrorMessage(null);
     const result = await createShiftRequest(authUser.id, workerId, shiftId, note);
     setSendingId(null);
-    if (result.ok) setSentId(shiftId);
-    else setErrorMessage(result.message);
+    if (result.ok) {
+      setSentId(shiftId);
+      showToast('Request sent! We will notify them right away.');
+    } else {
+      setErrorMessage(result.message);
+    }
   }
 
   return (
@@ -191,8 +197,12 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
   );
 }
 
-function FollowButton({ profileId }: { profileId: string }) {
-  const { isFollowing, followerCount: _count, follow, unfollow, isFollowPending } = useFollow(profileId);
+function FollowButton({ profileId, username }: { profileId: string; username: string | null }) {
+  const { showToast } = useToast();
+  const { isFollowing, followerCount: _count, follow, unfollow, isFollowPending } = useFollow(profileId, {
+    onFollowSuccess:   () => showToast(`Following @${username ?? 'user'}`),
+    onUnfollowSuccess: () => showToast(`Unfollowed @${username ?? 'user'}`),
+  });
 
   function handlePress() {
     if (isFollowPending) return;
@@ -385,7 +395,7 @@ export function WorkerProfileScreen() {
 
         {/* Action buttons */}
         <div className="flex gap-3 mb-3">
-          <FollowButton profileId={profile.id} />
+          <FollowButton profileId={profile.id} username={profile.username} />
           {authUser?.id !== profile.id && (
             <button type="button" onClick={() => void handleMessage()} disabled={isStartingChat}
               className="flex-1 bg-white border border-[#DBDBDB] text-black font-bold text-[14px] py-[14px] rounded-[8px] active:scale-[0.98] transition-transform disabled:opacity-50">

@@ -85,7 +85,8 @@ export function useShiftApplicants(shiftId: string | undefined) {
 
   useEffect(() => { void load(); }, [load]);
 
-  async function decide(applicationId: string, decision: 'accepted' | 'declined') {
+  /** Returns true when the DB update succeeded, false on error. */
+  async function decide(applicationId: string, decision: 'accepted' | 'declined'): Promise<boolean> {
     // Optimistic: pull the card immediately
     setApplicants((prev) => prev.filter((a) => a.applicationId !== applicationId));
     const { error: updateError } = await supabase
@@ -95,7 +96,9 @@ export function useShiftApplicants(shiftId: string | undefined) {
     if (updateError) {
       console.error('[useShiftApplicants] decision failed:', updateError.message);
       void load(); // reload to restore true state on failure
+      return false;
     }
+    return true;
   }
 
   return { applicants, isLoading, error, approve: (id: string) => decide(id, 'accepted'), decline: (id: string) => decide(id, 'declined'), refetch: load };

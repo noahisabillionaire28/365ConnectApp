@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import { RoleProvider } from '@/contexts/RoleContext';
+import { ToastProvider } from '@/contexts/ToastContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { MobileContainer } from '@/components/MobileContainer';
 import { AdminNav } from '@/components/AdminNav';
@@ -207,14 +208,16 @@ function App() {
       <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? ''} libraries={['places']}>
         <AuthProvider>
           <RoleProvider>
-            <TooltipProvider>
-              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-                <ErrorBoundary>
-                  <AppRouter />
-                </ErrorBoundary>
-              </WouterRouter>
-              <Toaster />
-            </TooltipProvider>
+            <ToastProvider>
+              <TooltipProvider>
+                <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+                  <ErrorBoundary>
+                    <AppRouter />
+                  </ErrorBoundary>
+                </WouterRouter>
+                <Toaster />
+              </TooltipProvider>
+            </ToastProvider>
           </RoleProvider>
         </AuthProvider>
       </APIProvider>

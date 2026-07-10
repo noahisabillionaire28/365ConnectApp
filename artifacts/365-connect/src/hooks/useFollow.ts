@@ -10,12 +10,20 @@ function followQueryKey(targetId: string) {
   return ['follow', targetId] as const;
 }
 
+type UseFollowOptions = {
+  /** Called after a follow insert succeeds in Supabase. */
+  onFollowSuccess?: () => void;
+  /** Called after an unfollow delete succeeds in Supabase. */
+  onUnfollowSuccess?: () => void;
+};
+
 /**
  * Provides follow/unfollow for a target user.
  * Pass the target's UUID (not username).
  * Uses optimistic updates: button flips immediately, rolls back on error.
+ * Optional `onFollowSuccess` / `onUnfollowSuccess` callbacks fire after DB confirms.
  */
-export function useFollow(targetUserId: string) {
+export function useFollow(targetUserId: string, options?: UseFollowOptions) {
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -70,6 +78,9 @@ export function useFollow(targetUserId: string) {
       }));
       return { prev };
     },
+    onSuccess: () => {
+      options?.onFollowSuccess?.();
+    },
     onError: (_err, _vars, ctx) => {
       qc.setQueryData(followQueryKey(targetUserId), ctx?.prev);
     },
@@ -99,6 +110,9 @@ export function useFollow(targetUserId: string) {
         isFollowing:   false,
       }));
       return { prev };
+    },
+    onSuccess: () => {
+      options?.onUnfollowSuccess?.();
     },
     onError: (_err, _vars, ctx) => {
       qc.setQueryData(followQueryKey(targetUserId), ctx?.prev);

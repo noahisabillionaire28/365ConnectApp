@@ -11,6 +11,7 @@ import { useShiftById } from '@/hooks/useShifts';
 import { useAuth } from '@/contexts/AuthContext';
 import { haversineMiles, supabase } from '@/lib/supabase';
 import { useTimeEntry } from '@/hooks/useTimeEntry';
+import { useToast } from '@/contexts/ToastContext';
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 function fmtHMS(secs: number): string {
@@ -444,6 +445,7 @@ export function ClockInScreen() {
   const { user }            = useAuth();
   const { data: shift, isLoading, error } = useShiftById(id);
   const { startOrResume, completeEntry } = useTimeEntry();
+  const { showToast } = useToast();
 
   const [phase,      setPhase]      = useState<Phase>('geo-check');
   const [failReason, setFailReason] = useState<GeoFailReason>('too-far');
@@ -528,8 +530,11 @@ export function ClockInScreen() {
     const t = setTimeout(() => {
       setPhase('active');
       shiftRef.current = setInterval(() => setShiftSecs((s) => s + 1), 1000);
+      showToast('Clocked in. Your timer has started.');
     }, 1600);
     return () => clearTimeout(t);
+  // showToast is stable (useCallback with [] deps) — safe to omit from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
   useEffect(() => {
@@ -601,6 +606,7 @@ export function ClockInScreen() {
     }
 
     if (id) markClockedIn(id);
+    showToast('Shift complete! Your timesheet has been sent.');
     setPhase('transfer');
   }
 

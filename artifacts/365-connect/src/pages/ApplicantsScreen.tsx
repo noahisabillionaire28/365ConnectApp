@@ -4,6 +4,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-mo
 import { ChevronLeft, X, Check, Star, Sparkles } from 'lucide-react';
 import { useShiftApplicants, type ApplicantCard } from '@/hooks/useShiftApplicants';
 import { useShiftById } from '@/hooks/useShifts';
+import { useToast } from '@/contexts/ToastContext';
 
 const SWIPE_THRESHOLD = 120;
 
@@ -100,6 +101,7 @@ export function ApplicantsScreen() {
   const [, navigate] = useLocation();
   const { data: shift, isLoading: shiftLoading } = useShiftById(id);
   const { applicants, isLoading, approve, decline } = useShiftApplicants(id);
+  const { showToast } = useToast();
 
   const isLoadingAny = shiftLoading || isLoading;
 
@@ -137,7 +139,10 @@ export function ApplicantsScreen() {
                 {applicants.slice(0, 3).reverse().map((a, i, arr) => (
                   <ApplicantCardView key={a.applicationId} applicant={a}
                     isTop={i === arr.length - 1}
-                    onDecide={(decision) => (decision === 'accepted' ? approve(a.applicationId) : decline(a.applicationId))} />
+                    onDecide={(decision) => {
+                      void (decision === 'accepted' ? approve(a.applicationId) : decline(a.applicationId))
+                        .then((ok) => { if (ok) showToast(decision === 'accepted' ? 'Worker confirmed for your shift!' : 'Applicant declined.'); });
+                    }} />
                 ))}
               </AnimatePresence>
             </div>
@@ -145,13 +150,19 @@ export function ApplicantsScreen() {
             <div className="flex items-center justify-center gap-6 pt-5" role="group" aria-label="Approve or decline applicant">
               <motion.button type="button" whileTap={{ scale: 0.9 }}
                 aria-label="Decline applicant"
-                onClick={() => applicants[0] && decline(applicants[0].applicationId)}
+                onClick={() => {
+                  const top = applicants[0];
+                  if (top) void decline(top.applicationId).then((ok) => { if (ok) showToast('Applicant declined.'); });
+                }}
                 className="w-16 h-16 rounded-full bg-white border-2 border-[#DBDBDB] flex items-center justify-center">
                 <X size={26} aria-hidden className="text-[#737373]" />
               </motion.button>
               <motion.button type="button" whileTap={{ scale: 0.9 }}
                 aria-label="Approve applicant"
-                onClick={() => applicants[0] && approve(applicants[0].applicationId)}
+                onClick={() => {
+                  const top = applicants[0];
+                  if (top) void approve(top.applicationId).then((ok) => { if (ok) showToast('Worker confirmed for your shift!'); });
+                }}
                 className="w-16 h-16 rounded-full bg-[#10B981] flex items-center justify-center">
                 <Check size={28} aria-hidden className="text-white" />
               </motion.button>

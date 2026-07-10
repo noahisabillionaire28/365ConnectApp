@@ -17,6 +17,7 @@ import {
 import { usePostShift } from '@/hooks/usePostShift';
 import { supabase } from '@/lib/supabase';
 import { BottomTabNav } from '@/components/BottomTabNav';
+import { useToast } from '@/contexts/ToastContext';
 
 // ─── Wizard primitives ────────────────────────────────────────────────────────
 function StepBar({ current, total }: { current: number; total: number }) {
@@ -90,6 +91,7 @@ export function PostShiftStep5Screen() {
   const [, navigate]      = useLocation();
   const draft             = getDraft();
   const postMutation      = usePostShift();
+  const { showToast }     = useToast();
   const [postError, setPostError] = useState<string | null>(null);
 
   // ── Derived ──────────────────────────────────────────────────────────────────
@@ -146,6 +148,7 @@ export function PostShiftStep5Screen() {
       });
 
       resetDraft();
+      showToast('Shift posted! Workers will start applying soon.');
       navigate(`/shift/${data.id}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';

@@ -2,6 +2,7 @@ import { useLocation } from 'wouter';
 import { BadgeCheck, Star } from 'lucide-react';
 import type { WorkerPerson } from '@/hooks/usePeopleFeed';
 import { useFollow } from '@/hooks/useFollow';
+import { useToast } from '@/contexts/ToastContext';
 
 const GOLD = '#FFD700';
 const NAVY = '#0A1628';
@@ -13,7 +14,11 @@ const NAVY = '#0A1628';
  */
 export function PeopleCard({ person }: { person: WorkerPerson }) {
   const [, navigate] = useLocation();
-  const { isFollowing, follow, unfollow, isFollowPending } = useFollow(person.id);
+  const { showToast } = useToast();
+  const { isFollowing, follow, unfollow, isFollowPending } = useFollow(person.id, {
+    onFollowSuccess:   () => showToast(`Following @${person.username}`),
+    onUnfollowSuccess: () => showToast(`Unfollowed @${person.username}`),
+  });
 
   return (
     <div className="mx-4 rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-4 flex items-center gap-4">

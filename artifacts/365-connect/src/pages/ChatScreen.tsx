@@ -4,6 +4,7 @@ import { ChevronLeft, Image as ImageIcon, Video, Mic, Send, Square, Check, Check
 import { supabase, uploadChatImage, uploadChatVideo, uploadChatVoice, getSignedChatMediaUrl, type ConversationRow, type UserRow, type MessageRow } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/hooks/useMessages';
+import { ImageCropper } from '@/components/ImageCropper';
 
 type OtherUser = Pick<UserRow, 'id' | 'username' | 'photo_url'>;
 
@@ -103,6 +104,13 @@ export function ChatScreen() {
   const [isSending, setSending] = useState(false);
   const [isRecording, setRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
+  // ImageCropper state — set when the user picks a photo; cleared after crop/cancel
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  // Ref keeps cropSrc visible to the unmount cleanup (closure captures stale state otherwise)
+  const cropSrcRef = useRef<string | null>(null);
+  useEffect(() => { cropSrcRef.current = cropSrc; }, [cropSrc]);
+  // Unmount: revoke any lingering crop URL if the user navigates away mid-crop
+  useEffect(() => () => { if (cropSrcRef.current) URL.revokeObjectURL(cropSrcRef.current); }, []);
 
   const scrollRef      = useRef<HTMLDivElement>(null);
   const bottomRef       = useRef<HTMLDivElement>(null);
@@ -151,10 +159,38 @@ export function ChatScreen() {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file || !user?.id || !conversationId || isSending) return;
+
+    if (kind === 'image') {
+      // Route images through the cropper before uploading
+      if (cropSrc) URL.revokeObjectURL(cropSrc);
+      setCropSrc(URL.createObjectURL(file));
+      return;
+    }
+
+    // Videos are uploaded directly (cropping video is not practical)
     setSending(true);
-    const url = kind === 'image' ? await uploadChatImage(conversationId, file) : await uploadChatVideo(conversationId, file);
-    if (url) await sendMessage(kind === 'image' ? { imageUrl: url } : { videoUrl: url });
+    const url = await uploadChatVideo(conversationId, file);
+    if (url) await sendMessage({ videoUrl: url });
     setSending(false);
+  }
+
+  async function handleCropDone(blob: Blob, previewUrl: string) {
+    // Revoke both the source URL and the preview URL produced by ImageCropper
+    // (we upload directly to Supabase and don't need the local preview URL in chat)
+    URL.revokeObjectURL(previewUrl);
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
+    if (!user?.id || !conversationId) return;
+    setSending(true);
+    const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+    const url = await uploadChatImage(conversationId, file);
+    if (url) await sendMessage({ imageUrl: url });
+    setSending(false);
+  }
+
+  function cancelCrop() {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
   }
 
   async function startRecording() {
@@ -193,6 +229,15 @@ export function ChatScreen() {
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
+      {/* Image cropper — shown as a full-screen overlay when user picks a photo */}
+      {cropSrc && (
+        <ImageCropper
+          imageSrc={cropSrc}
+          defaultAspect={1}
+          onDone={(blob, previewUrl) => void handleCropDone(blob, previewUrl)}
+          onCancel={cancelCrop}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center gap-3 px-3 pt-[52px] pb-3 border-b border-[#DBDBDB] bg-white flex-shrink-0">
         <button type="button" aria-label="Back to messages" onClick={() => navigate('/messages')}
