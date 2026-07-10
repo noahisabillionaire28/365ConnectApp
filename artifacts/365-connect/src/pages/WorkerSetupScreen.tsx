@@ -282,15 +282,22 @@ export function WorkerSetupScreen() {
       if (imageUrl || postCaption.trim()) {
         const { error: postErr } = await supabase.from('posts').insert({
           user_id:   user.id,
-          image_url: imageUrl,
+          photo_url: imageUrl,
           caption:   postCaption.trim() || null,
         });
-        if (postErr) throw postErr;
+        if (postErr) {
+          // Surface the real Supabase error (PostgrestError has .message, .code, .details)
+          const detail = [postErr.message, postErr.details, postErr.code].filter(Boolean).join(' | ');
+          console.error('[WorkerSetup Step 8] post insert failed:', postErr);
+          throw new Error(detail || 'Could not save post.');
+        }
       }
       localStorage.removeItem(stepKey(user.id));
       navigate('/home');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save post.');
+      const msg = (err as { message?: string })?.message ?? 'Could not save post.';
+      console.error('[WorkerSetup Step 8] error:', err);
+      setError(msg);
     } finally {
       setSaving(false);
     }

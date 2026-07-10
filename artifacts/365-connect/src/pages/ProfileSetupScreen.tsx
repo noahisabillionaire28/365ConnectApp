@@ -122,16 +122,23 @@ export function ProfileSetupScreen() {
       if (postPhotoUrl || postDescription.trim()) {
         const { error: postErr } = await supabase.from('posts').insert({
           user_id:   user.id,
-          image_url: postPhotoUrl,
+          photo_url: postPhotoUrl,
           caption:   postDescription.trim() || null,
         });
-        if (postErr) throw postErr;
+        if (postErr) {
+          // Surface the real Supabase error (PostgrestError has .message, .code, .details)
+          const detail = [postErr.message, postErr.details, postErr.code].filter(Boolean).join(' | ');
+          console.error('[ProfileSetup] post insert failed:', postErr);
+          throw new Error(detail || 'Could not save post.');
+        }
       }
 
       sessionStorage.removeItem('selectedRole');
       navigate('/home');
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save profile. Please try again.');
+      const msg = (err as { message?: string })?.message ?? 'Failed to save profile. Please try again.';
+      console.error('[ProfileSetup] save error:', err);
+      setSaveError(msg);
     } finally {
       setSaving(false);
     }
