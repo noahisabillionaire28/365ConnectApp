@@ -13,8 +13,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation }                   from 'wouter';
 import { ChevronLeft, Camera, AlertCircle, CreditCard, Lock, CheckCircle2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, uploadAvatar } from '@/lib/supabase';
 import { useAuth }  from '@/contexts/AuthContext';
+import { ImageCropper } from '@/components/ImageCropper';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const NAVY   = '#0A1628';
@@ -175,6 +176,7 @@ export function StafferSetupScreen() {
   const [logoFile,    setLogoFile]    = useState<File | null>(null);
   const logoRef = useRef<HTMLInputElement>(null);
   const [eventTypes,  setEventTypes]  = useState<string[]>([]);
+  const [cropSrc,     setCropSrc]     = useState<string | null>(null);
 
   // ── Load & resume ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -226,12 +228,7 @@ export function StafferSetupScreen() {
     try {
       let photoUrl = logoPreview;
       if (logoFile) {
-        const ext  = logoFile.name.split('.').pop() ?? 'jpg';
-        const path = `${user.id}/logo.${ext}`;
-        const { error: upErr } = await supabase.storage.from('avatars')
-          .upload(path, logoFile, { upsert: true, contentType: logoFile.type });
-        if (upErr) throw upErr;
-        photoUrl = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+        photoUrl = await uploadAvatar(user.id, logoFile); // throws with real message on failure
         setLogoPreview(photoUrl);
         setLogoFile(null);
       }
@@ -248,6 +245,20 @@ export function StafferSetupScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleCropDone(blob: Blob, previewUrl: string) {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    const file = new File([blob], 'logo.jpg', { type: 'image/jpeg' });
+    if (logoPreview?.startsWith('blob:')) URL.revokeObjectURL(logoPreview);
+    setLogoFile(file);
+    setLogoPreview(previewUrl);
+    setCropSrc(null);
+  }
+
+  function cancelCrop() {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
   }
 
   async function continueStep3() {
@@ -298,6 +309,16 @@ export function StafferSetupScreen() {
 
   return (
     <div className="flex flex-col h-full bg-white overflow-hidden">
+      {/* Crop modal — fixed overlay */}
+      {cropSrc && (
+        <ImageCropper
+          imageSrc={cropSrc}
+          defaultAspect={1}
+          onDone={handleCropDone}
+          onCancel={cancelCrop}
+        />
+      )}
+
       <StepHeader step={step} onBack={() => { if (step > 1) { storeStep(user!.id, step - 1); setStep(s => s - 1); } }} />
 
       {error && (
@@ -337,7 +358,7 @@ export function StafferSetupScreen() {
             <p className="text-[14px] mb-10 self-start" style={{ color: MUTED }}>Optional — appears on all your shift postings.</p>
             <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={e => {
               const f = e.target.files?.[0];
-              if (f) { setLogoFile(f); setLogoPreview(URL.createObjectURL(f)); }
+              if (f) { setCropSrc(URL.createObjectURL(f)); e.target.value = ''; }
             }} />
             <button onClick={() => logoRef.current?.click()}
               className="relative w-[140px] h-[140px] rounded-[20px] overflow-hidden active:scale-95 transition-transform"

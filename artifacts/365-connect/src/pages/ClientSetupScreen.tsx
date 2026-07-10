@@ -10,11 +10,12 @@
  *
  * Completion marker: users.username is set at the end of Step 4 (auto-slug from name).
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation }          from 'wouter';
-import { ChevronLeft, AlertCircle, CreditCard, Lock, CheckCircle2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { ChevronLeft, AlertCircle, CreditCard, Lock, CheckCircle2, Camera } from 'lucide-react';
+import { supabase, uploadAvatar } from '@/lib/supabase';
 import { useAuth }  from '@/contexts/AuthContext';
+import { ImageCropper } from '@/components/ImageCropper';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const NAVY   = '#0A1628';
@@ -221,6 +222,10 @@ export function ClientSetupScreen() {
   const [fullName,     setFullName]     = useState('');
   const [companyName,  setCompanyName]  = useState('');
   const [eventTypes,   setEventTypes]   = useState<string[]>([]);
+  const [logoFile,     setLogoFile]     = useState<File | null>(null);
+  const [logoPreview,  setLogoPreview]  = useState<string | null>(null);
+  const logoRef                         = useRef<HTMLInputElement>(null);
+  const [cropSrc,      setCropSrc]      = useState<string | null>(null);
 
   // ── Load & resume ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -268,11 +273,17 @@ export function ClientSetupScreen() {
     if (!user) return;
     setSaving(true); setError(null);
     try {
+      // Upload logo if one was selected via the cropper
+      if (logoFile) {
+        const photoUrl = await uploadAvatar(user.id, logoFile); // throws with real message
+        setLogoPreview(photoUrl);
+        setLogoFile(null);
+        await supabase.from('users').update({ photo_url: photoUrl }).eq('id', user.id);
+      }
       if (companyName.trim()) {
         const { error: dbErr } = await supabase.from('users')
           .update({ company_name: companyName.trim() }).eq('id', user.id);
         // Ignore only "column does not exist" — schema may not have this column.
-        // Any other failure (network, RLS, etc.) must surface to the user.
         if (dbErr && !/column .* does not exist/i.test(dbErr.message)) throw dbErr;
       }
       storeStep(user.id, 3);
@@ -282,6 +293,20 @@ export function ClientSetupScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleCropDone(blob: Blob, previewUrl: string) {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    const file = new File([blob], 'logo.jpg', { type: 'image/jpeg' });
+    if (logoPreview?.startsWith('blob:')) URL.revokeObjectURL(logoPreview);
+    setLogoFile(file);
+    setLogoPreview(previewUrl);
+    setCropSrc(null);
+  }
+
+  function cancelCrop() {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
   }
 
   async function continueStep3() {
@@ -334,6 +359,16 @@ export function ClientSetupScreen() {
   // ── Step content ──────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full bg-white overflow-hidden">
+      {/* Crop modal — fixed overlay */}
+      {cropSrc && (
+        <ImageCropper
+          imageSrc={cropSrc}
+          defaultAspect={1}
+          onDone={handleCropDone}
+          onCancel={cancelCrop}
+        />
+      )}
+
       <StepHeader step={step} onBack={() => { if (step > 1) { storeStep(user!.id, step - 1); setStep(s => s - 1); } }} />
 
       {error && (
@@ -371,17 +406,58 @@ export function ClientSetupScreen() {
           </div>
         )}
 
-        {/* ── STEP 2 — Company name ──────────────────────────────────────── */}
+        {/* ── STEP 2 — Company name + logo ──────────────────────────────── */}
         {step === 2 && (
           <div className="flex flex-col">
-            <h1 className="text-[26px] font-bold leading-tight mb-2" style={{ color: TEXT }}>Company name?</h1>
+            <h1 className="text-[26px] font-bold leading-tight mb-2" style={{ color: TEXT }}>Company name &amp; logo</h1>
             <p className="text-[14px] mb-8" style={{ color: MUTED }}>
-              Optional — add a company or venue name to build brand recognition.
+              Optional — add a company name and logo to build brand recognition.
             </p>
+
+            {/* Logo upload */}
+            <input
+              ref={logoRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) { setCropSrc(URL.createObjectURL(f)); e.target.value = ''; }
+              }}
+            />
+            <div className="flex flex-col items-center mb-8">
+              <button
+                onClick={() => logoRef.current?.click()}
+                className="relative w-[120px] h-[120px] rounded-[20px] overflow-hidden active:scale-95 transition-transform"
+                style={{ background: '#F9FAFB', border: `2px dashed ${BORDER}` }}
+                type="button"
+              >
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Logo preview" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="flex flex-col items-center justify-center w-full h-full gap-2">
+                    <Camera size={26} style={{ color: MUTED }} />
+                    <span className="text-[11px] font-medium" style={{ color: MUTED }}>Tap to upload</span>
+                  </div>
+                )}
+              </button>
+              {logoPreview && (
+                <button
+                  type="button"
+                  onClick={() => logoRef.current?.click()}
+                  className="mt-3 text-[13px] font-semibold"
+                  style={{ color: NAVY }}
+                >
+                  Change logo
+                </button>
+              )}
+              <p className="text-[11px] mt-2" style={{ color: MUTED }}>Optional</p>
+            </div>
+
+            {/* Company name */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[12px] font-semibold ml-0.5" style={{ color: MUTED }}>Company (optional)</label>
+              <label className="text-[12px] font-semibold ml-0.5" style={{ color: MUTED }}>Company name (optional)</label>
               <input
-                autoFocus
                 type="text"
                 placeholder="e.g. The Grand Venue"
                 value={companyName}

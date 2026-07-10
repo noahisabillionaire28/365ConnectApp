@@ -19,6 +19,7 @@ import { ChevronLeft, Camera, Plus, X, Check, AlertCircle, CheckCircle2 } from '
 import { supabase, uploadAvatar, uploadPostPhoto } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { JOB_TYPES } from '@/lib/jobTypes';
+import { ImageCropper } from '@/components/ImageCropper';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const NAVY   = '#0A1628';
@@ -113,6 +114,10 @@ export function WorkerSetupScreen() {
   const [photoFile,    setPhotoFile]    = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
+
+  // Step 8 photo already declared below; crop state shared for both upload points
+  const [cropSrc,    setCropSrc]    = useState<string | null>(null);
+  const [cropTarget, setCropTarget] = useState<'photo' | 'post' | null>(null);
 
   // Step 3 — bio
   const [bio, setBio] = useState('');
@@ -297,6 +302,36 @@ export function WorkerSetupScreen() {
     navigate('/home');
   }
 
+  function openCropper(file: File, target: 'photo' | 'post') {
+    // Revoke any existing crop URL before creating a new one
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropTarget(target);
+    setCropSrc(URL.createObjectURL(file));
+  }
+
+  function handleCropDone(blob: Blob, previewUrl: string) {
+    // Revoke the source object URL now that we're done with the cropper
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+    if (cropTarget === 'photo') {
+      if (photoPreview?.startsWith('blob:')) URL.revokeObjectURL(photoPreview);
+      setPhotoFile(file);
+      setPhotoPreview(previewUrl);
+    } else if (cropTarget === 'post') {
+      if (postPreview?.startsWith('blob:')) URL.revokeObjectURL(postPreview);
+      setPostFile(file);
+      setPostPreview(previewUrl);
+    }
+    setCropSrc(null);
+    setCropTarget(null);
+  }
+
+  function cancelCrop() {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
+    setCropTarget(null);
+  }
+
   function handleBack() {
     if (step > 1) {
       const prev = step - 1;
@@ -326,6 +361,16 @@ export function WorkerSetupScreen() {
   // ── Step content ──────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full bg-white overflow-hidden">
+      {/* Crop modal — fixed overlay, renders above everything */}
+      {cropSrc && (
+        <ImageCropper
+          imageSrc={cropSrc}
+          defaultAspect={cropTarget === 'post' ? 4 / 5 : 1}
+          onDone={handleCropDone}
+          onCancel={cancelCrop}
+        />
+      )}
+
       <StepHeader step={step} onBack={handleBack} />
 
       {error && <ErrorBanner msg={error} />}
@@ -381,7 +426,7 @@ export function WorkerSetupScreen() {
             </p>
             <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={e => {
               const f = e.target.files?.[0];
-              if (f) { setPhotoFile(f); setPhotoPreview(URL.createObjectURL(f)); }
+              if (f) { openCropper(f, 'photo'); e.target.value = ''; }
             }} />
             <button
               onClick={() => photoRef.current?.click()}
@@ -595,7 +640,7 @@ export function WorkerSetupScreen() {
             </p>
             <input ref={postRef} type="file" accept="image/*" className="hidden" onChange={e => {
               const f = e.target.files?.[0];
-              if (f) { setPostFile(f); setPostPreview(URL.createObjectURL(f)); }
+              if (f) { openCropper(f, 'post'); e.target.value = ''; }
             }} />
             <button
               onClick={() => postRef.current?.click()}

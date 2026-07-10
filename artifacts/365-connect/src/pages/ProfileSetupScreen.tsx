@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { Camera, Plus, X, ChevronLeft, Check, AlertCircle } from 'lucide-react';
 import { supabase, uploadAvatar, uploadPostPhoto } from '@/lib/supabase';
+import { ImageCropper } from '@/components/ImageCropper';
 
 const JOB_TYPES = [
   'Bartender', 'Server', 'DJ', 'Caterer',
@@ -22,6 +23,8 @@ export function ProfileSetupScreen() {
   const [photoPreview,      setPhotoPreview]      = useState<string | null>(null);
   const [photoFile,         setPhotoFile]         = useState<File | null>(null);
   const photoInputRef                             = useRef<HTMLInputElement>(null);
+  const [cropSrc,           setCropSrc]           = useState<string | null>(null);
+  const [cropTarget,        setCropTarget]        = useState<'photo' | 'post' | null>(null);
   const [bio,               setBio]               = useState('');
   const [selectedJobs,      setSelectedJobs]      = useState<string[]>([]);
   const [certInput,         setCertInput]         = useState('');
@@ -38,12 +41,44 @@ export function ProfileSetupScreen() {
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) { setPhotoFile(file); setPhotoPreview(URL.createObjectURL(file)); }
+    if (file) {
+      if (cropSrc) URL.revokeObjectURL(cropSrc);
+      setCropTarget('photo');
+      setCropSrc(URL.createObjectURL(file));
+      e.target.value = '';
+    }
   }
 
   function handlePostPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) { setPostPhotoFile(file); setPostPhotoPreview(URL.createObjectURL(file)); }
+    if (file) {
+      if (cropSrc) URL.revokeObjectURL(cropSrc);
+      setCropTarget('post');
+      setCropSrc(URL.createObjectURL(file));
+      e.target.value = '';
+    }
+  }
+
+  function handleCropDone(blob: Blob, previewUrl: string) {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+    if (cropTarget === 'photo') {
+      if (photoPreview?.startsWith('blob:')) URL.revokeObjectURL(photoPreview);
+      setPhotoFile(file);
+      setPhotoPreview(previewUrl);
+    } else if (cropTarget === 'post') {
+      if (postPhotoPreview?.startsWith('blob:')) URL.revokeObjectURL(postPhotoPreview);
+      setPostPhotoFile(file);
+      setPostPhotoPreview(previewUrl);
+    }
+    setCropSrc(null);
+    setCropTarget(null);
+  }
+
+  function cancelCrop() {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
+    setCropTarget(null);
   }
 
   function toggleJob(job: string) {
@@ -85,7 +120,12 @@ export function ProfileSetupScreen() {
       if (profileError) throw profileError;
 
       if (postPhotoUrl || postDescription.trim()) {
-        console.info('[365 Connect] First post captured:', { postPhotoUrl, postDescription });
+        const { error: postErr } = await supabase.from('posts').insert({
+          user_id:   user.id,
+          image_url: postPhotoUrl,
+          caption:   postDescription.trim() || null,
+        });
+        if (postErr) throw postErr;
       }
 
       sessionStorage.removeItem('selectedRole');
@@ -110,6 +150,16 @@ export function ProfileSetupScreen() {
 
   return (
     <div className="flex flex-col h-full bg-white text-black overflow-hidden">
+      {/* Crop modal — fixed overlay */}
+      {cropSrc && (
+        <ImageCropper
+          imageSrc={cropSrc}
+          defaultAspect={cropTarget === 'post' ? 4 / 5 : 1}
+          onDone={handleCropDone}
+          onCancel={cancelCrop}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center px-5 pt-12 pb-4">
         {step > 1 ? (
