@@ -72,6 +72,9 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    headers: {
+      'Cache-Control': 'no-store',
+    },
   },
   preview: {
     port,
