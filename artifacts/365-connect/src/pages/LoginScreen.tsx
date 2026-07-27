@@ -44,73 +44,53 @@ interface QuickLoginAccount {
 }
 
 const QUICK_ACCOUNTS: QuickLoginAccount[] = [
-  {
-    label:    'Login as Worker',
-    emailKey: 'VITE_TEST_WORKER_EMAIL',
-    passKey:  'VITE_TEST_WORKER_PASSWORD',
-  },
-  {
-    label:    'Login as Client',
-    emailKey: 'VITE_TEST_CLIENT_EMAIL',
-    passKey:  'VITE_TEST_CLIENT_PASSWORD',
-  },
-  {
-    label:    'Login as Staffer',
-    emailKey: 'VITE_TEST_STAFFER_EMAIL',
-    passKey:  'VITE_TEST_STAFFER_PASSWORD',
-  },
-  {
-    label:    'Login as Admin',
-    emailKey: 'VITE_TEST_ADMIN_EMAIL',
-    passKey:  'VITE_TEST_ADMIN_PASSWORD',
-  },
+  { label: 'Worker',  emailKey: 'VITE_TEST_WORKER_EMAIL',  passKey: 'VITE_TEST_WORKER_PASSWORD'  },
+  { label: 'Client',  emailKey: 'VITE_TEST_CLIENT_EMAIL',  passKey: 'VITE_TEST_CLIENT_PASSWORD'  },
+  { label: 'Staffer', emailKey: 'VITE_TEST_STAFFER_EMAIL', passKey: 'VITE_TEST_STAFFER_PASSWORD' },
+  { label: 'Admin',   emailKey: 'VITE_TEST_ADMIN_EMAIL',   passKey: 'VITE_TEST_ADMIN_PASSWORD'   },
 ];
 
 function QuickTestLogin({
-  onQuickLogin,
-  quickLoading,
+  onFill,
 }: {
-  onQuickLogin: (email: string, password: string) => Promise<void>;
-  quickLoading: boolean;
+  onFill: (email: string, password: string) => void;
 }) {
   if (import.meta.env['VITE_APP_ENV'] !== 'development') return null;
 
   return (
     <div className="mt-8 pt-6 border-t" style={{ borderColor: BORDER }}>
-      <p className="text-[11px] font-semibold uppercase tracking-wider mb-3 text-center"
+      <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-center"
         style={{ color: MUTED }}>
-        Quick Test Login
+        Quick Test Login — tap to fill, then tap Log In
       </p>
 
       <div className="grid grid-cols-2 gap-2">
         {QUICK_ACCOUNTS.map(({ label, emailKey, passKey }) => {
           const email    = import.meta.env[emailKey] as string | undefined;
           const password = import.meta.env[passKey]  as string | undefined;
-          const disabled = !email || !password || quickLoading;
+          const disabled = !email || !password;
 
           return (
             <button
               key={label}
               type="button"
               disabled={disabled}
-              onClick={() => {
-                if (email && password) onQuickLogin(email, password);
-              }}
-              aria-label={label}
+              onClick={() => { if (email && password) onFill(email, password); }}
+              aria-label={`Fill ${label} credentials`}
               style={{
-                borderRadius:  '12px',
-                border:        `1px solid ${BORDER}`,
-                background:    '#FFFFFF',
-                color:         disabled ? MUTED : NAVY,
-                fontFamily:    "'Space Grotesk', sans-serif",
-                fontSize:      '12px',
-                fontWeight:    600,
-                padding:       '10px 8px',
-                opacity:       disabled ? 0.45 : 1,
-                cursor:        disabled ? 'not-allowed' : 'pointer',
-                transition:    'opacity 0.15s',
-                lineHeight:    1.3,
-                textAlign:     'center' as const,
+                borderRadius: '12px',
+                border:       `1px solid ${disabled ? BORDER : NAVY}`,
+                background:   disabled ? '#F9FAFB' : NAVY,
+                color:        disabled ? MUTED : '#FFFFFF',
+                fontFamily:   "'Space Grotesk', sans-serif",
+                fontSize:     '13px',
+                fontWeight:   600,
+                padding:      '12px 8px',
+                opacity:      disabled ? 0.4 : 1,
+                cursor:       disabled ? 'not-allowed' : 'pointer',
+                transition:   'opacity 0.15s',
+                lineHeight:   1.3,
+                textAlign:    'center' as const,
               }}
             >
               {label}
@@ -132,10 +112,6 @@ export function LoginScreen() {
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState<string | null>(null);
   const [info,     setInfo]     = useState<string | null>(null);
-
-  // Separate loading state for quick-login buttons so they don't
-  // conflict with the main form's disabled logic.
-  const [quickLoading, setQuickLoading] = useState(false);
 
   // Per-provider inline errors
   const [googleError, setGoogleError] = useState<string | null>(null);
@@ -177,16 +153,12 @@ export function LoginScreen() {
     }
   }
 
-  // Quick-login handler — password is never stored in state or logged.
-  async function handleQuickLogin(loginEmail: string, loginPassword: string) {
-    setQuickLoading(true); setError(null); setInfo(null);
-    try {
-      await signInAndRoute(loginEmail, loginPassword);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Quick login failed. Check env vars.');
-    } finally {
-      setQuickLoading(false);
-    }
+  // Fill form fields with test credentials so user can review and tap Log In
+  function handleFill(loginEmail: string, loginPassword: string) {
+    setEmail(loginEmail);
+    setPassword(loginPassword);
+    setError(null);
+    setInfo(null);
   }
 
   async function handleForgotPassword() {
@@ -373,10 +345,7 @@ export function LoginScreen() {
       </div>
 
       {/* Dev-only quick login — only visible when VITE_APP_ENV === 'development' */}
-      <QuickTestLogin
-        onQuickLogin={handleQuickLogin}
-        quickLoading={quickLoading}
-      />
+      <QuickTestLogin onFill={handleFill} />
     </div>
   );
 }
