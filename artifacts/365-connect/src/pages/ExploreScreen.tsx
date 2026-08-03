@@ -16,7 +16,7 @@ function ExploreTile({ person, onTap }: { person: WorkerPerson; onTap: () => voi
           className="w-full h-full object-cover" />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
-          <span className="text-[#6B7280] font-bold text-[20px]">{person.username.slice(0, 2).toUpperCase()}</span>
+          <span className="text-[#6B7280] font-bold text-[20px]">{(person.username ?? '??').slice(0, 2).toUpperCase()}</span>
         </div>
       )}
       {person.isPro && (
@@ -43,7 +43,7 @@ export function ExploreScreen() {
 
   const filtered = people.filter((p) => {
     if (jobType && p.primaryJobType !== jobType) return false;
-    if (query && !p.username.toLowerCase().includes(query.toLowerCase())) return false;
+    if (query && !(p.username ?? '').toLowerCase().includes(query.toLowerCase())) return false;
     return true;
   });
 

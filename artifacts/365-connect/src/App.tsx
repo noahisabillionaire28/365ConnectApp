@@ -5,9 +5,13 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ClerkProvider, SignIn, SignUp } from '@clerk/react';
+import { publishableKeyFromHost } from '@clerk/react/internal';
+import { shadcn } from '@clerk/themes';
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import { RoleProvider } from '@/contexts/RoleContext';
+import { useSSE } from '@/hooks/useSSE';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { MobileContainer } from '@/components/MobileContainer';
@@ -16,16 +20,11 @@ import { AdminNav } from '@/components/AdminNav';
 // ── Mobile screens ─────────────────────────────────────────────────────────────
 // Auth / onboarding
 import { SplashScreen }         from '@/pages/SplashScreen';
-import { SignUpScreen }          from '@/pages/SignUpScreen';
-import { LoginScreen }           from '@/pages/LoginScreen';
 import { RoleSelectScreen }      from '@/pages/RoleSelectScreen';
 import { OnboardingScreen }      from '@/pages/OnboardingScreen';
 import { WorkerSetupScreen }     from '@/pages/WorkerSetupScreen';
 import { ClientSetupScreen }     from '@/pages/ClientSetupScreen';
 import { StafferSetupScreen }    from '@/pages/StafferSetupScreen';
-import { PhoneAuthScreen }       from '@/pages/PhoneAuthScreen';
-import { AuthCallbackScreen }    from '@/pages/AuthCallbackScreen';
-import { ResetPasswordScreen }   from '@/pages/ResetPasswordScreen';
 
 // Main app tabs
 import { HomeScreen }            from '@/pages/HomeScreen';
@@ -83,6 +82,111 @@ const queryClient = new QueryClient({
   },
 });
 
+// ── Clerk setup ───────────────────────────────────────────────────────────────
+// REQUIRED — copy verbatim. Resolves the key from window.location.hostname so
+// the same build serves multiple Clerk custom domains.
+const clerkPubKey = publishableKeyFromHost(
+  window.location.hostname,
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+);
+
+// REQUIRED — copy verbatim. Empty in dev (intentional), auto-set in prod.
+// Do NOT gate on import.meta.env.PROD.
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+// Clerk passes full paths; wouter's setLocation prepends the base — strip it.
+function stripBase(path: string): string {
+  return basePath && path.startsWith(basePath)
+    ? path.slice(basePath.length) || '/'
+    : path;
+}
+
+if (!clerkPubKey) {
+  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY');
+}
+
+const clerkAppearance = {
+  theme: shadcn,
+  cssLayerName: 'clerk',
+  options: {
+    logoPlacement:  'inside' as const,
+    logoLinkUrl:    basePath || '/',
+    logoImageUrl:   `${window.location.origin}${basePath}/logo.svg`,
+    socialButtonsVariant: 'blockButton' as const,
+  },
+  variables: {
+    colorPrimary:          '#0A1628',
+    colorForeground:       '#111827',
+    colorMutedForeground:  '#6B7280',
+    colorDanger:           '#EF4444',
+    colorBackground:       '#FFFFFF',
+    colorInput:            '#F9FAFB',
+    colorInputForeground:  '#111827',
+    colorNeutral:          '#E5E7EB',
+    fontFamily:            "'Space Grotesk', system-ui, sans-serif",
+    borderRadius:          '12px',
+  },
+  elements: {
+    rootBox:    'w-full flex justify-center',
+    cardBox:    'bg-white rounded-2xl w-[390px] max-w-full overflow-hidden shadow-sm border border-[#E5E7EB]',
+    card:       '!shadow-none !border-0 !bg-transparent !rounded-none',
+    footer:     '!shadow-none !border-0 !bg-transparent !rounded-none',
+    headerTitle:                  'text-[#111827] font-bold',
+    headerSubtitle:               'text-[#6B7280]',
+    socialButtonsBlockButtonText: 'text-[#111827] font-medium',
+    formFieldLabel:               'text-[#374151] font-medium',
+    footerActionLink:             'text-[#0A1628] font-semibold',
+    footerActionText:             'text-[#6B7280]',
+    dividerText:                  'text-[#6B7280]',
+    identityPreviewEditButton:    'text-[#0A1628]',
+    formFieldSuccessText:         'text-green-600',
+    alertText:                    'text-[#111827]',
+    logoBox:                      'mb-1',
+    logoImage:                    'h-8 w-auto',
+    socialButtonsBlockButton:     'border border-[#E5E7EB] hover:bg-[#F9FAFB]',
+    formButtonPrimary:            'bg-[#0A1628] hover:bg-[#0f2040] text-white font-bold',
+    formFieldInput:               'border border-[#E5E7EB] bg-[#F9FAFB] text-[#111827]',
+    footerAction:                 'bg-[#F9FAFB]',
+    dividerLine:                  'bg-[#E5E7EB]',
+    alert:                        'bg-[#FEF2F2] border border-[#FCA5A5]',
+    otpCodeFieldInput:            'border border-[#E5E7EB] bg-[#F9FAFB]',
+    formFieldRow:                 'mb-3',
+    main:                         'p-6',
+  },
+};
+
+// ── SSE mount — opens a live event stream once the user is authenticated ──────
+function SSEMount() { useSSE(); return null; }
+
+// ── Clerk sign-in / sign-up pages (inside MobileContainer) ───────────────────
+function SignInPage() {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-white px-4 py-8">
+      <SignIn
+        routing="path"
+        path={`${basePath}/sign-in`}
+        signUpUrl={`${basePath}/sign-up`}
+        fallbackRedirectUrl={`${basePath}/`}
+      />
+    </div>
+  );
+}
+
+function SignUpPage() {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-white px-4 py-8">
+      <SignUp
+        routing="path"
+        path={`${basePath}/sign-up`}
+        signInUrl={`${basePath}/sign-in`}
+        fallbackRedirectUrl={`${basePath}/`}
+      />
+    </div>
+  );
+}
+
 // ── Mobile router — 390 px centred column ─────────────────────────────────────
 function MobileRouter() {
   const [location] = useLocation();
@@ -98,23 +202,22 @@ function MobileRouter() {
           style={{ width: '100%' }}
         >
           <Switch>
-            {/* ── Auth / onboarding ─────────────────────────────────── */}
+            {/* ── Clerk auth routes ─────────────────────────────── */}
+            <Route path="/sign-in/*?" component={SignInPage} />
+            <Route path="/sign-up/*?" component={SignUpPage} />
+
+            {/* ── Auth / onboarding ─────────────────────────────── */}
             <Route path="/"              component={SplashScreen}       />
-            <Route path="/signup"        component={SignUpScreen}        />
-            <Route path="/login"         component={LoginScreen}         />
             <Route path="/role-select"   component={RoleSelectScreen}    />
             <Route path="/onboarding"    component={OnboardingScreen}    />
             <Route path="/worker-setup"  component={WorkerSetupScreen}   />
             <Route path="/client-setup"  component={ClientSetupScreen}   />
             <Route path="/staffer-setup" component={StafferSetupScreen}  />
-            <Route path="/phone-auth"    component={PhoneAuthScreen}     />
-            <Route path="/auth/callback" component={AuthCallbackScreen}  />
-            <Route path="/reset-password" component={ResetPasswordScreen} />
 
             {/* Legacy alias so any saved links still work */}
             <Route path="/profile-setup" component={WorkerSetupScreen}   />
 
-            {/* ── Main tabs ─────────────────────────────────────────── */}
+            {/* ── Main tabs ─────────────────────────────────────── */}
             <Route path="/home"          component={HomeScreen}          />
             <Route path="/jobs"          component={JobsScreen}          />
             <Route path="/explore"       component={ExploreScreen}       />
@@ -123,7 +226,7 @@ function MobileRouter() {
             <Route path="/notifications" component={NotificationsScreen} />
             <Route path="/profile"       component={ProfileScreen}       />
 
-            {/* ── Detail & misc ─────────────────────────────────────── */}
+            {/* ── Detail & misc ─────────────────────────────────── */}
             <Route path="/shift/:id"        component={ShiftDetailScreen}   />
             <Route path="/shift/:id/applicants" component={ApplicantsScreen} />
             <Route path="/requests"         component={ShiftRequestsScreen}  />
@@ -133,18 +236,18 @@ function MobileRouter() {
             <Route path="/pro-upgrade"              component={ProUpgradeScreen} />
             <Route path="/earnings"                 component={EarningsScreen} />
 
-            {/* ── Staffer: roster + assign workers ──────────────────── */}
+            {/* ── Staffer: roster + assign workers ──────────────── */}
             <Route path="/roster"           component={RosterScreen}         />
             <Route path="/shift/:id/assign" component={AssignWorkersScreen}  />
 
-            {/* ── Client post-shift wizard ──────────────────────────── */}
+            {/* ── Client post-shift wizard ──────────────────────── */}
             <Route path="/post-shift/step1" component={PostShiftStep1Screen} />
             <Route path="/post-shift/step2" component={PostShiftStep2Screen} />
             <Route path="/post-shift/step3" component={PostShiftStep3Screen} />
             <Route path="/post-shift/step4" component={PostShiftStep4Screen} />
             <Route path="/post-shift/step5" component={PostShiftStep5Screen} />
 
-            {/* ── Staffer post-shift wizard ─────────────────────────── */}
+            {/* ── Staffer post-shift wizard ─────────────────────── */}
             <Route path="/staffer-shift/step1" component={StafferPostStep1Screen} />
             <Route path="/staffer-shift/step2" component={StafferPostStep2Screen} />
             <Route path="/staffer-shift/step3" component={StafferPostStep3Screen} />
@@ -201,25 +304,59 @@ function AppRouter() {
   return isAdmin ? <AdminRouter /> : <MobileRouter />;
 }
 
+// ── ClerkProvider must live inside WouterRouter to use useLocation ────────────
+function ClerkProviderWithApp() {
+  const [, setLocation] = useLocation();
+
+  return (
+    <ClerkProvider
+      publishableKey={clerkPubKey}
+      proxyUrl={clerkProxyUrl}
+      appearance={clerkAppearance}
+      signInUrl={`${basePath}/sign-in`}
+      signUpUrl={`${basePath}/sign-up`}
+      localization={{
+        signIn: {
+          start: {
+            title:    'Welcome back',
+            subtitle: 'Sign in to your 365 Connect account',
+          },
+        },
+        signUp: {
+          start: {
+            title:    'Create your account',
+            subtitle: 'Join 365 Connect to start staffing smarter',
+          },
+        },
+      }}
+      routerPush={(to) => setLocation(stripBase(to))}
+      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+    >
+      <AuthProvider>
+        <SSEMount />
+        <RoleProvider>
+          <ToastProvider>
+            <TooltipProvider>
+              <ErrorBoundary>
+                <AppRouter />
+              </ErrorBoundary>
+            </TooltipProvider>
+          </ToastProvider>
+        </RoleProvider>
+      </AuthProvider>
+    </ClerkProvider>
+  );
+}
+
 // ── App root ──────────────────────────────────────────────────────────────────
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? ''} libraries={['places']}>
-        <AuthProvider>
-          <RoleProvider>
-            <ToastProvider>
-              <TooltipProvider>
-                <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-                  <ErrorBoundary>
-                    <AppRouter />
-                  </ErrorBoundary>
-                </WouterRouter>
-                <Toaster />
-              </TooltipProvider>
-            </ToastProvider>
-          </RoleProvider>
-        </AuthProvider>
+        <WouterRouter base={basePath}>
+          <ClerkProviderWithApp />
+        </WouterRouter>
+        <Toaster />
       </APIProvider>
     </QueryClientProvider>
   );

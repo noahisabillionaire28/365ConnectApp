@@ -1,82 +1,72 @@
-import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { useRoster, type RosterWorker } from './useRoster';
+import { useState, useCallback, useEffect } from 'react';
+import { apiClient } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
-export type AssignApplicationStatus = 'none' | 'pending' | 'accepted' | 'rejected' | 'declined' | 'withdrawn';
+export type AssignableWorker = {
+  id: string;
+  username: string | null;
+  photo_url: string | null;
+  photoUrl: string | null;
+  rating: number;
+  is_pro: boolean;
+  isPro: boolean;
+  primary_job_type: string | null;
+  primaryJobType: string | null;
+  job_types: string[];
+  certifications: string[];
+  /** The application status for this shift (undefined if not applied) */
+  applicationStatus?: string;
+};
 
-export type AssignableWorker = RosterWorker & { applicationStatus: AssignApplicationStatus };
-
-/**
- * A staffer's roster, cross-referenced with existing `applications` rows for
- * one shift, plus the ability to directly assign (insert an already-accepted
- * application row for) a roster worker.
- */
 export function useAssignWorkers(shiftId: string | undefined) {
-  const { workers: roster, isLoading: rosterLoading, error: rosterError } = useRoster();
-  const [statusByWorker, setStatusByWorker] = useState<Record<string, AssignApplicationStatus>>({});
-  const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const { user } = useAuth();
+  const [workers, setWorkers]       = useState<AssignableWorker[]>([]);
+  const [isLoading, setLoading]     = useState(true);
+  const [error, setError]           = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const loadStatuses = useCallback(async () => {
-    if (!shiftId || roster.length === 0) {
-      setStatusByWorker({});
-      setLoadingStatuses(false);
-      return;
-    }
-    setLoadingStatuses(true);
-    const { data, error } = await supabase
-      .from('applications')
-      .select('worker_id, status')
-      .eq('shift_id', shiftId)
-      .in('worker_id', roster.map((w) => w.id));
+  useEffect(() => {
+    if (!shiftId || !user?.id) { setWorkers([]); setLoading(false); return; }
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      // Roster workers
+      apiClient(user.id).get<(AssignableWorker & { is_pro: boolean; primary_job_type: string | null; photo_url: string | null })[]>('/follows/roster'),
+      // Current applicants for this shift (to know who is already accepted)
+      apiClient(user.id).get<{ worker_id: string; status: string }[]>(`/applications?shift_id=${shiftId}`),
+    ]).then(([roster, apps]) => {
+      const statusMap = new Map(apps.map((a) => [a.worker_id, a.status]));
+      setWorkers(roster.map((w) => ({
+        ...w,
+        photoUrl:        w.photo_url,
+        isPro:           w.is_pro,
+        primaryJobType:  w.primary_job_type,
+        applicationStatus: statusMap.get(w.id),
+      })));
+    }).catch((e) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+    }).finally(() => setLoading(false));
+  }, [shiftId, user?.id]);
 
-    if (error) {
-      console.error('[useAssignWorkers] status fetch failed:', error.message);
-      setErrorMessage(error.message);
-      setLoadingStatuses(false);
-      return;
-    }
-
-    const map: Record<string, AssignApplicationStatus> = {};
-    (data ?? []).forEach((r) => { map[r.worker_id as string] = r.status as AssignApplicationStatus; });
-    setStatusByWorker(map);
-    setLoadingStatuses(false);
-  }, [shiftId, roster]);
-
-  useEffect(() => { void loadStatuses(); }, [loadStatuses]);
-
-  async function assign(workerId: string) {
-    if (!shiftId || assigningId) return;
+  const assign = useCallback(async (workerId: string): Promise<boolean> => {
+    if (!shiftId || !user?.id) return false;
     setAssigningId(workerId);
-    setErrorMessage(null);
-
-    const { error } = await supabase
-      .from('applications')
-      .upsert(
-        { shift_id: shiftId, worker_id: workerId, status: 'accepted' },
-        { onConflict: 'shift_id,worker_id' },
-      );
-
-    setAssigningId(null);
-    if (error) {
-      console.error('[useAssignWorkers] assign failed:', error.message);
-      setErrorMessage(error.message);
-      return;
+    try {
+      await apiClient(user.id).post('/applications/assign', { shift_id: shiftId, worker_id: workerId });
+      setWorkers((prev) => prev.map((w) =>
+        w.id === workerId ? { ...w, applicationStatus: 'accepted' } : w,
+      ));
+      return true;
+    } catch (e) {
+      console.error('[useAssignWorkers] assign failed:', e);
+      return false;
+    } finally {
+      setAssigningId(null);
     }
-    setStatusByWorker((prev) => ({ ...prev, [workerId]: 'accepted' }));
-  }
+  }, [shiftId, user?.id]);
 
-  const workers: AssignableWorker[] = roster.map((w) => ({
-    ...w,
-    applicationStatus: statusByWorker[w.id] ?? 'none',
-  }));
+  const isAssigning = assigningId !== null;
 
-  return {
-    workers,
-    isLoading: rosterLoading || loadingStatuses,
-    error: rosterError ?? errorMessage,
-    assign,
-    assigningId,
-  };
+  return { workers, isLoading, error, assign, assigningId, isAssigning };
 }

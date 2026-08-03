@@ -6,7 +6,7 @@ import { useShiftById } from '@/hooks/useShifts';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useExistingReview, submitReview } from '@/hooks/useReviews';
-import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 
 const POSITIVE_TAGS = [
   'Punctual', 'Professional', 'Great energy', 'Skilled',
@@ -25,11 +25,11 @@ function useTargetName(userId: string | undefined) {
   useEffect(() => {
     let cancelled = false;
     if (!userId) return;
-    void supabase.from('users').select('username, company_name, role').eq('id', userId).maybeSingle()
-      .then(({ data }) => {
+    void apiClient(null).get<{ username: string | null; company_name: string | null; role: string }>(`/users/${userId}`)
+      .then((data) => {
         if (cancelled) return;
         setName(data?.company_name || (data?.username ? `@${data.username}` : null));
-      });
+      }).catch(() => {});
     return () => { cancelled = true; };
   }, [userId]);
   return name;

@@ -2,12 +2,13 @@
  * Step 1 of 5 — Job Type + Title
  * Pick one primary job type from the canonical 14, then name the shift.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Check } from 'lucide-react';
 import { JOB_TEMPLATES } from '@/data/postShiftTemplates';
-import { getDraft, setDraft, resetDraft, getEditShiftId, setEditShiftId } from '@/store/postShiftStore';
+import { getDraft, setDraft, resetDraft, getEditShiftId, setEditShiftId, initDraftLocation } from '@/store/postShiftStore';
+import { useProfile } from '@/hooks/useProfile';
 import { BottomTabNav } from '@/components/BottomTabNav';
 
 // ─── Shared wizard primitives ─────────────────────────────────────────────────
@@ -76,6 +77,16 @@ function JobTile({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export function PostShiftStep1Screen() {
   const [, navigate] = useLocation();
+  const profile = useProfile();
+
+  // Seed the wizard's default location from the user's profile coords as soon
+  // as the profile loads.  initDraftLocation is idempotent and no-ops if the
+  // user's draft already has a non-Miami location set.
+  useEffect(() => {
+    if (!profile.isLoading) {
+      void initDraftLocation(profile.lat ?? null, profile.lng ?? null);
+    }
+  }, [profile.isLoading, profile.lat, profile.lng]);
 
   // Restore from draft (back-navigation preserves state)
   const initial      = getDraft();

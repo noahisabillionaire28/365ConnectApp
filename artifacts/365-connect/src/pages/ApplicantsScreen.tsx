@@ -8,11 +8,12 @@ import { useToast } from '@/contexts/ToastContext';
 
 const SWIPE_THRESHOLD = 120;
 
-function StarRow({ rating }: { rating: number }) {
+function StarRow({ rating }: { rating: number | string }) {
+  const r = Number(rating);
   return (
-    <div className="flex items-center gap-1" aria-label={`${rating.toFixed(1)} star rating`}>
+    <div className="flex items-center gap-1" aria-label={`${r.toFixed(1)} star rating`}>
       <Star size={13} aria-hidden className="text-[#FFD700] fill-[#FFD700]" />
-      <span className="text-black text-[13px] font-semibold">{rating > 0 ? rating.toFixed(1) : 'New'}</span>
+      <span className="text-black text-[13px] font-semibold">{r > 0 ? r.toFixed(1) : 'New'}</span>
     </div>
   );
 }

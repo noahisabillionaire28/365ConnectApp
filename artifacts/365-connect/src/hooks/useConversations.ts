@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase, type ConversationRow, type UserRow } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { onSSE } from '@/lib/sseEmitter';
+import type { ConversationRow, UserRow } from '@/lib/supabase';
 
 export type OtherParticipant = Pick<UserRow, 'id' | 'username' | 'photo_url' | 'role'>;
 
@@ -8,9 +10,33 @@ export type ConversationWithOther = ConversationRow & {
   other: OtherParticipant | null;
   shiftTitle: string | null;
   unread: boolean;
+  participant_a_username?: string | null;
+  participant_a_photo?: string | null;
+  participant_b_username?: string | null;
+  participant_b_photo?: string | null;
 };
 
-/** All conversations the current user is part of, sorted by most recent activity. */
+/**
+ * Standalone named export for direct use in pages:
+ *   import { getOrCreateDirectConversation } from '@/hooks/useConversations';
+ */
+export async function getOrCreateDirectConversation(
+  userId: string,
+  otherUserId: string,
+  shiftId?: string,
+): Promise<string | null> {
+  try {
+    const conv = await apiClient(userId).post<ConversationRow>('/conversations', {
+      other_user_id: otherUserId,
+      shift_id:      shiftId,
+    });
+    return conv.id;
+  } catch (e) {
+    console.error('[getOrCreateDirectConversation] failed:', e);
+    return null;
+  }
+}
+
 export function useConversations() {
   const { user } = useAuth();
   const [items, setItems]       = useState<ConversationWithOther[]>([]);
@@ -19,94 +45,65 @@ export function useConversations() {
   const load = useCallback(async () => {
     if (!user?.id) { setItems([]); setLoading(false); return; }
     setLoading(true);
+    try {
+      const rows = await apiClient(user.id).get<(ConversationRow & {
+        participant_a_username?: string | null;
+        participant_a_photo?: string | null;
+        participant_a_role?: string | null;
+        participant_b_username?: string | null;
+        participant_b_photo?: string | null;
+        participant_b_role?: string | null;
+        shift_title?: string | null;
+      })[]>('/conversations');
 
-    const { data: convos, error } = await supabase
-      .from('conversations')
-      .select('*')
-      .or(`participant_a_id.eq.${user.id},participant_b_id.eq.${user.id}`)
-      .order('last_message_at', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false });
+      const withOther: ConversationWithOther[] = rows.map((c) => {
+        const isA = c.participant_a_id === user.id;
+        const otherId       = isA ? c.participant_b_id : c.participant_a_id;
+        const otherUsername = isA ? c.participant_b_username : c.participant_a_username;
+        const otherPhoto    = isA ? c.participant_b_photo    : c.participant_a_photo;
+        const otherRole     = isA ? c.participant_b_role     : c.participant_a_role;
 
-    if (error) {
-      console.error('[useConversations] fetch failed:', error.message);
+        return {
+          ...c,
+          other: otherId ? {
+            id:        otherId,
+            username:  otherUsername ?? null,
+            photo_url: otherPhoto    ?? null,
+            role:      (otherRole    ?? 'worker') as UserRow['role'],
+          } : null,
+          shiftTitle: c.shift_title ?? null,
+          unread: false,
+        };
+      });
+
+      setItems(withOther);
+    } catch (e) {
+      console.error('[useConversations] fetch failed:', e);
       setItems([]);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const rows = (convos ?? []) as ConversationRow[];
-    if (rows.length === 0) { setItems([]); setLoading(false); return; }
-
-    const otherIds  = rows.map((c) => (c.participant_a_id === user.id ? c.participant_b_id : c.participant_a_id));
-    const shiftIds  = rows.map((c) => c.shift_id).filter((id): id is string => !!id);
-
-    const [usersRes, shiftsRes, unreadRes] = await Promise.all([
-      supabase.from('users').select('id, username, photo_url, role').in('id', otherIds),
-      shiftIds.length
-        ? supabase.from('shifts').select('id, title').in('id', shiftIds)
-        : Promise.resolve({ data: [], error: null }),
-      supabase.from('messages').select('conversation_id, sender_id, read_at')
-        .in('conversation_id', rows.map((c) => c.id))
-        .is('read_at', null),
-    ]);
-
-    const userMap  = new Map((usersRes.data ?? []).map((u) => [u.id, u as OtherParticipant]));
-    const shiftMap = new Map(((shiftsRes.data ?? []) as { id: string; title: string }[]).map((s) => [s.id, s.title]));
-    const unreadSet = new Set(
-      ((unreadRes.data ?? []) as { conversation_id: string; sender_id: string }[])
-        .filter((m) => m.sender_id !== user.id)
-        .map((m) => m.conversation_id),
-    );
-
-    setItems(rows.map((c) => ({
-      ...c,
-      other: userMap.get(c.participant_a_id === user.id ? c.participant_b_id : c.participant_a_id) ?? null,
-      shiftTitle: c.shift_id ? shiftMap.get(c.shift_id) ?? null : null,
-      unread: unreadSet.has(c.id),
-    })));
-    setLoading(false);
   }, [user?.id]);
 
   useEffect(() => { void load(); }, [load]);
 
+  // Live updates: reload conversation list when any conversation changes
   useEffect(() => {
-    if (!user?.id) return;
-    const channel = supabase
-      .channel(`conversations-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => void load())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => void load())
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [user?.id, load]);
+    return onSSE<{ conversationId: string }>('conversation_update', () => {
+      void load();
+    });
+  }, [load]);
 
-  return { items, isLoading, refetch: load };
-}
+  /** Convenience method on the hook instance */
+  const getOrCreate = useCallback(
+    async (otherUserId: string, shiftId?: string): Promise<string | null> => {
+      if (!user?.id) return null;
+      const id = await getOrCreateDirectConversation(user.id, otherUserId, shiftId);
+      if (id) await load();
+      return id;
+    },
+    [user?.id, load],
+  );
 
-/** Finds an existing DM (no shift) between two users, or creates one. */
-export async function getOrCreateDirectConversation(myId: string, otherId: string): Promise<string | null> {
-  const { data: existing, error: findError } = await supabase
-    .from('conversations')
-    .select('id')
-    .is('shift_id', null)
-    .or(`and(participant_a_id.eq.${myId},participant_b_id.eq.${otherId}),and(participant_a_id.eq.${otherId},participant_b_id.eq.${myId})`)
-    .limit(1)
-    .maybeSingle();
-
-  if (findError) {
-    console.error('[getOrCreateDirectConversation] lookup failed:', findError.message);
-    return null;
-  }
-  if (existing) return existing.id;
-
-  const { data: created, error: insertError } = await supabase
-    .from('conversations')
-    .insert({ participant_a_id: myId, participant_b_id: otherId })
-    .select('id')
-    .single();
-
-  if (insertError) {
-    console.error('[getOrCreateDirectConversation] create failed:', insertError.message);
-    return null;
-  }
-  return created.id;
+  return { items, isLoading, refetch: load, getOrCreateConversation: getOrCreate };
 }

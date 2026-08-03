@@ -1,105 +1,92 @@
-import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
-export type ApplicantCard = {
-  applicationId: string;
-  workerId: string;
+/** Raw DB shape returned by the applications list endpoint */
+type RawApplicant = {
+  id: string;
+  shift_id: string;
+  worker_id: string;
+  status: 'pending' | 'accepted' | 'declined';
+  match_score: number | null;
+  applied_at: string;
+  created_at: string;
+  // Joined user fields
   username: string | null;
-  photoUrl: string | null;
-  bio: string | null;
-  jobTypes: string[];
+  photo_url: string | null;
   rating: number;
-  matchScore: number | null;
-  appliedAt: string;
+  job_types: string[];
+  primary_job_type: string | null;
+  certifications: string[];
+  bio: string | null;
 };
 
-/**
- * Pending applicants for a shift the current user owns (client/staffer).
- * Powers the Tinder-style Applicants swipe screen — RLS already restricts
- * `applications` reads to the shift owner or the applying worker, so this
- * naturally returns nothing if the viewer isn't the shift's client.
- */
+export type ApplicantCard = RawApplicant & {
+  /** camelCase alias */
+  applicationId: string;
+  photoUrl: string | null;
+  matchScore: number | null;
+  jobTypes: string[];
+  primaryJobType: string | null;
+};
+
+/** @deprecated use ApplicantCard */
+export type ApplicantRow = ApplicantCard;
+
 export function useShiftApplicants(shiftId: string | undefined) {
+  const { user } = useAuth();
   const [applicants, setApplicants] = useState<ApplicantCard[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setLoading]     = useState(true);
 
   const load = useCallback(async () => {
-    if (!shiftId) { setApplicants([]); setIsLoading(false); return; }
-    setIsLoading(true);
-    setError(null);
-
-    const { data: apps, error: appsError } = await supabase
-      .from('applications')
-      .select('id, worker_id, match_score, created_at')
-      .eq('shift_id', shiftId)
-      .eq('status', 'pending')
-      .order('match_score', { ascending: false, nullsFirst: false });
-
-    if (appsError) {
-      console.error('[useShiftApplicants] fetch failed:', appsError.message);
-      setError(appsError.message);
-      setIsLoading(false);
-      return;
+    if (!shiftId || !user?.id) { setApplicants([]); setLoading(false); return; }
+    setLoading(true);
+    try {
+      const rows = await apiClient(user.id).get<RawApplicant[]>(`/applications?shift_id=${shiftId}`);
+      setApplicants(rows.map((r) => ({
+        ...r,
+        applicationId: r.id,
+        photoUrl:      r.photo_url,
+        matchScore:    r.match_score ?? null,
+        jobTypes:      r.job_types,
+        primaryJobType: r.primary_job_type,
+      })));
+    } catch (e) {
+      console.error('[useShiftApplicants] load failed:', e);
+    } finally {
+      setLoading(false);
     }
-
-    const rows = apps ?? [];
-    if (rows.length === 0) {
-      setApplicants([]);
-      setIsLoading(false);
-      return;
-    }
-
-    const workerIds = rows.map((r) => r.worker_id as string);
-    const { data: users, error: usersError } = await supabase
-      .from('users')
-      .select('id, username, photo_url, bio, job_types, rating')
-      .in('id', workerIds);
-
-    if (usersError) {
-      console.error('[useShiftApplicants] worker fetch failed:', usersError.message);
-      setError(usersError.message);
-      setIsLoading(false);
-      return;
-    }
-
-    const byId = new Map((users ?? []).map((u) => [u.id as string, u]));
-    setApplicants(
-      rows.map((r) => {
-        const u = byId.get(r.worker_id as string);
-        return {
-          applicationId: r.id as string,
-          workerId:      r.worker_id as string,
-          username:      u?.username ?? null,
-          photoUrl:      u?.photo_url ?? null,
-          bio:           u?.bio ?? null,
-          jobTypes:      u?.job_types ?? [],
-          rating:        u?.rating ?? 0,
-          matchScore:    r.match_score as number | null,
-          appliedAt:     r.created_at as string,
-        };
-      }),
-    );
-    setIsLoading(false);
-  }, [shiftId]);
+  }, [shiftId, user?.id]);
 
   useEffect(() => { void load(); }, [load]);
 
-  /** Returns true when the DB update succeeded, false on error. */
-  async function decide(applicationId: string, decision: 'accepted' | 'declined'): Promise<boolean> {
-    // Optimistic: pull the card immediately
-    setApplicants((prev) => prev.filter((a) => a.applicationId !== applicationId));
-    const { error: updateError } = await supabase
-      .from('applications')
-      .update({ status: decision })
-      .eq('id', applicationId);
-    if (updateError) {
-      console.error('[useShiftApplicants] decision failed:', updateError.message);
-      void load(); // reload to restore true state on failure
-      return false;
+  const updateStatus = useCallback(async (applicationId: string, status: string): Promise<void> => {
+    try {
+      await apiClient(user?.id).patch(`/applications/${applicationId}`, { status });
+      setApplicants((prev) => prev.map((a) =>
+        a.id === applicationId ? { ...a, status: status as ApplicantCard['status'] } : a,
+      ));
+    } catch (e) {
+      console.error('[useShiftApplicants] updateStatus failed:', e);
+      throw e;
     }
-    return true;
-  }
+  }, [user?.id]);
 
-  return { applicants, isLoading, error, approve: (id: string) => decide(id, 'accepted'), decline: (id: string) => decide(id, 'declined'), refetch: load };
+  const approve = useCallback(async (applicationId: string): Promise<boolean> => {
+    try {
+      await updateStatus(applicationId, 'accepted');
+      setApplicants((prev) => prev.filter((a) => a.id !== applicationId));
+      return true;
+    } catch { return false; }
+  }, [updateStatus]);
+
+  const decline = useCallback(async (applicationId: string): Promise<boolean> => {
+    try {
+      await updateStatus(applicationId, 'declined');
+      setApplicants((prev) => prev.filter((a) => a.id !== applicationId));
+      return true;
+    } catch { return false; }
+  }, [updateStatus]);
+
+  return { applicants, isLoading, approve, decline, updateStatus, refetch: load };
 }

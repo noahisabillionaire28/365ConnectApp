@@ -13,7 +13,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation }                   from 'wouter';
 import { ChevronLeft, Camera, AlertCircle, CreditCard, Lock, CheckCircle2 } from 'lucide-react';
-import { supabase, uploadAvatar } from '@/lib/supabase';
+import { uploadAvatar } from '@/lib/storage';
+import { apiClient } from '@/lib/api';
 import { useAuth }  from '@/contexts/AuthContext';
 import { ImageCropper } from '@/components/ImageCropper';
 
@@ -181,9 +182,8 @@ export function StafferSetupScreen() {
   // ── Load & resume ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) { navigate('/'); return; }
-    supabase.from('users').select('username, bio, photo_url, secondary_job_types')
-      .eq('id', user.id).maybeSingle()
-      .then(({ data }) => {
+    apiClient(user.id).get<{ username?: string | null; bio?: string | null; photo_url?: string | null; secondary_job_types?: string[] }>('/users/me')
+      .then((data) => {
         if (data?.username) { navigate('/home'); return; }
         if (data?.bio)      setAgencyName(data.bio);
         if (data?.photo_url) setLogoPreview(data.photo_url);
@@ -206,8 +206,7 @@ export function StafferSetupScreen() {
     if (!user) return;
     setSaving(true); setError(null);
     try {
-      const { error: dbErr } = await supabase.from('users').update(patch).eq('id', user.id);
-      if (dbErr) throw dbErr;
+      await apiClient(user.id).patch('/users/me', patch);
       storeStep(user.id, next);
       setStep(next);
     } catch (err) {
@@ -235,8 +234,7 @@ export function StafferSetupScreen() {
       const patch: Record<string, unknown> = {};
       if (photoUrl) patch.photo_url = photoUrl;
       if (Object.keys(patch).length) {
-        const { error: dbErr } = await supabase.from('users').update(patch).eq('id', user.id);
-        if (dbErr) throw dbErr;
+        await apiClient(user.id).patch('/users/me', patch);
       }
       storeStep(user.id, 3);
       setStep(3);
@@ -270,15 +268,9 @@ export function StafferSetupScreen() {
     setSaving(true); setError(null);
     try {
       const autoUsername = slugify(agencyName || user.email?.split('@')[0] || 'agency');
-      const { error: usernameErr } = await supabase.from('users')
-        .update({ username: autoUsername }).eq('id', user.id);
-      if (usernameErr) throw usernameErr;
-      // Try storing the simulated billing ref (column may not exist — non-fatal)
-      const { error: billingErr } = await supabase.from('users')
-        .update({ billing_ref: ref }).eq('id', user.id);
-      if (billingErr && !/column .* does not exist/i.test(billingErr.message)) {
-        console.warn('[StafferSetup] billing_ref save failed:', billingErr.message);
-      }
+      await apiClient(user.id).patch('/users/me', { username: autoUsername });
+      // Try storing the simulated billing ref (non-fatal)
+      await apiClient(user.id).patch('/users/me', { billing_ref: ref }).catch(() => {});
       localStorage.removeItem(stepKey(user.id));
       setCardDone(true);
       setTimeout(() => navigate('/home'), 1200);

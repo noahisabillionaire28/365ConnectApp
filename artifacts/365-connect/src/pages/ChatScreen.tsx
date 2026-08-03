@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useLocation } from 'wouter';
 import { ChevronLeft, Image as ImageIcon, Video, Mic, Send, Square, Check, CheckCheck } from 'lucide-react';
-import { supabase, uploadChatImage, uploadChatVideo, uploadChatVoice, getSignedChatMediaUrl, type ConversationRow, type UserRow, type MessageRow } from '@/lib/supabase';
+import { uploadChatImage, uploadChatVideo, uploadChatVoice, getSignedChatMediaUrl } from '@/lib/storage';
+import type { ConversationRow, UserRow, MessageRow } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/hooks/useMessages';
 import { ImageCropper } from '@/components/ImageCropper';
@@ -123,23 +125,29 @@ export function ChatScreen() {
   useEffect(() => {
     if (!conversationId || !user?.id) return;
     (async () => {
-      const { data: conv } = await supabase.from('conversations').select('*').eq('id', conversationId).maybeSingle();
+      const conv = await apiClient(user.id).get<ConversationRow & {
+        participant_a_username?: string | null; participant_a_photo?: string | null;
+        participant_b_username?: string | null; participant_b_photo?: string | null;
+        shift_title?: string | null;
+      }>(`/conversations/${conversationId}`).catch(() => null);
       if (!conv) return;
       setConversation(conv as ConversationRow);
-      const otherId = conv.participant_a_id === user.id ? conv.participant_b_id : conv.participant_a_id;
-      const [{ data: u }, shiftRes] = await Promise.all([
-        supabase.from('users').select('id, username, photo_url').eq('id', otherId).maybeSingle(),
-        conv.shift_id
-          ? supabase.from('shifts').select('title').eq('id', conv.shift_id).maybeSingle()
-          : Promise.resolve({ data: null }),
-      ]);
-      setOther((u as OtherUser) ?? null);
-      setShiftTitle((shiftRes.data as { title: string } | null)?.title ?? null);
+      const isA = conv.participant_a_id === user.id;
+      const otherId = isA ? conv.participant_b_id : conv.participant_a_id;
+      const otherUsername = isA ? conv.participant_b_username : conv.participant_a_username;
+      const otherPhoto = isA ? conv.participant_b_photo : conv.participant_a_photo;
+      setOther(otherId ? { id: otherId, username: otherUsername ?? null, photo_url: otherPhoto ?? null } as OtherUser : null);
+      setShiftTitle(conv.shift_title ?? null);
     })();
   }, [conversationId, user?.id]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ block: 'end' }); }, [messages.length]);
-  useEffect(() => { if (!isLoading) void markRead(); }, [isLoading, messages.length, markRead]);
+  useEffect(() => {
+    if (!isLoading && messages.length > 0) {
+      const ids = messages.map((m) => (m as { id: string }).id).filter(Boolean);
+      if (ids.length) void markRead(ids);
+    }
+  }, [isLoading, messages.length, markRead]);
 
   function handleScroll() {
     if (scrollRef.current && scrollRef.current.scrollTop < 40 && hasMore) void loadOlder();

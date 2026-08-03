@@ -29,7 +29,7 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
           <img src={person.photoUrl} alt="" aria-hidden loading="lazy" decoding="async"
             className="w-full h-full object-cover" />
         ) : (
-          <span className="text-[#6B7280] font-bold text-[18px]">{person.username.slice(0, 2).toUpperCase()}</span>
+          <span className="text-[#6B7280] font-bold text-[18px]">{(person.username ?? '??').slice(0, 2).toUpperCase()}</span>
         )}
       </button>
 
@@ -44,7 +44,7 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
         <div className="flex items-center gap-1 mt-1">
           <Star size={12} aria-hidden className="text-amber-400 fill-amber-400" />
           <span className="text-[#6B7280] text-[12px] font-medium">
-            {person.rating > 0 ? person.rating.toFixed(1) : 'New'}
+            {Number(person.rating) > 0 ? Number(person.rating).toFixed(1) : 'New'}
           </span>
           <span className="text-[#D1D5DB]">·</span>
           <span className="text-[#6B7280] text-[12px]">{person.distanceMiles} mi</span>

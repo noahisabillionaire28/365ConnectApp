@@ -17,3 +17,5 @@
 - [Playwright e2e setup](playwright-e2e-setup.md) — magic-link token exchange avoids password + origin-mismatch issues; Nix libs required for Chromium headless
 - [Edit shift store pitfall](edit-shift-store-pitfall.md) — resetDraft() clears editShiftId; mid-wizard callers must save/restore it, and cancel paths must clear it explicitly
 - [Seed script live-schema quirks](seed-schema-quirks.md) — messages.recipient_id NOT NULL; users.rating NOT NULL no-default (must seed 0 for clients/staffers); reviews blocked by stale trigger (reviewee_id)
+- [API migration patterns](api-migration-patterns.md) — all 25 frontend hooks use apiClient(userId); x-user-id header for auth; index signatures [key:string]:unknown break ReactNode inference — avoid them in hook types
+- [Object Storage integration](object-storage-integration.md) — presigned-URL flow; esbuild cannot bundle zod so use manual validation in storage route; reviews API doesn't embed shift details

@@ -13,7 +13,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation }          from 'wouter';
 import { ChevronLeft, AlertCircle, CreditCard, Lock, CheckCircle2, Camera } from 'lucide-react';
-import { supabase, uploadAvatar } from '@/lib/supabase';
+import { uploadAvatar } from '@/lib/storage';
+import { apiClient } from '@/lib/api';
 import { useAuth }  from '@/contexts/AuthContext';
 import { ImageCropper } from '@/components/ImageCropper';
 
@@ -230,9 +231,8 @@ export function ClientSetupScreen() {
   // ── Load & resume ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) { navigate('/'); return; }
-    supabase.from('users').select('username, bio, secondary_job_types')
-      .eq('id', user.id).maybeSingle()
-      .then(({ data }) => {
+    apiClient(user.id).get<{ username?: string | null; bio?: string | null; secondary_job_types?: string[] }>('/users/me')
+      .then((data) => {
         if (data?.username) { navigate('/home'); return; }
         if (data?.bio)                setFullName(data.bio);
         if (Array.isArray(data?.secondary_job_types)) setEventTypes(data.secondary_job_types);
@@ -253,8 +253,7 @@ export function ClientSetupScreen() {
     if (!user) return;
     setSaving(true); setError(null);
     try {
-      const { error: dbErr } = await supabase.from('users').update(patch).eq('id', user.id);
-      if (dbErr) throw dbErr;
+      await apiClient(user.id).patch('/users/me', patch);
       storeStep(user.id, next);
       setStep(next);
     } catch (err) {
@@ -278,13 +277,10 @@ export function ClientSetupScreen() {
         const photoUrl = await uploadAvatar(user.id, logoFile); // throws with real message
         setLogoPreview(photoUrl);
         setLogoFile(null);
-        await supabase.from('users').update({ photo_url: photoUrl }).eq('id', user.id);
+        await apiClient(user.id).patch('/users/me', { photo_url: photoUrl });
       }
       if (companyName.trim()) {
-        const { error: dbErr } = await supabase.from('users')
-          .update({ company_name: companyName.trim() }).eq('id', user.id);
-        // Ignore only "column does not exist" — schema may not have this column.
-        if (dbErr && !/column .* does not exist/i.test(dbErr.message)) throw dbErr;
+        await apiClient(user.id).patch('/users/me', { company_name: companyName.trim() }).catch(() => {});
       }
       storeStep(user.id, 3);
       setStep(3);
@@ -318,16 +314,8 @@ export function ClientSetupScreen() {
     setSaving(true); setError(null);
     try {
       const autoUsername = slugify(fullName || user.email?.split('@')[0] || 'client');
-      // Mark setup complete by setting username — this is the required write.
-      const { error: usernameErr } = await supabase.from('users')
-        .update({ username: autoUsername }).eq('id', user.id);
-      if (usernameErr) throw usernameErr;
-      // Try storing the simulated billing ref (column may not exist — non-fatal)
-      const { error: billingErr } = await supabase.from('users')
-        .update({ billing_ref: ref }).eq('id', user.id);
-      if (billingErr && !/column .* does not exist/i.test(billingErr.message)) {
-        console.warn('[ClientSetup] billing_ref save failed:', billingErr.message);
-      }
+      await apiClient(user.id).patch('/users/me', { username: autoUsername });
+      await apiClient(user.id).patch('/users/me', { billing_ref: ref }).catch(() => {});
       localStorage.removeItem(stepKey(user.id));
       setCardDone(true);
       setTimeout(() => navigate('/home'), 1200);

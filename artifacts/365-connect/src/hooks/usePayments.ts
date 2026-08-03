@@ -1,33 +1,71 @@
-/**
- * usePayments — fetches all payment rows for the current authenticated user
- * (either as worker_id for shift earnings, or for Pro subscription charges).
- */
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import type { PaymentRow } from '@/lib/supabase';
 
 export const PAYMENTS_QUERY_KEY = ['payments'] as const;
 
+export type PaymentRow = {
+  id: string;
+  shift_id: string | null;
+  worker_id: string;
+  amount: number;
+  fee: number;
+  net_amount: number;
+  status: string;
+  payment_type: string;
+  created_at: string;
+  shift_title?: string | null;
+  company_name?: string | null;
+};
+
 export function usePayments() {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [isLoading, setLoading] = useState(true);
+  const [isError, setIsError]   = useState(false);
 
-  return useQuery<PaymentRow[]>({
-    queryKey: [...PAYMENTS_QUERY_KEY, user?.id ?? 'anon'],
-    enabled: !!user?.id && !authLoading,
-    staleTime: 30_000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('worker_id', user!.id)
-        .order('created_at', { ascending: false });
+  const load = useCallback(async () => {
+    if (!user?.id) { setPayments([]); setLoading(false); return; }
+    setLoading(true);
+    setIsError(false);
+    try {
+      const rows = await apiClient(user.id).get<PaymentRow[]>('/payments');
+      setPayments(rows);
+    } catch (e) {
+      console.error('[usePayments] load failed:', e);
+      setIsError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
 
-      if (error) {
-        console.error('[usePayments] fetch error:', error.message);
-        throw error;
-      }
-      return (data ?? []) as PaymentRow[];
-    },
-  });
+  useEffect(() => { void load(); }, [load]);
+
+  const createPayment = useCallback(async (payment: {
+    shift_id?: string | null;
+    amount: number;
+    fee: number;
+    net_amount: number;
+    status?: string;
+    payment_type?: string;
+  }): Promise<PaymentRow | null> => {
+    if (!user?.id) return null;
+    try {
+      const row = await apiClient(user.id).post<PaymentRow>('/payments', payment);
+      setPayments((prev) => [row, ...prev]);
+      return row;
+    } catch (e) {
+      console.error('[usePayments] createPayment failed:', e);
+      return null;
+    }
+  }, [user?.id]);
+
+  return {
+    data:      payments,
+    isError,
+    payments,
+    isLoading,
+    createPayment,
+    refetch: load,
+  };
 }

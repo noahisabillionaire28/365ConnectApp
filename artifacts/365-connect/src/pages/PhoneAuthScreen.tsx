@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { ChevronLeft, Phone, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 
 type Step = 'phone' | 'otp';
 
@@ -108,13 +109,9 @@ export function PhoneAuthScreen() {
       if (!data.session) throw new Error('Verification failed. Please try again.');
 
       // Upsert minimal users row for new phone-auth users (ignored if exists)
-      const { error: upsertErr } = await supabase.from('users').upsert(
-        { id: data.session.user.id, email: null, role: 'worker' },
-        { onConflict: 'id', ignoreDuplicates: true }
-      );
-      if (upsertErr) {
-        console.warn('[PhoneAuth] upsert warning:', upsertErr.message);
-      }
+      await apiClient(data.session.user.id).post('/users', {
+        id: data.session.user.id, email: null, role: 'worker',
+      }).catch((e) => console.warn('[PhoneAuth] upsert warning:', e));
 
       // Route based on profile completeness
       const { data: profile, error: profileErr } = await supabase

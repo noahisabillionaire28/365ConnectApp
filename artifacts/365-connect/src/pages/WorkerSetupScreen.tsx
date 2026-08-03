@@ -16,7 +16,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation }                  from 'wouter';
 import { ChevronLeft, Camera, Plus, X, Check, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { supabase, uploadAvatar, uploadPostPhoto } from '@/lib/supabase';
+import { uploadAvatar, uploadPostPhoto } from '@/lib/storage';
+import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { JOB_TYPES } from '@/lib/jobTypes';
 import { ImageCropper } from '@/components/ImageCropper';
@@ -146,11 +147,8 @@ export function WorkerSetupScreen() {
   // ── Load & resume ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) { navigate('/'); return; }
-    supabase.from('users')
-      .select('username, photo_url, bio, primary_job_type, secondary_job_types, certifications, availability')
-      .eq('id', user.id)
-      .maybeSingle()
-      .then(async ({ data }) => {
+    apiClient(user.id).get<{ username?: string | null; photo_url?: string | null; bio?: string | null; primary_job_type?: string | null; secondary_job_types?: string[]; certifications?: string[]; availability?: unknown }>('/users/me')
+      .then(async (data) => {
         if (!data) { setInitialized(true); return; }
 
         // If setup is already complete (incl. step 8 first post), go home
@@ -196,10 +194,10 @@ export function WorkerSetupScreen() {
 
     setUsernameStatus('checking');
     usernameTimer.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from('users').select('id').eq('username', val).maybeSingle();
-      // Allow if it's already this user's handle
-      setUsernameStatus(data && data.id !== user.id ? 'taken' : 'valid');
+      try {
+        const rows = await apiClient(null).get<{ id: string }[]>(`/workers?username=${encodeURIComponent(val)}&limit=1`);
+        setUsernameStatus(rows.length > 0 && rows[0]?.id !== user?.id ? 'taken' : 'valid');
+      } catch { setUsernameStatus('valid'); }
     }, 600);
 
     return () => { if (usernameTimer.current) clearTimeout(usernameTimer.current); };
@@ -210,8 +208,7 @@ export function WorkerSetupScreen() {
     if (!user) return;
     setSaving(true); setError(null);
     try {
-      const { error: dbErr } = await supabase.from('users').update(patch).eq('id', user.id);
-      if (dbErr) throw dbErr;
+      await apiClient(user.id).patch('/users/me', patch);
       storeStep(user.id, nextStep);
       setStep(nextStep);
     } catch (err) {
@@ -280,17 +277,10 @@ export function WorkerSetupScreen() {
       }
       // Only insert a post when the user has provided at least some content
       if (imageUrl || postCaption.trim()) {
-        const { error: postErr } = await supabase.from('posts').insert({
-          user_id:   user.id,
+        await apiClient(user.id).post('/posts', {
           photo_url: imageUrl,
           caption:   postCaption.trim() || null,
         });
-        if (postErr) {
-          // Surface the real Supabase error (PostgrestError has .message, .code, .details)
-          const detail = [postErr.message, postErr.details, postErr.code].filter(Boolean).join(' | ');
-          console.error('[WorkerSetup Step 8] post insert failed:', postErr);
-          throw new Error(detail || 'Could not save post.');
-        }
       }
       localStorage.removeItem(stepKey(user.id));
       navigate('/home');

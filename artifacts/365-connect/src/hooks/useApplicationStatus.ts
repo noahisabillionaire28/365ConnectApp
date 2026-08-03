@@ -1,28 +1,25 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
-export type ApplicationStatus = 'pending' | 'accepted' | 'declined' | 'rejected' | 'withdrawn' | null;
-
-/** The current worker's application status for a single shift (Shift Detail CTA). */
 export function useApplicationStatus(shiftId: string | undefined) {
   const { user } = useAuth();
-
-  const query = useQuery<ApplicationStatus, Error>({
+  const query = useQuery<{ status: string | null }, Error>({
     queryKey: ['application-status', shiftId, user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('applications')
-        .select('status')
-        .eq('shift_id', shiftId!)
-        .eq('worker_id', user!.id)
-        .maybeSingle();
-      if (error) throw error;
-      return (data?.status as ApplicationStatus) ?? null;
+      if (!shiftId || !user?.id) return { status: null };
+      return apiClient(user.id).get<{ status: string | null }>(`/applications/status/${shiftId}`);
     },
     enabled: !!shiftId && !!user?.id,
-    staleTime: 15_000,
+    staleTime: 30_000,
   });
 
-  return { status: query.data ?? null, isLoading: query.isLoading };
+  // Expose the actual application status (data.status), NOT the React Query
+  // query state (query.status), to avoid a confusing shadowing bug.
+  return {
+    status:    query.data?.status ?? null as string | null,
+    isLoading: query.isLoading,
+    isError:   query.isError,
+    refetch:   query.refetch,
+  };
 }

@@ -172,7 +172,7 @@ function UserDetailSheet({
           <div className="grid grid-cols-3 gap-2 mb-5">
             {[
               { label: 'Joined',  value: joinDate.replace(', 20', ' \'') },
-              { label: 'Rating',  value: user.rating > 0 ? user.rating.toFixed(1) : 'N/A' },
+              { label: 'Rating',  value: Number(user.rating) > 0 ? Number(user.rating).toFixed(1) : 'N/A' },
               { label: 'Pro',     value: user.is_pro ? 'Yes' : 'No' },
             ].map(({ label, value }) => (
               <div key={label} className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] py-3 px-3 text-center">
@@ -288,10 +288,10 @@ function UserListRow({ user, onOpen }: { user: AdminUserRow; onOpen: (u: AdminUs
         <div className="flex items-center gap-1.5 flex-wrap">
           <RoleBadge role={user.role} />
           <StatusBadge status={user.status ?? 'active'} />
-          {user.rating > 0 && (
+          {Number(user.rating) > 0 && (
             <span className="flex items-center gap-0.5 text-[11px] text-[#737373]">
               <Star size={10} aria-hidden className="text-[#FFD700] fill-[#FFD700]" />
-              {user.rating.toFixed(1)}
+              {Number(user.rating).toFixed(1)}
             </span>
           )}
         </div>

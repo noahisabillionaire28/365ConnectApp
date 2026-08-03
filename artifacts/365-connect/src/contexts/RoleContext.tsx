@@ -1,5 +1,5 @@
 /**
- * RoleContext — fetches the logged-in user's role from the `users` table
+ * RoleContext — fetches the logged-in user's role from the API
  * and makes it available app-wide via useRole().
  *
  * Must be rendered inside <AuthProvider>.
@@ -9,8 +9,8 @@
 import {
   createContext, useContext, useCallback, useEffect, useState, type ReactNode,
 } from 'react';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { apiClient } from '@/lib/api';
 
 export type UserRole = 'worker' | 'client' | 'staffer' | 'admin' | null;
 
@@ -28,9 +28,9 @@ const RoleContext = createContext<RoleContextType>({
 });
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  const { user }                          = useAuth();
-  const [role, setRole]                   = useState<UserRole>(null);
-  const [roleLoading, setRoleLoading]     = useState(true);
+  const { user }                      = useAuth();
+  const [role, setRole]               = useState<UserRole>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
 
   const fetchRole = useCallback(async () => {
     if (!user) {
@@ -39,14 +39,14 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       return;
     }
     setRoleLoading(true);
-    const { data } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle();
-    setRole((data?.role as UserRole) ?? null);
+    try {
+      const data = await apiClient(user.id).get<{ role: string | null }>('/users/me');
+      setRole((data?.role as UserRole) ?? null);
+    } catch {
+      setRole(null);
+    }
     setRoleLoading(false);
-  }, [user?.id]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch on mount + whenever auth user changes
   useEffect(() => { fetchRole(); }, [fetchRole]);

@@ -1,59 +1,63 @@
-import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
-export type AcceptedWorker = {
-  workerId: string;
+type RawAccepted = {
+  id: string;
+  shift_id: string;
+  worker_id: string;
+  status: string;
   username: string | null;
+  photo_url: string | null;
+  rating: number;
+  job_types: string[];
+  primary_job_type: string | null;
+  certifications: string[];
+  bio: string | null;
+  clock_out?: string | null;
+  already_reviewed?: boolean;
+  [key: string]: unknown;
+};
+
+export type AcceptedWorker = RawAccepted & {
+  /** camelCase aliases */
+  workerId: string;
   photoUrl: string | null;
+  /** true when the worker has clocked out */
   completed: boolean;
+  /** true when the shift owner has already rated this worker */
   alreadyReviewed: boolean;
 };
 
-/** Accepted workers on a shift the current user (client/staffer) owns, with completion + review state — for the "Rate this worker" list on Shift Detail. */
-export function useAcceptedWorkers(shiftId: string | undefined, viewerId: string | undefined) {
-  const [workers, setWorkers] = useState<AcceptedWorker[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export function useAcceptedWorkers(
+  shiftId: string | undefined,
+  /** optional — kept for compat, ignored (comes from auth context) */
+  _ownerId?: string,
+) {
+  const { user } = useAuth();
+  const [workers, setWorkers]   = useState<AcceptedWorker[]>([]);
+  const [isLoading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    if (!shiftId || !viewerId) { setWorkers([]); setIsLoading(false); return; }
-    setIsLoading(true);
-
-    const { data: apps, error: appsError } = await supabase
-      .from('applications')
-      .select('worker_id')
-      .eq('shift_id', shiftId)
-      .eq('status', 'accepted');
-
-    if (appsError || !apps || apps.length === 0) {
-      if (appsError) console.error('[useAcceptedWorkers] fetch failed:', appsError.message);
-      setWorkers([]);
-      setIsLoading(false);
-      return;
+    if (!shiftId || !user?.id) { setWorkers([]); setLoading(false); return; }
+    setLoading(true);
+    try {
+      const rows = await apiClient(user.id).get<RawAccepted[]>(
+        `/applications?shift_id=${shiftId}&status=accepted`,
+      );
+      setWorkers(rows.map((r) => ({
+        ...r,
+        workerId:        r.worker_id,
+        photoUrl:        r.photo_url,
+        completed:       !!(r.clock_out),
+        alreadyReviewed: !!(r.already_reviewed),
+      })));
+    } catch (e) {
+      console.error('[useAcceptedWorkers] load failed:', e);
+    } finally {
+      setLoading(false);
     }
-
-    const workerIds = apps.map((a) => a.worker_id as string);
-
-    const [{ data: users }, { data: entries }, { data: reviews }] = await Promise.all([
-      supabase.from('users').select('id, username, photo_url').in('id', workerIds),
-      supabase.from('time_entries').select('worker_id, clock_out').eq('shift_id', shiftId).in('worker_id', workerIds),
-      supabase.from('reviews_visible').select('reviewee_id').eq('shift_id', shiftId).eq('reviewer_id', viewerId).in('reviewee_id', workerIds),
-    ]);
-
-    const usersById   = new Map((users   ?? []).map((u) => [u.id as string, u]));
-    const entryById    = new Map((entries ?? []).map((e) => [e.worker_id as string, e]));
-    const reviewedSet  = new Set((reviews ?? []).map((r) => r.reviewee_id as string));
-
-    setWorkers(
-      workerIds.map((id) => ({
-        workerId:        id,
-        username:        usersById.get(id)?.username ?? null,
-        photoUrl:        usersById.get(id)?.photo_url ?? null,
-        completed:       !!entryById.get(id)?.clock_out,
-        alreadyReviewed: reviewedSet.has(id),
-      })),
-    );
-    setIsLoading(false);
-  }, [shiftId, viewerId]);
+  }, [shiftId, user?.id]);
 
   useEffect(() => { void load(); }, [load]);
 

@@ -1,0 +1,44 @@
+Fix the following bugs. Keep changes minimal and match existing code patterns.
+Do NOT touch Stripe/payments or chat photo upload — those are separate tasks.
+
+1. BottomTabNav — staffer "Post Shift" tab routes to /post-shift/step1 (the client
+   wizard). Route staffers to /staffer-shift/step1. Clients keep /post-shift/step1.
+
+2. AdminDisputes + AdminRevenue — these read admin auth synchronously while it
+   resolves async, rendering blank on hard refresh. Add an auth-loading guard:
+   show a loading state until auth resolves, then render data or redirect if
+   not admin.
+
+3. useAdminData.ts is empty. Implement it: fetch admin dashboard metrics from
+   Supabase, return { data, isLoading, error }, handle errors, and match the
+   shape AdminDashboard already expects.
+
+4. feedStore — saved/applied state is in-memory only. Persist per user to
+   Supabase (preferred) or localStorage keyed by user id as fallback. Hydrate
+   on app load.
+
+5. PostShiftStep1–5 wizard draft is a module singleton, wiped on refresh.
+   Persist draft to localStorage on each step change, hydrate on mount, clear
+   on submit or cancel.
+
+6. StafferPostStep store — default lat/lng hardcoded to Miami. Use the staffer's
+   saved profile location first, browser geolocation second, constant only as
+   last resort.
+
+7. NotificationsScreen — realtime INSERT events prepend without dedupe. Dedupe
+   by notification id before setState so refetch + realtime overlap can't
+   double-render.
+
+8. ChatScreen — read status is set optimistically with no rollback. Wrap the DB
+   write in try/catch and revert local read state (restore unread badge) on
+   failure.
+
+9. EarningsScreen — verify whether a real data hook backs it. If it's placeholder
+   UI, wire it to real earnings data from Supabase. If no data source exists,
+   report back instead of inventing one.
+
+Rules:
+- One commit per fix, clear message.
+- No new dependencies unless required.
+- Do not refactor unrelated code.
+- After each fix, state in one line what changed.

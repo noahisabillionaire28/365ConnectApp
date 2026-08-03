@@ -85,7 +85,7 @@ export function ShiftRequestsScreen() {
                       <p className="text-black font-bold text-[15px] truncate">{r.shiftTitle}</p>
                       <p className="text-[#737373] text-[12px] mt-[2px]">
                         {r.payRate != null ? `${r.payRate}/${r.payPeriod} · ` : ''}
-                        {friendlyDate(r.startTime)} · {formatTime(r.startTime)}
+                        {r.startTime ? friendlyDate(r.startTime) : ''} · {r.startTime ? formatTime(r.startTime) : ''}
                       </p>
                     </div>
                   </div>

@@ -27,14 +27,18 @@ export type PostShiftDraft = {
   requirements: string[]; // one requirement per line → string[]
 };
 
+// ─── Default location (updated by initDraftLocation; survives resetDraft) ────
+let _defaultLat = 25.7825;
+let _defaultLng = -80.1298;
+
 // ─── Empty draft ─────────────────────────────────────────────────────────────
 function empty(): PostShiftDraft {
   return {
     job_type:        '',
     title:           '',
     location:        '',
-    lat:             25.7825,
-    lng:             -80.1298,
+    lat:             _defaultLat,
+    lng:             _defaultLng,
     unit_info:       '',
     date:            '',
     start_time:      '18:00',
@@ -46,8 +50,56 @@ function empty(): PostShiftDraft {
   };
 }
 
+/**
+ * Resolve the best available location for the wizard and store it as the
+ * default so it survives resetDraft().  Call once when the wizard mounts.
+ * Priority: profile DB coords → browser geolocation → Miami constant.
+ */
+export async function initDraftLocation(
+  profileLat: number | null,
+  profileLng: number | null,
+): Promise<void> {
+  // 1. Profile coordinates
+  if (profileLat && profileLng) {
+    _defaultLat = profileLat;
+    _defaultLng = profileLng;
+    if (draft.lat === 25.7825 && draft.lng === -80.1298) {
+      draft = { ...draft, lat: _defaultLat, lng: _defaultLng };
+    }
+    return;
+  }
+  // 2. Browser geolocation
+  if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+    await new Promise<void>((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          _defaultLat = pos.coords.latitude;
+          _defaultLng = pos.coords.longitude;
+          if (draft.lat === 25.7825 && draft.lng === -80.1298) {
+            draft = { ...draft, lat: _defaultLat, lng: _defaultLng };
+          }
+          resolve();
+        },
+        () => resolve(),
+        { timeout: 5000, maximumAge: 60_000 },
+      );
+    });
+  }
+  // 3. Miami stays as-is (already the module default)
+}
+
 // ─── Singleton ────────────────────────────────────────────────────────────────
-let draft: PostShiftDraft = empty();
+const DRAFT_KEY = '365connect:post-shift-draft';
+
+function loadPersistedDraft(): PostShiftDraft {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (raw) return { ...empty(), ...JSON.parse(raw) };
+  } catch { /* corrupt — start fresh */ }
+  return empty();
+}
+
+let draft: PostShiftDraft = loadPersistedDraft();
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 export function getDraft(): PostShiftDraft {
@@ -55,10 +107,12 @@ export function getDraft(): PostShiftDraft {
 }
 export function setDraft(updates: Partial<PostShiftDraft>): void {
   draft = { ...draft, ...updates };
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch { /* ignore */ }
 }
 export function resetDraft(): void {
   draft = empty();
   editShiftId = null;
+  try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
 }
 
 // ─── Edit mode ────────────────────────────────────────────────────────────────

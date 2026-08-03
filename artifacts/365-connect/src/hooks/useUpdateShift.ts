@@ -1,56 +1,44 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
-import { SHIFTS_QUERY_KEY } from './useShifts';
+import { useState, useCallback } from 'react';
+import { apiClient } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import type { ShiftRow } from '@/lib/supabase';
 
-export type UpdateShiftInput = {
-  id:              string;
-  title:           string;
-  job_type:        string;
-  job_types:       string[];
-  description?:    string;
-  requirements?:   string[];
-  location?:       string;
-  lat?:            number;
-  lng?:            number;
-  unit_info?:      string;
-  pay_rate?:       number;
-  start_time:      string;   // ISO datetime
-  end_time:        string;   // ISO datetime
-  spots_available: number;
-};
-
-/** Mutation that updates an existing shift row (client edit flow). */
 export function useUpdateShift() {
-  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const [isLoading, setLoading] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError]       = useState<string | null>(null);
 
-  return useMutation({
-    mutationFn: async (input: UpdateShiftInput) => {
-      const { error } = await supabase
-        .from('shifts')
-        .update({
-          title:           input.title,
-          job_type:        input.job_type,
-          job_types:       input.job_types,
-          description:     input.description   ?? null,
-          requirements:    input.requirements  ?? [],
-          location:        input.location      ?? null,
-          lat:             input.lat           ?? null,
-          lng:             input.lng           ?? null,
-          unit_info:       input.unit_info     ?? null,
-          pay_rate:        input.pay_rate      ?? null,
-          start_time:      input.start_time,
-          end_time:        input.end_time,
-          spots_available: input.spots_available,
-        })
-        .eq('id', input.id);
-      if (error) throw error;
-      return input.id;
-    },
-    onSuccess: (_id, input) => {
-      queryClient.invalidateQueries({ queryKey: SHIFTS_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: ['my-posted-shifts'] });
-      queryClient.invalidateQueries({ queryKey: ['client-dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['shift', input.id] });
-    },
-  });
+  const updateShift = useCallback(async (id: string, updates: Partial<ShiftRow>): Promise<ShiftRow | null> => {
+    if (!user?.id) return null;
+    setLoading(true);
+    setIsPending(true);
+    setError(null);
+    try {
+      const row = await apiClient(user.id).patch<ShiftRow>(`/shifts/${id}`, updates);
+      return row;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      return null;
+    } finally {
+      setLoading(false);
+      setIsPending(false);
+    }
+  }, [user?.id]);
+
+  /**
+   * React Query mutation compat alias.
+   * Accepts a flat object `{ id, ...fields }`, a tuple `[id, updates]`,
+   * or an object `{ id, updates }`.
+   */
+  const mutateAsync = useCallback(async (
+    args: [string, Partial<ShiftRow>] | { id: string; updates?: Partial<ShiftRow> } & Partial<ShiftRow>,
+  ): Promise<ShiftRow | null> => {
+    if (Array.isArray(args)) return updateShift(args[0], args[1]);
+    const { id, updates, ...rest } = args as { id: string; updates?: Partial<ShiftRow> } & Partial<ShiftRow>;
+    return updateShift(id, updates ?? (rest as Partial<ShiftRow>));
+  }, [updateShift]);
+
+  return { updateShift, mutateAsync, isLoading, isPending, error };
 }

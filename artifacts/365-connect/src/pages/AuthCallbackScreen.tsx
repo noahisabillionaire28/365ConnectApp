@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 import { resolveSetupRoute } from '@/lib/setupRoute';
 import type { Session } from '@supabase/supabase-js';
 
@@ -35,29 +36,23 @@ export function AuthCallbackScreen() {
 
     try {
       // Upsert minimal row for new OAuth users (ignored if exists)
-      const { error: upsertErr } = await supabase.from('users').upsert(
-        {
+      try {
+        await apiClient(session.user.id).post('/users', {
           id:        session.user.id,
           email:     session.user.email ?? null,
           role:      'worker',
           photo_url: (session.user.user_metadata?.['avatar_url'] as string | undefined) ?? null,
-        },
-        { onConflict: 'id', ignoreDuplicates: true },
-      );
-      if (upsertErr) console.warn('[AuthCallback] upsert warning:', upsertErr.message);
+        });
+      } catch (e) {
+        console.warn('[AuthCallback] upsert warning:', e);
+      }
 
-      const { data: profile, error: profileErr } = await supabase
-        .from('users')
-        .select('username, role, availability')
-        .eq('id', session.user.id)
-        .maybeSingle();
-
-      const tableNotFound =
-        profileErr?.message?.toLowerCase().includes('relation') ||
-        profileErr?.message?.toLowerCase().includes('does not exist') ||
-        (profileErr as { code?: string } | null)?.code === '42P01';
-
-      if (profileErr && !tableNotFound) throw new Error(`Could not load your profile: ${profileErr.message}`);
+      let profile: { username: string | null; role: string | null; availability: unknown } | null = null;
+      try {
+        profile = await apiClient(session.user.id).get('/users/me');
+      } catch (e) {
+        console.warn('[AuthCallback] profile load warning:', e);
+      }
 
       navigate(await resolveSetupRoute(session.user.id, profile));
     } catch (err) {

@@ -1,50 +1,59 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+/**
+ * AuthContext — Task #21 Clerk shim.
+ *
+ * Wraps Clerk's useUser/useClerk and exposes the same { user, loading, signOut }
+ * shape that all existing screens already depend on, so no page changes are needed.
+ */
+import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import { useUser, useClerk } from '@clerk/react';
+import { hydrateForUser, clearUser } from '@/store/feedStore';
+
+export type SimpleUser = {
+  id:       string;
+  email:    string | undefined;
+  imageUrl: string | undefined;
+};
 
 type AuthContextType = {
-  user: User | null;
-  session: Session | null;
+  user:    SimpleUser | null;
   loading: boolean;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
-  user: null,
-  session: null,
+  user:    null,
   loading: true,
   signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user: clerkUser, isLoaded } = useUser();
+  const { signOut: clerkSignOut }     = useClerk();
 
+  const user: SimpleUser | null = clerkUser
+    ? {
+        id:       clerkUser.id,
+        email:    clerkUser.primaryEmailAddress?.emailAddress,
+        imageUrl: clerkUser.imageUrl ?? undefined,
+      }
+    : null;
+
+  // Keep the feed store hydrated whenever auth state changes
   useEffect(() => {
-    // Hydrate from current session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    // Subscribe to auth state changes (handles OAuth redirects too)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    if (!isLoaded) return;
+    if (user) {
+      hydrateForUser(user.id);
+    } else {
+      clearUser();
+    }
+  }, [user?.id, isLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await clerkSignOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signOut }}>
+    <AuthContext.Provider value={{ user, loading: !isLoaded, signOut }}>
       {children}
     </AuthContext.Provider>
   );

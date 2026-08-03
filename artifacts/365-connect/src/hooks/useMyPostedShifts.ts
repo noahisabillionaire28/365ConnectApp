@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase, shiftRowToMockShift, type ShiftRow, type MockShift } from '@/lib/supabase';
+import { shiftRowToMockShift, type ShiftRow, type MockShift } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyLocation } from './useMyLocation';
 
-/** Client/staffer's own posted shifts — used by the Jobs map (spec D). */
 export function useMyPostedShifts() {
   const { user } = useAuth();
   const { coords } = useMyLocation();
@@ -11,13 +11,8 @@ export function useMyPostedShifts() {
   const query = useQuery<MockShift[], Error>({
     queryKey: ['my-posted-shifts', user?.id, coords.lat, coords.lng],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('shifts')
-        .select('*')
-        .eq('client_id', user!.id)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return (data as ShiftRow[]).map((row) => shiftRowToMockShift(row, coords));
+      const rows = await apiClient(user?.id).get<ShiftRow[]>('/shifts/my');
+      return rows.map((row) => shiftRowToMockShift(row, coords));
     },
     enabled: !!user?.id,
     staleTime: 30_000,

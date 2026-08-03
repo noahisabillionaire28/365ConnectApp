@@ -355,7 +355,7 @@ function ClientShiftCard({
 }) {
   const dateStr = shift.startTimeISO
     ? new Date(shift.startTimeISO).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-    : shift.date;
+    : null;
 
   return (
     <div className="mx-4 mb-3 bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden">
@@ -375,7 +375,7 @@ function ClientShiftCard({
               <span className="text-[#6B7280] text-[12px] flex items-center gap-1">
                 <Clock3 size={11} aria-hidden />{shift.startTime}
               </span>
-              {shift.payRate > 0 && (
+              {(shift.payRate ?? 0) > 0 && (
                 <span className="text-[#6B7280] text-[12px] flex items-center gap-1">
                   <DollarSign size={11} aria-hidden />{shift.payRate}/{shift.payPeriod}
                 </span>

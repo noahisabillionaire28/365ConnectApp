@@ -11,7 +11,7 @@ import {
   TrendingUp, MessageSquare, Star, Compass, Shield,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { PAYMENTS_QUERY_KEY } from '@/hooks/usePayments';
@@ -157,23 +157,17 @@ export function ProUpgradeScreen() {
 
     try {
       // 1. Write simulated subscription payment row
-      const { error: payErr } = await supabase.from('payments').insert({
-        worker_id:    user.id,
-        shift_id:     null,           // no shift — subscription payment
+      await apiClient(user.id).post('/payments', {
+        shift_id:     null,
         payment_type: 'pro_subscription',
         amount:       17.00,
         fee:          0,
         net_amount:   17.00,
         status:       'simulated',
       });
-      if (payErr) throw new Error(payErr.message);
 
       // 2. Set is_pro = true on the user's profile
-      const { error: userErr } = await supabase
-        .from('users')
-        .update({ is_pro: true })
-        .eq('id', user.id);
-      if (userErr) throw new Error(userErr.message);
+      await apiClient(user.id).patch('/users/me', { is_pro: true });
 
       // 3. Invalidate profile and payments queries so UI refreshes
       await Promise.all([

@@ -16,7 +16,8 @@ import { useShiftById } from '@/hooks/useShifts';
 import { useProfile } from '@/hooks/useProfile';
 import { useMyLocation } from '@/hooks/useMyLocation';
 import { computeMatchScore } from '@/lib/matchScore';
-import { haversineMiles, supabase } from '@/lib/supabase';
+import { haversineMiles } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 import { resetDraft, setDraft, setEditShiftId } from '@/store/postShiftStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasCompletedTimeEntry } from '@/hooks/useTimeEntry';
@@ -220,27 +221,24 @@ export function ShiftDetailScreen() {
   }
 
   async function handleSaveDressCode() {
-    if (dressCodeDraft === null) return;
+    if (dressCodeDraft === null || !user?.id) return;
     setSavingDressCode(true);
-    const { error: saveError } = await supabase
-      .from('shifts')
-      .update({ dress_code: dressCodeDraft })
-      .eq('id', shiftId);
-    setSavingDressCode(false);
-    if (!saveError) setDressCodeDraft(null);
+    try {
+      await apiClient(user.id).patch(`/shifts/${shiftId}`, { dress_code: dressCodeDraft });
+      setDressCodeDraft(null);
+    } catch (e) {
+      console.error('[ShiftDetail] dress code save failed:', e);
+    } finally {
+      setSavingDressCode(false);
+    }
   }
 
   async function handleEditShift() {
     if (!user?.id || editLoading) return;
     setEditLoading(true);
     try {
-      const { data: raw } = await supabase
-        .from('shifts')
-        .select('*')
-        .eq('id', shiftId)
-        .eq('client_id', user.id)
-        .single();
-      if (!raw) return;
+      const raw = await apiClient(user.id).get<Record<string, unknown>>(`/shifts/${shiftId}`);
+      if (!raw || raw.client_id !== user.id) return;
       const startISO   = raw.start_time as string;
       const endISO     = raw.end_time   as string;
       const date       = startISO.split('T')[0] ?? '';
@@ -274,18 +272,15 @@ export function ShiftDetailScreen() {
   async function handleCancelShift() {
     if (!user?.id || cancelling) return;
     setCancelling(true);
-    const { error: cancelErr } = await supabase
-      .from('shifts')
-      .update({ status: 'cancelled' })
-      .eq('id', shiftId)
-      .eq('client_id', user.id);
-    setCancelling(false);
-    if (!cancelErr) {
+    try {
+      await apiClient(user.id).patch(`/shifts/${shiftId}`, { status: 'cancelled' });
       setShowCancelConfirm(false);
       showToast('Shift cancelled.');
       navigate('/home');
-    } else {
-      console.error('[ShiftDetail] cancel failed:', cancelErr.message);
+    } catch (e) {
+      console.error('[ShiftDetail] cancel failed:', e);
+    } finally {
+      setCancelling(false);
     }
   }
 

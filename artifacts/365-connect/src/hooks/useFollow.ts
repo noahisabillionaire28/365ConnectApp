@@ -1,133 +1,68 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
-type FollowState = {
-  followerCount: number;
-  isFollowing:   boolean;
-};
-
-function followQueryKey(targetId: string) {
-  return ['follow', targetId] as const;
-}
-
-type UseFollowOptions = {
-  /** Called after a follow insert succeeds in Supabase. */
-  onFollowSuccess?: () => void;
-  /** Called after an unfollow delete succeeds in Supabase. */
+type FollowOptions = {
+  onFollowSuccess?:   () => void;
   onUnfollowSuccess?: () => void;
 };
 
-/**
- * Provides follow/unfollow for a target user.
- * Pass the target's UUID (not username).
- * Uses optimistic updates: button flips immediately, rolls back on error.
- * Optional `onFollowSuccess` / `onUnfollowSuccess` callbacks fire after DB confirms.
- */
-export function useFollow(targetUserId: string, options?: UseFollowOptions) {
-  const qc = useQueryClient();
+export function useFollow(
+  targetUserId: string | undefined,
+  options: FollowOptions = {},
+) {
+  const { user } = useAuth();
+  const [isFollowing, setIsFollowing]       = useState(false);
+  const [followerCount, setFollowerCount]   = useState(0);
+  const [isLoading, setLoading]             = useState(true);
+  const [isFollowPending, setFollowPending] = useState(false);
 
-  const { data, isLoading } = useQuery({
-    queryKey: followQueryKey(targetUserId),
-    queryFn: async (): Promise<FollowState> => {
-      const { data: sessionData } = await supabase.auth.getUser();
-      const currentUserId = sessionData?.user?.id ?? null;
+  useEffect(() => {
+    if (!targetUserId || !user?.id) { setLoading(false); return; }
+    setLoading(true);
+    Promise.all([
+      apiClient(user.id).get<{ following: boolean }>(`/follows/status/${targetUserId}`),
+      apiClient(null).get<unknown[]>(`/follows/followers/${targetUserId}`),
+    ]).then(([status, followers]) => {
+      setIsFollowing(status.following);
+      setFollowerCount(followers.length);
+    }).catch((e) => console.error('[useFollow] load failed:', e))
+      .finally(() => setLoading(false));
+  }, [targetUserId, user?.id]);
 
-      const [countResult, isFollowingResult] = await Promise.all([
-        // Follower count for this profile
-        supabase
-          .from('follows')
-          .select('id', { count: 'exact', head: true })
-          .eq('following_id', targetUserId),
-        // Does the current user already follow this profile?
-        currentUserId
-          ? supabase
-              .from('follows')
-              .select('id')
-              .eq('follower_id', currentUserId)
-              .eq('following_id', targetUserId)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
-      ]);
+  const follow = useCallback(async () => {
+    if (!targetUserId || !user?.id || isFollowPending) return;
+    setFollowPending(true);
+    setIsFollowing(true);
+    setFollowerCount((c) => c + 1);
+    try {
+      await apiClient(user.id).post('/follows', { following_id: targetUserId });
+      options.onFollowSuccess?.();
+    } catch (e) {
+      setIsFollowing(false);
+      setFollowerCount((c) => c - 1);
+      console.error('[useFollow] follow failed:', e);
+    } finally {
+      setFollowPending(false);
+    }
+  }, [targetUserId, user?.id, isFollowPending, options]);
 
-      return {
-        followerCount: countResult.count ?? 0,
-        isFollowing:   !!isFollowingResult.data,
-      };
-    },
-    enabled: !!targetUserId,
-    staleTime: 30_000,
-  });
+  const unfollow = useCallback(async () => {
+    if (!targetUserId || !user?.id || isFollowPending) return;
+    setFollowPending(true);
+    setIsFollowing(false);
+    setFollowerCount((c) => Math.max(0, c - 1));
+    try {
+      await apiClient(user.id).delete(`/follows/${targetUserId}`);
+      options.onUnfollowSuccess?.();
+    } catch (e) {
+      setIsFollowing(true);
+      setFollowerCount((c) => c + 1);
+      console.error('[useFollow] unfollow failed:', e);
+    } finally {
+      setFollowPending(false);
+    }
+  }, [targetUserId, user?.id, isFollowPending, options]);
 
-  // ── Follow ────────────────────────────────────────────────────────────────
-  const followMutation = useMutation({
-    mutationFn: async () => {
-      const { data: sessionData } = await supabase.auth.getUser();
-      const currentUserId = sessionData?.user?.id;
-      if (!currentUserId) throw new Error('Not authenticated');
-      const { error } = await supabase
-        .from('follows')
-        .insert({ follower_id: currentUserId, following_id: targetUserId });
-      if (error) throw error;
-    },
-    onMutate: async () => {
-      await qc.cancelQueries({ queryKey: followQueryKey(targetUserId) });
-      const prev = qc.getQueryData<FollowState>(followQueryKey(targetUserId));
-      qc.setQueryData<FollowState>(followQueryKey(targetUserId), (old) => ({
-        followerCount: (old?.followerCount ?? 0) + 1,
-        isFollowing:   true,
-      }));
-      return { prev };
-    },
-    onSuccess: () => {
-      options?.onFollowSuccess?.();
-    },
-    onError: (_err, _vars, ctx) => {
-      qc.setQueryData(followQueryKey(targetUserId), ctx?.prev);
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: followQueryKey(targetUserId) });
-    },
-  });
-
-  // ── Unfollow ──────────────────────────────────────────────────────────────
-  const unfollowMutation = useMutation({
-    mutationFn: async () => {
-      const { data: sessionData } = await supabase.auth.getUser();
-      const currentUserId = sessionData?.user?.id;
-      if (!currentUserId) throw new Error('Not authenticated');
-      const { error } = await supabase
-        .from('follows')
-        .delete()
-        .eq('follower_id', currentUserId)
-        .eq('following_id', targetUserId);
-      if (error) throw error;
-    },
-    onMutate: async () => {
-      await qc.cancelQueries({ queryKey: followQueryKey(targetUserId) });
-      const prev = qc.getQueryData<FollowState>(followQueryKey(targetUserId));
-      qc.setQueryData<FollowState>(followQueryKey(targetUserId), (old) => ({
-        followerCount: Math.max(0, (old?.followerCount ?? 0) - 1),
-        isFollowing:   false,
-      }));
-      return { prev };
-    },
-    onSuccess: () => {
-      options?.onUnfollowSuccess?.();
-    },
-    onError: (_err, _vars, ctx) => {
-      qc.setQueryData(followQueryKey(targetUserId), ctx?.prev);
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: followQueryKey(targetUserId) });
-    },
-  });
-
-  return {
-    followerCount:   data?.followerCount  ?? 0,
-    isFollowing:     data?.isFollowing    ?? false,
-    isLoading,
-    follow:          () => followMutation.mutate(),
-    unfollow:        () => unfollowMutation.mutate(),
-    isFollowPending: followMutation.isPending || unfollowMutation.isPending,
-  };
+  return { isFollowing, followerCount, isLoading, isFollowPending, follow, unfollow };
 }

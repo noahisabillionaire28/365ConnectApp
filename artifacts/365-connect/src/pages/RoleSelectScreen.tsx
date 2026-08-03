@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { Briefcase, HardHat, Building2, AlertCircle } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/contexts/RoleContext';
 
@@ -56,14 +56,14 @@ export function RoleSelectScreen() {
     setSaving(true);
     setError(null);
     try {
-      const { error: dbErr } = await supabase.from('users').upsert(
-        { id: user.id, email: user.email ?? null, role: selected },
-        { onConflict: 'id' },
-      );
-      if (dbErr) throw dbErr;
-      // Sync role into context before navigating so walkthrough reads it
+      await apiClient(user.id).post('/users', {
+        id: user.id, email: user.email ?? null, role: selected,
+        // Seed the Clerk profile picture so the avatar is visible immediately
+        photo_url: user.imageUrl ?? null,
+      });
+      // Sync role into context then go straight to the app
       await refetchRole();
-      navigate('/onboarding');
+      navigate('/home');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save your role. Please try again.');
     } finally {

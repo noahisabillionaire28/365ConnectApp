@@ -2,8 +2,6 @@
  * Resolves the correct next route for a logged-in user based on their
  * profile data.
  */
-import { supabase } from './supabase';
-
 export async function resolveSetupRoute(
   userId: string,
   profile: {

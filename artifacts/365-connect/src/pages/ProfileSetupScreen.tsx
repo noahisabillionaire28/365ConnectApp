@@ -1,7 +1,9 @@
 import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { Camera, Plus, X, ChevronLeft, Check, AlertCircle } from 'lucide-react';
-import { supabase, uploadAvatar, uploadPostPhoto } from '@/lib/supabase';
+import { uploadAvatar, uploadPostPhoto } from '@/lib/storage';
+import { apiClient } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { ImageCropper } from '@/components/ImageCropper';
 
 const JOB_TYPES = [
@@ -15,6 +17,7 @@ const TOTAL_STEPS = 6;
 
 export function ProfileSetupScreen() {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   const [step,      setStep]      = useState(1);
   const [saving,    setSaving]    = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -100,7 +103,6 @@ export function ProfileSetupScreen() {
   async function handleComplete() {
     setSaving(true); setSaveError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setSaveError('You are not signed in. Please go back and sign in first.'); return; }
 
       let photoUrl:     string | null = null;
@@ -111,26 +113,17 @@ export function ProfileSetupScreen() {
 
       const role = (sessionStorage.getItem('selectedRole') ?? 'worker') as 'worker' | 'client' | 'staffer';
 
-      const { error: profileError } = await supabase.from('users').upsert({
+      await apiClient(user.id).post('/users', {
         id: user.id, email: user.email!, role,
         username: username.trim(), photo_url: photoUrl,
         bio: bio.trim() || null, job_types: selectedJobs, certifications: certs,
       });
 
-      if (profileError) throw profileError;
-
       if (postPhotoUrl || postDescription.trim()) {
-        const { error: postErr } = await supabase.from('posts').insert({
-          user_id:   user.id,
+        await apiClient(user.id).post('/posts', {
           photo_url: postPhotoUrl,
           caption:   postDescription.trim() || null,
         });
-        if (postErr) {
-          // Surface the real Supabase error (PostgrestError has .message, .code, .details)
-          const detail = [postErr.message, postErr.details, postErr.code].filter(Boolean).join(' | ');
-          console.error('[ProfileSetup] post insert failed:', postErr);
-          throw new Error(detail || 'Could not save post.');
-        }
       }
 
       sessionStorage.removeItem('selectedRole');

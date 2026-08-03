@@ -1,7 +1,7 @@
 import { useParams, useLocation } from 'wouter';
 import { BadgeCheck, Star, ChevronLeft, Heart, CalendarPlus, X, CheckCircle2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 import { friendlyDate } from '@/lib/supabase';
 import { useFollow } from '@/hooks/useFollow';
 import { useAuth } from '@/contexts/AuthContext';
@@ -98,7 +98,7 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
       setSentId(shiftId);
       showToast('Request sent! We will notify them right away.');
     } else {
-      setErrorMessage(result.message);
+      setErrorMessage(result.message ?? 'Failed to send request.');
     }
   }
 
@@ -248,42 +248,35 @@ export function WorkerProfileScreen() {
       setLoading(true);
       setNotFound(false);
 
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id, role, username, photo_url, bio, job_types, certifications, rating, created_at')
-        .eq('username', params.username)
-        .single();
-
-      if (userError || !userData) {
+      let userData: PublicUserRow | null = null;
+      try {
+        userData = await apiClient('').get<PublicUserRow>(`/users/by-username/${params.username}`);
+      } catch {
         setNotFound(true);
         setLoading(false);
         return;
       }
 
-      const { data: reviewData } = await supabase
-        .from('reviews_visible')
-        .select(`
-          id,
-          rating,
-          created_at,
-          shift:shifts (
-            title,
-            start_time,
-            client:users!shifts_client_id_fkey (
-              username
-            )
-          )
-        `)
-        .eq('reviewee_id', (userData as PublicUserRow).id)
-        .order('created_at', { ascending: false })
-        .limit(10)
-        .returns<ReviewWithShift[]>();
+      if (!userData) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+
+      type ReviewRow = {
+        id: string; rating: number; created_at: string;
+        shift_title?: string | null; shift_start_time?: string | null; reviewer_username?: string | null;
+      };
+      let reviewData: ReviewRow[] = [];
+      try {
+        reviewData = await apiClient('').get<ReviewRow[]>(`/reviews/${userData.id}`);
+      } catch { /* ignore */ }
 
       const pastShifts: PastShift[] = (reviewData ?? []).map((r) => ({
         id:     r.id,
-        name:   r.shift?.title ?? 'Unnamed Shift',
-        date:   r.shift?.start_time ? friendlyDate(r.shift.start_time) : '—',
-        client: r.shift?.client?.username ? `@${r.shift.client.username}` : 'Private Client',
+        name:   r.shift_title ?? 'Unnamed Shift',
+        date:   r.shift_start_time ? friendlyDate(r.shift_start_time) : '—',
+        client: r.reviewer_username ? `@${r.reviewer_username}` : 'Private Client',
         rating: r.rating,
       }));
 

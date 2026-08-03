@@ -104,8 +104,14 @@ const FILTERS: { key: RevFilter; label: string }[] = [
 export function AdminRevenue() {
   const [, navigate] = useLocation();
   const [filter, setFilter] = useState<RevFilter>('all');
+  const [authReady, setAuthReady] = useState(false);
 
-  useEffect(() => { initAdminSession().then((ok) => { if (!ok) navigate('/admin/login'); }); }, [navigate]);
+  useEffect(() => {
+    initAdminSession().then((ok) => {
+      setAuthReady(true);
+      if (!ok) navigate('/admin/login');
+    });
+  }, [navigate]);
 
   const { data: payments = [], isLoading, isError } = useAdminPayments();
   const { data: stats }                              = useAdminStats();
@@ -115,7 +121,11 @@ export function AdminRevenue() {
     [payments, filter],
   );
 
-  if (!isAdminAuthenticated()) return null;
+  if (!authReady) return (
+    <div className="min-h-[100dvh] bg-[#FAFAFA] flex items-center justify-center pt-[60px]">
+      <div className="w-8 h-8 rounded-full border-2 border-black border-t-transparent animate-spin" />
+    </div>
+  );
 
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col pt-[60px]">

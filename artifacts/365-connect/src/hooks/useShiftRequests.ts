@@ -1,130 +1,135 @@
-import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
-export type ShiftRequestCard = {
+export type ShiftRequestRow = {
   id: string;
-  shiftId: string;
-  clientId: string;
-  clientUsername: string | null;
-  clientPhotoUrl: string | null;
-  shiftTitle: string;
-  payRate: number | null;
-  payPeriod: string;
-  startTime: string;
+  shift_id: string;
+  client_id: string;
+  worker_id: string;
+  status: 'pending' | 'accepted' | 'declined';
   message: string | null;
-  createdAt: string;
+  created_at: string;
+  // Snake_case joined fields
+  shift_title?: string;
+  job_type?: string;
+  start_time?: string;
+  end_time?: string;
+  location?: string;
+  pay_rate?: number;
+  pay_period?: string;
+  company_name?: string;
+  worker_username?: string;
+  worker_photo?: string;
+  client_username?: string;
+  client_photo?: string;
+  // camelCase aliases for pages expecting them
+  shiftTitle?: string;
+  jobType?: string;
+  startTime?: string;
+  endTime?: string;
+  payRate?: number;
+  payPeriod?: string;
+  companyName?: string;
+  workerUsername?: string;
+  workerPhoto?: string;
+  clientUsername?: string;
+  clientPhotoUrl?: string;
 };
 
-/**
- * Direct invites a worker has received from clients/staffers for one of
- * their own posted shifts (Nowsta-style "Request for Shift"). Accepting
- * writes a confirmed `applications` row via a DB trigger — see
- * `handle_shift_request_decision` in supabase/schema.sql — which unlocks
- * Clock In immediately, skipping the normal pending-review flow.
- */
-export function useShiftRequests(workerId: string | undefined) {
-  const [requests, setRequests] = useState<ShiftRequestCard[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!workerId) { setRequests([]); setIsLoading(false); return; }
-    setIsLoading(true);
-    setError(null);
-
-    const { data, error: fetchError } = await supabase
-      .from('shift_requests')
-      .select(`
-        id, shift_id, client_id, message, created_at,
-        shift:shifts ( title, pay_rate, pay_period, start_time ),
-        client:users!shift_requests_client_id_fkey ( username, photo_url )
-      `)
-      .eq('worker_id', workerId)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
-
-    if (fetchError) {
-      console.error('[useShiftRequests] fetch failed:', fetchError.message);
-      setError(fetchError.message);
-      setRequests([]);
-      setIsLoading(false);
-      return;
-    }
-
-    type Row = {
-      id: string; shift_id: string; client_id: string; message: string | null; created_at: string;
-      shift: { title: string; pay_rate: number | null; pay_period: string; start_time: string } | null;
-      client: { username: string | null; photo_url: string | null } | null;
-    };
-
-    setRequests(
-      ((data ?? []) as unknown as Row[]).map((r) => ({
-        id:             r.id,
-        shiftId:        r.shift_id,
-        clientId:       r.client_id,
-        clientUsername: r.client?.username ?? null,
-        clientPhotoUrl: r.client?.photo_url ?? null,
-        shiftTitle:     r.shift?.title ?? 'Untitled shift',
-        payRate:        r.shift?.pay_rate ?? null,
-        payPeriod:      r.shift?.pay_period ?? 'hr',
-        startTime:      r.shift?.start_time ?? r.created_at,
-        message:        r.message,
-        createdAt:      r.created_at,
-      })),
-    );
-    setIsLoading(false);
-  }, [workerId]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  async function decide(requestId: string, decision: 'accepted' | 'declined') {
-    const snapshot = requests;
-    setRequests((prev) => prev.filter((r) => r.id !== requestId));
-    setError(null);
-    const { error: updateError } = await supabase
-      .from('shift_requests')
-      .update({ status: decision })
-      .eq('id', requestId);
-    if (updateError) {
-      console.error('[useShiftRequests] decision failed:', updateError.message);
-      setRequests(snapshot);
-      setError(`Could not ${decision === 'accepted' ? 'accept' : 'decline'} that request. Please try again.`);
-      return false;
-    }
-    return true;
+/** Standalone named export for direct use in page components */
+export async function createShiftRequest(
+  userId: string,
+  shiftId: string,
+  workerId: string,
+  message?: string,
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    await apiClient(userId).post('/shift-requests', { shift_id: shiftId, worker_id: workerId, message });
+    return { ok: true };
+  } catch (e) {
+    console.error('[createShiftRequest] failed:', e);
+    const msg = e instanceof Error ? e.message : 'Failed to send request';
+    return { ok: false, message: msg };
   }
+}
 
+function mapRow(r: ShiftRequestRow): ShiftRequestRow {
   return {
-    requests,
-    isLoading,
-    error,
-    accept: (id: string) => decide(id, 'accepted'),
-    decline: (id: string) => decide(id, 'declined'),
-    refetch: load,
+    ...r,
+    shiftTitle:    r.shift_title   ?? r.shiftTitle,
+    jobType:       r.job_type      ?? r.jobType,
+    startTime:     r.start_time    ?? r.startTime,
+    endTime:       r.end_time      ?? r.endTime,
+    payRate:       r.pay_rate      ?? r.payRate,
+    payPeriod:     r.pay_period    ?? r.payPeriod,
+    companyName:   r.company_name  ?? r.companyName,
+    workerUsername:r.worker_username ?? r.workerUsername,
+    workerPhoto:   r.worker_photo  ?? r.workerPhoto,
+    clientUsername:r.client_username ?? r.clientUsername,
+    clientPhotoUrl:r.client_photo  ?? r.clientPhotoUrl,
   };
 }
 
-/**
- * Client/staffer personally invites `workerId` to their own open shift.
- * RLS enforces the caller must be the shift's client, so this simply
- * surfaces the friendliest error message for the UI to show.
- */
-export async function createShiftRequest(
-  clientId: string, workerId: string, shiftId: string, message?: string,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { error } = await supabase
-    .from('shift_requests')
-    .insert({
-      client_id: clientId,
-      worker_id: workerId,
-      shift_id: shiftId,
-      message: message?.trim() ? message.trim() : null,
-    });
+export function useShiftRequests(
+  /** Optional userId override — if omitted, reads from AuthContext */
+  _userId?: string,
+) {
+  const { user } = useAuth();
+  const [requests, setRequests] = useState<ShiftRequestRow[]>([]);
+  const [isLoading, setLoading] = useState(true);
+  const [error, setError]       = useState<string | null>(null);
 
-  if (error) {
-    if (error.code === '23505') return { ok: false, message: 'You already requested this worker for this shift.' };
-    console.error('[createShiftRequest] insert failed:', error.message);
-    return { ok: false, message: 'Could not send the request. Please try again.' };
-  }
-  return { ok: true };
+  const load = useCallback(async () => {
+    if (!user?.id) { setRequests([]); setLoading(false); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      const rows = await apiClient(user.id).get<ShiftRequestRow[]>('/shift-requests');
+      setRequests(rows.map(mapRow));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const sendRequest = useCallback(async (shiftId: string, workerId: string, message?: string): Promise<boolean> => {
+    if (!user?.id) return false;
+    const result = await createShiftRequest(user.id, shiftId, workerId, message);
+    return result.ok;
+  }, [user?.id]);
+
+  const accept = useCallback(async (id: string): Promise<boolean> => {
+    if (!user?.id) return false;
+    try {
+      await apiClient(user.id).patch(`/shift-requests/${id}`, { status: 'accepted' });
+      setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status: 'accepted' as const } : r));
+      return true;
+    } catch (e) {
+      console.error('[useShiftRequests] accept failed:', e);
+      return false;
+    }
+  }, [user?.id]);
+
+  const decline = useCallback(async (id: string): Promise<boolean> => {
+    if (!user?.id) return false;
+    try {
+      await apiClient(user.id).patch(`/shift-requests/${id}`, { status: 'declined' });
+      setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status: 'declined' as const } : r));
+      return true;
+    } catch (e) {
+      console.error('[useShiftRequests] decline failed:', e);
+      return false;
+    }
+  }, [user?.id]);
+
+  const respondToRequest = useCallback(async (id: string, status: 'accepted' | 'declined'): Promise<boolean> => {
+    return status === 'accepted' ? accept(id) : decline(id);
+  }, [accept, decline]);
+
+  return { requests, isLoading, error, sendRequest, accept, decline, respondToRequest, refetch: load };
 }

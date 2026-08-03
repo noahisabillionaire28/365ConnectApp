@@ -1,30 +1,30 @@
 /**
  * Thin client for the admin API endpoints on the api-server.
- * Calls /api/admin/* — routed by the Replit proxy to the api-server.
- * Authenticates using the current user's Supabase session JWT (Bearer token);
- * the server verifies the JWT and checks the user has role='admin'.
+ * Auth is handled by Clerk's session cookie (sent automatically by the browser).
+ * The server verifies the session and checks the user has role='admin'.
  */
-import { supabase } from '@/lib/supabase';
 
 const BASE = '/api/admin';
 
-async function headers(): Promise<HeadersInit> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return {
-    'Content-Type':  'application/json',
-    'Authorization': session ? `Bearer ${session.access_token}` : '',
-  };
+async function makeHeaders(): Promise<HeadersInit> {
+  return { 'Content-Type': 'application/json' };
 }
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { headers: await headers() });
+  const res = await fetch(`${BASE}${path}`, {
+    headers: await makeHeaders(),
+    credentials: 'include',
+  });
   if (!res.ok) throw new Error(`Admin API ${path} → ${res.status}`);
   return res.json() as Promise<T>;
 }
 
 async function patch<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    method: 'PATCH', headers: await headers(), body: JSON.stringify(body),
+    method: 'PATCH',
+    headers: await makeHeaders(),
+    credentials: 'include',
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`Admin API PATCH ${path} → ${res.status}`);
   return res.json() as Promise<T>;
@@ -104,10 +104,10 @@ export const adminApi = {
   getPayments: ()                              => get<AdminPaymentRow[]>('/payments'),
   getDisputes: ()                              => get<AdminDisputeRow[]>('/disputes'),
 
-  updateUser:      (id: string, body: Partial<Pick<AdminUserRow, 'role' | 'status' | 'is_pro'>>) =>
+  updateUser:    (id: string, body: Partial<Pick<AdminUserRow, 'role' | 'status' | 'is_pro'>>) =>
     patch<{ ok: boolean }>(`/users/${id}`, body),
-  cancelShift:     (id: string) =>
+  cancelShift:   (id: string) =>
     patch<{ ok: boolean }>(`/shifts/${id}/cancel`, {}),
-  updateDispute:   (id: string, status: string, note?: string) =>
+  updateDispute: (id: string, status: string, note?: string) =>
     patch<{ ok: boolean }>(`/disputes/${id}`, { status, resolution_note: note }),
 };

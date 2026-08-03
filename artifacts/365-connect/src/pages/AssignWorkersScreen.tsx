@@ -52,10 +52,10 @@ function AssignCard({ worker, shiftFull, isAssigning, onAssign }: {
         {worker.primaryJobType && (
           <p className="text-[#6B7280] text-[13px] mt-0.5 truncate">{worker.primaryJobType}</p>
         )}
-        <div className="flex items-center gap-1 mt-1" aria-label={`${worker.rating.toFixed(1)} star rating`}>
+        <div className="flex items-center gap-1 mt-1" aria-label={`${Number(worker.rating).toFixed(1)} star rating`}>
           <Star size={13} aria-hidden style={{ color: GOLD }} fill={GOLD} />
           <span className="text-[#0A1628] text-[13px] font-semibold">
-            {worker.rating > 0 ? worker.rating.toFixed(1) : 'New'}
+            {Number(worker.rating) > 0 ? Number(worker.rating).toFixed(1) : 'New'}
           </span>
         </div>
       </div>

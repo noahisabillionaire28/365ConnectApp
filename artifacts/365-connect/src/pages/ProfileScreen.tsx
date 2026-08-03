@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   Star, ChevronRight, Settings,
   CreditCard, Bell, Shield, HelpCircle, LogOut,
   Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
-  BadgeCheck, Zap,
+  BadgeCheck, Zap, Eye,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useAuth } from '@/contexts/AuthContext';
@@ -206,11 +206,16 @@ export function ProfileScreen() {
     navigate('/');
   }
 
-  // Unauthenticated guard — redirect to splash rather than rendering a blank profile
-  if (!profile.isLoading && !profile.email) {
-    navigate('/');
-    return null;
-  }
+  // Unauthenticated guard — redirect to splash rather than rendering a blank profile.
+  // Must live in useEffect; calling navigate() during render causes React to warn
+  // "Cannot update a component while rendering a different component".
+  useEffect(() => {
+    if (!profile.isLoading && !profile.email) {
+      navigate('/');
+    }
+  }, [profile.isLoading, profile.email]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!profile.isLoading && !profile.email) return null;
 
   if (profile.isLoading) return <ProfileSkeleton />;
 
@@ -422,6 +427,9 @@ export function ProfileScreen() {
       <div className="px-4 mb-4">
         <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Account</p>
         <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
+          {username && (
+            <SettingRow icon={Eye} label="View My Public Profile" onTap={() => navigate(`/worker/${username}`)} />
+          )}
           <SettingRow icon={Settings}    label="Account Settings"    onTap={() => setComingSoon('Account Settings')} />
           <SettingRow icon={CreditCard}  label="Payments & Earnings"  onTap={() => navigate('/earnings')} />
           <SettingRow icon={Bell}        label="Notifications"         onTap={() => navigate('/notifications')} />

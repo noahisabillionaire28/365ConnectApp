@@ -9,7 +9,8 @@ import type { MockShift } from '@/lib/supabase';
 import { markClockedIn } from '@/store/feedStore';
 import { useShiftById } from '@/hooks/useShifts';
 import { useAuth } from '@/contexts/AuthContext';
-import { haversineMiles, supabase } from '@/lib/supabase';
+import { haversineMiles } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 import { useTimeEntry } from '@/hooks/useTimeEntry';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -444,7 +445,7 @@ export function ClockInScreen() {
   const [, navigate]       = useLocation();
   const { user }            = useAuth();
   const { data: shift, isLoading, error } = useShiftById(id);
-  const { startOrResume, completeEntry } = useTimeEntry();
+  const { startOrResume, completeEntry } = useTimeEntry(id);
   const { showToast } = useToast();
 
   const [phase,      setPhase]      = useState<Phase>('geo-check');
@@ -589,17 +590,17 @@ export function ClockInScreen() {
       return;
     }
 
-    const { error: paymentError } = await supabase.from('payments').insert({
-      shift_id:     shift.id,
-      worker_id:    user.id,
-      payment_type: 'shift_payment',
-      amount:       Math.round(grossPay * 100) / 100,
-      fee:          Math.round(serviceFee * 100) / 100,
-      net_amount:   Math.round(netPay * 100) / 100,
-      status:       'completed',
-    });
-    if (paymentError) {
-      console.error('[ClockIn] failed to record payment:', paymentError.message);
+    try {
+      await apiClient(user.id).post('/payments', {
+        shift_id:     shift.id,
+        payment_type: 'shift_payment',
+        amount:       Math.round(grossPay * 100) / 100,
+        fee:          Math.round(serviceFee * 100) / 100,
+        net_amount:   Math.round(netPay * 100) / 100,
+        status:       'completed',
+      });
+    } catch (payErr) {
+      console.error('[ClockIn] failed to record payment:', payErr);
       setEndShiftError("Your timesheet was saved, but the payout couldn't be processed. It will be retried shortly.");
       setPhase('end-error');
       return;

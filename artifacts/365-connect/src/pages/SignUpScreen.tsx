@@ -11,6 +11,7 @@ import { ChevronLeft, Phone, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'luci
 import { FcGoogle } from 'react-icons/fc';
 import { FaApple }  from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const NAVY   = '#0A1628';
@@ -56,10 +57,9 @@ export function SignUpScreen() {
 
       if (data.session) {
         // Immediately signed in (email confirmation disabled in project)
-        await supabase.from('users').upsert(
-          { id: data.session.user.id, email: email.trim(), role: 'worker' },
-          { onConflict: 'id', ignoreDuplicates: true },
-        );
+        await apiClient(data.session.user.id).post('/users', {
+          id: data.session.user.id, email: email.trim(), role: 'worker',
+        }).catch(() => {}); // ignore if already exists
         setSignupState('done');
         setTimeout(() => navigate('/role-select'), 600);
       } else {

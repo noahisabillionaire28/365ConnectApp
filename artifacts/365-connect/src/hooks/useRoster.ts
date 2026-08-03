@@ -1,97 +1,83 @@
-import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 export type RosterWorker = {
   id: string;
   username: string | null;
+  photo_url: string | null;
+  /** camelCase alias */
   photoUrl: string | null;
-  isPro: boolean;
-  primaryJobType: string | null;
-  secondaryJobTypes: string[];
+  role: string;
   rating: number;
+  job_types: string[];
+  primary_job_type: string | null;
+  /** camelCase alias */
+  primaryJobType: string | null;
+  is_pro: boolean;
+  /** camelCase alias */
+  isPro: boolean;
+  company_name: string | null;
+  followed_at: string;
 };
 
-/**
- * A staffer's roster of workers. Reuses the existing `follows` table —
- * a staffer's roster is simply the set of workers they follow — there is no
- * separate roster table.
- */
 export function useRoster() {
   const { user } = useAuth();
-  const [workers, setWorkers] = useState<RosterWorker[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [roster, setRoster]     = useState<RosterWorker[]>([]);
+  const [isLoading, setLoading] = useState(true);
+  const [error, setError]       = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!user?.id) { setWorkers([]); setIsLoading(false); return; }
-    setIsLoading(true);
+    if (!user?.id) { setRoster([]); setLoading(false); return; }
+    setLoading(true);
     setError(null);
-
-    const { data: followRows, error: followError } = await supabase
-      .from('follows')
-      .select('following_id')
-      .eq('follower_id', user.id);
-
-    if (followError) {
-      console.error('[useRoster] follows fetch failed:', followError.message);
-      setError(followError.message);
-      setIsLoading(false);
-      return;
+    try {
+      const rows = await apiClient(user.id).get<(RosterWorker & { is_pro: boolean; primary_job_type: string | null; photo_url: string | null })[]>('/follows/roster');
+      setRoster(rows.map((r) => ({
+        ...r,
+        photoUrl:       r.photo_url,
+        primaryJobType: r.primary_job_type,
+        isPro:          r.is_pro,
+      })));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+    } finally {
+      setLoading(false);
     }
-
-    const workerIds = (followRows ?? []).map((r) => r.following_id as string);
-    if (workerIds.length === 0) {
-      setWorkers([]);
-      setIsLoading(false);
-      return;
-    }
-
-    const { data: userRows, error: usersError } = await supabase
-      .from('users')
-      .select('id, username, photo_url, is_pro, primary_job_type, secondary_job_types, rating, role')
-      .in('id', workerIds)
-      .eq('role', 'worker')
-      .order('username', { ascending: true });
-
-    if (usersError) {
-      console.error('[useRoster] users fetch failed:', usersError.message);
-      setError(usersError.message);
-      setIsLoading(false);
-      return;
-    }
-
-    setWorkers(
-      (userRows ?? []).map((u) => ({
-        id: u.id as string,
-        username: u.username as string | null,
-        photoUrl: u.photo_url as string | null,
-        isPro: !!u.is_pro,
-        primaryJobType: u.primary_job_type as string | null,
-        secondaryJobTypes: (u.secondary_job_types as string[] | null) ?? [],
-        rating: (u.rating as number | null) ?? 0,
-      })),
-    );
-    setIsLoading(false);
   }, [user?.id]);
 
   useEffect(() => { void load(); }, [load]);
 
-  async function remove(workerId: string) {
+  const removeFromRoster = useCallback(async (workerId: string): Promise<void> => {
     if (!user?.id) return;
-    const prev = workers;
-    setWorkers((cur) => cur.filter((w) => w.id !== workerId)); // optimistic
-    const { error: deleteError } = await supabase
-      .from('follows')
-      .delete()
-      .eq('follower_id', user.id)
-      .eq('following_id', workerId);
-    if (deleteError) {
-      console.error('[useRoster] remove failed:', deleteError.message);
-      setWorkers(prev); // rollback
-      setError(deleteError.message);
+    setRoster((prev) => prev.filter((w) => w.id !== workerId));
+    try {
+      await apiClient(user.id).delete(`/follows/${workerId}`);
+    } catch (e) {
+      console.error('[useRoster] remove failed:', e);
+      await load();
     }
-  }
+  }, [user?.id, load]);
 
-  return { workers, isLoading, error, remove, refetch: load };
+  const addToRoster = useCallback(async (workerId: string): Promise<void> => {
+    if (!user?.id) return;
+    try {
+      await apiClient(user.id).post('/follows', { following_id: workerId });
+      await load();
+    } catch (e) {
+      console.error('[useRoster] add failed:', e);
+    }
+  }, [user?.id, load]);
+
+  return {
+    roster,
+    workers:          roster,           // alias for pages that use `workers`
+    isLoading,
+    error,
+    removeFromRoster,
+    remove:           removeFromRoster, // alias for pages that use `remove`
+    addToRoster,
+    refetch: load,
+  };
 }

@@ -13,7 +13,7 @@ import {
   Zap, Users, BarChart2,
   Building2, Cpu, LineChart,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 const NAVY  = '#0A1628';
@@ -91,8 +91,9 @@ export function OnboardingScreen() {
   // Fetch role directly so we don't rely on context timing after RoleSelect
   useEffect(() => {
     if (!user) return;
-    supabase.from('users').select('role').eq('id', user.id).maybeSingle()
-      .then(({ data }) => { if (data?.role) setRole(data.role as Role); });
+    apiClient(user.id).get<{ role: string | null }>('/users/me')
+      .then((data) => { if (data?.role) setRole(data.role as Role); })
+      .catch(() => {});
   }, [user?.id]);
 
   const slides = SLIDES[role];

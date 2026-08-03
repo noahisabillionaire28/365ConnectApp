@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
@@ -50,14 +50,21 @@ function StatCard({
 /* ── AdminDashboard ───────────────────────────────────────────────────────── */
 export function AdminDashboard() {
   const [, navigate] = useLocation();
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
-    initAdminSession().then((ok) => { if (!ok) navigate('/admin/login'); });
+    initAdminSession().then((ok) => {
+      if (!ok) { navigate('/admin/login'); } else { setAuthReady(true); }
+    });
   }, [navigate]);
 
   const { data: stats, isLoading, isError } = useAdminStats();
 
-  if (!isAdminAuthenticated()) return null;
+  if (!authReady) return (
+    <div className="min-h-[100dvh] bg-[#FAFAFA] flex items-center justify-center">
+      <div className="w-8 h-8 rounded-full border-2 border-black border-t-transparent animate-spin" />
+    </div>
+  );
 
   const fmtK = (n: number) =>
     n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${n.toFixed(0)}`;

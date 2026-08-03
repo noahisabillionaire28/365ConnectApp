@@ -16,7 +16,7 @@ import {
 } from '@/store/postShiftStore';
 import { usePostShift } from '@/hooks/usePostShift';
 import { useUpdateShift } from '@/hooks/useUpdateShift';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -90,6 +90,7 @@ function ReadinessItem({ label, done }: { label: string; done: boolean }) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export function PostShiftStep5Screen() {
   const [, navigate]      = useLocation();
+  const { user }          = useAuth();
   const draft             = getDraft();
   const postMutation      = usePostShift();
   const updateMutation    = useUpdateShift();
@@ -119,7 +120,6 @@ export function PostShiftStep5Screen() {
   async function handlePost() {
     setPostError(null);
 
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setPostError('You must be signed in to post a shift.');
       return;
@@ -173,7 +173,7 @@ export function PostShiftStep5Screen() {
         });
         resetDraft();
         showToast('Shift posted! Workers will start applying soon.');
-        navigate(`/shift/${data.id}`);
+        if (data) navigate(`/shift/${data.id}`);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
