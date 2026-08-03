@@ -42,6 +42,21 @@ const CARDS: { role: Role; icon: React.ReactNode; title: string; subtitle: strin
   },
 ];
 
+/**
+ * Derive a URL-safe username from the user's email address + a unique suffix
+ * taken from their Clerk user ID. The COALESCE in the upsert means this will
+ * never overwrite a username the user has already chosen during full setup.
+ */
+function generateUsername(email: string | undefined, userId: string): string {
+  const prefix = (email ?? '').split('@')[0]
+    .toLowerCase()
+    .replace(/[^a-z0-9_.]/g, '')
+    .slice(0, 15) || 'user';
+  // Last 6 alphanumeric chars of the Clerk ID guarantee uniqueness
+  const suffix = userId.replace(/[^a-z0-9]/gi, '').slice(-6).toLowerCase();
+  return `${prefix}_${suffix}`;
+}
+
 export function RoleSelectScreen() {
   const [, navigate]    = useLocation();
   const { user }        = useAuth();
@@ -56,10 +71,14 @@ export function RoleSelectScreen() {
     setSaving(true);
     setError(null);
     try {
+      // Auto-generate a username so the user is immediately discoverable in the
+      // people feed (workers API requires username IS NOT NULL). The upsert uses
+      // COALESCE so this will never overwrite a username set during full setup.
+      const username = generateUsername(user.email, user.id);
       await apiClient(user.id).post('/users', {
         id: user.id, email: user.email ?? null, role: selected,
-        // Seed the Clerk profile picture so the avatar is visible immediately
         photo_url: user.imageUrl ?? null,
+        username,
       });
       // Sync role into context then go straight to the app
       await refetchRole();

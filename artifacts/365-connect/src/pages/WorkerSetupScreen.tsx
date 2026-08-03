@@ -16,6 +16,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation }                  from 'wouter';
 import { ChevronLeft, Camera, Plus, X, Check, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { uploadAvatar, uploadPostPhoto } from '@/lib/storage';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -99,6 +100,7 @@ function ErrorBanner({ msg }: { msg: string }) {
 export function WorkerSetupScreen() {
   const [, navigate] = useLocation();
   const { user }     = useAuth();
+  const queryClient  = useQueryClient();
 
   // Init
   const [initialized, setInitialized] = useState(false);
@@ -283,6 +285,9 @@ export function WorkerSetupScreen() {
         });
       }
       localStorage.removeItem(stepKey(user.id));
+      // Flush stale profile + feed caches so the new photo/username show immediately
+      void queryClient.invalidateQueries({ queryKey: ['profile'] });
+      void queryClient.invalidateQueries({ queryKey: ['people-feed'] });
       navigate('/home');
     } catch (err) {
       const msg = (err as { message?: string })?.message ?? 'Could not save post.';
@@ -296,6 +301,8 @@ export function WorkerSetupScreen() {
   function skipStep8() {
     if (!user) return;
     localStorage.removeItem(stepKey(user.id));
+    void queryClient.invalidateQueries({ queryKey: ['profile'] });
+    void queryClient.invalidateQueries({ queryKey: ['people-feed'] });
     navigate('/home');
   }
 

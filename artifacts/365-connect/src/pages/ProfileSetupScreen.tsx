@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { Camera, Plus, X, ChevronLeft, Check, AlertCircle } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { uploadAvatar, uploadPostPhoto } from '@/lib/storage';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,8 +17,9 @@ const JOB_TYPES = [
 const TOTAL_STEPS = 6;
 
 export function ProfileSetupScreen() {
-  const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const [, navigate]  = useLocation();
+  const { user }      = useAuth();
+  const queryClient   = useQueryClient();
   const [step,      setStep]      = useState(1);
   const [saving,    setSaving]    = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -127,6 +129,9 @@ export function ProfileSetupScreen() {
       }
 
       sessionStorage.removeItem('selectedRole');
+      // Flush stale caches so photo + username show immediately on /profile
+      void queryClient.invalidateQueries({ queryKey: ['profile'] });
+      void queryClient.invalidateQueries({ queryKey: ['people-feed'] });
       navigate('/home');
     } catch (err) {
       const msg = (err as { message?: string })?.message ?? 'Failed to save profile. Please try again.';

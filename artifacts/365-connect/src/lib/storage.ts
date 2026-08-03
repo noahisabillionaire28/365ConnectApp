@@ -29,6 +29,7 @@ export async function uploadFile(
   const metaRes = await fetch('/api/storage/uploads/request-url', {
     method: 'POST',
     headers,
+    credentials: 'include',    // send Clerk session cookie
     body: JSON.stringify({
       name,
       size: file.size,
