@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { pool } from '@workspace/db';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -61,7 +61,7 @@ router.get('/:id', async (req, res) => {
 });
 
 /** POST /api/shifts — create shift */
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const b = req.body as Record<string, unknown>;
   try {
     const { rows } = await pool.query(
@@ -93,7 +93,7 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 /** PATCH /api/shifts/:id — update shift (owner only) */
-router.patch('/:id', requireAuth, async (req, res) => {
+router.patch('/:id', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const allowed = [
     'title','description','location','job_type','job_types','pay_rate','pay_period',
     'start_time','end_time','spots_available','status','lat','lng','cover_image',

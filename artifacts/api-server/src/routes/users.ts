@@ -22,6 +22,8 @@ router.post('/', requireAuth, async (req, res) => {
     primary_job_type, secondary_job_types, availability,
     lat, lng, is_pro, company_name, billing_ref, status,
   } = req.body as Record<string, unknown>;
+  // Users may only self-assign a non-privileged role; admin/staffer are granted out-of-band.
+  const safeRole = role === 'client' ? 'client' : 'worker';
   try {
     const { rows } = await pool.query(
       `INSERT INTO users (
@@ -48,7 +50,7 @@ router.post('/', requireAuth, async (req, res) => {
          status = COALESCE(EXCLUDED.status, users.status)
        RETURNING *`,
       [
-        req.userId, email ?? null, role ?? 'worker', username ?? null,
+        req.userId, email ?? null, safeRole, username ?? null,
         photo_url ?? null, bio ?? null,
         job_types ?? '{}', certifications ?? '{}',
         primary_job_type ?? null, secondary_job_types ?? '{}',
@@ -65,9 +67,9 @@ router.post('/', requireAuth, async (req, res) => {
 /** PATCH /api/users/me — partial update of current user */
 router.patch('/me', requireAuth, async (req, res) => {
   const allowed = [
-    'email','role','username','photo_url','bio','job_types','certifications',
+    'email','username','photo_url','bio','job_types','certifications',
     'primary_job_type','secondary_job_types','availability',
-    'lat','lng','is_pro','company_name','billing_ref','status',
+    'lat','lng','company_name',
   ];
   const updates: string[] = [];
   const values: unknown[] = [];

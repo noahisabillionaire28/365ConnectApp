@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { pool } from '@workspace/db';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -25,7 +25,7 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 /** POST /api/shift-requests — create a shift request (client invites worker) */
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const { shift_id, worker_id, message } = req.body as Record<string, string>;
   try {
     const { rows } = await pool.query(
