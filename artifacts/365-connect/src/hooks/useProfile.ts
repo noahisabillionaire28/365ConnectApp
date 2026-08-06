@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth, type SimpleUser } from '@/contexts/AuthContext';
+import { toNumber } from '@/lib/number';
 
 type UserProfileRow = {
   username:            string | null;
@@ -88,7 +89,7 @@ export function useProfile(): ProfileResult {
     bio:               row?.bio               ?? null,
     jobTypes:          row?.job_types         ?? [],
     certifications:    row?.certifications    ?? [],
-    rating:            row?.rating            ?? 0,
+    rating:            toNumber(row?.rating),
     memberSince,
     email:             user?.email            ?? null,
     role:              row?.role              ?? null,
