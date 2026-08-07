@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "PORT=3000 BASE_PATH=/ pnpm --filter @workspace/365-connect run build",
-  "outputDirectory": "artifacts/365-connect/dist/public",
+  "buildCommand": "PORT=3000 BASE_PATH=/ pnpm --filter @workspace/365-connect run build && rm -rf public && cp -r artifacts/365-connect/dist/public public",
+  "outputDirectory": "public",
   "framework": null,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
