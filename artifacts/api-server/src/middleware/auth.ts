@@ -14,6 +14,7 @@ declare global {
     interface Request {
       userId: string | null;
       userRole?: string | null;
+      authReason?: string;
     }
   }
 }
@@ -51,20 +52,25 @@ export async function attachUserId(
   const token =
     (typeof xToken === "string" ? xToken : undefined) || bearer || undefined;
 
+  const hasAuthz = typeof authz === "string" && authz.length > 0;
+  const hasXToken = typeof xToken === "string" && xToken.length > 0;
+
   if (token) {
     try {
       const payload = await verifyToken(token, {
         secretKey: process.env.CLERK_SECRET_KEY,
       });
       req.userId = (payload.sub as string | undefined) ?? null;
+      if (!req.userId) req.authReason = "token-verified-but-no-sub";
       next();
       return;
     } catch (err) {
-      logger.warn(
-        { err: err instanceof Error ? err.message : String(err) },
-        "clerk token verification failed",
-      );
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warn({ err: msg }, "clerk token verification failed");
+      req.authReason = `verify-failed: ${msg}`;
     }
+  } else {
+    req.authReason = `no-token (authz=${hasAuthz} xToken=${hasXToken} secret=${Boolean(process.env.CLERK_SECRET_KEY)})`;
   }
 
   req.userId = null;
@@ -80,7 +86,7 @@ export function requireAuth(
   next: NextFunction,
 ): void {
   if (!req.userId) {
-    res.status(401).json({ error: "Unauthorized" });
+    res.status(401).json({ error: `Unauthorized — ${req.authReason ?? "no session"}` });
     return;
   }
   next();
