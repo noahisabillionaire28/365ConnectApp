@@ -29,7 +29,12 @@ async function makeHeaders(userId: string | null | undefined): Promise<Record<st
   const h: Record<string, string> = { 'Content-Type': 'application/json' };
   if (userId) h['x-user-id'] = userId;
   const token = await getClerkToken();
-  if (token) h['Authorization'] = `Bearer ${token}`;
+  if (token) {
+    h['Authorization'] = `Bearer ${token}`;
+    // Also send as a custom header: some proxies strip Authorization, but
+    // custom headers are forwarded, so the API server can still authenticate.
+    h['X-Clerk-Token'] = token;
+  }
   return h;
 }
 

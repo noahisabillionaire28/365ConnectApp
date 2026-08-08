@@ -4,8 +4,9 @@
  * Identity is derived ONLY from the Clerk session — there is no header-based
  * fallback, so callers cannot spoof another user by setting a request header.
  */
-import { getAuth } from "@clerk/express";
+import { getAuth, verifyToken } from "@clerk/express";
 import { pool } from "@workspace/db";
+import { logger } from "../lib/logger.js";
 import type { Request, Response, NextFunction } from "express";
 
 declare global {
@@ -21,13 +22,52 @@ declare global {
  * Attaches req.userId from Clerk's verified session.
  * Never rejects — routes that require auth must call requireAuth().
  */
-export function attachUserId(
+export async function attachUserId(
   req: Request,
   _res: Response,
   next: NextFunction,
-): void {
-  const auth = getAuth(req);
-  req.userId = auth?.userId ?? null;
+): Promise<void> {
+  // 1) Standard Clerk middleware (session cookie or Authorization bearer).
+  try {
+    const auth = getAuth(req);
+    if (auth?.userId) {
+      req.userId = auth.userId;
+      next();
+      return;
+    }
+  } catch {
+    /* fall through to explicit-token verification */
+  }
+
+  // 2) Fallback: verify a Clerk session token passed explicitly by the SPA.
+  // The frontend and API run on different origins (the API is proxied under
+  // /api), so cookie-based auth is unreliable — the SPA sends the token in an
+  // x-clerk-token header (and Authorization) which survives the proxy. verify
+  // it directly here.
+  const authz = req.headers["authorization"];
+  const bearer =
+    typeof authz === "string" ? authz.replace(/^Bearer\s+/i, "") : undefined;
+  const xToken = req.headers["x-clerk-token"];
+  const token =
+    (typeof xToken === "string" ? xToken : undefined) || bearer || undefined;
+
+  if (token) {
+    try {
+      const payload = await verifyToken(token, {
+        secretKey: process.env.CLERK_SECRET_KEY,
+      });
+      req.userId = (payload.sub as string | undefined) ?? null;
+      next();
+      return;
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : String(err) },
+        "clerk token verification failed",
+      );
+    }
+  }
+
+  req.userId = null;
   next();
 }
 
