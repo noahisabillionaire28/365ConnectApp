@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "echo 'no build step — Vercel compiles the serverless function'",
+  "buildCommand": "pnpm --filter @workspace/api-server run build",
   "outputDirectory": ".",
   "framework": null,
   "rewrites": [
