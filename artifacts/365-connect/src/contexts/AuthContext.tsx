@@ -1,11 +1,15 @@
 /**
- * AuthContext — Task #21 Clerk shim.
+ * AuthContext — Supabase Auth.
  *
- * Wraps Clerk's useUser/useClerk and exposes the same { user, loading, signOut }
- * shape that all existing screens already depend on, so no page changes are needed.
+ * Exposes the same { user, loading, signOut } shape that all existing screens
+ * already depend on, so no page changes are needed. Identity now comes from
+ * Supabase Auth instead of Clerk.
  */
-import { createContext, useContext, useEffect, type ReactNode } from 'react';
-import { useUser, useClerk } from '@clerk/react';
+import {
+  createContext, useContext, useEffect, useState, type ReactNode,
+} from 'react';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import { hydrateForUser, clearUser } from '@/store/feedStore';
 
 export type SimpleUser = {
@@ -26,34 +30,63 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
+function toSimpleUser(session: Session | null): SimpleUser | null {
+  const u = session?.user;
+  if (!u) return null;
+  const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
+  const imageUrl =
+    (meta.avatar_url as string | undefined) ??
+    (meta.picture as string | undefined) ??
+    undefined;
+  return {
+    id:       u.id,
+    email:    u.email ?? undefined,
+    imageUrl,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { user: clerkUser, isLoaded } = useUser();
-  const { signOut: clerkSignOut }     = useClerk();
+  const [user, setUser]       = useState<SimpleUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const user: SimpleUser | null = clerkUser
-    ? {
-        id:       clerkUser.id,
-        email:    clerkUser.primaryEmailAddress?.emailAddress,
-        imageUrl: clerkUser.imageUrl ?? undefined,
-      }
-    : null;
-
-  // Keep the feed store hydrated whenever auth state changes
   useEffect(() => {
-    if (!isLoaded) return;
+    let active = true;
+
+    // Initial session (from persisted storage).
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setUser(toSimpleUser(data.session));
+      setLoading(false);
+    });
+
+    // React to sign-in / sign-out / token-refresh.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(toSimpleUser(session));
+      setLoading(false);
+    });
+
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Keep the feed store hydrated whenever auth state settles.
+  useEffect(() => {
+    if (loading) return;
     if (user) {
       hydrateForUser(user.id);
     } else {
       clearUser();
     }
-  }, [user?.id, isLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signOut = async () => {
-    await clerkSignOut();
+    await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading: !isLoaded, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );

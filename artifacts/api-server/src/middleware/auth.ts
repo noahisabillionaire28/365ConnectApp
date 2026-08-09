@@ -1,10 +1,12 @@
 /**
- * Auth middleware.
- * Reads the authenticated user's ID from Clerk's verified session via getAuth().
- * Identity is derived ONLY from the Clerk session — there is no header-based
- * fallback, so callers cannot spoof another user by setting a request header.
+ * Auth middleware — Supabase Auth.
+ *
+ * Identity is derived ONLY from a verified Supabase session access token, sent
+ * by the SPA as an `Authorization: Bearer` header (and mirrored in
+ * `X-Supabase-Token`, which survives cross-origin proxying). The `x-user-id`
+ * header is NOT trusted for identity, so callers cannot spoof another user.
  */
-import { getAuth, verifyToken } from "@clerk/express";
+import { adminDb } from "../lib/supabaseAdmin.js";
 import { pool } from "@workspace/db";
 import { logger } from "../lib/logger.js";
 import type { Request, Response, NextFunction } from "express";
@@ -20,7 +22,7 @@ declare global {
 }
 
 /**
- * Attaches req.userId from Clerk's verified session.
+ * Attaches req.userId from a verified Supabase access token.
  * Never rejects — routes that require auth must call requireAuth().
  */
 export async function attachUserId(
@@ -28,52 +30,34 @@ export async function attachUserId(
   _res: Response,
   next: NextFunction,
 ): Promise<void> {
-  // 1) Standard Clerk middleware (session cookie or Authorization bearer).
-  try {
-    const auth = getAuth(req);
-    if (auth?.userId) {
-      req.userId = auth.userId;
-      next();
-      return;
-    }
-  } catch {
-    /* fall through to explicit-token verification */
-  }
-
-  // 2) Fallback: verify a Clerk session token passed explicitly by the SPA.
-  // The frontend and API run on different origins (the API is proxied under
-  // /api), so cookie-based auth is unreliable — the SPA sends the token in an
-  // x-clerk-token header (and Authorization) which survives the proxy. verify
-  // it directly here.
   const authz = req.headers["authorization"];
   const bearer =
     typeof authz === "string" ? authz.replace(/^Bearer\s+/i, "") : undefined;
-  const xToken = req.headers["x-clerk-token"];
+  const xToken = req.headers["x-supabase-token"];
   const token =
     (typeof xToken === "string" ? xToken : undefined) || bearer || undefined;
 
-  const hasAuthz = typeof authz === "string" && authz.length > 0;
-  const hasXToken = typeof xToken === "string" && xToken.length > 0;
-
-  if (token) {
-    try {
-      const payload = await verifyToken(token, {
-        secretKey: process.env.CLERK_SECRET_KEY,
-      });
-      req.userId = (payload.sub as string | undefined) ?? null;
-      if (!req.userId) req.authReason = "token-verified-but-no-sub";
-      next();
-      return;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      logger.warn({ err: msg }, "clerk token verification failed");
-      req.authReason = `verify-failed: ${msg}`;
-    }
-  } else {
-    req.authReason = `no-token (authz=${hasAuthz} xToken=${hasXToken} secret=${Boolean(process.env.CLERK_SECRET_KEY)})`;
+  if (!token) {
+    req.userId = null;
+    req.authReason = "no-token";
+    next();
+    return;
   }
 
-  req.userId = null;
+  try {
+    const { data, error } = await adminDb.auth.getUser(token);
+    if (error || !data?.user) {
+      req.userId = null;
+      req.authReason = `verify-failed: ${error?.message ?? "no user"}`;
+    } else {
+      req.userId = data.user.id;
+    }
+  } catch (err) {
+    req.userId = null;
+    req.authReason = `verify-error: ${err instanceof Error ? err.message : String(err)}`;
+    logger.warn({ err: req.authReason }, "supabase token verification threw");
+  }
+
   next();
 }
 
@@ -122,7 +106,7 @@ export function requireRole(...roles: string[]) {
       const role = await getUserRole(req.userId);
       req.userRole = role;
       if (!role || !roles.includes(role)) {
-        res.status(403).json({ error: "Forbidden \u2014 insufficient role" });
+        res.status(403).json({ error: "Forbidden — insufficient role" });
         return;
       }
       next();

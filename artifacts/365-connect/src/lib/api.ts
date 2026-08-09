@@ -1,39 +1,35 @@
 /**
  * Unified API client for all data operations.
- * Calls /api/* on the api-server (proxied by Replit).
+ * Calls /api/* on the api-server (proxied same-origin in production).
  *
- * Auth: Clerk session cookies are sent automatically (credentials: 'include').
- * x-user-id header is kept as a fallback for seed scripts and admin tooling.
+ * Auth: the caller's Supabase session access token is attached as a Bearer
+ * header (and X-Supabase-Token as a proxy-safe fallback). The API server
+ * verifies the token and derives identity from it.
  */
+import { supabase } from '@/lib/supabase';
 
 const BASE = '/api';
 
-/**
- * Resolve the current Clerk session token so it can be sent as a Bearer header.
- * The backend and frontend run on different origins (the backend is proxied
- * under /api), so cookie-based Clerk auth is unreliable — especially on Clerk
- * development instances. A Bearer token is verified networklessly by the API
- * server's Clerk middleware and works cross-origin. Returns null if Clerk isn't
- * ready or there's no active session.
- */
-async function getClerkToken(): Promise<string | null> {
+/** Resolve the current Supabase session access token, or null if signed out. */
+async function getAccessToken(): Promise<string | null> {
   try {
-    const clerk = (globalThis as { Clerk?: { session?: { getToken?: () => Promise<string | null> } } }).Clerk;
-    return (await clerk?.session?.getToken?.()) ?? null;
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
   } catch {
     return null;
   }
 }
 
-async function makeHeaders(userId: string | null | undefined): Promise<Record<string, string>> {
+async function makeHeaders(
+  userId: string | null | undefined,
+): Promise<Record<string, string>> {
   const h: Record<string, string> = { 'Content-Type': 'application/json' };
   if (userId) h['x-user-id'] = userId;
-  const token = await getClerkToken();
+  const token = await getAccessToken();
   if (token) {
     h['Authorization'] = `Bearer ${token}`;
-    // Also send as a custom header: some proxies strip Authorization, but
-    // custom headers are forwarded, so the API server can still authenticate.
-    h['X-Clerk-Token'] = token;
+    // Some proxies strip Authorization; a custom header is forwarded reliably.
+    h['X-Supabase-Token'] = token;
   }
   return h;
 }
@@ -47,7 +43,7 @@ async function request<T>(
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers: await makeHeaders(userId),
-    credentials: 'include',          // still send the Clerk session cookie when available
+    credentials: 'include',
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   if (!res.ok) {

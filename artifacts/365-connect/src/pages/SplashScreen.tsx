@@ -65,7 +65,7 @@ export function SplashScreen() {
       {/* CTA buttons */}
       <div className="flex flex-col gap-3 pb-14">
         <button
-          onClick={() => navigate('/sign-up')}
+          onClick={() => navigate('/signup')}
           className="w-full text-white font-bold text-[16px] h-[52px] rounded-[12px] active:scale-[0.98] transition-transform"
           style={{ background: NAVY }}
           data-testid="btn-splash-signup"
@@ -73,7 +73,7 @@ export function SplashScreen() {
           Sign Up
         </button>
         <button
-          onClick={() => navigate('/sign-in')}
+          onClick={() => navigate('/login')}
           className="w-full font-bold text-[16px] h-[52px] rounded-[12px] active:scale-[0.98] transition-transform bg-white"
           style={{ border: `1px solid ${BORDER}`, color: NAVY }}
           data-testid="btn-splash-login"
