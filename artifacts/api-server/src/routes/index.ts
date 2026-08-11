@@ -1,5 +1,6 @@
 import { Router, type IRouter } from 'express';
 import { attachUserId } from '../middleware/auth.js';
+import authRouter        from './auth.js';
 import sseRouter         from './sse.js';
 import storageRouter     from './storage.js';
 import healthRouter      from './health.js';
@@ -28,6 +29,9 @@ router.use(sseRouter);
 
 // Storage
 router.use(storageRouter);
+
+// Auth (public — server-side account creation)
+router.use('/auth', authRouter);
 
 // Health + admin
 router.use(healthRouter);

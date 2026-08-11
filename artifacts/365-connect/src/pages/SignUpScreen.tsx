@@ -52,18 +52,21 @@ export function SignUpScreen() {
     if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
     setLoading(true); setError(null);
     try {
-      const { data, error: authErr } = await supabase.auth.signUp({ email: email.trim(), password });
-      if (authErr) throw authErr;
+      // Create an already-confirmed account server-side (no email round-trip),
+      // then sign in normally to obtain a session.
+      await apiClient(null).post('/auth/register', { email: email.trim(), password });
+
+      const { data, error: signInErr } =
+        await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (signInErr) throw signInErr;
 
       if (data.session) {
-        // Immediately signed in (email confirmation disabled in project)
         await apiClient(data.session.user.id).post('/users', {
           id: data.session.user.id, email: email.trim(), role: 'worker',
         }).catch(() => {}); // ignore if already exists
         setSignupState('done');
         setTimeout(() => navigate('/role-select'), 600);
       } else {
-        // Email confirmation required
         setSignupState('confirm');
       }
     } catch (err) {
