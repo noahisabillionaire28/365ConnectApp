@@ -10,7 +10,7 @@
  */
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ChevronLeft, Eye, EyeOff, AlertCircle, Phone } from 'lucide-react';
+import { ChevronLeft, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 import { FaApple }  from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
@@ -262,14 +262,6 @@ export function LoginScreen() {
           </button>
           {appleError && <p className="text-[12px] px-1 leading-snug" style={{ color: RED }}>{appleError}</p>}
         </div>
-
-        <button onClick={() => navigate('/phone-auth')} disabled={loading}
-          className="w-full rounded-[12px] py-4 px-4 flex items-center justify-center relative active:scale-[0.98] transition-transform disabled:opacity-50"
-          style={{ border: `1px solid ${BORDER}`, background: '#FFFFFF' }}
-          data-testid="btn-auth-phone">
-          <div className="absolute left-4"><Phone size={18} style={{ color: TEXT }} /></div>
-          <span className="font-medium text-[15px]" style={{ color: TEXT }}>Continue with Phone</span>
-        </button>
       </div>
 
       {/* Divider */}
