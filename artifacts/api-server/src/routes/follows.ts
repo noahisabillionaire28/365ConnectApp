@@ -1,80 +1,91 @@
 import { Router } from 'express';
-import { pool } from '../lib/db.js';
+import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
 /** GET /api/follows/roster — all users I follow (my roster) */
 router.get('/roster', requireAuth, async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT u.id, u.username, u.photo_url, u.role, u.rating, u.job_types,
-              u.primary_job_type, u.certifications, u.is_pro, u.company_name,
-              f.created_at AS followed_at
-       FROM follows f JOIN users u ON u.id = f.following_id
-       WHERE f.follower_id = $1
-       ORDER BY f.created_at DESC`,
-      [req.userId],
-    );
-    return res.json(rows);
-  } catch (e) {
-    return res.status(500).json({ error: String(e) });
+  const { data: follows, error } = await adminDb
+    .from('follows')
+    .select('following_id, created_at')
+    .eq('follower_id', req.userId)
+    .order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const ids = [...new Set((follows ?? []).map((f) => f.following_id).filter(Boolean))];
+  const userMap = new Map<string, Record<string, unknown>>();
+  if (ids.length) {
+    const { data: users, error: uErr } = await adminDb
+      .from('users')
+      .select('id, username, photo_url, role, rating, job_types, primary_job_type, certifications, is_pro, company_name')
+      .in('id', ids);
+    if (uErr) return res.status(500).json({ error: uErr.message });
+    for (const u of users ?? []) userMap.set(u.id, u);
   }
+
+  const rows = (follows ?? [])
+    .map((f) => {
+      const u = userMap.get(f.following_id);
+      if (!u) return null;
+      return { ...u, followed_at: f.created_at };
+    })
+    .filter(Boolean);
+  return res.json(rows);
 });
 
 /** GET /api/follows/status/:userId — am I following this user? */
 router.get('/status/:userId', requireAuth, async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT id FROM follows WHERE follower_id = $1 AND following_id = $2`,
-      [req.userId, req.params.userId],
-    );
-    return res.json({ following: rows.length > 0 });
-  } catch (e) {
-    return res.status(500).json({ error: String(e) });
-  }
+  const { count, error } = await adminDb
+    .from('follows')
+    .select('*', { count: 'exact', head: true })
+    .eq('follower_id', req.userId)
+    .eq('following_id', req.params.userId);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ following: (count ?? 0) > 0 });
 });
 
 /** GET /api/follows/followers/:userId — who follows this user */
 router.get('/followers/:userId', async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT u.id, u.username, u.photo_url, u.role
-       FROM follows f JOIN users u ON u.id = f.follower_id
-       WHERE f.following_id = $1`,
-      [req.params.userId],
-    );
-    return res.json(rows);
-  } catch (e) {
-    return res.status(500).json({ error: String(e) });
-  }
+  const { data: follows, error } = await adminDb
+    .from('follows')
+    .select('follower_id')
+    .eq('following_id', req.params.userId);
+  if (error) return res.status(500).json({ error: error.message });
+
+  const ids = [...new Set((follows ?? []).map((f) => f.follower_id).filter(Boolean))];
+  if (!ids.length) return res.json([]);
+
+  const { data: users, error: uErr } = await adminDb
+    .from('users')
+    .select('id, username, photo_url, role')
+    .in('id', ids);
+  if (uErr) return res.status(500).json({ error: uErr.message });
+  return res.json(users ?? []);
 });
 
 /** POST /api/follows — follow a user */
 router.post('/', requireAuth, async (req, res) => {
   const { following_id } = req.body as { following_id: string };
-  try {
-    await pool.query(
-      `INSERT INTO follows (follower_id, following_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-      [req.userId, following_id],
+  const { error } = await adminDb
+    .from('follows')
+    .upsert(
+      { follower_id: req.userId, following_id },
+      { onConflict: 'follower_id,following_id', ignoreDuplicates: true },
     );
-    return res.json({ ok: true });
-  } catch (e) {
-    return res.status(500).json({ error: String(e) });
-  }
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ ok: true });
 });
 
 /** DELETE /api/follows/:userId — unfollow */
 router.delete('/:userId', requireAuth, async (req, res) => {
-  try {
-    await pool.query(
-      `DELETE FROM follows WHERE follower_id = $1 AND following_id = $2`,
-      [req.userId, req.params.userId],
-    );
-    return res.json({ ok: true });
-  } catch (e) {
-    return res.status(500).json({ error: String(e) });
-  }
+  const { error } = await adminDb
+    .from('follows')
+    .delete()
+    .eq('follower_id', req.userId)
+    .eq('following_id', req.params.userId);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ ok: true });
 });
 
 export default router;

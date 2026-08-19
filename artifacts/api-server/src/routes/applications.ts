@@ -1,16 +1,17 @@
 import { Router } from 'express';
-import { pool } from '../lib/db.js';
+import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
 /** Returns true if userId is the client that owns the given shift. */
 async function ownsShift(userId: string, shiftId: string): Promise<boolean> {
-  const { rows } = await pool.query(
-    'SELECT 1 FROM shifts WHERE id = $1 AND client_id = $2',
-    [shiftId, userId],
-  );
-  return rows.length > 0;
+  const { count } = await adminDb
+    .from('shifts')
+    .select('*', { count: 'exact', head: true })
+    .eq('id', shiftId)
+    .eq('client_id', userId);
+  return (count ?? 0) > 0;
 }
 
 /** GET /api/applications?shift_id=&worker_id= */
@@ -22,30 +23,75 @@ router.get('/', requireAuth, async (req, res) => {
       if (!(await ownsShift(req.userId!, shift_id))) {
         return res.status(403).json({ error: 'Forbidden' });
       }
-      const { rows } = await pool.query(
-        `SELECT a.*, u.username, u.photo_url, u.rating, u.job_types,
-                u.primary_job_type, u.certifications, u.bio
-           FROM applications a JOIN users u ON u.id = a.worker_id
-          WHERE a.shift_id = $1
-          ORDER BY a.created_at DESC`,
-        [shift_id],
-      );
-      return res.json(rows);
+      const { data: apps, error } = await adminDb
+        .from('applications')
+        .select('*')
+        .eq('shift_id', shift_id)
+        .order('created_at', { ascending: false });
+      if (error) return res.status(500).json({ error: error.message });
+
+      const workerIds = [...new Set((apps ?? []).map((a) => a.worker_id))];
+      const { data: users, error: uErr } = await adminDb
+        .from('users')
+        .select(
+          'id, username, photo_url, rating, job_types, primary_job_type, certifications, bio',
+        )
+        .in('id', workerIds);
+      if (uErr) return res.status(500).json({ error: uErr.message });
+
+      const userMap = new Map((users ?? []).map((u) => [u.id, u]));
+      const merged = (apps ?? []).map((a) => {
+        const u = userMap.get(a.worker_id);
+        return {
+          ...a,
+          username: u?.username ?? null,
+          photo_url: u?.photo_url ?? null,
+          rating: u?.rating ?? null,
+          job_types: u?.job_types ?? null,
+          primary_job_type: u?.primary_job_type ?? null,
+          certifications: u?.certifications ?? null,
+          bio: u?.bio ?? null,
+        };
+      });
+      return res.json(merged);
     }
     // Any other listing is scoped to the caller's own applications only.
     // (An explicit worker_id belonging to someone else is not honoured.)
     if (worker_id && worker_id !== 'me' && worker_id !== req.userId) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    const { rows } = await pool.query(
-      `SELECT a.*, s.title, s.job_type, s.start_time, s.end_time, s.location,
-              s.pay_rate, s.pay_period, s.company_name
-         FROM applications a JOIN shifts s ON s.id = a.shift_id
-        WHERE a.worker_id = $1
-        ORDER BY a.created_at DESC`,
-      [req.userId],
-    );
-    return res.json(rows);
+    const { data: apps, error } = await adminDb
+      .from('applications')
+      .select('*')
+      .eq('worker_id', req.userId)
+      .order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+
+    const shiftIds = [...new Set((apps ?? []).map((a) => a.shift_id))];
+    const { data: shifts, error: sErr } = await adminDb
+      .from('shifts')
+      .select(
+        'id, title, job_type, start_time, end_time, location, pay_rate, pay_period, company_name',
+      )
+      .in('id', shiftIds);
+    if (sErr) return res.status(500).json({ error: sErr.message });
+
+    const shiftMap = new Map((shifts ?? []).map((s) => [s.id, s]));
+    const merged = (apps ?? []).map((a) => {
+      const s = shiftMap.get(a.shift_id);
+      return {
+        ...a,
+        title: s?.title ?? null,
+        job_type: s?.job_type ?? null,
+        start_time: s?.start_time ?? null,
+        end_time: s?.end_time ?? null,
+        location: s?.location ?? null,
+        pay_rate: s?.pay_rate ?? null,
+        pay_period: s?.pay_period ?? null,
+        company_name: s?.company_name ?? null,
+      };
+    });
+    return res.json(merged);
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }
@@ -54,11 +100,14 @@ router.get('/', requireAuth, async (req, res) => {
 /** GET /api/applications/status/:shiftId - caller's own status for a shift */
 router.get('/status/:shiftId', requireAuth, async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT status FROM applications WHERE shift_id = $1 AND worker_id = $2`,
-      [req.params.shiftId, req.userId],
-    );
-    return res.json({ status: rows[0]?.status ?? null });
+    const { data, error } = await adminDb
+      .from('applications')
+      .select('status')
+      .eq('shift_id', req.params.shiftId)
+      .eq('worker_id', req.userId)
+      .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ status: data?.status ?? null });
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }
@@ -67,11 +116,12 @@ router.get('/status/:shiftId', requireAuth, async (req, res) => {
 /** GET /api/applications/my-shift-ids - set of shift IDs I've applied to */
 router.get('/my-shift-ids', requireAuth, async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT shift_id, status FROM applications WHERE worker_id = $1`,
-      [req.userId],
-    );
-    return res.json(rows);
+    const { data, error } = await adminDb
+      .from('applications')
+      .select('shift_id, status')
+      .eq('worker_id', req.userId);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data);
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }
@@ -81,15 +131,23 @@ router.get('/my-shift-ids', requireAuth, async (req, res) => {
 router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
   const { shift_id, match_score, message } = req.body as Record<string, unknown>;
   try {
-    const { rows } = await pool.query(
-      `INSERT INTO applications (shift_id, worker_id, status, match_score, message)
-         VALUES ($1, $2, 'pending', $3, $4)
-         ON CONFLICT (shift_id, worker_id) DO NOTHING
-         RETURNING *`,
-      [shift_id, req.userId, match_score ?? null, message ?? null],
-    );
-    if (!rows[0]) return res.status(409).json({ error: 'Already applied' });
-    return res.status(201).json(rows[0]);
+    const { data, error } = await adminDb
+      .from('applications')
+      .upsert(
+        {
+          shift_id,
+          worker_id: req.userId,
+          status: 'pending',
+          match_score: match_score ?? null,
+          message: message ?? null,
+        },
+        { onConflict: 'shift_id,worker_id', ignoreDuplicates: true },
+      )
+      .select()
+      .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(409).json({ error: 'Already applied' });
+    return res.status(201).json(data);
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }
@@ -107,14 +165,22 @@ router.patch('/:id', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Invalid status' });
   }
   try {
-    const { rows: appRows } = await pool.query(
-      `SELECT a.worker_id, s.client_id
-         FROM applications a JOIN shifts s ON s.id = a.shift_id
-        WHERE a.id = $1`,
-      [req.params.id],
-    );
-    const app = appRows[0];
-    if (!app) return res.status(404).json({ error: 'Not found' });
+    const { data: appRow, error: aErr } = await adminDb
+      .from('applications')
+      .select('worker_id, shift_id')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (aErr) return res.status(500).json({ error: aErr.message });
+    if (!appRow) return res.status(404).json({ error: 'Not found' });
+
+    const { data: shiftRow, error: sErr } = await adminDb
+      .from('shifts')
+      .select('client_id')
+      .eq('id', appRow.shift_id)
+      .maybeSingle();
+    if (sErr) return res.status(500).json({ error: sErr.message });
+
+    const app = { worker_id: appRow.worker_id, client_id: shiftRow?.client_id };
 
     const isApplicant = app.worker_id === req.userId;
     const isShiftOwner = app.client_id === req.userId;
@@ -129,11 +195,14 @@ router.patch('/:id', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const { rows } = await pool.query(
-      `UPDATE applications SET status = $1 WHERE id = $2 RETURNING *`,
-      [status, req.params.id],
-    );
-    return res.json(rows[0]);
+    const { data, error } = await adminDb
+      .from('applications')
+      .update({ status })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data);
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }
@@ -153,14 +222,16 @@ router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req
     if (req.userRole === 'client' && !(await ownsShift(req.userId!, shift_id))) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    const { rows } = await pool.query(
-      `INSERT INTO applications (shift_id, worker_id, status)
-         VALUES ($1, $2, 'accepted')
-         ON CONFLICT (shift_id, worker_id) DO UPDATE SET status = 'accepted'
-         RETURNING *`,
-      [shift_id, worker_id],
-    );
-    return res.status(201).json(rows[0]);
+    const { data, error } = await adminDb
+      .from('applications')
+      .upsert(
+        { shift_id, worker_id, status: 'accepted' },
+        { onConflict: 'shift_id,worker_id' },
+      )
+      .select()
+      .single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(201).json(data);
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }

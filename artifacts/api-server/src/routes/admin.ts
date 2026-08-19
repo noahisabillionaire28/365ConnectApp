@@ -1,10 +1,10 @@
 /**
- * Admin API — all backed by the Replit Postgres pool.
+ * Admin API — all backed by the Supabase service-role client (adminDb).
  * Auth: reads x-user-id header and verifies role='admin' in users table.
  * Mounted at /admin/* under the /api prefix → full paths: /api/admin/*
  */
 import { Router } from 'express';
-import { pool } from '../lib/db.js';
+import { adminDb } from '../lib/supabaseAdmin.js';
 import type { Request, Response, NextFunction } from 'express';
 
 const router = Router();
@@ -13,8 +13,13 @@ async function requireAdminSession(req: Request, res: Response, next: NextFuncti
   const userId = req.userId;
   if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
   try {
-    const { rows } = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
-    if (!rows[0] || rows[0].role !== 'admin') {
+    const { data, error } = await adminDb
+      .from('users')
+      .select('role')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) { res.status(500).json({ error: 'Auth check failed' }); return; }
+    if (!data || data.role !== 'admin') {
       res.status(403).json({ error: 'Forbidden — admin role required' });
       return;
     }
@@ -32,24 +37,29 @@ router.get('/stats', async (_req, res) => {
     const todayStart = new Date(); todayStart.setHours(0,0,0,0);
 
     const [users, shifts, apps, payments, newToday, activeShifts, disputes] = await Promise.all([
-      pool.query('SELECT COUNT(*) FROM users'),
-      pool.query('SELECT COUNT(*) FROM shifts'),
-      pool.query('SELECT COUNT(*) FROM applications'),
-      pool.query('SELECT COALESCE(SUM(amount),0) AS rev, COALESCE(SUM(fee),0) AS fee FROM payments'),
-      pool.query('SELECT COUNT(*) FROM users WHERE created_at >= $1', [todayStart.toISOString()]),
-      pool.query("SELECT COUNT(*) FROM shifts WHERE status IN ('open','filled')"),
-      pool.query("SELECT COUNT(*) FROM disputes WHERE status = 'open'").catch(() => ({ rows: [{ count: 0 }] })),
+      adminDb.from('users').select('*', { count: 'exact', head: true }),
+      adminDb.from('shifts').select('*', { count: 'exact', head: true }),
+      adminDb.from('applications').select('*', { count: 'exact', head: true }),
+      adminDb.from('payments').select('amount, fee'),
+      adminDb.from('users').select('*', { count: 'exact', head: true }).gte('created_at', todayStart.toISOString()),
+      adminDb.from('shifts').select('*', { count: 'exact', head: true }).in('status', ['open', 'filled']),
+      adminDb.from('disputes').select('*', { count: 'exact', head: true }).eq('status', 'open')
+        .then((r) => (r.error ? { count: 0 } : r), () => ({ count: 0 })),
     ]);
 
+    const payRows = (payments.data ?? []) as Array<{ amount: unknown; fee: unknown }>;
+    const rev = payRows.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const feeTotal = payRows.reduce((sum, p) => sum + (Number(p.fee) || 0), 0);
+
     res.json({
-      totalUsers:      parseInt(users.rows[0].count),
-      totalShifts:     parseInt(shifts.rows[0].count),
-      totalApps:       parseInt(apps.rows[0].count),
-      totalRevenue:    parseFloat(payments.rows[0].rev),
-      platformFeeRev:  parseFloat(payments.rows[0].fee),
-      newSignupsToday: parseInt(newToday.rows[0].count),
-      activeShifts:    parseInt(activeShifts.rows[0].count),
-      openDisputes:    parseInt(String(disputes.rows[0].count)),
+      totalUsers:      users.count ?? 0,
+      totalShifts:     shifts.count ?? 0,
+      totalApps:       apps.count ?? 0,
+      totalRevenue:    rev,
+      platformFeeRev:  feeTotal,
+      newSignupsToday: newToday.count ?? 0,
+      activeShifts:    activeShifts.count ?? 0,
+      openDisputes:    disputes.count ?? 0,
     });
   } catch (err) {
     console.error('[admin/stats]', err);
@@ -60,11 +70,12 @@ router.get('/stats', async (_req, res) => {
 /* ── GET /api/admin/users ─────────────────────────────────────────────────── */
 router.get('/users', async (_req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT id, email, role, username, photo_url, is_pro, rating, status, created_at
-       FROM users ORDER BY created_at DESC`,
-    );
-    res.json(rows);
+    const { data, error } = await adminDb
+      .from('users')
+      .select('id, email, role, username, photo_url, is_pro, rating, status, created_at')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(data ?? []);
   } catch (err) {
     console.error('[admin/users]', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -76,15 +87,14 @@ router.patch('/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const allowed = ['role', 'is_pro', 'status'] as const;
-    const updates: string[] = [];
-    const values: unknown[] = [];
-    let idx = 1;
+    const body = req.body as Record<string, unknown>;
+    const updates: Record<string, unknown> = {};
     for (const k of allowed) {
-      if (k in req.body) { updates.push(`${k} = $${idx++}`); values.push((req.body as Record<string,unknown>)[k]); }
+      if (k in body) updates[k] = body[k];
     }
-    if (!updates.length) { res.status(400).json({ error: 'No valid fields' }); return; }
-    values.push(id);
-    await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${idx}`, values);
+    if (!Object.keys(updates).length) { res.status(400).json({ error: 'No valid fields' }); return; }
+    const { error } = await adminDb.from('users').update(updates).eq('id', id);
+    if (error) throw error;
     res.json({ ok: true });
   } catch (err) {
     console.error('[admin/users PATCH]', err);
@@ -95,13 +105,16 @@ router.patch('/users/:id', async (req, res) => {
 /* ── GET /api/admin/shifts ────────────────────────────────────────────────── */
 router.get('/shifts', async (_req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT id, title, job_type, company_name, status, pay_rate,
-              spots_available, spots_filled, created_at, client_id,
-              start_time, end_time, location
-       FROM shifts ORDER BY created_at DESC`,
-    );
-    res.json(rows);
+    const { data, error } = await adminDb
+      .from('shifts')
+      .select(
+        'id, title, job_type, company_name, status, pay_rate, ' +
+          'spots_available, spots_filled, created_at, client_id, ' +
+          'start_time, end_time, location',
+      )
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(data ?? []);
   } catch (err) {
     console.error('[admin/shifts]', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -111,7 +124,8 @@ router.get('/shifts', async (_req, res) => {
 /* ── PATCH /api/admin/shifts/:id/cancel ──────────────────────────────────── */
 router.patch('/shifts/:id/cancel', async (req, res) => {
   try {
-    await pool.query(`UPDATE shifts SET status = 'cancelled' WHERE id = $1`, [req.params.id]);
+    const { error } = await adminDb.from('shifts').update({ status: 'cancelled' }).eq('id', req.params.id);
+    if (error) throw error;
     res.json({ ok: true });
   } catch (err) {
     console.error('[admin/shifts/cancel]', err);
@@ -122,11 +136,12 @@ router.patch('/shifts/:id/cancel', async (req, res) => {
 /* ── GET /api/admin/payments ──────────────────────────────────────────────── */
 router.get('/payments', async (_req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT id, shift_id, worker_id, payment_type, amount, fee, net_amount, status, created_at
-       FROM payments ORDER BY created_at DESC`,
-    );
-    res.json(rows);
+    const { data, error } = await adminDb
+      .from('payments')
+      .select('id, shift_id, worker_id, payment_type, amount, fee, net_amount, status, created_at')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(data ?? []);
   } catch (err) {
     console.error('[admin/payments]', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -136,11 +151,13 @@ router.get('/payments', async (_req, res) => {
 /* ── GET /api/admin/disputes ──────────────────────────────────────────────── */
 router.get('/disputes', async (_req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT id, type, reported_user_id, reported_by_user_id, reason, status, created_at, resolution_note
-       FROM disputes ORDER BY created_at DESC`,
-    ).catch(() => ({ rows: [] as Record<string,unknown>[] }));
-    res.json(rows);
+    const { data, error } = await adminDb
+      .from('disputes')
+      .select('id, type, reported_user_id, reported_by_user_id, reason, status, created_at, resolution_note')
+      .order('created_at', { ascending: false });
+    // disputes table may not exist — stay resilient and return an empty list.
+    if (error) { res.json([]); return; }
+    res.json(data ?? []);
   } catch (err) {
     console.error('[admin/disputes]', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -151,13 +168,11 @@ router.get('/disputes', async (_req, res) => {
 router.patch('/disputes/:id', async (req, res) => {
   try {
     const { status, resolution_note } = req.body as { status: string; resolution_note?: string };
-    const updates = ['status = $1'];
-    const values: unknown[] = [status];
-    let idx = 2;
-    if (resolution_note !== undefined) { updates.push(`resolution_note = $${idx++}`); values.push(resolution_note); }
-    if (['resolved','warned','banned'].includes(status)) { updates.push(`resolved_at = $${idx++}`); values.push(new Date().toISOString()); }
-    values.push(req.params.id);
-    await pool.query(`UPDATE disputes SET ${updates.join(', ')} WHERE id = $${idx}`, values);
+    const updates: Record<string, unknown> = { status };
+    if (resolution_note !== undefined) updates.resolution_note = resolution_note;
+    if (['resolved','warned','banned'].includes(status)) updates.resolved_at = new Date().toISOString();
+    const { error } = await adminDb.from('disputes').update(updates).eq('id', req.params.id);
+    if (error) throw error;
     res.json({ ok: true });
   } catch (err) {
     console.error('[admin/disputes PATCH]', err);
@@ -168,12 +183,40 @@ router.patch('/disputes/:id', async (req, res) => {
 /* ── GET /api/admin/applications ─────────────────────────────────────────── */
 router.get('/applications', async (_req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT a.*, s.title AS shift_title, u.username AS worker_username
-       FROM applications a JOIN shifts s ON s.id = a.shift_id JOIN users u ON u.id = a.worker_id
-       ORDER BY a.created_at DESC`,
-    );
-    res.json(rows);
+    const { data: apps, error } = await adminDb
+      .from('applications')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+
+    const rows = (apps ?? []) as Array<Record<string, unknown>>;
+    const shiftIds = [...new Set(rows.map((a) => a.shift_id).filter(Boolean))];
+    const workerIds = [...new Set(rows.map((a) => a.worker_id).filter(Boolean))];
+
+    const [shiftsRes, usersRes] = await Promise.all([
+      shiftIds.length
+        ? adminDb.from('shifts').select('id, title').in('id', shiftIds as string[])
+        : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
+      workerIds.length
+        ? adminDb.from('users').select('id, username').in('id', workerIds as string[])
+        : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
+    ]);
+    if (shiftsRes.error) throw shiftsRes.error;
+    if (usersRes.error) throw usersRes.error;
+
+    const shiftById = new Map((shiftsRes.data ?? []).map((s) => [s.id, s]));
+    const userById = new Map((usersRes.data ?? []).map((u) => [u.id, u]));
+
+    // Original used INNER JOINs on shifts and users — drop rows lacking either match.
+    const merged = rows
+      .filter((a) => shiftById.has(a.shift_id) && userById.has(a.worker_id))
+      .map((a) => ({
+        ...a,
+        shift_title: shiftById.get(a.shift_id)!.title,
+        worker_username: userById.get(a.worker_id)!.username,
+      }));
+
+    res.json(merged);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }

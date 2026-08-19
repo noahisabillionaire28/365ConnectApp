@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { pool } from '../lib/db.js';
+import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
@@ -7,35 +7,49 @@ const router = Router();
 /** GET /api/shifts — open shifts, optional filters */
 router.get('/', async (req, res) => {
   const { job_type, status = 'open', limit = '50', offset = '0' } = req.query as Record<string, string>;
-  try {
-    const conditions = ['s.status = $1'];
-    const values: unknown[] = [status];
-    let idx = 2;
-    if (job_type) { conditions.push(`(s.job_type = $${idx} OR $${idx} = ANY(s.job_types))`); values.push(job_type); idx++; }
-    const { rows } = await pool.query(
-      `SELECT s.*, u.username AS client_username, u.company_name AS client_company, u.photo_url AS client_photo_url
-       FROM shifts s LEFT JOIN users u ON u.id = s.client_id
-       WHERE ${conditions.join(' AND ')}
-       ORDER BY s.created_at DESC LIMIT $${idx} OFFSET $${idx+1}`,
-      [...values, parseInt(limit), parseInt(offset)],
-    );
-    return res.json(rows);
-  } catch (e) {
-    return res.status(500).json({ error: String(e) });
+  const lim = parseInt(limit);
+  const off = parseInt(offset);
+  let q = adminDb.from('shifts').select('*').eq('status', status);
+  if (job_type) {
+    q = q.or(`job_type.eq.${job_type},job_types.cs.{${job_type}}`);
   }
+  const { data: shifts, error } = await q
+    .order('created_at', { ascending: false })
+    .range(off, off + lim - 1);
+  if (error) return res.status(500).json({ error: error.message });
+
+  const clientIds = [...new Set((shifts ?? []).map((s: any) => s.client_id).filter(Boolean))];
+  const userMap = new Map<string, any>();
+  if (clientIds.length) {
+    const { data: users, error: uErr } = await adminDb
+      .from('users')
+      .select('id, username, company_name, photo_url')
+      .in('id', clientIds);
+    if (uErr) return res.status(500).json({ error: uErr.message });
+    for (const u of users ?? []) userMap.set(u.id, u);
+  }
+
+  const rows = (shifts ?? []).map((s: any) => {
+    const u = userMap.get(s.client_id);
+    return {
+      ...s,
+      client_username: u?.username ?? null,
+      client_company: u?.company_name ?? null,
+      client_photo_url: u?.photo_url ?? null,
+    };
+  });
+  return res.json(rows);
 });
 
 /** GET /api/shifts/my — shifts posted by the current user (client) */
 router.get('/my', requireAuth, async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT * FROM shifts WHERE client_id = $1 ORDER BY created_at DESC`,
-      [req.userId],
-    );
-    return res.json(rows);
-  } catch (e) {
-    return res.status(500).json({ error: String(e) });
-  }
+  const { data, error } = await adminDb
+    .from('shifts')
+    .select('*')
+    .eq('client_id', req.userId)
+    .order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json(data);
 });
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -45,51 +59,70 @@ router.get('/:id', async (req, res) => {
   if (!UUID_RE.test(req.params.id)) {
     return res.status(404).json({ error: 'Not found' });
   }
-  try {
-    const { rows } = await pool.query(
-      `SELECT s.*, u.username AS client_username, u.company_name AS client_company,
-              u.photo_url AS client_photo_url, u.rating AS client_rating
-       FROM shifts s LEFT JOIN users u ON u.id = s.client_id
-       WHERE s.id = $1`,
-      [req.params.id],
-    );
-    if (!rows[0]) return res.status(404).json({ error: 'Not found' });
-    return res.json(rows[0]);
-  } catch (e) {
-    return res.status(500).json({ error: String(e) });
+  const { data: shift, error } = await adminDb
+    .from('shifts')
+    .select('*')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (error) return res.status(500).json({ error: error.message });
+  if (!shift) return res.status(404).json({ error: 'Not found' });
+
+  let u: any = null;
+  if (shift.client_id) {
+    const { data: user, error: uErr } = await adminDb
+      .from('users')
+      .select('id, username, company_name, photo_url, rating')
+      .eq('id', shift.client_id)
+      .maybeSingle();
+    if (uErr) return res.status(500).json({ error: uErr.message });
+    u = user;
   }
+
+  return res.json({
+    ...shift,
+    client_username: u?.username ?? null,
+    client_company: u?.company_name ?? null,
+    client_photo_url: u?.photo_url ?? null,
+    client_rating: u?.rating ?? null,
+  });
 });
 
 /** POST /api/shifts — create shift */
 router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const b = req.body as Record<string, unknown>;
-  try {
-    const { rows } = await pool.query(
-      `INSERT INTO shifts (
-        client_id, title, description, location, job_type, job_types,
-        pay_rate, pay_period, start_time, end_time, spots_available,
-        lat, lng, cover_image, company_name, requirements, dress_code,
-        dress_code_items, point_of_contact, contact_phone,
-        unit_info, parking_notes, special_instructions, repeat_type
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
-      RETURNING *`,
-      [
-        req.userId, b.title, b.description ?? null, b.location ?? null,
-        b.job_type, b.job_types ?? '{}', b.pay_rate ?? null,
-        b.pay_period ?? 'hr', b.start_time, b.end_time,
-        b.spots_available ?? 1, b.lat ?? null, b.lng ?? null,
-        b.cover_image ?? null, b.company_name ?? null,
-        b.requirements ?? '{}', b.dress_code ?? null,
-        b.dress_code_items ?? '{}', b.point_of_contact ?? null,
-        b.contact_phone ?? null, b.unit_info ?? null,
-        b.parking_notes ?? null, b.special_instructions ?? null,
-        b.repeat_type ?? 'once',
-      ],
-    );
-    return res.status(201).json(rows[0]);
-  } catch (e) {
-    return res.status(500).json({ error: String(e) });
-  }
+  const payload = {
+    client_id: req.userId,
+    title: b.title,
+    description: b.description ?? null,
+    location: b.location ?? null,
+    job_type: b.job_type,
+    job_types: b.job_types ?? [],
+    pay_rate: b.pay_rate ?? null,
+    pay_period: b.pay_period ?? 'hr',
+    start_time: b.start_time,
+    end_time: b.end_time,
+    spots_available: b.spots_available ?? 1,
+    lat: b.lat ?? null,
+    lng: b.lng ?? null,
+    cover_image: b.cover_image ?? null,
+    company_name: b.company_name ?? null,
+    requirements: b.requirements ?? [],
+    dress_code: b.dress_code ?? null,
+    dress_code_items: b.dress_code_items ?? [],
+    point_of_contact: b.point_of_contact ?? null,
+    contact_phone: b.contact_phone ?? null,
+    unit_info: b.unit_info ?? null,
+    parking_notes: b.parking_notes ?? null,
+    special_instructions: b.special_instructions ?? null,
+    repeat_type: b.repeat_type ?? 'once',
+  };
+  const { data, error } = await adminDb
+    .from('shifts')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(201).json(data);
 });
 
 /** PATCH /api/shifts/:id — update shift (owner only) */
@@ -101,28 +134,23 @@ router.patch('/:id', requireAuth, requireRole('client', 'staffer'), async (req, 
     'point_of_contact','contact_phone','unit_info','parking_notes',
     'special_instructions','repeat_type',
   ];
-  const updates: string[] = [];
-  const values: unknown[] = [];
-  let idx = 1;
+  const body = req.body as Record<string, unknown>;
+  const updates: Record<string, unknown> = {};
   for (const key of allowed) {
-    if (key in req.body) {
-      updates.push(`${key} = $${idx++}`);
-      values.push((req.body as Record<string,unknown>)[key]);
-    }
+    if (key in body) updates[key] = body[key];
   }
-  if (!updates.length) return res.status(400).json({ error: 'No valid fields' });
-  values.push(req.params.id, req.userId);
-  try {
-    const { rows } = await pool.query(
-      `UPDATE shifts SET ${updates.join(', ')}
-       WHERE id = $${idx} AND client_id = $${idx+1} RETURNING *`,
-      values,
-    );
-    if (!rows[0]) return res.status(404).json({ error: 'Not found or not authorized' });
-    return res.json(rows[0]);
-  } catch (e) {
-    return res.status(500).json({ error: String(e) });
-  }
+  if (!Object.keys(updates).length) return res.status(400).json({ error: 'No valid fields' });
+
+  const { data, error } = await adminDb
+    .from('shifts')
+    .update(updates)
+    .eq('id', req.params.id)
+    .eq('client_id', req.userId)
+    .select()
+    .maybeSingle();
+  if (error) return res.status(500).json({ error: error.message });
+  if (!data) return res.status(404).json({ error: 'Not found or not authorized' });
+  return res.json(data);
 });
 
 export default router;
