@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { pool } from '@workspace/db';
+import { pool } from '../lib/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { broadcastToUser } from '../lib/sseManager.js';
 

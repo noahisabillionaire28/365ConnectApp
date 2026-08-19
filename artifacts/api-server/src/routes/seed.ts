@@ -2,7 +2,7 @@
  * Seed — creates test users + demo shifts in Replit Postgres.
  * Only runs in development. Safe to re-run (upserts / ON CONFLICT).
  */
-import { pool } from '@workspace/db';
+import { pool } from '../lib/db.js';
 
 const WORKER_ID  = 'seed-worker-001';
 const CLIENT_ID  = 'seed-client-001';

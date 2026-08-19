@@ -4,7 +4,7 @@
  * Mounted at /admin/* under the /api prefix → full paths: /api/admin/*
  */
 import { Router } from 'express';
-import { pool } from '@workspace/db';
+import { pool } from '../lib/db.js';
 import type { Request, Response, NextFunction } from 'express';
 
 const router = Router();
