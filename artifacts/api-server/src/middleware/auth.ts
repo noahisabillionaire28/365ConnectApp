@@ -7,7 +7,6 @@
  * header is NOT trusted for identity, so callers cannot spoof another user.
  */
 import { adminDb } from "../lib/supabaseAdmin.js";
-import { pool } from "@workspace/db";
 import { logger } from "../lib/logger.js";
 import type { Request, Response, NextFunction } from "express";
 
@@ -81,11 +80,12 @@ export function requireAuth(
  * does not exist. Result is memoised on req.userRole for the request.
  */
 export async function getUserRole(userId: string): Promise<string | null> {
-  const { rows } = await pool.query(
-    "SELECT role FROM users WHERE id = $1",
-    [userId],
-  );
-  return rows[0]?.role ?? null;
+  const { data } = await adminDb
+    .from("users")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+  return (data?.role as string | undefined) ?? null;
 }
 
 /**
