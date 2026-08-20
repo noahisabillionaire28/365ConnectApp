@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatTime } from '@/lib/supabase';
 
 type RawShift = {
   id: string;
@@ -42,7 +43,7 @@ function toClientShift(s: RawShift, appCount: number): ClientShift {
     applicantCount:   appCount,
     jobType:          s.job_type    ?? null,
     companyName:      s.company_name ?? null,
-    startTime:        s.start_time,
+    startTime:        formatTime(s.start_time),
     startTimeISO:     s.start_time,
     payRate:          s.pay_rate    ?? null,
     payPeriod:        s.pay_period  ?? null,

@@ -191,7 +191,15 @@ export function PostShiftStep1Screen() {
       {/* Fixed CTA */}
       <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-[390px] px-5 pb-4 pt-4
         bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
-        {jobType && (
+        {jobType && title.trim().length < 3 ? (
+          <motion.p
+            key="need-title"
+            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+            className="text-center text-[#6B7280] text-[12px] mb-2"
+          >
+            Add a <span className="text-[#0A1628] font-bold">shift title</span> above to continue
+          </motion.p>
+        ) : jobType ? (
           <motion.p
             key={jobType}
             initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
@@ -199,7 +207,7 @@ export function PostShiftStep1Screen() {
           >
             <span className="text-[#0A1628] font-bold">{jobType}</span> selected
           </motion.p>
-        )}
+        ) : null}
         <motion.button
           type="button" whileTap={{ scale: 0.97 }}
           onClick={handleContinue}

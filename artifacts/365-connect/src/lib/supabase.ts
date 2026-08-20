@@ -234,25 +234,34 @@ export type ShiftRequestRow = {
 
 // ─── Date / time helpers ──────────────────────────────────────────────────────
 
-/** "9:00 PM" format from an ISO timestamptz string */
+// Shift times are entered as a venue "wall clock" and stored labelled UTC
+// (e.g. 6:00 PM → 2026-08-20T18:00:00+00:00). We therefore render them in UTC
+// so every viewer sees the time exactly as it was entered, regardless of their
+// own timezone — otherwise a Pacific viewer would see a 6 PM shift as 11 AM.
+
+/** "9:00 PM" format from an ISO timestamptz string (rendered as entered) */
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
+    timeZone: 'UTC',
   });
 }
 
 /** "Tonight" / "Tomorrow" / "Mon Jul 8" from an ISO timestamptz string */
 export function friendlyDate(iso: string): string {
-  const d         = new Date(iso);
-  const today     = new Date();
-  const tomorrow  = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
+  const d        = new Date(iso);
+  const now      = new Date();
+  const tomorrow = new Date(now.getTime() + 86_400_000);
+  // Compare on the UTC calendar day to stay consistent with formatTime above.
+  const key = (x: Date) => `${x.getUTCFullYear()}-${x.getUTCMonth()}-${x.getUTCDate()}`;
 
-  if (d.toDateString() === today.toDateString())    return 'Tonight';
-  if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  if (key(d) === key(now))      return 'Tonight';
+  if (key(d) === key(tomorrow)) return 'Tomorrow';
+  return d.toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC',
+  });
 }
 
 // Fallback cover images by job type
