@@ -43,6 +43,7 @@ router.post('/', requireAuth, async (req, res) => {
     worker_id: req.userId,
     amount,
     fee: fee ?? 0,
+    total: amount ?? net_amount ?? 0,
     net_amount,
     status: status ?? 'completed',
     payment_type: payment_type ?? 'shift_payment',

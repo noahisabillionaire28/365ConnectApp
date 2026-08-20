@@ -197,8 +197,9 @@ export function WorkerSetupScreen() {
     setUsernameStatus('checking');
     usernameTimer.current = setTimeout(async () => {
       try {
-        const rows = await apiClient(null).get<{ id: string }[]>(`/workers?username=${encodeURIComponent(val)}&limit=1`);
-        setUsernameStatus(rows.length > 0 && rows[0]?.id !== user?.id ? 'taken' : 'valid');
+        // by-username returns the user (200) if taken, or 404 (throws) if free.
+        const existing = await apiClient(null).get<{ id: string }>(`/users/by-username/${encodeURIComponent(val)}`);
+        setUsernameStatus(existing && existing.id !== user?.id ? 'taken' : 'valid');
       } catch { setUsernameStatus('valid'); }
     }, 600);
 

@@ -200,8 +200,9 @@ router.patch('/:id', requireAuth, async (req, res) => {
       .update({ status })
       .eq('id', req.params.id)
       .select()
-      .single();
+      .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Not found' });
     return res.json(data);
   } catch (e) {
     return res.status(500).json({ error: String(e) });

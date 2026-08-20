@@ -1,13 +1,24 @@
 /**
  * Thin client for the admin API endpoints on the api-server.
- * Auth is handled by Clerk's session cookie (sent automatically by the browser).
- * The server verifies the session and checks the user has role='admin'.
+ * Auth: the admin's Supabase session access token is attached as a Bearer
+ * header (and X-Supabase-Token as a proxy-safe fallback), matching lib/api.ts.
+ * The server verifies the token and checks the user has role='admin'.
  */
+import { supabase } from '@/lib/supabase';
 
 const BASE = '/api/admin';
 
 async function makeHeaders(): Promise<HeadersInit> {
-  return { 'Content-Type': 'application/json' };
+  const h: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) {
+      h['Authorization'] = `Bearer ${token}`;
+      h['X-Supabase-Token'] = token;
+    }
+  } catch { /* signed out — request will 401 */ }
+  return h;
 }
 
 async function get<T>(path: string): Promise<T> {

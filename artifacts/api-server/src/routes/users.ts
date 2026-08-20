@@ -33,7 +33,7 @@ router.post('/', requireAuth, async (req, res) => {
   const optional = [
     'email', 'username', 'photo_url', 'bio', 'job_types', 'certifications',
     'primary_job_type', 'secondary_job_types', 'availability',
-    'lat', 'lng', 'is_pro', 'company_name', 'billing_ref', 'status',
+    'lat', 'lng', 'is_pro', 'company_name', 'status',
   ];
   const payload: Record<string, unknown> = { id: req.userId };
   for (const f of optional) {
@@ -55,7 +55,7 @@ router.patch('/me', requireAuth, async (req, res) => {
   const allowed = [
     'email', 'username', 'photo_url', 'bio', 'job_types', 'certifications',
     'primary_job_type', 'secondary_job_types', 'availability',
-    'lat', 'lng', 'company_name',
+    'lat', 'lng', 'company_name', 'is_pro',
   ];
   const body = req.body as Record<string, unknown>;
   const updates: Record<string, unknown> = {};
@@ -69,8 +69,9 @@ router.patch('/me', requireAuth, async (req, res) => {
     .update(updates)
     .eq('id', req.userId)
     .select()
-    .single();
+    .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
+  if (!data) return res.status(404).json({ error: 'User not found' });
   return res.json(data);
 });
 

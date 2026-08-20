@@ -19,7 +19,7 @@ router.get('/:shiftId', requireAuth, async (req, res) => {
 /** POST /api/time-entries — clock in */
 router.post('/', requireAuth, async (req, res) => {
   const { shift_id } = req.body as Record<string, unknown>;
-  const payload = { shift_id, worker_id: req.userId };
+  const payload = { shift_id, worker_id: req.userId, clock_in: new Date().toISOString() };
   const { data, error } = await adminDb
     .from('time_entries')
     .upsert(payload, { onConflict: 'shift_id,worker_id', ignoreDuplicates: true })

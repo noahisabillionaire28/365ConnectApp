@@ -1,4 +1,6 @@
-/* ─── Admin auth (backed by Clerk JWT + role check via API) ─────────────────── */
+/* ─── Admin auth (backed by the Supabase JWT + role check via API) ──────────── */
+import { apiClient } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 
 let _adminAuthenticated = false;
 
@@ -9,13 +11,11 @@ export function isAdminAuthenticated(): boolean {
 
 /**
  * Call on every admin page mount to restore session state after a hard refresh.
- * Returns true if the current Clerk session belongs to a user with role='admin'.
+ * Returns true if the current Supabase session belongs to a user with role='admin'.
  */
 export async function initAdminSession(): Promise<boolean> {
   try {
-    const res = await fetch('/api/users/me', { credentials: 'include' });
-    if (!res.ok) { _adminAuthenticated = false; return false; }
-    const profile = await res.json() as { role?: string };
+    const profile = await apiClient(null).get<{ role?: string }>('/users/me');
     _adminAuthenticated = profile?.role === 'admin';
     return _adminAuthenticated;
   } catch {
@@ -25,21 +25,16 @@ export async function initAdminSession(): Promise<boolean> {
 }
 
 /**
- * Admin users now sign in via the standard Clerk flow (/sign-in).
- * This helper navigates to sign-in and returns false — kept for
- * backwards compat with AdminLogin.tsx.
+ * Admin users sign in via the standard Supabase flow (/login).
+ * Kept for backwards compat with AdminLogin.tsx.
  */
 export async function adminLogin(_email: string, _password: string): Promise<boolean> {
-  window.location.href = '/sign-in';
+  window.location.href = '/login';
   return false;
 }
 
-/** Signs out via Clerk and clears local admin session state. */
+/** Signs out via Supabase and clears local admin session state. */
 export async function adminLogout(): Promise<void> {
   _adminAuthenticated = false;
-  // Use Clerk's global instance if available
-  const clerkGlobal = (window as unknown as { Clerk?: { signOut: () => Promise<void> } }).Clerk;
-  if (clerkGlobal?.signOut) {
-    await clerkGlobal.signOut();
-  }
+  try { await supabase.auth.signOut(); } catch { /* ignore */ }
 }

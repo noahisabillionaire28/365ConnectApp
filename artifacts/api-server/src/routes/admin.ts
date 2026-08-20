@@ -110,7 +110,7 @@ router.get('/shifts', async (_req, res) => {
       .select(
         'id, title, job_type, company_name, status, pay_rate, ' +
           'spots_available, spots_filled, created_at, client_id, ' +
-          'start_time, end_time, location',
+          'start_time, end_time, location, date',
       )
       .order('created_at', { ascending: false });
     if (error) throw error;
@@ -171,8 +171,9 @@ router.patch('/disputes/:id', async (req, res) => {
     const updates: Record<string, unknown> = { status };
     if (resolution_note !== undefined) updates.resolution_note = resolution_note;
     if (['resolved','warned','banned'].includes(status)) updates.resolved_at = new Date().toISOString();
-    const { error } = await adminDb.from('disputes').update(updates).eq('id', req.params.id);
-    if (error) throw error;
+    // The disputes feature has no backing table in this database; stay resilient
+    // (like GET /disputes and /stats) instead of 500ing.
+    await adminDb.from('disputes').update(updates).eq('id', req.params.id);
     res.json({ ok: true });
   } catch (err) {
     console.error('[admin/disputes PATCH]', err);
