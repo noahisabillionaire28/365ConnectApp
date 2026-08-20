@@ -20,7 +20,7 @@ router.post('/', requireAuth, async (req, res) => {
   const { image_url, caption } = req.body as Record<string, unknown>;
   const { data, error } = await adminDb
     .from('posts')
-    .insert({ user_id: req.userId, image_url: image_url ?? null, caption: caption ?? null })
+    .insert({ user_id: req.userId, photo_url: image_url ?? null, caption: caption ?? null })
     .select()
     .single();
   if (error) return res.status(500).json({ error: error.message });
