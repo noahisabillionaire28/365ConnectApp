@@ -235,7 +235,10 @@ function AppShell() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? ''} libraries={['places']}>
+      <APIProvider
+        apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? 'AIzaSyCMo5whiFbGLBQNp4rIGZEo4kwBga8oiyE'}
+        libraries={['places']}
+      >
         <WouterRouter base={basePath}>
           <AppShell />
         </WouterRouter>
