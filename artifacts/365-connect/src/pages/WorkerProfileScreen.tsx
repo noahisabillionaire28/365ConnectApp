@@ -1,5 +1,5 @@
 import { useParams, useLocation } from 'wouter';
-import { BadgeCheck, Star, ChevronLeft, Heart, CalendarPlus, X, CheckCircle2 } from 'lucide-react';
+import { BadgeCheck, Star, ChevronLeft, Heart, CalendarPlus, X, CheckCircle2, Flag } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api';
 import { friendlyDate } from '@/lib/supabase';
@@ -225,6 +225,82 @@ function FollowButton({ profileId, username }: { profileId: string; username: st
   );
 }
 
+const REPORT_TYPES: { key: string; label: string }[] = [
+  { key: 'no-show',     label: 'No-show' },
+  { key: 'late-cancel', label: 'Late cancellation' },
+  { key: 'harassment',  label: 'Harassment' },
+  { key: 'payment',     label: 'Payment issue' },
+  { key: 'fake-review', label: 'Fake review' },
+  { key: 'other',       label: 'Other' },
+];
+
+/** Report-a-user sheet — files a dispute the admin team reviews. */
+function ReportSheet({
+  reportedUserId, username, onClose,
+}: { reportedUserId: string; username: string | null; onClose: () => void }) {
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const [type, setType] = useState('no-show');
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function submit() {
+    if (!reason.trim()) { setErr('Please describe what happened.'); return; }
+    setSubmitting(true); setErr(null);
+    try {
+      await apiClient(user?.id).post('/disputes', {
+        reported_user_id: reportedUserId, type, reason: reason.trim(),
+      });
+      showToast('Report submitted. Our team will review it.');
+      onClose();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not submit report.');
+    } finally { setSubmitting(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-[430px] bg-white rounded-t-[20px] px-5 pt-4 pb-8">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-black font-bold text-[17px]">Report @{username ?? 'user'}</p>
+          <button type="button" aria-label="Close" onClick={onClose}
+            className="w-8 h-8 rounded-full bg-[#F5F5F5] flex items-center justify-center">
+            <X size={16} className="text-[#737373]" />
+          </button>
+        </div>
+
+        <p className="text-[#737373] text-[12px] font-semibold uppercase tracking-wide mb-2">Reason</p>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {REPORT_TYPES.map((t) => (
+            <button key={t.key} type="button" onClick={() => setType(t.key)}
+              className={`px-3 h-[34px] rounded-full text-[13px] font-semibold border ${
+                type === t.key ? 'bg-black text-white border-black' : 'bg-white text-[#737373] border-[#DBDBDB]'
+              }`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <textarea
+          value={reason}
+          onChange={(e) => { setReason(e.target.value); setErr(null); }}
+          placeholder="What happened?"
+          rows={3}
+          className="w-full rounded-[10px] border border-[#DBDBDB] px-3 py-2.5 text-[14px] outline-none focus:border-black resize-none mb-2"
+        />
+        {err && <p className="text-[#EF4444] text-[12px] mb-2">{err}</p>}
+
+        <button type="button" onClick={() => void submit()} disabled={submitting}
+          className="w-full h-[48px] rounded-[10px] bg-[#EF4444] text-white font-bold text-[15px] disabled:opacity-60">
+          {submitting ? 'Submitting…' : 'Submit Report'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function WorkerProfileScreen() {
   const params = useParams<{ username: string }>();
   const [, navigate] = useLocation();
@@ -235,6 +311,7 @@ export function WorkerProfileScreen() {
   const [notFound, setNotFound] = useState(false);
   const [isStartingChat, setStartingChat] = useState(false);
   const [showRequestSheet, setShowRequestSheet] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   const { followerCount } = useFollow(profile?.id ?? '');
   const canRequestShift =
@@ -327,6 +404,13 @@ export function WorkerProfileScreen() {
           className="absolute top-12 left-4 z-10 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform">
           <ChevronLeft size={20} className="text-white" />
         </button>
+
+        {authUser && authUser.id !== profile.id && (
+          <button type="button" aria-label={`Report @${profile.username}`} onClick={() => setShowReport(true)}
+            className="absolute top-12 right-4 z-10 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform">
+            <Flag size={17} className="text-white" />
+          </button>
+        )}
 
         <div className="w-full aspect-square bg-[#F5F5F5] flex items-center justify-center">
           {profile.photo_url ? (
@@ -470,6 +554,14 @@ export function WorkerProfileScreen() {
           workerId={profile.id}
           workerUsername={profile.username}
           onClose={() => setShowRequestSheet(false)}
+        />
+      )}
+
+      {showReport && (
+        <ReportSheet
+          reportedUserId={profile.id}
+          username={profile.username}
+          onClose={() => setShowReport(false)}
         />
       )}
     </div>

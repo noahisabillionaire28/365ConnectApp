@@ -18,6 +18,7 @@ import postsRouter       from './posts.js';
 import followsRouter     from './follows.js';
 import shiftRequestsRouter from './shift-requests.js';
 import workersRouter     from './workers.js';
+import disputesRouter    from './disputes.js';
 
 const router: IRouter = Router();
 
@@ -51,5 +52,6 @@ router.use('/posts',          postsRouter);
 router.use('/follows',        followsRouter);
 router.use('/shift-requests', shiftRequestsRouter);
 router.use('/workers',        workersRouter);
+router.use('/disputes',       disputesRouter);
 
 export default router;

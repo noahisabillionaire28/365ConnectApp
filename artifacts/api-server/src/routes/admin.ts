@@ -171,9 +171,22 @@ router.patch('/disputes/:id', async (req, res) => {
     const updates: Record<string, unknown> = { status };
     if (resolution_note !== undefined) updates.resolution_note = resolution_note;
     if (['resolved','warned','banned'].includes(status)) updates.resolved_at = new Date().toISOString();
-    // The disputes feature has no backing table in this database; stay resilient
-    // (like GET /disputes and /stats) instead of 500ing.
-    await adminDb.from('disputes').update(updates).eq('id', req.params.id);
+
+    const { data: dispute, error } = await adminDb
+      .from('disputes')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select()
+      .maybeSingle();
+    if (error) { res.status(500).json({ error: error.message }); return; }
+
+    // Banning a dispute bans the reported user for real.
+    if (status === 'banned' && dispute?.reported_user_id) {
+      await adminDb
+        .from('users')
+        .update({ status: 'banned', is_banned: true })
+        .eq('id', dispute.reported_user_id);
+    }
     res.json({ ok: true });
   } catch (err) {
     console.error('[admin/disputes PATCH]', err);
