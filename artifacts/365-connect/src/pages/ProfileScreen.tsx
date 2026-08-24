@@ -11,6 +11,8 @@ import { BottomTabNav } from '@/components/BottomTabNav';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useMyApplications, type MyApplication } from '@/hooks/useMyApplications';
+import { usePayments } from '@/hooks/usePayments';
+import { useReviews } from '@/hooks/useReviews';
 
 /* ── Sub-components ──────────────────────────────────────────────────────── */
 function StarRow({ rating, size = 12 }: { rating: number; size?: number }) {
@@ -197,6 +199,15 @@ export function ProfileScreen() {
   const { signOut }  = useAuth();
   const [, navigate] = useLocation();
   const profile      = useProfile();
+  const { payments } = usePayments();
+  const { reviews }  = useReviews(); // defaults to the logged-in user's reviews
+
+  // Real lifetime stats derived from the worker's paid shifts.
+  const shiftsCompleted = payments.length;
+  const totalEarned = payments.reduce((sum, p) => sum + (Number(p.net_amount) || 0), 0);
+  const earnedDisplay = totalEarned >= 1000
+    ? `$${(totalEarned / 1000).toFixed(1)}k`
+    : `$${Math.round(totalEarned)}`;
 
   const [available, setAvailable]     = useState(true);
   const [comingSoonLabel, setComingSoon] = useState<string | null>(null);
@@ -316,9 +327,9 @@ export function ProfileScreen() {
       <div className="mx-4 grid grid-cols-3 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] mb-5 overflow-hidden"
         role="list" aria-label="Profile statistics">
         {[
-          { label: 'Shifts',  value: '0',           sub: 'completed'   },
-          { label: 'Rating',  value: `${ratingDisplay}★`, sub: ratingSubLabel },
-          { label: 'Earned',  value: '$0',           sub: 'lifetime'    },
+          { label: 'Shifts',  value: `${shiftsCompleted}`, sub: 'completed'   },
+          { label: 'Rating',  value: `${ratingDisplay}★`,  sub: ratingSubLabel },
+          { label: 'Earned',  value: earnedDisplay,        sub: 'lifetime'    },
         ].map(({ label, value, sub }, i) => (
           <div key={label} role="listitem" aria-label={`${label}: ${value}`}
             className={`flex flex-col items-center justify-center py-4 ${i < 2 ? 'border-r border-[#DBDBDB]' : ''}`}>
@@ -382,11 +393,45 @@ export function ProfileScreen() {
             </div>
           )}
         </div>
-        <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] p-4 flex flex-col items-center gap-1 text-center">
-          <Star size={22} aria-hidden className="text-[#DBDBDB] mb-1" />
-          <p className="text-[#737373] text-[13px] font-medium">No reviews yet</p>
-          <p className="text-[#AAAAAA] text-[12px]">Reviews from clients will appear here after your first shift.</p>
-        </div>
+        {reviews.length > 0 ? (
+          <div className="flex flex-col gap-3">
+            {reviews.map((r) => (
+              <div key={r.id} className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] p-4">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    {r.reviewer_photo ? (
+                      <img src={r.reviewer_photo} alt="" className="w-6 h-6 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-[#DBDBDB]" />
+                    )}
+                    <span className="text-black text-[13px] font-semibold">
+                      {r.reviewer_username ? `@${r.reviewer_username}` : 'Client'}
+                    </span>
+                  </div>
+                  <StarRow rating={r.rating} size={11} />
+                </div>
+                {r.comment && (
+                  <p className="text-[#737373] text-[13px] leading-relaxed">{r.comment}</p>
+                )}
+                {r.positive_tags?.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {r.positive_tags.map((t) => (
+                      <span key={t} className="text-[11px] text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] p-4 flex flex-col items-center gap-1 text-center">
+            <Star size={22} aria-hidden className="text-[#DBDBDB] mb-1" />
+            <p className="text-[#737373] text-[13px] font-medium">No reviews yet</p>
+            <p className="text-[#AAAAAA] text-[12px]">Reviews from clients will appear here after your first shift.</p>
+          </div>
+        )}
       </div>
 
       {/* Go Pro CTA — shown when not yet Pro */}
