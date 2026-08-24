@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, Star, UserPlus,
-  Edit3, Trash2,
+  Edit3, Trash2, DollarSign,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -23,6 +23,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { hasCompletedTimeEntry } from '@/hooks/useTimeEntry';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
 import { useAcceptedWorkers } from '@/hooks/useAcceptedWorkers';
+import { startShiftPayment } from '@/lib/checkout';
 
 function parseDisplayMinutes(t: string): number {
   const [time, mer] = t.split(' ');
@@ -134,6 +135,7 @@ export function ShiftDetailScreen() {
   );
   const { showToast } = useToast();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [payingId, setPayingId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   // ── No more hooks below this line ────────────────────────────────────────────
@@ -266,6 +268,21 @@ export function ShiftDetailScreen() {
       console.error('[ShiftDetail] edit prefill failed:', e);
     } finally {
       setEditLoading(false);
+    }
+  }
+
+  async function handlePayWorker(workerId: string) {
+    if (!user?.id || payingId) return;
+    const hrs = calcDurationHours(shift.startTime, shift.endTime);
+    const amount = Math.round(shift.payRate * hrs * 100) / 100;
+    if (amount <= 0) { showToast('Set a pay rate before paying.'); return; }
+    setPayingId(workerId);
+    try {
+      // Redirects to Stripe Checkout; returns to /earnings on success.
+      await startShiftPayment(user.id, { shift_id: shiftId, worker_id: workerId, amount });
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not start payment.');
+      setPayingId(null);
     }
   }
 
@@ -586,20 +603,31 @@ export function ShiftDetailScreen() {
                       {w.completed ? 'Shift completed' : 'In progress'}
                     </p>
                   </div>
-                  {w.completed && !w.alreadyReviewed && (
-                    <motion.button type="button" whileTap={{ scale: 0.95 }}
-                      onClick={() => navigate(`/review/${shiftId}/${w.workerId}`)}
-                      aria-label={`Rate ${w.username ?? 'this worker'}`}
-                      className="bg-[#0A1628] text-white text-[12px] font-semibold px-3.5 py-2 rounded-[8px] flex items-center gap-1.5 flex-shrink-0">
-                      <Star size={13} aria-hidden className="fill-white" />
-                      Rate
-                    </motion.button>
-                  )}
-                  {w.completed && w.alreadyReviewed && (
-                    <span className="text-emerald-600 text-[12px] font-semibold flex items-center gap-1 flex-shrink-0">
-                      <CheckCircle2 size={13} aria-hidden />
-                      Rated
-                    </span>
+                  {w.completed && (
+                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                      <motion.button type="button" whileTap={{ scale: 0.95 }}
+                        disabled={payingId === w.workerId}
+                        onClick={() => void handlePayWorker(w.workerId)}
+                        aria-label={`Pay ${w.username ?? 'this worker'}`}
+                        className="bg-emerald-600 text-white text-[12px] font-semibold px-3.5 py-2 rounded-[8px] flex items-center gap-1.5 disabled:opacity-60">
+                        <DollarSign size={13} aria-hidden />
+                        {payingId === w.workerId ? 'Opening…' : 'Pay'}
+                      </motion.button>
+                      {!w.alreadyReviewed ? (
+                        <motion.button type="button" whileTap={{ scale: 0.95 }}
+                          onClick={() => navigate(`/review/${shiftId}/${w.workerId}`)}
+                          aria-label={`Rate ${w.username ?? 'this worker'}`}
+                          className="bg-[#0A1628] text-white text-[12px] font-semibold px-3.5 py-2 rounded-[8px] flex items-center gap-1.5">
+                          <Star size={13} aria-hidden className="fill-white" />
+                          Rate
+                        </motion.button>
+                      ) : (
+                        <span className="text-emerald-600 text-[12px] font-semibold flex items-center gap-1">
+                          <CheckCircle2 size={13} aria-hidden />
+                          Rated
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
