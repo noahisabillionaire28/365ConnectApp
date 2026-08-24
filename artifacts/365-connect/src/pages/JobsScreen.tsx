@@ -263,7 +263,7 @@ export function JobsScreen() {
   function handlePostShift() {
     if (role === 'staffer') {
       resetStafferDraft();           // fresh wizard — clear any previous partial draft
-      navigate('/staffer-shift/step1');
+      navigate('/post-shift/step1');
     } else {
       resetDraft();                  // fresh wizard — clear any previous partial draft
       navigate('/post-shift/step1');

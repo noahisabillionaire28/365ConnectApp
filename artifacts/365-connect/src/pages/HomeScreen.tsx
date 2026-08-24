@@ -561,7 +561,7 @@ function StafferHomeFeed() {
 
   function handlePostShift() {
     resetStafferDraft();
-    navigate('/staffer-shift/step1');
+    navigate('/post-shift/step1');
   }
 
   return (
