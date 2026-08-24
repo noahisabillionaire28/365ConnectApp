@@ -55,7 +55,7 @@ router.patch('/me', requireAuth, async (req, res) => {
   const allowed = [
     'email', 'username', 'photo_url', 'bio', 'job_types', 'certifications',
     'primary_job_type', 'secondary_job_types', 'availability',
-    'lat', 'lng', 'company_name', 'is_pro',
+    'lat', 'lng', 'company_name', 'is_pro', 'is_available',
   ];
   const body = req.body as Record<string, unknown>;
   const updates: Record<string, unknown> = {};

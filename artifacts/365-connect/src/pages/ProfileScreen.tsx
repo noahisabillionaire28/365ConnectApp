@@ -13,6 +13,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useMyApplications, type MyApplication } from '@/hooks/useMyApplications';
 import { usePayments } from '@/hooks/usePayments';
 import { useReviews } from '@/hooks/useReviews';
+import { apiClient } from '@/lib/api';
 
 /* ── Sub-components ──────────────────────────────────────────────────────── */
 function StarRow({ rating, size = 12 }: { rating: number; size?: number }) {
@@ -196,7 +197,7 @@ function MyApplicationsSection() {
 
 /* ── ProfileScreen ───────────────────────────────────────────────────────── */
 export function ProfileScreen() {
-  const { signOut }  = useAuth();
+  const { signOut, user } = useAuth();
   const [, navigate] = useLocation();
   const profile      = useProfile();
   const { payments } = usePayments();
@@ -211,6 +212,21 @@ export function ProfileScreen() {
 
   const [available, setAvailable]     = useState(true);
   const [comingSoonLabel, setComingSoon] = useState<string | null>(null);
+
+  // Seed the toggle from the saved value once the profile loads.
+  useEffect(() => {
+    if (!profile.isLoading) setAvailable(profile.isAvailable);
+  }, [profile.isLoading, profile.isAvailable]);
+
+  async function toggleAvailable() {
+    const next = !available;
+    setAvailable(next); // optimistic
+    try {
+      await apiClient(user?.id).patch('/users/me', { is_available: next });
+    } catch {
+      setAvailable(!next); // revert on failure
+    }
+  }
 
   async function handleSignOut() {
     await signOut();
@@ -286,7 +302,7 @@ export function ProfileScreen() {
         <div className="flex justify-end px-5 pt-3">
           <button type="button" aria-pressed={available}
             aria-label={available ? 'Set yourself as unavailable' : 'Set yourself as available'}
-            onClick={() => setAvailable((v) => !v)}
+            onClick={() => void toggleAvailable()}
             className={`flex items-center gap-1.5 h-[28px] px-3 rounded-full text-[11px] font-bold border transition-all ${
               available ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]'
             }`}>
@@ -475,11 +491,9 @@ export function ProfileScreen() {
           {username && (
             <SettingRow icon={Eye} label="View My Public Profile" onTap={() => navigate(`/worker/${username}`)} />
           )}
-          <SettingRow icon={Settings}    label="Account Settings"    onTap={() => setComingSoon('Account Settings')} />
+          <SettingRow icon={Settings}    label="Account Settings"    onTap={() => navigate('/profile-setup')} />
           <SettingRow icon={CreditCard}  label="Payments & Earnings"  onTap={() => navigate('/earnings')} />
           <SettingRow icon={Bell}        label="Notifications"         onTap={() => navigate('/notifications')} />
-          <SettingRow icon={Shield}      label="Privacy & Safety"      onTap={() => setComingSoon('Privacy & Safety')} />
-          <SettingRow icon={HelpCircle}  label="Help & Support"        onTap={() => setComingSoon('Help & Support')} />
         </div>
       </div>
 

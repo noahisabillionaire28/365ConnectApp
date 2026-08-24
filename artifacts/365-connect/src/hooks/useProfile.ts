@@ -17,6 +17,7 @@ type UserProfileRow = {
   lat:                 number | null;
   lng:                 number | null;
   is_pro:              boolean;
+  is_available:        boolean;
 };
 
 function deriveDisplayName(authUser: SimpleUser, row: UserProfileRow | null): string {
@@ -46,6 +47,7 @@ export type ProfileResult = {
   lat:               number | null;
   lng:               number | null;
   isPro:             boolean;
+  isAvailable:       boolean;
 };
 
 export function useProfile(): ProfileResult {
@@ -98,5 +100,6 @@ export function useProfile(): ProfileResult {
     lat:               row?.lat               ?? null,
     lng:               row?.lng               ?? null,
     isPro:             row?.is_pro            ?? false,
+    isAvailable:       row?.is_available      ?? true,
   };
 }
