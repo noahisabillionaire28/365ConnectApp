@@ -24,9 +24,13 @@ router.get('/me', requireAuth, async (req, res) => {
 /** POST /api/users — upsert user (called after sign-up / profile setup) */
 router.post('/', requireAuth, async (req, res) => {
   const body = req.body as Record<string, unknown>;
-  // Users may only self-assign a non-privileged role; admin/staffer are granted out-of-band.
+  // Users may self-assign worker/client/staffer during onboarding; admin is
+  // granted out-of-band and can never be self-assigned here.
+  const SELF_ASSIGNABLE = ['worker', 'client', 'staffer'];
   const safeRole =
-    body.role === 'client' ? 'client' : body.role === 'worker' ? 'worker' : undefined;
+    typeof body.role === 'string' && SELF_ASSIGNABLE.includes(body.role)
+      ? body.role
+      : undefined;
 
   // Build the payload with only provided fields so an upsert never nulls out
   // existing values on conflict.
