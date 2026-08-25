@@ -239,14 +239,17 @@ export function WorkerSetupScreen() {
     try {
       let photoUrl: string | null = photoPreview ?? null; // might already be a remote URL (resume)
       if (photoFile) {
-        photoUrl = await uploadAvatar(user.id, photoFile); // throws with real message on failure
-        setPhotoPreview(photoUrl);
-        setPhotoFile(null);
+        try {
+          photoUrl = await uploadAvatar(user.id, photoFile);
+          setPhotoPreview(photoUrl);
+          setPhotoFile(null);
+        } catch (err) {
+          // Photo is optional — never block onboarding on an upload hiccup.
+          console.error('[WorkerSetup] avatar upload failed:', err);
+          photoUrl = photoPreview?.startsWith('http') ? photoPreview : null;
+        }
       }
-      // photo is optional — advance with whatever URL we have (may be null)
       await saveAndAdvance(3, { photo_url: photoUrl });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Photo upload failed.');
     } finally {
       setSaving(false);
     }
@@ -281,14 +284,19 @@ export function WorkerSetupScreen() {
     try {
       let imageUrl: string | null = null;
       if (postFile) {
-        imageUrl = await uploadPostPhoto(user.id, postFile); // throws with real message on failure
+        try {
+          imageUrl = await uploadPostPhoto(user.id, postFile);
+        } catch (e) {
+          // Best-effort — a failed post photo must not block finishing setup.
+          console.error('[WorkerSetup] post photo upload failed:', e);
+        }
       }
       // Only insert a post when the user has provided at least some content
       if (imageUrl || postCaption.trim()) {
         await apiClient(user.id).post('/posts', {
           photo_url: imageUrl,
           caption:   postCaption.trim() || null,
-        });
+        }).catch((e) => console.error('[WorkerSetup] post create failed:', e));
       }
       localStorage.removeItem(stepKey(user.id));
       // Flush stale profile + feed caches so the new photo/username show immediately

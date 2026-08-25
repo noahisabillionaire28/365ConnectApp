@@ -7,36 +7,30 @@
  * production host.)
  */
 import { supabase } from '@/lib/supabase';
-
-const BUCKET = 'uploads';
-
-/** Sanitise a filename into a storage-safe segment. */
-function safeName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
-}
+import { apiClient } from '@/lib/api';
 
 /**
  * Upload a file to Supabase Storage and return its public URL.
- * Throws on failure.
+ *
+ * The backend (service-role) mints a pre-authorised signed upload URL and
+ * ensures the bucket exists; the browser then uploads directly to Supabase.
+ * This needs no client-side storage RLS policy. Throws on failure.
  */
 export async function uploadFile(
   file: File | Blob,
   name: string,
   userId?: string | null,
 ): Promise<{ objectPath: string; url: string }> {
-  const folder = userId || 'anon';
-  const path = `${folder}/${Date.now()}-${safeName(name)}`;
-  const contentType =
-    file instanceof File ? file.type : (file as Blob).type || 'application/octet-stream';
+  const sig = await apiClient(userId).post<{
+    bucket: string; path: string; token: string; publicUrl: string;
+  }>('/storage/sign-upload', { name });
 
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-    contentType,
-    upsert: true,
-  });
+  const { error } = await supabase.storage
+    .from(sig.bucket)
+    .uploadToSignedUrl(sig.path, sig.token, file);
   if (error) throw new Error(`Upload failed: ${error.message}`);
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return { objectPath: path, url: data.publicUrl };
+  return { objectPath: sig.path, url: sig.publicUrl };
 }
 
 /** Upload a user avatar. Returns the serving URL. */

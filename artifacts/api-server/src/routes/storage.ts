@@ -4,9 +4,57 @@ import {
   ObjectNotFoundError,
   ObjectStorageService,
 } from '../lib/objectStorage.js';
+import { adminDb } from '../lib/supabaseAdmin.js';
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
+
+// ── Supabase Storage: signed-upload flow ─────────────────────────────────────
+// The service-role client mints a pre-authorised upload URL (bypassing storage
+// RLS) and ensures the bucket exists, so the browser can upload directly to
+// Supabase Storage without depending on any client-side storage policy.
+const UPLOAD_BUCKET = 'uploads';
+let bucketReady = false;
+
+async function ensureBucket(): Promise<void> {
+  if (bucketReady) return;
+  try {
+    await adminDb.storage.createBucket(UPLOAD_BUCKET, {
+      public: true,
+      fileSizeLimit: '25MB',
+    });
+  } catch { /* already exists — fine */ }
+  bucketReady = true;
+}
+
+function safeName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) || 'file';
+}
+
+/**
+ * POST /storage/sign-upload — returns a pre-authorised Supabase Storage upload
+ * URL for the signed-in user. The client then uploads the file directly.
+ */
+router.post('/storage/sign-upload', async (req: Request, res: Response) => {
+  if (!req.userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  const body = req.body as Record<string, unknown>;
+  const name = typeof body.name === 'string' ? safeName(body.name) : 'file';
+  const path = `${req.userId}/${Date.now()}-${name}`;
+  try {
+    await ensureBucket();
+    const { data, error } = await adminDb.storage
+      .from(UPLOAD_BUCKET)
+      .createSignedUploadUrl(path);
+    if (error || !data) {
+      res.status(500).json({ error: error?.message ?? 'Could not create upload URL' });
+      return;
+    }
+    const { data: pub } = adminDb.storage.from(UPLOAD_BUCKET).getPublicUrl(path);
+    res.json({ bucket: UPLOAD_BUCKET, path, token: data.token, publicUrl: pub.publicUrl });
+  } catch (e) {
+    res.status(500).json({ error: `Upload URL failed: ${String(e)}` });
+  }
+});
 
 /**
  * POST /storage/uploads/request-url
