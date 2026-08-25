@@ -4,12 +4,12 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-/** GET /api/payments — my payments */
+/** GET /api/payments — my payments (earned as a worker AND paid out as a client) */
 router.get('/', requireAuth, async (req, res) => {
   const { data: payments, error } = await adminDb
     .from('payments')
     .select('*')
-    .eq('worker_id', req.userId)
+    .or(`worker_id.eq.${req.userId},client_id.eq.${req.userId}`)
     .order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
 
@@ -26,10 +26,13 @@ router.get('/', requireAuth, async (req, res) => {
 
   const rows = (payments ?? []).map((p) => {
     const s = p.shift_id ? shiftMap.get(p.shift_id) : undefined;
+    // 'out' = the caller paid this (they are the client); 'in' = they earned it.
+    const direction = p.client_id === req.userId && p.worker_id !== req.userId ? 'out' : 'in';
     return {
       ...p,
       shift_title: s?.title ?? null,
       company_name: s?.company_name ?? null,
+      direction,
     };
   });
   return res.json(rows);

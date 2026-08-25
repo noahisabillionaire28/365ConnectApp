@@ -62,6 +62,19 @@ router.get('/', requireAuth, async (req, res) => {
         for (const r of revs ?? []) reviewedSet.add(r.reviewee_id);
       }
 
+      // Whether each worker has already been paid for this shift (prevents
+      // the owner from paying — and being charged — twice for the same shift).
+      const paidSet = new Set<string>();
+      if (workerIds.length) {
+        const { data: pays } = await adminDb
+          .from('payments')
+          .select('worker_id')
+          .eq('shift_id', shift_id)
+          .eq('status', 'completed')
+          .in('worker_id', workerIds);
+        for (const p of pays ?? []) paidSet.add(p.worker_id);
+      }
+
       const merged = (apps ?? []).map((a) => {
         const u = userMap.get(a.worker_id);
         return {
@@ -75,6 +88,7 @@ router.get('/', requireAuth, async (req, res) => {
           bio: u?.bio ?? null,
           clock_out: clockOutMap.get(a.worker_id) ?? null,
           already_reviewed: reviewedSet.has(a.worker_id),
+          paid: paidSet.has(a.worker_id),
         };
       });
       return res.json(merged);

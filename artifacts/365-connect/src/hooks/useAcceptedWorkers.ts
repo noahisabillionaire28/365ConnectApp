@@ -16,6 +16,7 @@ type RawAccepted = {
   bio: string | null;
   clock_out?: string | null;
   already_reviewed?: boolean;
+  paid?: boolean;
   [key: string]: unknown;
 };
 
@@ -27,6 +28,8 @@ export type AcceptedWorker = RawAccepted & {
   completed: boolean;
   /** true when the shift owner has already rated this worker */
   alreadyReviewed: boolean;
+  /** true when this worker has already been paid for the shift */
+  paid: boolean;
 };
 
 export function useAcceptedWorkers(
@@ -51,6 +54,7 @@ export function useAcceptedWorkers(
         photoUrl:        r.photo_url,
         completed:       !!(r.clock_out),
         alreadyReviewed: !!(r.already_reviewed),
+        paid:            !!(r.paid),
       })));
     } catch (e) {
       console.error('[useAcceptedWorkers] load failed:', e);

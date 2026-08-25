@@ -16,6 +16,9 @@ export type PaymentRow = {
   created_at: string;
   shift_title?: string | null;
   company_name?: string | null;
+  /** 'in' = earned by the worker; 'out' = paid by the client */
+  direction?: 'in' | 'out';
+  client_id?: string | null;
 };
 
 export function usePayments() {

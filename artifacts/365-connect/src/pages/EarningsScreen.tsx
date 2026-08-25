@@ -48,6 +48,7 @@ function StatusChip({ status }: { status: string }) {
 // ─── Payment type label ───────────────────────────────────────────────────────
 function typeLabel(row: PaymentRow): string {
   if (row.payment_type === 'pro_subscription') return 'Pro subscription';
+  if (row.direction === 'out') return 'Shift payment sent';
   return 'Shift earnings';
 }
 
@@ -74,11 +75,15 @@ function PaymentSkeleton() {
 
 // ─── Summary stats card ───────────────────────────────────────────────────────
 function SummaryCard({ payments }: { payments: PaymentRow[] }) {
-  const shiftPayments = payments.filter((p) => p.payment_type !== 'pro_subscription');
+  // Only money EARNED (as a worker) counts toward the total — payments the user
+  // sent as a client (direction === 'out') are money going out, not earnings.
+  const shiftPayments = payments.filter(
+    (p) => p.payment_type !== 'pro_subscription' && p.direction !== 'out',
+  );
   const totalEarned   = shiftPayments
     .filter((p) => p.status === 'completed')
     .reduce((acc, p) => acc + p.net_amount, 0);
-  const pending       = payments.filter((p) => p.status === 'pending').reduce((acc, p) => acc + p.amount, 0);
+  const pending       = payments.filter((p) => p.status === 'pending' && p.direction !== 'out').reduce((acc, p) => acc + p.amount, 0);
   const completed     = shiftPayments.filter((p) => p.status === 'completed').length;
 
   return (
@@ -102,6 +107,7 @@ function SummaryCard({ payments }: { payments: PaymentRow[] }) {
 // ─── Payment row card ─────────────────────────────────────────────────────────
 function PaymentCard({ payment, index }: { payment: PaymentRow; index: number }) {
   const isSubscription = payment.payment_type === 'pro_subscription';
+  const isOutgoing     = payment.direction === 'out';
 
   return (
     <motion.div
@@ -128,10 +134,10 @@ function PaymentCard({ payment, index }: { payment: PaymentRow; index: number })
 
       {/* Amounts */}
       <div className="text-right flex-shrink-0">
-        <p className="text-[#111827] font-bold text-[15px]">
-          {isSubscription ? `−${fmtAmount(payment.amount)}` : `+${fmtAmount(payment.net_amount)}`}
+        <p className={`font-bold text-[15px] ${isOutgoing ? 'text-[#B45309]' : 'text-[#111827]'}`}>
+          {isSubscription || isOutgoing ? `−${fmtAmount(payment.amount)}` : `+${fmtAmount(payment.net_amount)}`}
         </p>
-        {!isSubscription && payment.fee > 0 && (
+        {!isSubscription && !isOutgoing && payment.fee > 0 && (
           <p className="text-[#9CA3AF] text-[11px] mt-0.5">
             gross {fmtAmount(payment.amount)}
           </p>
@@ -175,7 +181,8 @@ export function EarningsScreen() {
       .finally(() => window.history.replaceState({}, '', '/earnings'));
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const shiftPayments = payments.filter((p) => p.payment_type !== 'pro_subscription');
+  const shiftPayments = payments.filter((p) => p.payment_type !== 'pro_subscription' && p.direction !== 'out');
+  const sentPayments  = payments.filter((p) => p.direction === 'out');
   const subscriptions = payments.filter((p) => p.payment_type === 'pro_subscription');
 
   return (
@@ -236,6 +243,19 @@ export function EarningsScreen() {
                 <div className="flex flex-col gap-3">
                   {shiftPayments.map((p, i) => (
                     <PaymentCard key={p.id} payment={p} index={i} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {sentPayments.length > 0 && (
+              <div className="mb-5">
+                <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider mb-3">
+                  Payments Sent
+                </p>
+                <div className="flex flex-col gap-3">
+                  {sentPayments.map((p, i) => (
+                    <PaymentCard key={p.id} payment={p} index={shiftPayments.length + i} />
                   ))}
                 </div>
               </div>

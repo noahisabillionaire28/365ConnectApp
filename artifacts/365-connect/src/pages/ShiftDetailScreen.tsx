@@ -605,14 +605,21 @@ export function ShiftDetailScreen() {
                   </div>
                   {w.completed && (
                     <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                      <motion.button type="button" whileTap={{ scale: 0.95 }}
-                        disabled={payingId === w.workerId}
-                        onClick={() => void handlePayWorker(w.workerId)}
-                        aria-label={`Pay ${w.username ?? 'this worker'}`}
-                        className="bg-emerald-600 text-white text-[12px] font-semibold px-3.5 py-2 rounded-[8px] flex items-center gap-1.5 disabled:opacity-60">
-                        <DollarSign size={13} aria-hidden />
-                        {payingId === w.workerId ? 'Opening…' : 'Pay'}
-                      </motion.button>
+                      {w.paid ? (
+                        <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-[12px] font-semibold px-3.5 py-2 rounded-[8px] flex items-center gap-1.5">
+                          <CheckCircle2 size={13} aria-hidden />
+                          Paid
+                        </span>
+                      ) : (
+                        <motion.button type="button" whileTap={{ scale: 0.95 }}
+                          disabled={payingId === w.workerId}
+                          onClick={() => void handlePayWorker(w.workerId)}
+                          aria-label={`Pay ${w.username ?? 'this worker'}`}
+                          className="bg-emerald-600 text-white text-[12px] font-semibold px-3.5 py-2 rounded-[8px] flex items-center gap-1.5 disabled:opacity-60">
+                          <DollarSign size={13} aria-hidden />
+                          {payingId === w.workerId ? 'Opening…' : 'Pay'}
+                        </motion.button>
+                      )}
                       {!w.alreadyReviewed ? (
                         <motion.button type="button" whileTap={{ scale: 0.95 }}
                           onClick={() => navigate(`/review/${shiftId}/${w.workerId}`)}
