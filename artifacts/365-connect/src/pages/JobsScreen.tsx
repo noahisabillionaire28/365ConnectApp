@@ -1,11 +1,13 @@
-import { Map, Marker, useMap } from '@vis.gl/react-google-maps';
+import { Map as GoogleMap, Marker, useMap } from '@vis.gl/react-google-maps';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
-import { motion, useMotionValue, animate, type PanInfo } from 'framer-motion';
-import { Search, SlidersHorizontal, Heart, MapPin, Clock, Users, WifiOff, CheckCircle2, Plus } from 'lucide-react';
+import { motion } from 'framer-motion';
+import {
+  Search, MapPin, WifiOff, Plus,
+  List as ListIcon, Map as MapIcon, CalendarDays, Clock, DollarSign, Users, CheckCircle2,
+} from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { type MockShift } from '@/lib/supabase';
-import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { LIGHT_MAP_STYLES, navyPinUrl } from '@/lib/mapStyles';
 import { useShifts } from '@/hooks/useShifts';
 import { useMyPostedShifts } from '@/hooks/useMyPostedShifts';
@@ -18,27 +20,7 @@ import { JOB_TYPES } from '@/lib/jobTypes';
 /* ── API key — resolved once at module load ─────────────────────────────── */
 const API_KEY: string = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 
-/* ── MapController — lives inside <Map> context ─────────────────────────── */
-function MapController({ shift }: { shift: MockShift | null }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!map) return;
-    // Belt-and-suspenders resize after the SDK mounts, in case the container
-    // still reported 0 height at init time.
-    const id = window.setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
-    return () => window.clearTimeout(id);
-  }, [map]);
-
-  useEffect(() => {
-    if (map && shift) {
-      map.panTo({ lat: shift.lat, lng: shift.lng });
-      map.setZoom(14);
-    }
-  }, [map, shift]);
-
-  return null;
-}
+const NAVY = '#0A1628';
 
 /* ── Filter logic ────────────────────────────────────────────────────────── */
 type FilterKey = 'all' | 'pay30' | 'near3' | 'tonight';
@@ -59,256 +41,111 @@ function applyFilter(shifts: MockShift[], f: FilterKey): MockShift[] {
   }
 }
 
-/* ── Sheet card ──────────────────────────────────────────────────────────── */
-function SheetCard({ shift, selected, onTap, applied }: {
-  shift: MockShift; selected: boolean; onTap: () => void; applied?: boolean;
+/* ── List card — clean Nowsta-style vertical row ─────────────────────────── */
+function ShiftRow({ shift, applied, onTap }: {
+  shift: MockShift; applied: boolean; onTap: () => void;
 }) {
-  const store    = useFeedStore();
-  const saved    = store.isSaved(shift.id);
   const spotsLow = shift.spotsAvailable < 3;
-
-  function handleSave(e: React.MouseEvent) { e.stopPropagation(); toggleSaved(shift.id); }
-
   return (
-    <div role="article" tabIndex={0}
-      aria-label={`${shift.jobType} at ${shift.companyName}, ${shift.payRate}/${shift.payPeriod}${applied ? ' — Applied' : ''}`}
-      onClick={onTap} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onTap()}
-      className={`w-[264px] flex-shrink-0 rounded-[12px] overflow-hidden bg-white cursor-pointer
-        transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-black
-        ${selected ? 'border-2 border-black shadow-lg' : 'border border-[#DBDBDB]'}`}>
+    <div role="article" tabIndex={0} onClick={onTap}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onTap())}
+      aria-label={`${shift.jobType} at ${shift.companyName}, $${shift.payRate}/${shift.payPeriod}${applied ? ' — already applied' : ''}`}
+      className="rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-4 flex flex-col gap-3 cursor-pointer
+        transition-colors active:bg-[#FAFAFA] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A1628]">
 
-      <div className="relative h-[120px] overflow-hidden">
-        <img src={shift.coverImage} alt={`${shift.jobType} at ${shift.companyName}`}
-          loading="lazy" decoding="async" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/5 to-black/20" />
-
-        <div className="absolute top-2.5 left-2.5">
-          <span className="bg-black text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide flex-shrink-0"
+            style={{ background: NAVY }}>
             {shift.jobType}
           </span>
+          <span className={`text-[11px] font-semibold flex items-center gap-0.5 flex-shrink-0 ${
+            spotsLow ? 'text-[#EF4444]' : 'text-[#6B7280]'}`}>
+            <Users size={11} aria-hidden />
+            {shift.spotsAvailable} left
+          </span>
         </div>
-
-        {/* Applied badge — green circle, sits to the left of the heart when present */}
         {applied && (
-          <div
-            aria-label="Already applied"
-            className="absolute top-2.5 right-[42px] w-7 h-7 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-sm"
-          >
+          <div aria-label="Already applied" className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
             <CheckCircle2 size={13} aria-hidden className="text-white" strokeWidth={2.5} />
           </div>
         )}
+      </div>
 
-        <button type="button" aria-label={saved ? 'Remove from saved' : 'Save shift'} aria-pressed={saved}
-          onClick={handleSave}
-          className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 flex items-center justify-center">
-          <Heart size={12} aria-hidden className={saved ? 'text-white fill-white' : 'text-white fill-transparent'} />
-        </button>
-
-        <div className="absolute bottom-2 left-2.5 right-8">
-          <p className="text-white font-bold text-[13px] leading-tight truncate drop-shadow-md">{shift.companyName}</p>
+      <div>
+        <p className="text-[#111827] font-bold text-[16px] leading-tight truncate">{shift.companyName}</p>
+        <div className="flex items-center gap-1 mt-1">
+          <MapPin size={12} aria-hidden className="text-[#6B7280] flex-shrink-0" />
+          <p className="text-[#6B7280] text-[12px] truncate">{shift.location} · {shift.distanceMiles} mi</p>
         </div>
       </div>
 
-      <div className="px-3 pt-2.5 pb-3 flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-baseline gap-0.5">
-            <span className="text-black font-bold text-[18px]">${shift.payRate}</span>
-            <span className="text-[#737373] text-[11px]">/{shift.payPeriod}</span>
-          </div>
-          <div className="flex items-center gap-1 bg-[#FAFAFA] border border-[#DBDBDB] rounded-full px-2 py-1">
-            <Clock size={10} aria-hidden className="text-[#737373]" />
-            <span className="text-[#737373] text-[10px]">{shift.startTime}</span>
-          </div>
+      <div className="flex items-center justify-between pt-1 border-t border-[#F3F4F6]">
+        <div className="flex items-center gap-3">
+          <span className="text-[#6B7280] text-[12px] flex items-center gap-1">
+            <CalendarDays size={12} aria-hidden />{shift.date}
+          </span>
+          <span className="text-[#6B7280] text-[12px] flex items-center gap-1">
+            <Clock size={12} aria-hidden />{shift.startTime}
+          </span>
         </div>
-
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <div className="flex items-center gap-1 bg-[#FAFAFA] border border-[#DBDBDB] rounded-full px-2 py-0.5">
-            <span className="text-[#737373] text-[10px]">{shift.date}</span>
-          </div>
-          <div className="flex items-center gap-1 bg-[#FAFAFA] border border-[#DBDBDB] rounded-full px-2 py-0.5">
-            <MapPin size={9} aria-hidden className="text-[#737373]" />
-            <span className="text-[#737373] text-[10px]">{shift.distanceMiles} mi</span>
-          </div>
-          <div className={`flex items-center gap-1 rounded-full px-2 py-0.5 border ${
-            spotsLow ? 'bg-red-50 border-red-200' : 'bg-[#FAFAFA] border-[#DBDBDB]'}`}>
-            <Users size={9} aria-hidden className={spotsLow ? 'text-red-500' : 'text-[#737373]'} />
-            <span className={`text-[10px] ${spotsLow ? 'text-red-500' : 'text-[#737373]'}`}>
-              {shift.spotsAvailable} left
-            </span>
-          </div>
+        <div className="flex items-baseline gap-0.5">
+          <DollarSign size={14} aria-hidden className="text-[#111827] self-center" />
+          <span className="text-[#111827] font-bold text-[19px]">{shift.payRate}</span>
+          <span className="text-[#6B7280] text-[12px] font-medium">/{shift.payPeriod}</span>
         </div>
       </div>
     </div>
   );
 }
 
-/* ── Sheet skeleton card ─────────────────────────────────────────────────── */
-function SheetCardSkeleton() {
+function ShiftRowSkeleton() {
   return (
-    <div className="w-[264px] flex-shrink-0 rounded-[12px] overflow-hidden bg-white border border-[#DBDBDB]">
-      <div className="h-[120px] bg-[#EFEFEF] animate-pulse" />
-      <div className="px-3 pt-2.5 pb-3 flex flex-col gap-2">
-        <div className="flex justify-between">
-          <div className="w-12 h-5 rounded bg-[#EFEFEF] animate-pulse" />
-          <div className="w-20 h-5 rounded-full bg-[#EFEFEF] animate-pulse" />
-        </div>
-        <div className="flex gap-1.5">
-          <div className="w-14 h-4 rounded-full bg-[#EFEFEF] animate-pulse" />
-          <div className="w-10 h-4 rounded-full bg-[#EFEFEF] animate-pulse" />
-        </div>
-      </div>
+    <div className="rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-4 flex flex-col gap-3">
+      <div className="w-24 h-5 rounded-full bg-[#EFEFEF] animate-pulse" />
+      <div className="w-40 h-4 rounded bg-[#EFEFEF] animate-pulse" />
+      <div className="w-full h-4 rounded bg-[#EFEFEF] animate-pulse" />
     </div>
   );
 }
 
-/* ── Bottom sheet ────────────────────────────────────────────────────────── */
-const SHEET_H   = 428;
-const COLLAPSED = 216;
-const SNAP_COLL = SHEET_H - COLLAPSED;
-const SNAP_EXP  = 0;
-
-function BottomSheet({ shifts, isLoading, selectedId, onSelectShift, appliedShiftIds }: {
-  shifts: MockShift[]; isLoading: boolean; selectedId: string | null;
-  onSelectShift: (shift: MockShift) => void; appliedShiftIds: Set<string>;
-}) {
-  const y         = useMotionValue(SNAP_COLL);
-  const [expanded, setExpanded] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const cardRefs  = useRef<Record<string, HTMLDivElement | null>>({});
+/* ── MapController — lives inside <GoogleMap> context ────────────────────── */
+function MapController({ shift }: { shift: MockShift | null }) {
+  const map = useMap();
 
   useEffect(() => {
-    if (!selectedId || !scrollRef.current) return;
-    const container = scrollRef.current;
-    const el = cardRefs.current[selectedId];
-    if (!el) return;
-    // Compute scroll position that centers the card in the viewport.
-    // scrollIntoView is unreliable for horizontal-only overflow containers
-    // because the browser may also scroll vertically or pick the wrong ancestor.
-    const targetLeft = el.offsetLeft - (container.clientWidth - el.offsetWidth) / 2;
-    container.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
-  }, [selectedId]);
+    if (!map) return;
+    const id = window.setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+    return () => window.clearTimeout(id);
+  }, [map]);
 
-  function snapTo(target: number, isExpanded: boolean) {
-    animate(y, target, { type: 'spring', stiffness: 380, damping: 38, restDelta: 0.5 });
-    setExpanded(isExpanded);
-  }
+  useEffect(() => {
+    if (map && shift) {
+      map.panTo({ lat: shift.lat, lng: shift.lng });
+      map.setZoom(14);
+    }
+  }, [map, shift]);
 
-  function handleDragEnd(_: unknown, info: PanInfo) {
-    const cur = y.get();
-    const mid = (SNAP_EXP + SNAP_COLL) / 2;
-    if (info.velocity.y < -300) snapTo(SNAP_EXP, true);
-    else if (info.velocity.y > 300) snapTo(SNAP_COLL, false);
-    else { const t = cur <= mid ? SNAP_EXP : SNAP_COLL; snapTo(t, t === SNAP_EXP); }
-  }
-
-  return (
-    <div className="fixed left-1/2 -translate-x-1/2 w-full max-w-[390px] z-30" style={{ bottom: 56 }}>
-      <motion.div drag="y" dragConstraints={{ top: SNAP_EXP, bottom: SNAP_COLL }}
-        dragElastic={{ top: 0.08, bottom: 0.08 }} onDragEnd={handleDragEnd}
-        style={{ y, touchAction: 'none' }}>
-        <div className="bg-white border-t border-[#DBDBDB] rounded-t-[20px] overflow-hidden shadow-lg" style={{ height: SHEET_H }}>
-          <div className="flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing" aria-hidden>
-            <div className="w-10 h-[4px] rounded-full bg-[#DBDBDB]" />
-          </div>
-
-          <div className="flex items-center justify-between px-4 py-2">
-            <div>
-              <p className="text-black font-bold text-[15px]">
-                {isLoading ? 'Loading shifts…' : `${shifts.length} shift${shifts.length !== 1 ? 's' : ''} near you`}
-              </p>
-              <p className="text-[#737373] text-[11px] mt-[1px]">Tap a pin or card to view details</p>
-            </div>
-            <button type="button" aria-label={expanded ? 'Collapse sheet' : 'Expand sheet'}
-              onClick={() => expanded ? snapTo(SNAP_COLL, false) : snapTo(SNAP_EXP, true)}
-              className="text-[#0095F6] text-[11px] font-medium underline underline-offset-2">
-              {expanded ? 'Collapse' : 'See all'}
-            </button>
-          </div>
-
-          <div ref={scrollRef}
-            className="flex gap-3 px-4 pb-4 overflow-x-auto scrollbar-none pt-1"
-            role="list" aria-label="Available shifts" style={{ WebkitOverflowScrolling: 'touch' }}>
-            {isLoading && [1, 2, 3].map((n) => <SheetCardSkeleton key={n} />)}
-
-            {!isLoading && shifts.map((shift) => (
-              <div key={shift.id} role="listitem" ref={(el) => { cardRefs.current[shift.id] = el; }}>
-                <SheetCard shift={shift} selected={selectedId === shift.id} onTap={() => onSelectShift(shift)} applied={appliedShiftIds.has(shift.id)} />
-              </div>
-            ))}
-
-            {!isLoading && shifts.length === 0 && (
-              <div className="flex-1 flex flex-col items-center justify-center py-8 text-center px-4">
-                <p className="text-[#737373] text-[14px]">No shifts match this filter.</p>
-                <p className="text-[#AAAAAA] text-[12px] mt-1">Try a different category.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  );
+  return null;
 }
 
-/* ── JobsScreen ──────────────────────────────────────────────────────────── */
-export function JobsScreen() {
-  const [, navigate]    = useLocation();
-  const [query, setQuery]               = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
-  const [jobTypeFilter, setJobTypeFilter] = useState<string | null>(null);
-  const [selectedId, setSelectedId]     = useState<string | null>(null);
-
-  // Role-gated FAB: visible only for staffer / client
-  const { role } = useProfile();
-  const canPost = role === 'staffer' || role === 'client';
-  function handlePostShift() {
-    if (role === 'staffer') {
-      resetStafferDraft();           // fresh wizard — clear any previous partial draft
-      navigate('/post-shift/step1');
-    } else {
-      resetDraft();                  // fresh wizard — clear any previous partial draft
-      navigate('/post-shift/step1');
-    }
-  }
-
-  // Map readiness tracking
-  const [tilesLoaded, setTilesLoaded]   = useState(false);
-  const [mapFailed,   setMapFailed]     = useState(false);
-  const tilesLoadedRef                  = useRef(false);   // sync ref — read inside timeout callback
-
-  // Container height measured via ResizeObserver so Map always gets real pixels
+/* ── MapPane — the whole Google-Map surface, mounted only in map view ────── */
+function MapPane({ shifts, selectedId, onPinClick }: {
+  shifts: MockShift[]; selectedId: string | null; onPinClick: (s: MockShift) => void;
+}) {
+  const [tilesLoaded, setTilesLoaded] = useState(false);
+  const [mapFailed,   setMapFailed]   = useState(false);
+  const tilesLoadedRef                = useRef(false);
   const containerRef  = useRef<HTMLDivElement>(null);
   const [mapHeight, setMapHeight] = useState(0);
 
-  // Workers browse all open shifts; clients/staffers see only their own posted shifts.
-  const openShifts   = useShifts();
-  const postedShifts = useMyPostedShifts();
-  const isWorkerRole = role === 'worker' || role === null;
-  const shifts    = isWorkerRole ? openShifts.shifts   : postedShifts.shifts;
-  const isLoading = isWorkerRole ? openShifts.isLoading : postedShifts.isLoading;
-  const { appliedShiftIds }   = useApplications();
+  const selectedShift = shifts.find((s) => s.id === selectedId) ?? null;
 
-  // ── 1. Log API-key presence on mount (never log the full key) ──
-  useEffect(() => {
-    if (API_KEY) {
-      console.log(
-        `[Jobs] Maps API key present — length: ${API_KEY.length}, prefix: ${API_KEY.slice(0, 6)}…`,
-      );
-    } else {
-      console.warn('[Jobs] Maps API key is MISSING (import.meta.env.VITE_GOOGLE_MAPS_API_KEY is undefined)');
-    }
-  }, []);
-
-  // ── 2. Measure container height — useLayoutEffect fires synchronously after
-  //       React commits the DOM, so offsetHeight is the real painted value.
-  //       Reading it here forces a synchronous layout, giving us a non-zero
-  //       height before the first paint and before <Map> can mount at 0px.
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    // Synchronous read — forces browser layout, always non-zero after commit
     const h = el.offsetHeight;
     if (h > 0) setMapHeight(h);
-    // ResizeObserver keeps the value fresh if the viewport resizes later
     const ro = new ResizeObserver((entries) => {
       const rh = entries[0]?.contentRect.height ?? 0;
       if (rh > 0) setMapHeight(rh);
@@ -317,15 +154,10 @@ export function JobsScreen() {
     return () => ro.disconnect();
   }, []);
 
-  // ── 3. 10-second soft fallback — overlay a message if tiles are slow,
-  //       but keep <Map> mounted so it can still finish loading behind it.
   useEffect(() => {
     if (!API_KEY) return;
     const t = window.setTimeout(() => {
-      if (!tilesLoadedRef.current) {
-        console.warn('[Jobs] Map tiles did not load within 10 s — showing overlay (map stays mounted)');
-        setMapFailed(true);
-      }
+      if (!tilesLoadedRef.current) setMapFailed(true);
     }, 10000);
     return () => window.clearTimeout(t);
   }, []);
@@ -333,10 +165,133 @@ export function JobsScreen() {
   function handleTilesReady() {
     tilesLoadedRef.current = true;
     setTilesLoaded(true);
-    setMapFailed(false); // in case timer fired just before tiles arrived
+    setMapFailed(false);
   }
 
-  const textFiltered  = shifts.filter((s) =>
+  if (!API_KEY) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-[#FAFAFA]">
+        <div className="flex flex-col items-center gap-2 text-center px-8">
+          <WifiOff size={28} aria-hidden className="text-[#DBDBDB]" />
+          <p className="text-[#737373] text-[14px] font-medium">Map unavailable</p>
+          <p className="text-[#AAAAAA] text-[12px]">Switch to List to browse shifts</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="flex-1 relative bg-[#f5f5f5]">
+      <div className="absolute inset-0" style={{ height: mapHeight > 0 ? mapHeight : '100%' }}>
+        {mapHeight > 0 && (
+          <GoogleMap
+            defaultCenter={{ lat: 25.7913, lng: -80.145 }}
+            defaultZoom={12}
+            styles={LIGHT_MAP_STYLES}
+            disableDefaultUI
+            gestureHandling="greedy"
+            backgroundColor="#f5f5f5"
+            style={{ width: '100%', height: '100%' }}
+            onIdle={handleTilesReady}
+            onTilesLoaded={handleTilesReady}
+          >
+            <MapController shift={selectedShift} />
+            {shifts.map((shift) => (
+              <Marker
+                key={shift.id}
+                position={{ lat: shift.lat, lng: shift.lng }}
+                icon={navyPinUrl(selectedId === shift.id)}
+                onClick={() => onPinClick(shift)}
+              />
+            ))}
+          </GoogleMap>
+        )}
+
+        {!tilesLoaded && !mapFailed && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[#f5f5f5]"
+            aria-live="polite" aria-label="Map loading">
+            <div className="w-8 h-8 rounded-full border-[2.5px] border-[#DBDBDB] border-t-black animate-spin" />
+            <p className="text-[#737373] text-[13px] font-medium">Map loading…</p>
+          </div>
+        )}
+
+        {mapFailed && !tilesLoaded && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-[#FAFAFA]/90"
+            aria-live="polite" aria-label="Map slow to load">
+            <WifiOff size={28} aria-hidden className="text-[#DBDBDB]" />
+            <p className="text-[#737373] text-[14px] font-medium">Map is taking a while…</p>
+            <p className="text-[#AAAAAA] text-[12px]">Switch to List to browse shifts</p>
+          </div>
+        )}
+      </div>
+
+      {/* Selected-shift chip — tap to open detail */}
+      {selectedShift && (
+        <button type="button" onClick={() => onPinClick(selectedShift)}
+          className="absolute left-1/2 -translate-x-1/2 bottom-4 z-20 w-[88%] max-w-[360px] bg-white rounded-[14px] border border-[#E5E7EB] shadow-lg px-4 py-3 flex items-center justify-between gap-3 text-left">
+          <div className="min-w-0">
+            <span className="text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
+              style={{ background: NAVY }}>{selectedShift.jobType}</span>
+            <p className="text-[#111827] font-bold text-[14px] truncate mt-1">{selectedShift.companyName}</p>
+            <p className="text-[#6B7280] text-[11px] truncate">{selectedShift.date} · {selectedShift.startTime}</p>
+          </div>
+          <div className="flex items-baseline gap-0.5 flex-shrink-0">
+            <span className="text-[#111827] font-bold text-[18px]">${selectedShift.payRate}</span>
+            <span className="text-[#6B7280] text-[11px]">/{selectedShift.payPeriod}</span>
+          </div>
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ── View toggle (List / Map) ────────────────────────────────────────────── */
+function ViewToggle({ view, onChange }: { view: 'list' | 'map'; onChange: (v: 'list' | 'map') => void }) {
+  return (
+    <div className="flex bg-[#F3F4F6] rounded-full p-[3px]" role="tablist" aria-label="Choose view">
+      <button type="button" role="tab" aria-selected={view === 'list'} aria-label="List view"
+        onClick={() => onChange('list')}
+        className={`flex items-center gap-1 h-[32px] px-3 rounded-full text-[12px] font-semibold transition-all ${
+          view === 'list' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280]'}`}>
+        <ListIcon size={14} aria-hidden /> List
+      </button>
+      <button type="button" role="tab" aria-selected={view === 'map'} aria-label="Map view"
+        onClick={() => onChange('map')}
+        className={`flex items-center gap-1 h-[32px] px-3 rounded-full text-[12px] font-semibold transition-all ${
+          view === 'map' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280]'}`}>
+        <MapIcon size={14} aria-hidden /> Map
+      </button>
+    </div>
+  );
+}
+
+/* ── JobsScreen ──────────────────────────────────────────────────────────── */
+export function JobsScreen() {
+  const [, navigate]    = useLocation();
+  const [query, setQuery]                 = useState('');
+  const [activeFilter, setActiveFilter]   = useState<FilterKey>('all');
+  const [jobTypeFilter, setJobTypeFilter] = useState<string | null>(null);
+  const [selectedId, setSelectedId]       = useState<string | null>(null);
+  const [view, setView]                   = useState<'list' | 'map'>('list');
+
+  // Role-gated FAB: visible only for staffer / client
+  const { role } = useProfile();
+  const canPost = role === 'staffer' || role === 'client';
+  function handlePostShift() {
+    if (role === 'staffer') resetStafferDraft();
+    else resetDraft();
+    navigate('/post-shift/step1');
+  }
+
+  // Workers browse all open shifts; clients/staffers see only their own posted shifts.
+  const openShifts   = useShifts();
+  const postedShifts = useMyPostedShifts();
+  const isWorkerRole = role === 'worker' || role === null;
+  const shifts    = isWorkerRole ? openShifts.shifts    : postedShifts.shifts;
+  const isLoading = isWorkerRole ? openShifts.isLoading : postedShifts.isLoading;
+  const { appliedShiftIds } = useApplications();
+
+  const textFiltered = shifts.filter((s) =>
     !query || [s.jobType, s.companyName, s.location].some((f) =>
       f.toLowerCase().includes(query.toLowerCase()),
     ),
@@ -345,180 +300,113 @@ export function JobsScreen() {
     ? textFiltered.filter((s) => s.jobTypes.includes(jobTypeFilter))
     : textFiltered;
   const visibleShifts = applyFilter(jobTypeFiltered, activeFilter);
-  const selectedShift = visibleShifts.find((s) => s.id === selectedId) ?? null;
 
   function handleSelectShift(shift: MockShift) { setSelectedId(shift.id); navigate(`/shift/${shift.id}`); }
   function handlePinClick(shift: MockShift)    { setSelectedId(shift.id); }
 
   return (
-    // APIProvider lives in App.tsx (app root) — the SDK is already loaded
-    // before this screen mounts, eliminating the per-navigation init delay.
-    <div ref={containerRef} className="relative h-[100dvh] bg-[#f5f5f5] overflow-hidden">
+    <div className="h-[100dvh] bg-white flex flex-col overflow-hidden">
 
-        {/* ── Map layer ─────────────────────────────────────────────────────
-            The map container is ALWAYS rendered when API_KEY is present.
-            Overlays (loading, timeout) sit on top — we never unmount <Map>
-            so a slow tile load can still complete and reveal itself.         */}
-        {!!API_KEY && (
-          <div
-            className="absolute inset-0 z-0"
-            style={{ height: mapHeight > 0 ? mapHeight : '100dvh' }}
-          >
-            {/* Mount Map only after useLayoutEffect gives us a real px height */}
-            {mapHeight > 0 && (
-              <Map
-                defaultCenter={{ lat: 25.7913, lng: -80.145 }}
-                defaultZoom={12}
-                styles={LIGHT_MAP_STYLES}
-                disableDefaultUI
-                gestureHandling="greedy"
-                backgroundColor="#f5f5f5"
-                style={{ width: '100%', height: '100%' }}
-                onIdle={handleTilesReady}
-                onTilesLoaded={handleTilesReady}
-              >
-                <MapController shift={selectedShift} />
-                {visibleShifts.map((shift) => (
-                  <Marker
-                    key={shift.id}
-                    position={{ lat: shift.lat, lng: shift.lng }}
-                    icon={navyPinUrl(selectedId === shift.id)}
-                    onClick={() => handlePinClick(shift)}
-                  />
-                ))}
-              </Map>
-            )}
-
-            {/* Loading overlay — shown while tiles haven't arrived yet.
-                Sits above the map but does NOT unmount it.                  */}
-            {!tilesLoaded && !mapFailed && (
-              <div
-                className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[#f5f5f5]"
-                aria-live="polite" aria-label="Map loading"
-              >
-                <div className="w-8 h-8 rounded-full border-[2.5px] border-[#DBDBDB] border-t-black animate-spin" />
-                <p className="text-[#737373] text-[13px] font-medium">Map loading…</p>
-              </div>
-            )}
-
-            {/* Timeout overlay — shown after 10 s if tiles still haven't fired.
-                Map remains mounted underneath and will reveal itself if/when
-                onIdle fires (handleTilesReady clears mapFailed).             */}
-            {mapFailed && !tilesLoaded && (
-              <div
-                className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-[#FAFAFA]/90"
-                aria-live="polite" aria-label="Map slow to load"
-              >
-                <WifiOff size={28} aria-hidden className="text-[#DBDBDB]" />
-                <p className="text-[#737373] text-[14px] font-medium">Map is taking a while…</p>
-                <p className="text-[#AAAAAA] text-[12px]">Browse shifts in the list below</p>
-              </div>
+      {/* ── Header: search + filters + view toggle ───────────────────────── */}
+      <div className="flex-shrink-0 bg-white border-b border-[#EAEAEA]">
+        <div className="px-4 pt-4 pb-2 flex items-center gap-2">
+          <div className="flex-1 flex items-center gap-2 bg-[#F5F5F5] border border-[#E5E7EB] rounded-[12px] px-3.5 h-[44px]">
+            <Search size={16} aria-hidden className="text-[#737373] flex-shrink-0" />
+            <input
+              type="search"
+              placeholder="Search shifts"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search shifts"
+              className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] outline-none font-medium"
+            />
+            {query && (
+              <button type="button" aria-label="Clear search" onClick={() => setQuery('')}
+                className="text-[#737373] text-[13px]">✕</button>
             )}
           </div>
-        )}
-
-        {/* ── No-key fallback — only when VITE_GOOGLE_MAPS_API_KEY is absent ── */}
-        {!API_KEY && (
-          <div className="absolute inset-0 z-0 flex items-center justify-center bg-[#FAFAFA]">
-            <div className="flex flex-col items-center gap-2 text-center px-8">
-              <WifiOff size={28} aria-hidden className="text-[#DBDBDB]" />
-              <p className="text-[#737373] text-[14px] font-medium">Map unavailable</p>
-              <p className="text-[#AAAAAA] text-[12px]">Browse shifts in the list below</p>
-            </div>
-          </div>
-        )}
-
-        {/* ── Search + filter overlay ───────────────────────────────────── */}
-        <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none">
-          <div className="pointer-events-auto">
-            <div className="px-4 pt-5 pb-3 bg-gradient-to-b from-white/95 via-white/80 to-transparent">
-              <div className="flex items-center gap-2 bg-white border border-[#DBDBDB] rounded-[10px] px-3.5 h-[46px] shadow-sm">
-                <Search size={16} aria-hidden className="text-[#737373] flex-shrink-0" />
-                <input
-                  type="search"
-                  placeholder="Search by job type, pay rate, distance, date…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  aria-label="Search shifts"
-                  className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] outline-none font-medium"
-                />
-                {query && (
-                  <button type="button" aria-label="Clear search" onClick={() => setQuery('')}
-                    className="text-[#737373] text-[12px]">✕</button>
-                )}
-                <div className="w-px h-4 bg-[#DBDBDB]" aria-hidden />
-                <button type="button" aria-label="Open filters" className="flex-shrink-0">
-                  <SlidersHorizontal size={15} aria-hidden className="text-[#737373]" />
-                </button>
-              </div>
-            </div>
-
-            <div
-              className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none"
-              role="radiogroup" aria-label="Filter shifts"
-              style={{ WebkitOverflowScrolling: 'touch' }}
-            >
-              <select
-                value={jobTypeFilter ?? ''}
-                onChange={(e) => { setJobTypeFilter(e.target.value || null); setSelectedId(null); }}
-                aria-label="Filter by job type"
-                className={`flex-shrink-0 h-[34px] px-3 rounded-full text-[12px] font-semibold shadow-sm outline-none whitespace-nowrap
-                  ${jobTypeFilter ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
-                <option value="">Job Type: All</option>
-                {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-              {FILTER_PILLS.map((pill) => {
-                const active = activeFilter === pill.key;
-                return (
-                  <button key={pill.key} type="button" role="radio" aria-checked={active}
-                    onClick={() => { setActiveFilter(pill.key); setSelectedId(null); }}
-                    className={`flex-shrink-0 h-[34px] px-4 rounded-full text-[12px] font-semibold transition-all duration-150 whitespace-nowrap shadow-sm
-                      ${active
-                        ? 'bg-black text-white border-2 border-black'
-                        : 'bg-white text-black border border-[#DBDBDB]'}`}>
-                    {pill.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <ViewToggle view={view} onChange={setView} />
         </div>
 
-        {/* SR-only shift list for keyboard/screen-reader users */}
-        <div className="sr-only" aria-label="Shifts on map">
-          {visibleShifts.map((shift) => (
-            <button key={shift.id} type="button"
-              aria-label={`Select ${shift.jobType} at ${shift.companyName}`}
-              onClick={() => handlePinClick(shift)} />
-          ))}
+        <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none"
+          role="radiogroup" aria-label="Filter shifts" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <select
+            value={jobTypeFilter ?? ''}
+            onChange={(e) => { setJobTypeFilter(e.target.value || null); setSelectedId(null); }}
+            aria-label="Filter by job type"
+            className={`flex-shrink-0 h-[34px] px-3 rounded-full text-[12px] font-semibold outline-none whitespace-nowrap
+              ${jobTypeFilter ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
+            <option value="">Job Type: All</option>
+            {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          {FILTER_PILLS.map((pill) => {
+            const active = activeFilter === pill.key;
+            return (
+              <button key={pill.key} type="button" role="radio" aria-checked={active}
+                onClick={() => { setActiveFilter(pill.key); setSelectedId(null); }}
+                className={`flex-shrink-0 h-[34px] px-4 rounded-full text-[12px] font-semibold transition-all duration-150 whitespace-nowrap
+                  ${active ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
+                {pill.label}
+              </button>
+            );
+          })}
         </div>
-
-        <BottomSheet
-          shifts={visibleShifts}
-          isLoading={isLoading}
-          selectedId={selectedId}
-          onSelectShift={handleSelectShift}
-          appliedShiftIds={appliedShiftIds}
-        />
-
-        {/* ── Post-a-Shift FAB — visible only for staffer / client roles ── */}
-        {canPost && (
-          <motion.button
-            type="button"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 28, delay: 0.15 }}
-            whileTap={{ scale: 0.93 }}
-            onClick={handlePostShift}
-            aria-label="Post a shift"
-            className="absolute bottom-[80px] right-4 z-50 flex items-center gap-2 h-[44px] px-4 bg-black text-white rounded-full shadow-lg font-bold text-[13px]"
-          >
-            <Plus size={16} aria-hidden className="flex-shrink-0" />
-            Post a Shift
-          </motion.button>
-        )}
-
-        <BottomTabNav />
       </div>
+
+      {/* ── Body ─────────────────────────────────────────────────────────── */}
+      {view === 'list' ? (
+        <main className="flex-1 overflow-y-auto" aria-label="Shift list">
+          <div className="px-4 pt-3 pb-[88px] flex flex-col gap-3">
+            {isLoading && [1, 2, 3, 4].map((n) => <ShiftRowSkeleton key={n} />)}
+
+            {!isLoading && visibleShifts.map((shift, i) => (
+              <motion.div key={shift.id}
+                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.25, ease: 'easeOut' }}>
+                <ShiftRow shift={shift} applied={appliedShiftIds.has(shift.id)}
+                  onTap={() => handleSelectShift(shift)} />
+              </motion.div>
+            ))}
+
+            {!isLoading && visibleShifts.length === 0 && (
+              <div className="mt-6 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
+                <p className="text-[#737373] text-[14px] font-medium">No shifts match this filter.</p>
+                <p className="text-[#AAAAAA] text-[12px] mt-1">Try a different category or clear the search.</p>
+              </div>
+            )}
+          </div>
+        </main>
+      ) : (
+        <MapPane shifts={visibleShifts} selectedId={selectedId} onPinClick={handlePinClick} />
+      )}
+
+      {/* SR-only shift list for keyboard/screen-reader users */}
+      <div className="sr-only" aria-label="Shifts">
+        {visibleShifts.map((shift) => (
+          <button key={shift.id} type="button"
+            aria-label={`Open ${shift.jobType} at ${shift.companyName}`}
+            onClick={() => handleSelectShift(shift)} />
+        ))}
+      </div>
+
+      {/* ── Post-a-Shift FAB — visible only for staffer / client roles ────── */}
+      {canPost && (
+        <motion.button
+          type="button"
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 28, delay: 0.15 }}
+          whileTap={{ scale: 0.93 }}
+          onClick={handlePostShift}
+          aria-label="Post a shift"
+          className="absolute bottom-[80px] right-4 z-50 flex items-center gap-2 h-[44px] px-4 bg-black text-white rounded-full shadow-lg font-bold text-[13px]"
+        >
+          <Plus size={16} aria-hidden className="flex-shrink-0" />
+          Post a Shift
+        </motion.button>
+      )}
+
+      <BottomTabNav />
+    </div>
   );
 }
