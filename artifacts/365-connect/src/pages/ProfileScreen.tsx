@@ -288,7 +288,7 @@ export function ProfileScreen() {
         <div aria-hidden className="absolute top-0 left-0 right-0 h-[1px] bg-[#DBDBDB]" />
 
         {/* Edit button */}
-        <button type="button" aria-label="Edit profile" onClick={() => navigate('/profile-setup')}
+        <button type="button" aria-label="Edit profile" onClick={() => navigate('/profile-setup?edit=1')}
           className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white border border-[#DBDBDB] flex items-center justify-center">
           <Edit3 size={15} aria-hidden className="text-black" />
         </button>
@@ -491,7 +491,7 @@ export function ProfileScreen() {
           {username && (
             <SettingRow icon={Eye} label="View My Public Profile" onTap={() => navigate(`/worker/${username}`)} />
           )}
-          <SettingRow icon={Settings}    label="Account Settings"    onTap={() => navigate('/profile-setup')} />
+          <SettingRow icon={Settings}    label="Account Settings"    onTap={() => navigate('/profile-setup?edit=1')} />
           <SettingRow icon={CreditCard}  label="Payments & Earnings"  onTap={() => navigate('/earnings')} />
           <SettingRow icon={Bell}        label="Notifications"         onTap={() => navigate('/notifications')} />
         </div>
