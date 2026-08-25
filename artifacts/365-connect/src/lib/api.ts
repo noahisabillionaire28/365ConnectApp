@@ -6,15 +6,27 @@
  * header (and X-Supabase-Token as a proxy-safe fallback). The API server
  * verifies the token and derives identity from it.
  */
-import { supabase } from '@/lib/supabase';
+import { supabase, getCachedAccessToken } from '@/lib/supabase';
 
 const BASE = '/api';
 
-/** Resolve the current Supabase session access token, or null if signed out. */
+/**
+ * Resolve the current Supabase access token, or null if signed out.
+ *
+ * Fast path: read the module-level cache (kept fresh by onAuthStateChange),
+ * so the common case is synchronous and never touches the auth lock. Only when
+ * the cache is empty (e.g. a request that races the very first auth event) do
+ * we fall back to getSession() — and even then we time out fast rather than let
+ * the request hang on supabase-js's navigator-lock.
+ */
 async function getAccessToken(): Promise<string | null> {
+  const cached = getCachedAccessToken();
+  if (cached) return cached;
   try {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token ?? null;
+    return await Promise.race<string | null>([
+      supabase.auth.getSession().then(({ data }) => data.session?.access_token ?? null),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+    ]);
   } catch {
     return null;
   }

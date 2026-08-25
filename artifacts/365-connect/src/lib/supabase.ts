@@ -56,6 +56,33 @@ export const supabase = createClient(
   supabaseAnonKey ?? 'placeholder-anon-key'
 );
 
+// ─── Access-token cache ───────────────────────────────────────────────────────
+// api.ts attaches the current access token to every /api request. Calling
+// supabase.auth.getSession() on each request is unreliable: it can briefly
+// return null during hydration and can BLOCK on supabase-js's navigator-lock
+// (used to serialise token refreshes). When that happened, requests went out
+// with no token → 401 "Unauthorized — no-token" and authenticated pages hung on
+// a blank skeleton. Instead we keep the latest token in this module variable,
+// refreshed by onAuthStateChange (which fires INITIAL_SESSION on load and
+// TOKEN_REFRESHED as the token rotates), and read it synchronously.
+let currentAccessToken: string | null = null;
+
+/** The latest Supabase access token, or null when signed out. Synchronous. */
+export function getCachedAccessToken(): string | null {
+  return currentAccessToken;
+}
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  currentAccessToken = session?.access_token ?? null;
+});
+
+// Seed once from persisted storage, covering the window before the first
+// onAuthStateChange event fires on a fresh page load.
+void supabase.auth
+  .getSession()
+  .then(({ data }) => { if (data.session?.access_token) currentAccessToken = data.session.access_token; })
+  .catch(() => { /* ignore — cache stays null until an auth event arrives */ });
+
 // ─── Typed row shapes (match DB schema exactly) ───────────────────────────────
 
 export type UserRow = {
