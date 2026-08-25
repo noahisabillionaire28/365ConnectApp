@@ -110,8 +110,14 @@ export function ProfileSetupScreen() {
       let photoUrl:     string | null = null;
       let postPhotoUrl: string | null = null;
 
-      if (photoFile)     photoUrl     = await uploadAvatar(user.id, photoFile);
-      if (postPhotoFile) postPhotoUrl = await uploadPostPhoto(user.id, postPhotoFile);
+      // Photo uploads are best-effort — a failed upload must never block saving
+      // the rest of the profile (name, bio, job types).
+      try {
+        if (photoFile)     photoUrl     = await uploadAvatar(user.id, photoFile);
+        if (postPhotoFile) postPhotoUrl = await uploadPostPhoto(user.id, postPhotoFile);
+      } catch (e) {
+        console.error('[ProfileSetup] photo upload failed (saving profile anyway):', e);
+      }
 
       const role = (sessionStorage.getItem('selectedRole') ?? 'worker') as 'worker' | 'client' | 'staffer';
 
