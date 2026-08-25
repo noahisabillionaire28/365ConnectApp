@@ -16,21 +16,20 @@ async function ownsShift(userId: string, shiftId: string): Promise<boolean> {
 
 /** GET /api/applications?shift_id=&worker_id= */
 router.get('/', requireAuth, async (req, res) => {
-  const { shift_id, worker_id } = req.query as Record<string, string>;
+  const { shift_id, worker_id, status } = req.query as Record<string, string>;
   try {
     if (shift_id) {
       // Only the shift owner may see the applicants for their shift.
       if (!(await ownsShift(req.userId!, shift_id))) {
         return res.status(403).json({ error: 'Forbidden' });
       }
-      const { data: apps, error } = await adminDb
-        .from('applications')
-        .select('*')
-        .eq('shift_id', shift_id)
-        .order('created_at', { ascending: false });
+      let q = adminDb.from('applications').select('*').eq('shift_id', shift_id);
+      if (status) q = q.eq('status', status);
+      const { data: apps, error } = await q.order('created_at', { ascending: false });
       if (error) return res.status(500).json({ error: error.message });
 
       const workerIds = [...new Set((apps ?? []).map((a) => a.worker_id))];
+
       const { data: users, error: uErr } = await adminDb
         .from('users')
         .select(
@@ -38,8 +37,31 @@ router.get('/', requireAuth, async (req, res) => {
         )
         .in('id', workerIds);
       if (uErr) return res.status(500).json({ error: uErr.message });
-
       const userMap = new Map((users ?? []).map((u) => [u.id, u]));
+
+      // Completion state — a time entry with a clock_out for this shift+worker.
+      const clockOutMap = new Map<string, string | null>();
+      if (workerIds.length) {
+        const { data: entries } = await adminDb
+          .from('time_entries')
+          .select('worker_id, clock_out')
+          .eq('shift_id', shift_id)
+          .in('worker_id', workerIds);
+        for (const t of entries ?? []) clockOutMap.set(t.worker_id, t.clock_out);
+      }
+
+      // Whether the owner has already reviewed each worker for this shift.
+      const reviewedSet = new Set<string>();
+      if (workerIds.length) {
+        const { data: revs } = await adminDb
+          .from('reviews')
+          .select('reviewee_id')
+          .eq('shift_id', shift_id)
+          .eq('reviewer_id', req.userId)
+          .in('reviewee_id', workerIds);
+        for (const r of revs ?? []) reviewedSet.add(r.reviewee_id);
+      }
+
       const merged = (apps ?? []).map((a) => {
         const u = userMap.get(a.worker_id);
         return {
@@ -51,6 +73,8 @@ router.get('/', requireAuth, async (req, res) => {
           primary_job_type: u?.primary_job_type ?? null,
           certifications: u?.certifications ?? null,
           bio: u?.bio ?? null,
+          clock_out: clockOutMap.get(a.worker_id) ?? null,
+          already_reviewed: reviewedSet.has(a.worker_id),
         };
       });
       return res.json(merged);
