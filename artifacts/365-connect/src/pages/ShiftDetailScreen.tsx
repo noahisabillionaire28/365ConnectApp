@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, Star, UserPlus,
-  Edit3, Trash2, DollarSign,
+  Edit3, Trash2, DollarSign, Navigation, X,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -23,6 +23,16 @@ import { hasCompletedTimeEntry } from '@/hooks/useTimeEntry';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
 import { useAcceptedWorkers } from '@/hooks/useAcceptedWorkers';
 import { startShiftPayment } from '@/lib/checkout';
+
+/** Deep links to open a destination in each navigation app. */
+function directionsLinks(lat: number, lng: number, label: string) {
+  const q = encodeURIComponent(label || `${lat},${lng}`);
+  return {
+    apple:  `https://maps.apple.com/?daddr=${lat},${lng}&q=${q}`,
+    google: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+    waze:   `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`,
+  };
+}
 
 function parseDisplayMinutes(t: string): number {
   const [time, mer] = t.split(' ');
@@ -135,6 +145,7 @@ export function ShiftDetailScreen() {
   const { showToast } = useToast();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [directionsOpen, setDirectionsOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   // ── No more hooks below this line ────────────────────────────────────────────
@@ -482,21 +493,69 @@ export function ShiftDetailScreen() {
         {/* Map */}
         <div className="px-5 pb-6">
           <SectionHeading>Location</SectionHeading>
-          <div className="rounded-[12px] overflow-hidden border border-[#DBDBDB]" style={{ height: 180 }}>
-            <LeafletMap
-              center={{ lat: shift.lat, lng: shift.lng }}
-              zoom={15}
-              interactive={false}
-              recenter
-              ariaLabel="Shift location map"
-              markers={[{ id: shift.id, lat: shift.lat, lng: shift.lng, selected: true }]}
-            />
-          </div>
-          <div className="flex items-center gap-2 mt-2.5">
-            <MapPin size={13} aria-hidden className="text-[#737373] flex-shrink-0" />
-            <p className="text-[#737373] text-[13px]">{shift.location} · {shift.distanceMiles} mi from your location</p>
-          </div>
+          <button type="button" onClick={() => setDirectionsOpen(true)}
+            aria-label="Get directions to this shift" className="block w-full text-left">
+            <div className="rounded-[12px] overflow-hidden border border-[#DBDBDB] relative" style={{ height: 180 }}>
+              <LeafletMap
+                center={{ lat: shift.lat, lng: shift.lng }}
+                zoom={15}
+                interactive={false}
+                recenter
+                ariaLabel="Shift location map"
+                markers={[{ id: shift.id, lat: shift.lat, lng: shift.lng, selected: true }]}
+              />
+              {/* Transparent tap layer so a tap anywhere on the map opens directions */}
+              <div aria-hidden className="absolute inset-0" />
+            </div>
+            <div className="flex items-center gap-2 mt-2.5">
+              <MapPin size={13} aria-hidden className="text-[#737373] flex-shrink-0" />
+              <p className="text-[#737373] text-[13px]">{shift.location} · {shift.distanceMiles} mi from your location</p>
+            </div>
+          </button>
+          <button type="button" onClick={() => setDirectionsOpen(true)}
+            className="mt-3 w-full h-[44px] rounded-[10px] bg-[#0A1628] text-white font-semibold text-[14px] flex items-center justify-center gap-2 active:scale-[0.99] transition-transform">
+            <Navigation size={15} aria-hidden />
+            Get Directions
+          </button>
         </div>
+
+        {/* Directions chooser */}
+        <AnimatePresence>
+          {directionsOpen && (() => {
+            const links = directionsLinks(shift.lat, shift.lng, shift.location);
+            const opts = [
+              { label: 'Apple Maps',  href: links.apple  },
+              { label: 'Google Maps', href: links.google },
+              { label: 'Waze',        href: links.waze   },
+            ];
+            return (
+              <>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  onClick={() => setDirectionsOpen(false)}
+                  className="fixed inset-0 bg-black/40 z-[60]" />
+                <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 38 }}
+                  className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] z-[61] bg-white rounded-t-[20px] px-5 pt-4 pb-9 shadow-2xl">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="font-bold text-[16px] text-[#111827]">Get directions</p>
+                    <button type="button" onClick={() => setDirectionsOpen(false)} aria-label="Close">
+                      <X size={18} className="text-[#737373]" />
+                    </button>
+                  </div>
+                  <p className="text-[#737373] text-[13px] mb-4 truncate">{shift.location}</p>
+                  {opts.map((o) => (
+                    <a key={o.label} href={o.href} target="_blank" rel="noreferrer"
+                      onClick={() => setDirectionsOpen(false)}
+                      className="flex items-center gap-3 h-[52px] px-4 rounded-[12px] border border-[#E5E7EB] mb-2.5 active:bg-[#FAFAFA]">
+                      <Navigation size={16} className="text-[#0A1628] flex-shrink-0" />
+                      <span className="font-semibold text-[15px] text-[#111827]">{o.label}</span>
+                    </a>
+                  ))}
+                </motion.div>
+              </>
+            );
+          })()}
+        </AnimatePresence>
 
         {/* AI match score — worker-only, computed 40 job-type + 30 availability + 20 rating + 10 distance */}
         {isWorker && matchScore !== null && (

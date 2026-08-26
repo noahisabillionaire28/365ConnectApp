@@ -78,7 +78,7 @@ export function LeafletMap({
       zoom={zoom}
       style={style ?? { width: '100%', height: '100%' }}
       zoomControl={false}
-      attributionControl
+      attributionControl={false}
       dragging={interactive}
       scrollWheelZoom={interactive}
       doubleClickZoom={interactive}
