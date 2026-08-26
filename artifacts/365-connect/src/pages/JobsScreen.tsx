@@ -1,14 +1,13 @@
-import { Map as GoogleMap, Marker, useMap } from '@vis.gl/react-google-maps';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
-  Search, MapPin, WifiOff, Plus,
+  Search, MapPin, Plus,
   List as ListIcon, Map as MapIcon, CalendarDays, Clock, DollarSign, Users, CheckCircle2,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
+import { LeafletMap } from '@/components/LeafletMap';
 import { type MockShift } from '@/lib/supabase';
-import { LIGHT_MAP_STYLES, navyPinUrl } from '@/lib/mapStyles';
 import { useShifts } from '@/hooks/useShifts';
 import { useMyPostedShifts } from '@/hooks/useMyPostedShifts';
 import { useApplications } from '@/hooks/useApplications';
@@ -16,9 +15,6 @@ import { useProfile } from '@/hooks/useProfile';
 import { resetStafferDraft } from '@/store/stafferPostShiftStore';
 import { resetDraft } from '@/store/postShiftStore';
 import { JOB_TYPES } from '@/lib/jobTypes';
-
-/* ── API key — resolved once at module load ─────────────────────────────── */
-const API_KEY: string = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 
 const NAVY = '#0A1628';
 
@@ -109,121 +105,38 @@ function ShiftRowSkeleton() {
   );
 }
 
-/* ── MapController — lives inside <GoogleMap> context ────────────────────── */
-function MapController({ shift }: { shift: MockShift | null }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!map) return;
-    const id = window.setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
-    return () => window.clearTimeout(id);
-  }, [map]);
-
-  useEffect(() => {
-    if (map && shift) {
-      map.panTo({ lat: shift.lat, lng: shift.lng });
-      map.setZoom(14);
-    }
-  }, [map, shift]);
-
-  return null;
-}
-
-/* ── MapPane — the whole Google-Map surface, mounted only in map view ────── */
+/* ── MapPane — free Leaflet map, mounted only in map view ────────────────── */
 function MapPane({ shifts, selectedId, onPinClick }: {
   shifts: MockShift[]; selectedId: string | null; onPinClick: (s: MockShift) => void;
 }) {
-  const [tilesLoaded, setTilesLoaded] = useState(false);
-  const [mapFailed,   setMapFailed]   = useState(false);
-  const tilesLoadedRef                = useRef(false);
-  const containerRef  = useRef<HTMLDivElement>(null);
-  const [mapHeight, setMapHeight] = useState(0);
-
   const selectedShift = shifts.find((s) => s.id === selectedId) ?? null;
+  const byId = new Map(shifts.map((s) => [s.id, s]));
 
-  useLayoutEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const h = el.offsetHeight;
-    if (h > 0) setMapHeight(h);
-    const ro = new ResizeObserver((entries) => {
-      const rh = entries[0]?.contentRect.height ?? 0;
-      if (rh > 0) setMapHeight(rh);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!API_KEY) return;
-    const t = window.setTimeout(() => {
-      if (!tilesLoadedRef.current) setMapFailed(true);
-    }, 10000);
-    return () => window.clearTimeout(t);
-  }, []);
-
-  function handleTilesReady() {
-    tilesLoadedRef.current = true;
-    setTilesLoaded(true);
-    setMapFailed(false);
-  }
-
-  if (!API_KEY) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-[#FAFAFA]">
-        <div className="flex flex-col items-center gap-2 text-center px-8">
-          <WifiOff size={28} aria-hidden className="text-[#DBDBDB]" />
-          <p className="text-[#737373] text-[14px] font-medium">Map unavailable</p>
-          <p className="text-[#AAAAAA] text-[12px]">Switch to List to browse shifts</p>
-        </div>
-      </div>
-    );
-  }
+  // Center on the selected shift, else the first shift, else the Miami default.
+  const center = selectedShift
+    ? { lat: selectedShift.lat, lng: selectedShift.lng }
+    : shifts[0]
+      ? { lat: shifts[0].lat, lng: shifts[0].lng }
+      : { lat: 25.7913, lng: -80.145 };
 
   return (
-    <div ref={containerRef} className="flex-1 relative bg-[#f5f5f5]">
-      <div className="absolute inset-0" style={{ height: mapHeight > 0 ? mapHeight : '100%' }}>
-        {mapHeight > 0 && (
-          <GoogleMap
-            defaultCenter={{ lat: 25.7913, lng: -80.145 }}
-            defaultZoom={12}
-            styles={LIGHT_MAP_STYLES}
-            disableDefaultUI
-            gestureHandling="greedy"
-            backgroundColor="#f5f5f5"
-            style={{ width: '100%', height: '100%' }}
-            onIdle={handleTilesReady}
-            onTilesLoaded={handleTilesReady}
-          >
-            <MapController shift={selectedShift} />
-            {shifts.map((shift) => (
-              <Marker
-                key={shift.id}
-                position={{ lat: shift.lat, lng: shift.lng }}
-                icon={navyPinUrl(selectedId === shift.id)}
-                onClick={() => onPinClick(shift)}
-              />
-            ))}
-          </GoogleMap>
-        )}
+    <div className="flex-1 relative bg-[#f5f5f5]">
+      <LeafletMap
+        center={center}
+        zoom={12}
+        recenter={!!selectedShift}
+        ariaLabel="Map of available shifts"
+        markers={shifts.map((s) => ({ id: s.id, lat: s.lat, lng: s.lng, selected: s.id === selectedId }))}
+        onMarkerClick={(id) => { const s = byId.get(id); if (s) onPinClick(s); }}
+      />
 
-        {!tilesLoaded && !mapFailed && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[#f5f5f5]"
-            aria-live="polite" aria-label="Map loading">
-            <div className="w-8 h-8 rounded-full border-[2.5px] border-[#DBDBDB] border-t-black animate-spin" />
-            <p className="text-[#737373] text-[13px] font-medium">Map loading…</p>
-          </div>
-        )}
-
-        {mapFailed && !tilesLoaded && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-[#FAFAFA]/90"
-            aria-live="polite" aria-label="Map slow to load">
-            <WifiOff size={28} aria-hidden className="text-[#DBDBDB]" />
-            <p className="text-[#737373] text-[14px] font-medium">Map is taking a while…</p>
-            <p className="text-[#AAAAAA] text-[12px]">Switch to List to browse shifts</p>
-          </div>
-        )}
-      </div>
+      {shifts.length === 0 && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-[#FAFAFA]/80 pointer-events-none">
+          <MapPin size={28} aria-hidden className="text-[#DBDBDB]" />
+          <p className="text-[#737373] text-[14px] font-medium">No shifts to map</p>
+          <p className="text-[#AAAAAA] text-[12px]">Try a different filter</p>
+        </div>
+      )}
 
       {/* Selected-shift chip — tap to open detail */}
       {selectedShift && (

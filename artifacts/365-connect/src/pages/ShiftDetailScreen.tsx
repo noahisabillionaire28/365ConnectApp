@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Map, Marker } from '@vis.gl/react-google-maps';
 import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -11,7 +10,7 @@ import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
 import { useToast } from '@/contexts/ToastContext';
 import { useApplicationStatus } from '@/hooks/useApplicationStatus';
-import { LIGHT_MAP_STYLES, goldPinUrl } from '@/lib/mapStyles';
+import { LeafletMap } from '@/components/LeafletMap';
 import { useShiftById } from '@/hooks/useShifts';
 import { useProfile } from '@/hooks/useProfile';
 import { useMyLocation } from '@/hooks/useMyLocation';
@@ -484,11 +483,14 @@ export function ShiftDetailScreen() {
         <div className="px-5 pb-6">
           <SectionHeading>Location</SectionHeading>
           <div className="rounded-[12px] overflow-hidden border border-[#DBDBDB]" style={{ height: 180 }}>
-            <Map defaultCenter={{ lat: shift.lat, lng: shift.lng }} defaultZoom={15}
-              styles={LIGHT_MAP_STYLES} disableDefaultUI gestureHandling="none"
-              backgroundColor="#f5f5f5" style={{ width: '100%', height: '100%' }}>
-              <Marker position={{ lat: shift.lat, lng: shift.lng }} icon={goldPinUrl(true)} />
-            </Map>
+            <LeafletMap
+              center={{ lat: shift.lat, lng: shift.lng }}
+              zoom={15}
+              interactive={false}
+              recenter
+              ariaLabel="Shift location map"
+              markers={[{ id: shift.id, lat: shift.lat, lng: shift.lng, selected: true }]}
+            />
           </div>
           <div className="flex items-center gap-2 mt-2.5">
             <MapPin size={13} aria-hidden className="text-[#737373] flex-shrink-0" />

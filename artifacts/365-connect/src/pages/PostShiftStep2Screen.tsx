@@ -6,9 +6,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { ChevronLeft, MapPin, Building2 } from 'lucide-react';
-import { Map, Marker, useMapsLibrary } from '@vis.gl/react-google-maps';
+import { useMapsLibrary } from '@vis.gl/react-google-maps';
 import { getDraft, setDraft } from '@/store/postShiftStore';
-import { LIGHT_MAP_STYLES, navyPinUrl } from '@/lib/mapStyles';
+import { LeafletMap } from '@/components/LeafletMap';
 import { BottomTabNav } from '@/components/BottomTabNav';
 
 // ─── Wizard primitives ────────────────────────────────────────────────────────
@@ -187,18 +187,14 @@ export function PostShiftStep2Screen() {
                 aria-label="Map showing shift location"
                 role="img"
               >
-                <Map
+                <LeafletMap
                   center={displayCoords}
-                  zoom={14}
-                  // @ts-ignore — vis.gl Map passes unknown props through to MapOptions
-                  styles={LIGHT_MAP_STYLES}
-                  disableDefaultUI
-                  gestureHandling="none"
-                  backgroundColor="#f5f5f5"
-                  style={{ width: '100%', height: '100%' }}
-                >
-                  <Marker position={displayCoords} icon={navyPinUrl(true)} />
-                </Map>
+                  zoom={15}
+                  interactive={false}
+                  recenter
+                  ariaLabel="Selected location preview"
+                  markers={[{ id: 'picked', lat: displayCoords.lat, lng: displayCoords.lng, selected: true }]}
+                />
               </div>
             </div>
           </div>
