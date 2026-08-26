@@ -20,6 +20,11 @@ const TEXT   = '#111827';
 const MUTED  = '#6B7280';
 const RED    = '#EF4444';
 
+// Google/Apple sign-in are not configured in Supabase yet ("provider is not
+// enabled"), so hide those buttons until they're set up. Flip to true once the
+// providers are enabled in the Supabase dashboard.
+const SHOW_SOCIAL_AUTH = false;
+
 function callbackUrl() {
   const base = import.meta.env.BASE_URL ?? '/';
   return `${window.location.origin}${base.replace(/\/$/, '')}/auth/callback`;
@@ -161,42 +166,46 @@ export function SignUpScreen() {
         </div>
       )}
 
-      {/* Social auth */}
-      <div className="flex flex-col gap-3 mt-7">
-        <div className="flex flex-col gap-1">
-          <button onClick={handleGoogle} disabled={loading}
-            className="w-full rounded-[12px] py-4 px-4 flex items-center justify-center relative active:scale-[0.98] transition-transform disabled:opacity-50"
-            style={{ border: `1px solid ${BORDER}`, background: '#FFFFFF' }}
-            data-testid="btn-auth-google">
-            <div className="absolute left-4"><FcGoogle size={20} /></div>
-            <span className="font-medium text-[15px]" style={{ color: TEXT }}>Continue with Google</span>
-          </button>
-          {googleError && (
-            <p className="text-[12px] px-1 leading-snug" style={{ color: RED }}>{googleError}</p>
-          )}
-        </div>
+      {/* Social auth — hidden until Google/Apple are enabled in Supabase */}
+      {SHOW_SOCIAL_AUTH && (
+        <>
+          <div className="flex flex-col gap-3 mt-7">
+            <div className="flex flex-col gap-1">
+              <button onClick={handleGoogle} disabled={loading}
+                className="w-full rounded-[12px] py-4 px-4 flex items-center justify-center relative active:scale-[0.98] transition-transform disabled:opacity-50"
+                style={{ border: `1px solid ${BORDER}`, background: '#FFFFFF' }}
+                data-testid="btn-auth-google">
+                <div className="absolute left-4"><FcGoogle size={20} /></div>
+                <span className="font-medium text-[15px]" style={{ color: TEXT }}>Continue with Google</span>
+              </button>
+              {googleError && (
+                <p className="text-[12px] px-1 leading-snug" style={{ color: RED }}>{googleError}</p>
+              )}
+            </div>
 
-        <div className="flex flex-col gap-1">
-          <button onClick={handleApple} disabled={loading}
-            className="w-full rounded-[12px] py-4 px-4 flex items-center justify-center relative active:scale-[0.98] transition-transform disabled:opacity-50"
-            style={{ border: `1px solid ${BORDER}`, background: '#FFFFFF' }}
-            data-testid="btn-auth-apple">
-            <div className="absolute left-4"><FaApple size={20} color={TEXT} /></div>
-            <span className="font-medium text-[15px]" style={{ color: TEXT }}>Continue with Apple</span>
-          </button>
-          {appleError && (
-            <p className="text-[12px] px-1 leading-snug" style={{ color: RED }}>{appleError}</p>
-          )}
-        </div>
+            <div className="flex flex-col gap-1">
+              <button onClick={handleApple} disabled={loading}
+                className="w-full rounded-[12px] py-4 px-4 flex items-center justify-center relative active:scale-[0.98] transition-transform disabled:opacity-50"
+                style={{ border: `1px solid ${BORDER}`, background: '#FFFFFF' }}
+                data-testid="btn-auth-apple">
+                <div className="absolute left-4"><FaApple size={20} color={TEXT} /></div>
+                <span className="font-medium text-[15px]" style={{ color: TEXT }}>Continue with Apple</span>
+              </button>
+              {appleError && (
+                <p className="text-[12px] px-1 leading-snug" style={{ color: RED }}>{appleError}</p>
+              )}
+            </div>
 
-      </div>
+          </div>
 
-      {/* Divider */}
-      <div className="flex items-center gap-4 mt-6">
-        <div className="flex-1 h-[1px]" style={{ background: BORDER }} />
-        <span className="text-sm font-medium" style={{ color: MUTED }}>or</span>
-        <div className="flex-1 h-[1px]" style={{ background: BORDER }} />
-      </div>
+          {/* Divider */}
+          <div className="flex items-center gap-4 mt-6">
+            <div className="flex-1 h-[1px]" style={{ background: BORDER }} />
+            <span className="text-sm font-medium" style={{ color: MUTED }}>or</span>
+            <div className="flex-1 h-[1px]" style={{ background: BORDER }} />
+          </div>
+        </>
+      )}
 
       {/* Email / password */}
       <div className="flex flex-col gap-4 mt-6">
