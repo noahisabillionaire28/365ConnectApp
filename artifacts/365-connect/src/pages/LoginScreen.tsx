@@ -286,6 +286,9 @@ export function LoginScreen() {
           <label className="text-[12px] font-semibold ml-1" style={{ color: MUTED }}>Email</label>
           <input
             type="email"
+            name="email"
+            autoComplete="email"
+            inputMode="email"
             value={email}
             onChange={e => { setEmail(e.target.value); setError(null); }}
             className="w-full rounded-[12px] px-4 py-3.5 outline-none font-medium text-[15px] transition-colors placeholder:text-[#C0C0C0]"
@@ -300,6 +303,8 @@ export function LoginScreen() {
           <div className="relative">
             <input
               type={showPw ? 'text' : 'password'}
+              name="password"
+              autoComplete="current-password"
               value={password}
               onChange={e => { setPassword(e.target.value); setError(null); }}
               onKeyDown={e => e.key === 'Enter' && handleLogin()}
