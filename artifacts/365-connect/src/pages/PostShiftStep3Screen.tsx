@@ -130,8 +130,8 @@ export function PostShiftStep3Screen() {
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
-          <div className="flex-1"><StepBar current={3} total={5} /></div>
-          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">3 of 5</span>
+          <div className="flex-1"><StepBar current={4} total={6} /></div>
+          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">4 of 6</span>
         </div>
         <h1 className="text-[#111827] font-bold text-[22px] tracking-tight">When & how many?</h1>
         <p className="text-[#6B7280] text-[13px] mt-0.5">Set the date, times, and headcount</p>

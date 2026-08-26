@@ -5,7 +5,10 @@
  */
 
 export type PostShiftDraft = {
-  // ── Step 1: Job type + title ─────────────────────────────────────────────
+  // ── Step 1: Event type ───────────────────────────────────────────────────
+  event_type: string; // Wedding, Corporate, Cocktail Party, …
+
+  // ── Step 2: Job type + title ─────────────────────────────────────────────
   job_type: string;   // single primary type from the canonical 14
   title:    string;
 
@@ -34,6 +37,7 @@ let _defaultLng = -80.1298;
 // ─── Empty draft ─────────────────────────────────────────────────────────────
 function empty(): PostShiftDraft {
   return {
+    event_type:      '',
     job_type:        '',
     title:           '',
     location:        '',

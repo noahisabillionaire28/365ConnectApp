@@ -95,6 +95,7 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
     title: b.title,
     description: b.description ?? null,
     location: b.location ?? null,
+    event_type: b.event_type ?? null,
     job_type: b.job_type,
     job_types: b.job_types ?? [],
     pay_rate: b.pay_rate ?? null,
@@ -128,7 +129,7 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
 /** PATCH /api/shifts/:id — update shift (owner only) */
 router.patch('/:id', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const allowed = [
-    'title','description','location','job_type','job_types','pay_rate','pay_period',
+    'title','description','location','event_type','job_type','job_types','pay_rate','pay_period',
     'start_time','end_time','spots_available','status','lat','lng','cover_image',
     'company_name','requirements','dress_code','dress_code_items',
     'point_of_contact','contact_phone','unit_info','parking_notes',

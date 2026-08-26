@@ -7,7 +7,7 @@ import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Check } from 'lucide-react';
 import { JOB_TEMPLATES } from '@/data/postShiftTemplates';
-import { getDraft, setDraft, resetDraft, getEditShiftId, setEditShiftId, initDraftLocation } from '@/store/postShiftStore';
+import { getDraft, setDraft, initDraftLocation } from '@/store/postShiftStore';
 import { useProfile } from '@/hooks/useProfile';
 import { BottomTabNav } from '@/components/BottomTabNav';
 
@@ -100,10 +100,9 @@ export function PostShiftStep1Screen() {
     if (!jobType) return;
     const t = title.trim();
     if (t.length < 3) { setTitleErr('Title must be at least 3 characters'); return; }
-    const editId = getEditShiftId();   // save before resetDraft clears it
-    resetDraft();                      // clear stale wizard state
+    // Preserve the rest of the draft (event type, edit context) — the fresh
+    // start happens once, on the Event Type step.
     setDraft({ job_type: jobType, title: t });
-    if (editId) setEditShiftId(editId); // restore edit context for step 5
     navigate('/post-shift/step2');
   }
 
@@ -114,24 +113,14 @@ export function PostShiftStep1Screen() {
       <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
         <div className="flex items-center gap-3 mb-4">
           <button
-            type="button" aria-label="Cancel — go back to home"
-            onClick={() => {
-              const editId = getEditShiftId();
-              if (editId) {
-                // Cancel edit — clear mode so next "Post" starts fresh
-                setEditShiftId(null);
-                resetDraft();
-                navigate(`/shift/${editId}`);
-              } else {
-                navigate('/home');
-              }
-            }}
+            type="button" aria-label="Back to event type"
+            onClick={() => navigate('/post-shift/event')}
             className="w-9 h-9 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
-          <div className="flex-1"><StepBar current={1} total={5} /></div>
-          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">1 of 5</span>
+          <div className="flex-1"><StepBar current={2} total={6} /></div>
+          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">2 of 6</span>
         </div>
         <h1 className="text-[#111827] font-bold text-[22px] tracking-tight">Who do you need?</h1>
         <p className="text-[#6B7280] text-[13px] mt-0.5">Select a job type and name this shift</p>

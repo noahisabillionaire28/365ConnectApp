@@ -12,6 +12,8 @@ export type StoryWorker = {
 
 export type MockShift = {
   id: string;
+  /** Event this shift is for (Wedding, Corporate, …); null on legacy shifts. */
+  eventType: string | null;
   jobType: string;
   /** All job types this shift accepts (job-type intersection filtering, AI match). */
   jobTypes: string[];
@@ -117,6 +119,7 @@ export type ShiftRow = {
   title: string;
   description: string | null;
   location: string | null;
+  event_type: string | null;
   job_type: string;
   job_types: string[];
   pay_rate: number | null;
@@ -343,6 +346,7 @@ export function shiftRowToMockShift(
 
   return {
     id:             row.id,
+    eventType:      row.event_type ?? null,
     jobType:        primaryType,
     jobTypes:       row.job_types?.length ? row.job_types : [primaryType],
     companyName:    row.company_name    ?? 'Private Client',

@@ -8,7 +8,7 @@ import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   ChevronLeft, Briefcase, MapPin, Calendar, Clock,
-  Users, DollarSign, FileText, CheckCircle2, AlertCircle,
+  Users, DollarSign, FileText, CheckCircle2, AlertCircle, PartyPopper,
 } from 'lucide-react';
 import {
   getDraft, resetDraft, getEditShiftId,
@@ -138,6 +138,7 @@ export function PostShiftStep5Screen() {
         await updateMutation.mutateAsync({
           id:              editId,
           title:           draft.title,
+          event_type:      draft.event_type || null,
           job_type:        draft.job_type,
           job_types:       [draft.job_type],
           location:        draft.location  || undefined,
@@ -158,6 +159,7 @@ export function PostShiftStep5Screen() {
         const data = await postMutation.mutateAsync({
           client_id:       user.id,
           title:           draft.title,
+          event_type:      draft.event_type || null,
           job_type:        draft.job_type,
           job_types:       [draft.job_type],
           location:        draft.location  || undefined,
@@ -194,8 +196,8 @@ export function PostShiftStep5Screen() {
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
-          <div className="flex-1"><StepBar current={5} total={5} /></div>
-          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">5 of 5</span>
+          <div className="flex-1"><StepBar current={6} total={6} /></div>
+          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">6 of 6</span>
         </div>
         <h1 className="text-[#111827] font-bold text-[22px] tracking-tight">
           {isEditing ? 'Review changes' : 'Review & post'}
@@ -210,6 +212,11 @@ export function PostShiftStep5Screen() {
 
         {/* Summary card */}
         <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-1 mb-4">
+          <SummaryRow
+            icon={<PartyPopper size={15} aria-hidden className="text-[#0A1628]" />}
+            label="Event type"
+            value={draft.event_type || '—'}
+          />
           <SummaryRow
             icon={<Briefcase size={15} aria-hidden className="text-[#0A1628]" />}
             label="Job type"

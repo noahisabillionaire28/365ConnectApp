@@ -15,6 +15,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { resetStafferDraft } from '@/store/stafferPostShiftStore';
 import { resetDraft } from '@/store/postShiftStore';
 import { JOB_TYPES } from '@/lib/jobTypes';
+import { EVENT_TYPES } from '@/lib/eventTypes';
 
 const NAVY = '#0A1628';
 
@@ -184,6 +185,7 @@ export function JobsScreen() {
   const [query, setQuery]                 = useState('');
   const [activeFilter, setActiveFilter]   = useState<FilterKey>('all');
   const [jobTypeFilter, setJobTypeFilter] = useState<string | null>(null);
+  const [eventTypeFilter, setEventTypeFilter] = useState<string | null>(null);
   const [selectedId, setSelectedId]       = useState<string | null>(null);
   const [view, setView]                   = useState<'list' | 'map'>('list');
 
@@ -193,7 +195,7 @@ export function JobsScreen() {
   function handlePostShift() {
     if (role === 'staffer') resetStafferDraft();
     else resetDraft();
-    navigate('/post-shift/step1');
+    navigate('/post-shift/event');
   }
 
   // Workers browse all open shifts; clients/staffers see only their own posted shifts.
@@ -212,7 +214,10 @@ export function JobsScreen() {
   const jobTypeFiltered = jobTypeFilter
     ? textFiltered.filter((s) => s.jobTypes.includes(jobTypeFilter))
     : textFiltered;
-  const visibleShifts = applyFilter(jobTypeFiltered, activeFilter);
+  const eventTypeFiltered = eventTypeFilter
+    ? jobTypeFiltered.filter((s) => s.eventType === eventTypeFilter)
+    : jobTypeFiltered;
+  const visibleShifts = applyFilter(eventTypeFiltered, activeFilter);
 
   function handleSelectShift(shift: MockShift) { setSelectedId(shift.id); navigate(`/shift/${shift.id}`); }
   function handlePinClick(shift: MockShift)    { setSelectedId(shift.id); }
@@ -243,6 +248,15 @@ export function JobsScreen() {
 
         <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none"
           role="radiogroup" aria-label="Filter shifts" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <select
+            value={eventTypeFilter ?? ''}
+            onChange={(e) => { setEventTypeFilter(e.target.value || null); setSelectedId(null); }}
+            aria-label="Filter by event type"
+            className={`flex-shrink-0 h-[34px] px-3 rounded-full text-[12px] font-semibold outline-none whitespace-nowrap
+              ${eventTypeFilter ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
+            <option value="">Event: All</option>
+            {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
           <select
             value={jobTypeFilter ?? ''}
             onChange={(e) => { setJobTypeFilter(e.target.value || null); setSelectedId(null); }}

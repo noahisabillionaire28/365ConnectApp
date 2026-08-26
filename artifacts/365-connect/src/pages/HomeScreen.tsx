@@ -498,7 +498,7 @@ function ClientMyShiftsView() {
           <Briefcase size={28} aria-hidden className="text-[#D1D5DB] mx-auto mb-3" />
           <p className="text-[#6B7280] font-semibold text-[14px]">No shifts posted yet</p>
           <p className="text-[#9CA3AF] text-[12px] mt-1">Post a shift to start finding workers.</p>
-          <button type="button" onClick={() => navigate('/post-shift/step1')}
+          <button type="button" onClick={() => navigate('/post-shift/event')}
             className="mt-4 h-[40px] px-5 bg-[#0A1628] text-white rounded-[10px] text-[13px] font-semibold">
             Post a Shift
           </button>
@@ -561,7 +561,7 @@ function StafferHomeFeed() {
 
   function handlePostShift() {
     resetStafferDraft();
-    navigate('/post-shift/step1');
+    navigate('/post-shift/event');
   }
 
   return (

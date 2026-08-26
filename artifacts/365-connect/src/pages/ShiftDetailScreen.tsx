@@ -273,7 +273,7 @@ export function ShiftDetailScreen() {
         requirements:    (raw.requirements    as string[] | null)  ?? [],
       });
       setEditShiftId(shiftId);
-      navigate('/post-shift/step1');
+      navigate('/post-shift/event');
     } catch (e) {
       console.error('[ShiftDetail] edit prefill failed:', e);
     } finally {
@@ -367,9 +367,16 @@ export function ShiftDetailScreen() {
 
         {/* Job type + pay */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#DBDBDB]">
-          <span className="bg-black text-white text-[12px] font-bold px-4 py-1.5 rounded-full uppercase tracking-wide">
-            {shift.jobType}
-          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="bg-black text-white text-[12px] font-bold px-4 py-1.5 rounded-full uppercase tracking-wide">
+              {shift.jobType}
+            </span>
+            {shift.eventType && (
+              <span className="bg-[#F3F4F6] text-[#0A1628] text-[12px] font-bold px-3 py-1.5 rounded-full border border-[#E5E7EB]">
+                {shift.eventType}
+              </span>
+            )}
+          </div>
           <div className="flex items-baseline gap-1">
             <span className="text-black font-bold text-[26px]">${shift.payRate}</span>
             <span className="text-[#737373] text-[14px] font-medium">/{shift.payPeriod}</span>
