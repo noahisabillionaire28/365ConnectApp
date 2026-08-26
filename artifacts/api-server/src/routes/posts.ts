@@ -17,10 +17,11 @@ router.get('/:userId', async (req, res) => {
 
 /** POST /api/posts — create post */
 router.post('/', requireAuth, async (req, res) => {
-  const { image_url, caption } = req.body as Record<string, unknown>;
+  // Accept either field name — the client sends photo_url; image_url kept for compat.
+  const { image_url, photo_url, caption } = req.body as Record<string, unknown>;
   const { data, error } = await adminDb
     .from('posts')
-    .insert({ user_id: req.userId, photo_url: image_url ?? null, caption: caption ?? null })
+    .insert({ user_id: req.userId, photo_url: (photo_url ?? image_url) ?? null, caption: caption ?? null })
     .select()
     .single();
   if (error) return res.status(500).json({ error: error.message });
