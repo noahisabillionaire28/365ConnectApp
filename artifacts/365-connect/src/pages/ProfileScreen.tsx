@@ -91,7 +91,7 @@ function ProfileSkeleton() {
   return (
     <div className="min-h-[100dvh] bg-white pb-[64px]">
       {/* Cover */}
-      <div className="h-[140px] bg-[#F5F5F5] animate-pulse" />
+      <div className="h-[96px] bg-[#F5F5F5] animate-pulse" />
       <div className="px-5 mt-[52px] mb-4 space-y-2">
         <div className="w-40 h-6 rounded-full bg-[#EFEFEF] animate-pulse" />
         <div className="w-24 h-4 rounded-full bg-[#EFEFEF] animate-pulse" />
@@ -282,10 +282,9 @@ export function ProfileScreen() {
         </div>
       )}
 
-      {/* Cover */}
+      {/* Cover — subtle navy brand gradient (no empty grey band) */}
       <div className="relative">
-        <div aria-hidden className="h-[140px] w-full bg-[#F5F5F5]" />
-        <div aria-hidden className="absolute top-0 left-0 right-0 h-[1px] bg-[#DBDBDB]" />
+        <div aria-hidden className="h-[96px] w-full bg-gradient-to-br from-[#0A1628] via-[#152742] to-[#0A1628]" />
 
         {/* Edit button */}
         <button type="button" aria-label="Edit profile" onClick={() => navigate('/profile-setup?edit=1')}
