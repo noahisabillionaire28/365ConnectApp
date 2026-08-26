@@ -80,9 +80,10 @@ export function RoleSelectScreen() {
         photo_url: user.imageUrl ?? null,
         username,
       });
-      // Sync role into context then go straight to the app
+      // Sync role into context, then show the 3-screen walkthrough (which then
+      // sends the user into the app; full profile setup is optional afterwards).
       await refetchRole();
-      navigate('/home');
+      navigate('/onboarding');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save your role. Please try again.');
     } finally {

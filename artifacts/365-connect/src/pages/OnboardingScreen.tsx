@@ -76,11 +76,6 @@ const SLIDES: Record<Role, { icon: React.ComponentType<{ size: number; style?: R
   ],
 };
 
-const SETUP_ROUTES: Record<Role, string> = {
-  worker:  '/worker-setup',
-  client:  '/client-setup',
-  staffer: '/staffer-setup',
-};
 
 export function OnboardingScreen() {
   const [, navigate]     = useLocation();
@@ -98,12 +93,14 @@ export function OnboardingScreen() {
 
   const slides = SLIDES[role];
 
+  // After the walkthrough, go straight to the app. Profile setup is optional and
+  // can be completed later (Profile → Edit); a bare profile still works.
   function advance() {
     if (slide < slides.length - 1) { setSlide(s => s + 1); return; }
-    navigate(SETUP_ROUTES[role]);
+    navigate('/home');
   }
 
-  function skip() { navigate(SETUP_ROUTES[role]); }
+  function skip() { navigate('/home'); }
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-white overflow-hidden">
