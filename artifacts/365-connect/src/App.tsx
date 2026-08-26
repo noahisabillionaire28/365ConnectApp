@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { restoreQueryCache, startQueryCachePersistence } from '@/lib/queryPersist';
 import { APIProvider } from '@vis.gl/react-google-maps';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -70,12 +71,20 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime:            30_000,
-      gcTime:               5 * 60_000,
+      // Keep entries in memory for a day so navigating back is instant and the
+      // on-device snapshot has something to persist even after long idle gaps.
+      gcTime:               24 * 60 * 60_000,
       retry:                2,
       refetchOnWindowFocus: false,
     },
   },
 });
+
+// Offline resilience: restore the last-known data from the device immediately,
+// then keep the on-device snapshot in sync. A Supabase/network blip now shows
+// cached data instead of a blank screen; fresh data loads in the background.
+restoreQueryCache(queryClient);
+startQueryCachePersistence(queryClient);
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 

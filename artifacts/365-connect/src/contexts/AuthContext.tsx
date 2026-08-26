@@ -11,6 +11,7 @@ import {
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { hydrateForUser, clearUser } from '@/store/feedStore';
+import { clearQueryCache } from '@/lib/queryPersist';
 
 export type SimpleUser = {
   id:       string;
@@ -82,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.id, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signOut = async () => {
+    clearQueryCache(); // don't leak one user's cached data to the next
     await supabase.auth.signOut();
   };
 
