@@ -12,11 +12,12 @@ import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { navyPinUrl } from '@/lib/mapStyles';
 
-// Free, key-less light basemap. {r} serves retina tiles on high-DPI screens.
+// Free, key-less light-gray basemap (Esri "World Light Gray"). Clean/minimal
+// like Apple Maps, no API key, no watermark. (CARTO now watermarks keyless tiles.)
 const TILE_URL =
-  'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-const TILE_ATTR =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+const TILE_ATTR = 'Tiles &copy; Esri';
+const TILE_MAX_ZOOM = 16;
 
 export type MapMarker = { id: string; lat: number; lng: number; selected?: boolean };
 
@@ -87,7 +88,7 @@ export function LeafletMap({
       keyboard={interactive}
       aria-label={ariaLabel}
     >
-      <TileLayer url={TILE_URL} attribution={TILE_ATTR} />
+      <TileLayer url={TILE_URL} attribution={TILE_ATTR} maxZoom={TILE_MAX_ZOOM} />
       <InvalidateSize />
       {recenter && <Recenter lat={center.lat} lng={center.lng} zoom={zoom} />}
       {markers.map((m) => (
