@@ -333,8 +333,12 @@ export function shiftRowToMockShift(
   refCoords: { lat: number; lng: number } = MIAMI_BEACH,
 ): MockShift {
   const primaryType    = row.job_type || row.job_types?.[0] || 'Event Staff';
-  const lat            = row.lat  ?? MIAMI_BEACH.lat;
-  const lng            = row.lng  ?? MIAMI_BEACH.lng;
+  // Postgres returns numeric columns as strings, so coerce and guard against
+  // NaN — a string/NaN coordinate makes Google Maps drop the pin at nowhere.
+  const rawLat         = row.lat != null ? Number(row.lat) : NaN;
+  const rawLng         = row.lng != null ? Number(row.lng) : NaN;
+  const lat            = Number.isFinite(rawLat) ? rawLat : MIAMI_BEACH.lat;
+  const lng            = Number.isFinite(rawLng) ? rawLng : MIAMI_BEACH.lng;
   const spotsAvailable = Math.max(0, (row.spots_available ?? 1) - (row.spots_filled ?? 0));
 
   return {
