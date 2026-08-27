@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api';
 import { friendlyDate } from '@/lib/supabase';
 import { useFollow } from '@/hooks/useFollow';
+import { usePosts } from '@/hooks/usePosts';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/contexts/RoleContext';
 import { getOrCreateDirectConversation } from '@/hooks/useConversations';
@@ -314,6 +315,7 @@ export function WorkerProfileScreen() {
   const [showReport, setShowReport] = useState(false);
 
   const { followerCount } = useFollow(profile?.id ?? '');
+  const { data: workerPosts = [] } = usePosts(profile?.id);
   const canRequestShift =
     !!authUser && !!profile && authUser.id !== profile.id &&
     (role === 'client' || role === 'staffer') && profile.role === 'worker';
@@ -493,6 +495,23 @@ export function WorkerProfileScreen() {
           </button>
         )}
         {!canRequestShift && <div className="mb-8" />}
+
+        {/* Posts grid */}
+        {workerPosts.filter((p) => p.photo_url).length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-[13px] font-semibold text-[#737373] uppercase tracking-widest mb-3">
+              Posts
+            </h2>
+            <div className="grid grid-cols-3 gap-[3px]">
+              {workerPosts.filter((p) => p.photo_url).map((p) => (
+                <div key={p.id} className="relative aspect-square overflow-hidden bg-[#EFEFEF] rounded-[4px]">
+                  <img src={p.photo_url as string} alt={p.caption ?? 'Post'}
+                    loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Certifications */}
         {profile.certifications.length > 0 && (

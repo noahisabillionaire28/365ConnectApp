@@ -13,6 +13,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useMyApplications, type MyApplication } from '@/hooks/useMyApplications';
 import { usePayments } from '@/hooks/usePayments';
 import { useReviews } from '@/hooks/useReviews';
+import { usePosts } from '@/hooks/usePosts';
 import { apiClient } from '@/lib/api';
 
 /* ── Sub-components ──────────────────────────────────────────────────────── */
@@ -202,6 +203,7 @@ export function ProfileScreen() {
   const profile      = useProfile();
   const { payments } = usePayments();
   const { reviews }  = useReviews(); // defaults to the logged-in user's reviews
+  const { data: posts = [] } = usePosts(user?.id);
 
   // Real lifetime stats derived from the worker's paid shifts.
   const shiftsCompleted = payments.length;
@@ -394,6 +396,25 @@ export function ProfileScreen() {
           <p className="text-[#AAAAAA] text-[13px] italic">
             No certifications added yet — tap Edit to add them.
           </p>
+        )}
+      </div>
+
+      {/* Posts grid */}
+      <div className="px-5 mb-6">
+        <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-3">Posts</p>
+        {posts.filter((p) => p.photo_url).length > 0 ? (
+          <div className="grid grid-cols-3 gap-[3px]">
+            {posts.filter((p) => p.photo_url).map((p) => (
+              <div key={p.id} className="relative aspect-square overflow-hidden bg-[#EFEFEF] rounded-[4px]">
+                <img src={p.photo_url as string} alt={p.caption ?? 'Post'}
+                  loading="lazy" decoding="async" className="w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-[12px] bg-[#FAFAFA] border border-[#EFEFEF] px-6 py-8 text-center">
+            <p className="text-[#AAAAAA] text-[12px]">No posts yet — tap Edit to add your first one.</p>
+          </div>
         )}
       </div>
 
