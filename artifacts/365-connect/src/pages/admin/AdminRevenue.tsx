@@ -145,7 +145,7 @@ export function AdminRevenue() {
               className="bg-white border border-[#DBDBDB] rounded-[12px] p-4">
               <p className="text-[#737373] text-[10px] font-bold uppercase tracking-wider mb-1">Gross Revenue</p>
               <p className="text-black font-bold text-[22px]">{fmtUsd(stats.totalRevenue)}</p>
-              <p className="text-[#737373] text-[11px] mt-0.5">all payments</p>
+              <p className="text-[#737373] text-[11px] mt-0.5">completed shift payments</p>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
               className="bg-white border border-[#DBDBDB] rounded-[12px] p-4">

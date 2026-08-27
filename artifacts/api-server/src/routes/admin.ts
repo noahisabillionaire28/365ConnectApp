@@ -40,16 +40,23 @@ router.get('/stats', async (_req, res) => {
       adminDb.from('users').select('*', { count: 'exact', head: true }),
       adminDb.from('shifts').select('*', { count: 'exact', head: true }),
       adminDb.from('applications').select('*', { count: 'exact', head: true }),
-      adminDb.from('payments').select('amount, fee'),
+      adminDb.from('payments').select('amount, fee, status, payment_type'),
       adminDb.from('users').select('*', { count: 'exact', head: true }).gte('created_at', todayStart.toISOString()),
       adminDb.from('shifts').select('*', { count: 'exact', head: true }).in('status', ['open', 'filled']),
       adminDb.from('disputes').select('*', { count: 'exact', head: true }).eq('status', 'open')
         .then((r) => (r.error ? { count: 0 } : r), () => ({ count: 0 })),
     ]);
 
-    const payRows = (payments.data ?? []) as Array<{ amount: unknown; fee: unknown }>;
-    const rev = payRows.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    const feeTotal = payRows.reduce((sum, p) => sum + (Number(p.fee) || 0), 0);
+    const payRows = (payments.data ?? []) as Array<{
+      amount: unknown; fee: unknown; status?: string; payment_type?: string;
+    }>;
+    // Real revenue = completed shift payments only. Simulated Pro subscriptions
+    // are demo data and must not inflate the platform's revenue/fee totals.
+    const realPays = payRows.filter(
+      (p) => p.status !== 'simulated' && p.payment_type !== 'pro_subscription',
+    );
+    const rev = realPays.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const feeTotal = realPays.reduce((sum, p) => sum + (Number(p.fee) || 0), 0);
 
     res.json({
       totalUsers:      users.count ?? 0,
