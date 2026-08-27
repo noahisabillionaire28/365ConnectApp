@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { restoreQueryCache, startQueryCachePersistence } from '@/lib/queryPersist';
-import { APIProvider } from '@vis.gl/react-google-maps';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
@@ -232,15 +231,10 @@ function AppShell() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <APIProvider
-        apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? 'AIzaSyCMo5whiFbGLBQNp4rIGZEo4kwBga8oiyE'}
-        libraries={['places']}
-      >
-        <WouterRouter base={basePath}>
-          <AppShell />
-        </WouterRouter>
-        <Toaster />
-      </APIProvider>
+      <WouterRouter base={basePath}>
+        <AppShell />
+      </WouterRouter>
+      <Toaster />
     </QueryClientProvider>
   );
 }

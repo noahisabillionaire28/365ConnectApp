@@ -2,10 +2,9 @@
  * Shared UI primitives reused across the 5-step client wizard and the
  * 7-step staffer wizard. Import from here — do not duplicate locally.
  */
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useState, useRef, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Check } from 'lucide-react';
-import { useMapsLibrary } from '@vis.gl/react-google-maps';
 import { JOB_TEMPLATES, type JobTemplate } from '@/data/postShiftTemplates';
 
 /* ── Step progress bar ────────────────────────────────────────────────────── */
@@ -177,45 +176,70 @@ export function JobTypeGrid({
   );
 }
 
-/* ── Google Places autocomplete input ─────────────────────────────────────── */
+/* ── Address autocomplete (free OpenStreetMap / Nominatim type-ahead) ──────── */
+type NomSuggestion = { display_name: string; lat: string; lon: string };
+
 export function LocationAutocomplete({ value, onChange, onPlacePicked, error }: {
   value: string; onChange: (v: string) => void;
   onPlacePicked: (coords: { lat: number; lng: number }) => void; error?: string;
 }) {
-  const placesLib = useMapsLibrary('places');
-  const inputRef  = useRef<HTMLInputElement>(null);
+  const [suggestions, setSuggestions] = useState<NomSuggestion[]>([]);
+  const [open, setOpen]     = useState(false);
+  const [loading, setLoading] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    if (!placesLib || !inputRef.current) return;
-    const ac = new placesLib.Autocomplete(inputRef.current, {
-      types: ['establishment', 'geocode'],
-      componentRestrictions: { country: 'us' },
-      fields: ['name', 'formatted_address', 'geometry'],
-    });
-    const listener = ac.addListener('place_changed', () => {
-      const place = ac.getPlace();
-      if (!place) return;
-      const display = place.name && place.formatted_address
-        ? `${place.name}, ${place.formatted_address}`
-        : place.formatted_address ?? place.name ?? '';
-      onChange(display);
-      if (place.geometry?.location) {
-        onPlacePicked({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng() });
+  function handleInput(v: string) {
+    onChange(v);
+    if (timer.current) clearTimeout(timer.current);
+    if (v.trim().length < 3) { setSuggestions([]); setOpen(false); setLoading(false); return; }
+    setLoading(true);
+    timer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          'https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=us&q=' +
+            encodeURIComponent(v),
+          { headers: { Accept: 'application/json' } },
+        );
+        const data = (await res.json()) as NomSuggestion[];
+        setSuggestions(Array.isArray(data) ? data : []);
+        setOpen(true);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setLoading(false);
       }
-    });
-    return () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).google?.maps?.event?.removeListener(listener);
-    };
-  }, [placesLib]);
+    }, 450);
+  }
+
+  function pick(s: NomSuggestion) {
+    const lat = parseFloat(s.lat);
+    const lng = parseFloat(s.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) onPlacePicked({ lat, lng });
+    onChange(s.display_name);
+    setSuggestions([]);
+    setOpen(false);
+  }
 
   return (
-    <div>
-      <input ref={inputRef} type="text" defaultValue={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="e.g. 1 Hotel South Beach, Miami FL"
+    <div className="relative">
+      <input type="text" value={value}
+        onChange={(e) => handleInput(e.target.value)}
+        onFocus={() => { if (suggestions.length) setOpen(true); }}
+        placeholder="Start typing an address or venue…"
         aria-label="Shift location address" aria-invalid={!!error} aria-autocomplete="list"
+        autoComplete="off"
         className={INPUT_CLS + (error ? ' border-red-400' : '')} />
+      {open && suggestions.length > 0 && (
+        <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-[#E5E7EB] rounded-[10px] shadow-lg max-h-[220px] overflow-y-auto">
+          {suggestions.map((s, i) => (
+            <button key={i} type="button" onClick={() => pick(s)}
+              className="w-full text-left px-3 py-2.5 text-[13px] leading-snug text-[#111827] active:bg-[#F5F5F5] border-b border-[#F3F4F6] last:border-0">
+              {s.display_name}
+            </button>
+          ))}
+        </div>
+      )}
+      {loading && <p className="text-[#9CA3AF] text-[11px] mt-1">Searching…</p>}
       {error && <p className="text-red-500 text-[11px] mt-1">{error}</p>}
     </div>
   );
