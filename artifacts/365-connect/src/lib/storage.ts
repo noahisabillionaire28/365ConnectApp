@@ -8,6 +8,7 @@
  */
 import { supabase } from '@/lib/supabase';
 import { apiClient } from '@/lib/api';
+import { compressImage } from '@/lib/imageCompression';
 
 /**
  * Upload a file to Supabase Storage and return its public URL.
@@ -21,13 +22,16 @@ export async function uploadFile(
   name: string,
   userId?: string | null,
 ): Promise<{ objectPath: string; url: string }> {
+  // Shrink large photos before upload (best-effort; non-images pass through).
+  const payload = await compressImage(file);
+
   const sig = await apiClient(userId).post<{
     bucket: string; path: string; token: string; publicUrl: string;
   }>('/storage/sign-upload', { name });
 
   const { error } = await supabase.storage
     .from(sig.bucket)
-    .uploadToSignedUrl(sig.path, sig.token, file);
+    .uploadToSignedUrl(sig.path, sig.token, payload);
   if (error) throw new Error(`Upload failed: ${error.message}`);
 
   return { objectPath: sig.path, url: sig.publicUrl };
