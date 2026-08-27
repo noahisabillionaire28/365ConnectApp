@@ -174,8 +174,8 @@ export function PostShiftStep5Screen() {
           requirements:    draft.requirements.length ? draft.requirements : undefined,
         });
         resetDraft();
-        showToast('Shift posted! Workers will start applying soon.');
-        if (data) navigate(`/shift/${data.id}`);
+        if (data) navigate(`/post-shift/success?id=${data.id}`);
+        else navigate('/home');
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
