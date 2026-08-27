@@ -4,7 +4,7 @@
  */
 import { useLocation, useSearch } from 'wouter';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Eye, Home } from 'lucide-react';
+import { CheckCircle2, Eye, Briefcase } from 'lucide-react';
 
 export function PostShiftSuccessScreen() {
   const [, navigate] = useLocation();
@@ -40,11 +40,11 @@ export function PostShiftSuccessScreen() {
         )}
         <motion.button
           type="button" whileTap={{ scale: 0.97 }}
-          onClick={() => navigate('/home')}
+          onClick={() => navigate('/home?tab=my-shifts')}
           className="w-full h-[52px] rounded-[12px] bg-white border border-[#E5E7EB] text-[#111827] font-bold text-[16px] flex items-center justify-center gap-2"
         >
-          <Home size={17} aria-hidden />
-          Back to Home
+          <Briefcase size={17} aria-hidden />
+          Go to My Shifts
         </motion.button>
       </div>
     </div>

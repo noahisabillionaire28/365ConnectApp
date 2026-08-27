@@ -8,9 +8,10 @@ export type PostShiftDraft = {
   // ── Step 1: Event type ───────────────────────────────────────────────────
   event_type: string; // Wedding, Corporate, Cocktail Party, …
 
-  // ── Step 2: Job type + title ─────────────────────────────────────────────
-  job_type: string;   // single primary type from the canonical 14
-  title:    string;
+  // ── Step 2: Job type(s) + title ──────────────────────────────────────────
+  job_type:  string;   // primary type (first of job_types) — kept for compat
+  job_types: string[]; // all worker types this shift needs (multi-select)
+  title:     string;
 
   // ── Step 2: Location ─────────────────────────────────────────────────────
   location:  string;
@@ -39,6 +40,7 @@ function empty(): PostShiftDraft {
   return {
     event_type:      '',
     job_type:        '',
+    job_types:       [],
     title:           '',
     location:        '',
     lat:             _defaultLat,
@@ -107,7 +109,7 @@ let draft: PostShiftDraft = loadPersistedDraft();
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 export function getDraft(): PostShiftDraft {
-  return { ...draft, requirements: [...draft.requirements] };
+  return { ...draft, requirements: [...draft.requirements], job_types: [...draft.job_types] };
 }
 export function setDraft(updates: Partial<PostShiftDraft>): void {
   draft = { ...draft, ...updates };

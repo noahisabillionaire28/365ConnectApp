@@ -278,7 +278,7 @@ export function EarningsScreen() {
               <div className="flex items-center gap-2">
                 <CreditCard size={13} aria-hidden className="text-[#9CA3AF]" />
                 <p className="text-[#9CA3AF] text-[11px]">
-                  Shift earnings are net of the 8% platform fee. Subscription charges are simulated.
+                  Subscription charges are simulated.
                 </p>
               </div>
             </div>

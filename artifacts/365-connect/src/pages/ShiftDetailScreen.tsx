@@ -624,8 +624,7 @@ export function ShiftDetailScreen() {
             {(() => {
               const durHrs  = calcDurationHours(shift.startTime, shift.endTime);
               const gross   = shift.payRate * shift.spotsTotal * durHrs;
-              const fee     = gross * 0.08;
-              const total   = gross + fee;
+              const total   = gross;
               const fmtUsd  = (n: number) =>
                 n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
               return (
@@ -635,10 +634,6 @@ export function ShiftDetailScreen() {
                       {shift.spotsTotal} worker{shift.spotsTotal !== 1 ? 's' : ''} × {durHrs.toFixed(1)}h × ${shift.payRate}/hr
                     </p>
                     <p className="text-black font-semibold text-[14px]">{fmtUsd(gross)}</p>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-[#EFEFEF]">
-                    <p className="text-[#737373] text-[13px]">Platform fee (8%)</p>
-                    <p className="text-black font-semibold text-[14px]">{fmtUsd(fee)}</p>
                   </div>
                   <div className="flex justify-between items-center pt-2.5">
                     <p className="text-black font-bold text-[14px]">Total Estimate</p>

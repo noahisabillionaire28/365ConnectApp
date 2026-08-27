@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   Bell, Search, PlusCircle, SlidersHorizontal,
@@ -533,9 +533,15 @@ function ClientMyShiftsView() {
   );
 }
 
+/** Read the initial home tab from ?tab= (used after posting a shift). */
+function useInitialPosterTab(): 'browse' | 'my-shifts' {
+  const search = useSearch();
+  return new URLSearchParams(search).get('tab') === 'my-shifts' ? 'my-shifts' : 'browse';
+}
+
 /* ─── (B) Client Home Feed ───────────────────────────────────────────────────── */
 function ClientHomeFeed() {
-  const [tab, setTab] = useState<'browse' | 'my-shifts'>('browse');
+  const [tab, setTab] = useState<'browse' | 'my-shifts'>(useInitialPosterTab());
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
       <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
@@ -558,6 +564,7 @@ function ClientHomeFeed() {
 /* ─── (C) Staffer Home Feed ──────────────────────────────────────────────────── */
 function StafferHomeFeed() {
   const [, navigate] = useLocation();
+  const [tab, setTab] = useState<'browse' | 'my-shifts'>(useInitialPosterTab());
 
   function handlePostShift() {
     resetStafferDraft();
@@ -567,9 +574,17 @@ function StafferHomeFeed() {
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
       <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
-        <FeedHeader subtitle="Discover workers" onPost={handlePostShift} />
+        <FeedHeader subtitle={tab === 'browse' ? 'Discover workers' : 'Your posted shifts'} onPost={handlePostShift} />
+        <SegmentControl
+          tabs={[
+            { value: 'browse', label: 'Browse Workers' },
+            { value: 'my-shifts', label: 'My Shifts' },
+          ]}
+          value={tab}
+          onChange={(v) => setTab(v as 'browse' | 'my-shifts')}
+        />
       </div>
-      <WorkerDiscoveryBody />
+      {tab === 'browse' ? <WorkerDiscoveryBody /> : <ClientMyShiftsView />}
 
       <motion.button
         type="button"

@@ -60,7 +60,7 @@ router.post('/', requireAuth, async (req, res) => {
 // Uses Stripe's hosted checkout via the REST API (no SDK, no webhook): the
 // client is redirected to Stripe to pay; on return the app calls /confirm which
 // verifies the session server-side and records the payment idempotently.
-const PLATFORM_FEE_PCT = 0.08; // 8% platform fee
+const PLATFORM_FEE_PCT = 0; // platform fee removed for now
 const STRIPE_API = 'https://api.stripe.com/v1';
 
 function stripeKey(): string | null {

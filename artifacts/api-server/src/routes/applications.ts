@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { createNotification } from './notifications.js';
 
 const router = Router();
 
@@ -241,6 +242,20 @@ router.patch('/:id', requireAuth, async (req, res) => {
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'Not found' });
+
+    // Notify the worker when the owner books them.
+    if (status === 'accepted' && isShiftOwner) {
+      const { data: sh } = await adminDb
+        .from('shifts').select('title').eq('id', appRow.shift_id).maybeSingle();
+      await createNotification({
+        userId: appRow.worker_id,
+        fromUserId: req.userId,
+        type: 'booking',
+        title: "You're booked!",
+        body: `You've been accepted for ${sh?.title ? `"${sh.title}"` : 'a shift'}.`,
+        shiftId: appRow.shift_id,
+      });
+    }
     return res.json(data);
   } catch (e) {
     return res.status(500).json({ error: String(e) });
@@ -270,6 +285,17 @@ router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req
       .select()
       .single();
     if (error) return res.status(500).json({ error: error.message });
+
+    const { data: sh } = await adminDb
+      .from('shifts').select('title').eq('id', shift_id).maybeSingle();
+    await createNotification({
+      userId: worker_id,
+      fromUserId: req.userId,
+      type: 'booking',
+      title: "You're booked!",
+      body: `You've been assigned to ${sh?.title ? `"${sh.title}"` : 'a shift'}.`,
+      shiftId: shift_id,
+    });
     return res.status(201).json(data);
   } catch (e) {
     return res.status(500).json({ error: String(e) });

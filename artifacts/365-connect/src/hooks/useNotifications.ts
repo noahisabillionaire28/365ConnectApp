@@ -28,6 +28,8 @@ export function notificationDeepLink(
   /** optional usernames map (ignored — route is built from n.shift_id / n.type) */
   _usernames?: Record<string, string>,
 ): string {
+  // A booking (worker accepted for a shift) sends the worker to their home.
+  if (n.type === 'booking') return '/home';
   if (n.shift_id) return `/shift/${n.shift_id}`;
   if (n.type === 'new_message') return '/messages';
   return '/notifications';

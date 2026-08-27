@@ -103,7 +103,7 @@ export function PostShiftStep5Screen() {
   const durHrs   = durationHours(draft.start_time, draft.end_time);
   const durLabel = durationLabel(draft.start_time, draft.end_time);
   const grossCost    = draft.pay_rate * draft.spots_available * durHrs;
-  const platformFee  = grossCost * 0.08;
+  const platformFee  = 0; // platform fee removed for now
   const totalCost    = grossCost + platformFee;
 
   const readiness = [
@@ -140,7 +140,7 @@ export function PostShiftStep5Screen() {
           title:           draft.title,
           event_type:      draft.event_type || null,
           job_type:        draft.job_type,
-          job_types:       [draft.job_type],
+          job_types:       draft.job_types.length ? draft.job_types : [draft.job_type],
           location:        draft.location  || undefined,
           lat:             draft.lat       || undefined,
           lng:             draft.lng       || undefined,
@@ -161,7 +161,7 @@ export function PostShiftStep5Screen() {
           title:           draft.title,
           event_type:      draft.event_type || null,
           job_type:        draft.job_type,
-          job_types:       [draft.job_type],
+          job_types:       draft.job_types.length ? draft.job_types : [draft.job_type],
           location:        draft.location  || undefined,
           lat:             draft.lat       || undefined,
           lng:             draft.lng       || undefined,
@@ -219,8 +219,8 @@ export function PostShiftStep5Screen() {
           />
           <SummaryRow
             icon={<Briefcase size={15} aria-hidden className="text-[#0A1628]" />}
-            label="Job type"
-            value={draft.job_type || '—'}
+            label={draft.job_types.length > 1 ? 'Job types' : 'Job type'}
+            value={(draft.job_types.length ? draft.job_types : [draft.job_type]).filter(Boolean).join(', ') || '—'}
             sub={draft.title || undefined}
           />
           <SummaryRow
@@ -272,7 +272,6 @@ export function PostShiftStep5Screen() {
               value={`$${grossCost.toFixed(2)}`}
               muted
             />
-            <CostRow label="Platform fee (8%)" value={`$${platformFee.toFixed(2)}`} muted />
             <div className="border-t border-[#E5E7EB] my-2" />
             <CostRow label="Total Estimated Cost" value={`$${totalCost.toFixed(2)}`} highlight />
             <p className="text-[#9CA3AF] text-[11px] mt-3 leading-relaxed">

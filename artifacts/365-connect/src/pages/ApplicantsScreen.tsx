@@ -142,7 +142,11 @@ export function ApplicantsScreen() {
                     isTop={i === arr.length - 1}
                     onDecide={(decision) => {
                       void (decision === 'accepted' ? approve(a.applicationId) : decline(a.applicationId))
-                        .then((ok) => { if (ok) showToast(decision === 'accepted' ? 'Worker confirmed for your shift!' : 'Applicant declined.'); });
+                        .then((ok) => {
+                          if (!ok) return;
+                          if (decision === 'accepted') { showToast('Worker confirmed for your shift!'); navigate('/home'); }
+                          else showToast('Applicant declined.');
+                        });
                     }} />
                 ))}
               </AnimatePresence>
@@ -162,7 +166,7 @@ export function ApplicantsScreen() {
                 aria-label="Approve applicant"
                 onClick={() => {
                   const top = applicants[0];
-                  if (top) void approve(top.applicationId).then((ok) => { if (ok) showToast('Worker confirmed for your shift!'); });
+                  if (top) void approve(top.applicationId).then((ok) => { if (ok) { showToast('Worker confirmed for your shift!'); navigate('/home'); } });
                 }}
                 className="w-16 h-16 rounded-full bg-[#10B981] flex items-center justify-center">
                 <Check size={28} aria-hidden className="text-white" />

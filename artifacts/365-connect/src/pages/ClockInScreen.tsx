@@ -362,11 +362,8 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
         </div>
 
         <div className="flex flex-col gap-3.5 pt-4">
-          <SummaryRow label="Gross pay" value={fmtMoney(grossPay)} />
-          <SummaryRow label="365 Service Fee (8%)" value={`−${fmtMoney(serviceFee)}`}
-            valueClass="text-[#737373]" small />
           <div className="flex items-center justify-between mt-1 pt-4 border-t border-[#DBDBDB]">
-            <p className="text-black font-bold text-[16px]">Your net pay</p>
+            <p className="text-black font-bold text-[16px]">Your pay</p>
             <p className="text-black font-bold" style={{ fontSize: 28 }}>{fmtMoney(netPay)}</p>
           </div>
         </div>
@@ -560,7 +557,7 @@ export function ClockInScreen() {
   const billedSecs  = Math.max(0, shiftSecs - breakSecs);
   const billedHours = billedSecs / 3600;
   const grossPay    = billedHours * (shift?.payRate ?? 0);
-  const serviceFee  = grossPay * 0.08;
+  const serviceFee  = 0; // platform fee removed for now
   const netPay      = grossPay - serviceFee;
 
   async function handleEndShift() {
