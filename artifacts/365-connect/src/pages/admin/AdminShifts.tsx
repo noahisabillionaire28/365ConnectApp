@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Users, DollarSign, Calendar, XCircle, AlertCircle } from 'lucide-react';
 import { isAdminAuthenticated, initAdminSession } from '@/store/adminStore';
-import { useAdminShifts, useCancelShift } from '@/hooks/useAdminData';
+import { useAdminShifts, useCancelShift, useReopenShift } from '@/hooks/useAdminData';
 import type { AdminShiftRow } from '@/lib/adminApi';
 
 /* ── Status badge ────────────────────────────────────────────────────────── */
@@ -50,6 +50,8 @@ function SkeletonCard() {
 /* ── Shift card ──────────────────────────────────────────────────────────── */
 function ShiftCard({ shift }: { shift: AdminShiftRow }) {
   const cancelShift = useCancelShift();
+  const reopenShift = useReopenShift();
+  const canReopen = shift.status !== 'open';
   const [confirm, setConfirm] = useState(false);
 
   const canCancel = shift.status !== 'cancelled' && shift.status !== 'completed';
@@ -135,6 +137,17 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
             <XCircle size={13} aria-hidden /> Cancel Shift
           </button>
         )
+      )}
+
+      {canReopen && (
+        <button type="button" disabled={reopenShift.isPending}
+          aria-label={`Reopen ${shift.job_type} shift for re-staffing`}
+          onClick={() => reopenShift.mutate(shift.id)}
+          className="w-full h-[38px] mt-2 rounded-[8px] bg-[#0A1628] text-white text-[12px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60">
+          {reopenShift.isPending
+            ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            : 'Reopen / Reassign'}
+        </button>
       )}
     </motion.div>
   );

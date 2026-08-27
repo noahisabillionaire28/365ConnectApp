@@ -3,10 +3,10 @@ import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, X, Ban, Flag, ChevronRight, Star, BadgeCheck, AlertCircle,
+  Search, X, Ban, Flag, ChevronRight, Star, BadgeCheck, AlertCircle, Trash2,
 } from 'lucide-react';
 import { isAdminAuthenticated, initAdminSession } from '@/store/adminStore';
-import { useAdminUsers, useUpdateUser } from '@/hooks/useAdminData';
+import { useAdminUsers, useUpdateUser, useDeleteUser } from '@/hooks/useAdminData';
 import type { AdminUserRow } from '@/lib/adminApi';
 
 /* ── Shared types ────────────────────────────────────────────────────────── */
@@ -96,8 +96,17 @@ function UserDetailSheet({
   user, onClose,
 }: { user: AdminUserRow; onClose: () => void }) {
   const updateUser = useUpdateUser();
-  const [confirmOp, setConfirmOp] = useState<'ban' | 'unban' | 'flag' | 'unflag' | null>(null);
+  const deleteUser = useDeleteUser();
+  const [confirmOp, setConfirmOp] = useState<'ban' | 'unban' | 'flag' | 'unflag' | 'delete' | null>(null);
   const [busy, setBusy]           = useState(false);
+  const [delErr, setDelErr]       = useState<string | null>(null);
+
+  async function handleDelete() {
+    setBusy(true); setDelErr(null);
+    try { await deleteUser.mutateAsync(user.id); onClose(); }
+    catch (e) { setDelErr(e instanceof Error ? e.message : 'Could not delete user.'); }
+    finally { setBusy(false); setConfirmOp(null); }
+  }
 
   const isBanned  = user.status === 'suspended';
   const isFlagged = user.status === 'flagged';
@@ -198,6 +207,14 @@ function UserDetailSheet({
               <Ban size={15} aria-hidden />
               {isBanned ? 'Restore Account' : 'Suspend Account'}
             </button>
+            <button type="button" disabled={busy}
+              aria-label="Delete user permanently"
+              onClick={() => setConfirmOp('delete')}
+              className="w-full h-[44px] rounded-[8px] bg-white border border-[#DBDBDB] text-[#737373] font-semibold text-[13px] flex items-center justify-center gap-2">
+              <Trash2 size={14} aria-hidden />
+              Delete User
+            </button>
+            {delErr && <p className="text-red-500 text-[12px] text-center">{delErr}</p>}
           </div>
         </div>
       </motion.div>
@@ -229,6 +246,13 @@ function UserDetailSheet({
             message="Remove the flag from this user's account?"
             confirmLabel="Remove Flag" confirmClass="bg-emerald-500 text-white"
             onConfirm={() => applyUpdate({ status: 'active' } as Parameters<typeof updateUser.mutateAsync>[0]['body'])}
+            onCancel={() => setConfirmOp(null)} />
+        )}
+        {confirmOp === 'delete' && (
+          <ConfirmOverlay key="delete"
+            message="Permanently delete this user? This cannot be undone. (If they have linked shifts or payments, suspend them instead.)"
+            confirmLabel="Delete" confirmClass="bg-red-500 text-white"
+            onConfirm={handleDelete}
             onCancel={() => setConfirmOp(null)} />
         )}
       </AnimatePresence>

@@ -41,6 +41,25 @@ export function useCancelShift() {
   });
 }
 
+export function useReopenShift() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminApi.reopenShift(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin', 'shifts'] }); },
+  });
+}
+
+export function useDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminApi.deleteUser(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'stats'] });
+    },
+  });
+}
+
 export function useUpdateDispute() {
   const qc = useQueryClient();
   return useMutation({

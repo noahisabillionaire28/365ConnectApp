@@ -41,6 +41,19 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function del<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'DELETE',
+    headers: await makeHeaders(),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
+    throw new Error(b.error ?? `Admin API DELETE ${path} → ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 /* ── Shapes ──────────────────────────────────────────────────────────────── */
 
 export type AdminStats = {
@@ -119,6 +132,10 @@ export const adminApi = {
     patch<{ ok: boolean }>(`/users/${id}`, body),
   cancelShift:   (id: string) =>
     patch<{ ok: boolean }>(`/shifts/${id}/cancel`, {}),
+  reopenShift:   (id: string) =>
+    patch<{ ok: boolean }>(`/shifts/${id}/reopen`, {}),
+  deleteUser:    (id: string) =>
+    del<{ ok: boolean }>(`/users/${id}`),
   updateDispute: (id: string, status: string, note?: string) =>
     patch<{ ok: boolean }>(`/disputes/${id}`, { status, resolution_note: note }),
 };

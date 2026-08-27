@@ -109,6 +109,21 @@ router.patch('/users/:id', async (req, res) => {
   }
 });
 
+/* ── DELETE /api/admin/users/:id ──────────────────────────────────────────── */
+router.delete('/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Remove the profile row, then the auth account (best-effort).
+    const { error } = await adminDb.from('users').delete().eq('id', id);
+    if (error) throw error;
+    try { await adminDb.auth.admin.deleteUser(id); } catch { /* auth user may already be gone */ }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[admin/users DELETE]', err);
+    res.status(409).json({ error: 'Could not delete — this user has linked shifts/payments. Ban them instead.' });
+  }
+});
+
 /* ── GET /api/admin/shifts ────────────────────────────────────────────────── */
 router.get('/shifts', async (_req, res) => {
   try {
@@ -136,6 +151,22 @@ router.patch('/shifts/:id/cancel', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('[admin/shifts/cancel]', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/* ── PATCH /api/admin/shifts/:id/reopen — reassign: reopen for re-staffing ── */
+router.patch('/shifts/:id/reopen', async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Reopen the shift and clear any accepted bookings so it can be re-staffed.
+    const { error } = await adminDb.from('shifts').update({ status: 'open' }).eq('id', id);
+    if (error) throw error;
+    await adminDb.from('applications').update({ status: 'declined' })
+      .eq('shift_id', id).eq('status', 'accepted');
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[admin/shifts/reopen]', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
