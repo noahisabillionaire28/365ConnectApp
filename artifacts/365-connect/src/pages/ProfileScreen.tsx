@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
@@ -14,6 +14,8 @@ import { useMyApplications, type MyApplication } from '@/hooks/useMyApplications
 import { usePayments } from '@/hooks/usePayments';
 import { useReviews } from '@/hooks/useReviews';
 import { usePosts } from '@/hooks/usePosts';
+import { useQueryClient } from '@tanstack/react-query';
+import { uploadPostPhoto } from '@/lib/storage';
 import { apiClient } from '@/lib/api';
 
 /* ── Sub-components ──────────────────────────────────────────────────────── */
@@ -204,6 +206,25 @@ export function ProfileScreen() {
   const { payments } = usePayments();
   const { reviews }  = useReviews(); // defaults to the logged-in user's reviews
   const { data: posts = [] } = usePosts(user?.id);
+  const queryClient = useQueryClient();
+  const postFileRef = useRef<HTMLInputElement>(null);
+  const [postingMoment, setPostingMoment] = useState(false);
+
+  async function handleAddPost(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file || !user?.id) return;
+    setPostingMoment(true);
+    try {
+      const url = await uploadPostPhoto(user.id, file);
+      await apiClient(user.id).post('/posts', { photo_url: url, caption: null });
+      await queryClient.invalidateQueries({ queryKey: ['posts'] });
+    } catch (err) {
+      console.error('[Profile] add post failed:', err);
+    } finally {
+      setPostingMoment(false);
+    }
+  }
 
   // Real lifetime stats derived from the worker's paid shifts.
   const shiftsCompleted = payments.length;
@@ -401,7 +422,14 @@ export function ProfileScreen() {
 
       {/* Posts grid */}
       <div className="px-5 mb-6">
-        <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-3">Posts</p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em]">Posts</p>
+          <button type="button" onClick={() => postFileRef.current?.click()} disabled={postingMoment}
+            className="flex items-center gap-1 text-[#0A1628] text-[12px] font-bold disabled:opacity-50">
+            <span className="text-[15px] leading-none">＋</span>{postingMoment ? 'Posting…' : 'Share a moment'}
+          </button>
+        </div>
+        <input ref={postFileRef} type="file" accept="image/*" hidden onChange={handleAddPost} />
         {posts.filter((p) => p.photo_url).length > 0 ? (
           <div className="grid grid-cols-3 gap-[3px]">
             {posts.filter((p) => p.photo_url).map((p) => (
@@ -412,9 +440,10 @@ export function ProfileScreen() {
             ))}
           </div>
         ) : (
-          <div className="rounded-[12px] bg-[#FAFAFA] border border-[#EFEFEF] px-6 py-8 text-center">
-            <p className="text-[#AAAAAA] text-[12px]">No posts yet — tap Edit to add your first one.</p>
-          </div>
+          <button type="button" onClick={() => postFileRef.current?.click()} disabled={postingMoment}
+            className="w-full rounded-[12px] bg-[#FAFAFA] border border-[#EFEFEF] px-6 py-8 text-center disabled:opacity-50">
+            <p className="text-[#AAAAAA] text-[12px]">{postingMoment ? 'Posting your moment…' : 'No posts yet — tap to share a moment.'}</p>
+          </button>
         )}
       </div>
 

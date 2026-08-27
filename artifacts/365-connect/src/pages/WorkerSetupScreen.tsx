@@ -299,9 +299,10 @@ export function WorkerSetupScreen() {
         }).catch((e) => console.error('[WorkerSetup] post create failed:', e));
       }
       localStorage.removeItem(stepKey(user.id));
-      // Flush stale profile + feed caches so the new photo/username show immediately
+      // Flush stale profile + feed + posts caches so the new photo/username show immediately
       void queryClient.invalidateQueries({ queryKey: ['profile'] });
       void queryClient.invalidateQueries({ queryKey: ['people-feed'] });
+      void queryClient.invalidateQueries({ queryKey: ['posts'] });
       navigate('/home');
     } catch (err) {
       const msg = (err as { message?: string })?.message ?? 'Could not save post.';
