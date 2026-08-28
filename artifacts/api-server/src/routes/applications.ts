@@ -5,6 +5,18 @@ import { createNotification } from './notifications.js';
 
 const router = Router();
 
+/** A worker's @handle for use in notification copy, or a neutral fallback. */
+async function workerName(id: string): Promise<string> {
+  const { data } = await adminDb.from('users').select('username').eq('id', id).maybeSingle();
+  return data?.username ? `@${data.username}` : 'the worker';
+}
+
+/** A shift's title wrapped in quotes for notification copy, or a neutral fallback. */
+async function shiftLabel(id: string): Promise<string> {
+  const { data } = await adminDb.from('shifts').select('title').eq('id', id).maybeSingle();
+  return data?.title ? `"${data.title}"` : 'a shift';
+}
+
 /** Returns true if userId is the client that owns the given shift. */
 async function ownsShift(userId: string, shiftId: string): Promise<boolean> {
   const { count } = await adminDb
@@ -243,16 +255,35 @@ router.patch('/:id', requireAuth, async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'Not found' });
 
-    // Notify the worker when the owner books them.
+    // Notify the worker when the owner books them, and send the owner a receipt.
     if (status === 'accepted' && isShiftOwner) {
-      const { data: sh } = await adminDb
-        .from('shifts').select('title').eq('id', appRow.shift_id).maybeSingle();
+      const label = await shiftLabel(appRow.shift_id);
       await createNotification({
         userId: appRow.worker_id,
         fromUserId: req.userId,
         type: 'booking',
         title: "You're booked!",
-        body: `You've been accepted for ${sh?.title ? `"${sh.title}"` : 'a shift'}.`,
+        body: `You've been accepted for ${label}.`,
+        shiftId: appRow.shift_id,
+      });
+      await createNotification({
+        userId: req.userId!,
+        fromUserId: appRow.worker_id,
+        type: 'receipt',
+        title: 'Worker booked',
+        body: `You booked ${await workerName(appRow.worker_id)} for ${label}.`,
+        shiftId: appRow.shift_id,
+      });
+    }
+    // Receipt to the owner/staffer when they remove (decline/reject) a worker.
+    if ((status === 'declined' || status === 'rejected') && isShiftOwner) {
+      const label = await shiftLabel(appRow.shift_id);
+      await createNotification({
+        userId: req.userId!,
+        fromUserId: appRow.worker_id,
+        type: 'receipt',
+        title: 'Worker removed',
+        body: `You removed ${await workerName(appRow.worker_id)} from ${label}.`,
         shiftId: appRow.shift_id,
       });
     }
@@ -286,14 +317,22 @@ router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req
       .single();
     if (error) return res.status(500).json({ error: error.message });
 
-    const { data: sh } = await adminDb
-      .from('shifts').select('title').eq('id', shift_id).maybeSingle();
+    const label = await shiftLabel(shift_id);
     await createNotification({
       userId: worker_id,
       fromUserId: req.userId,
       type: 'booking',
       title: "You're booked!",
-      body: `You've been assigned to ${sh?.title ? `"${sh.title}"` : 'a shift'}.`,
+      body: `You've been assigned to ${label}.`,
+      shiftId: shift_id,
+    });
+    // Receipt to the owner/staffer who made the booking.
+    await createNotification({
+      userId: req.userId!,
+      fromUserId: worker_id,
+      type: 'receipt',
+      title: 'Worker booked',
+      body: `You booked ${await workerName(worker_id)} for ${label}.`,
       shiftId: shift_id,
     });
     return res.status(201).json(data);

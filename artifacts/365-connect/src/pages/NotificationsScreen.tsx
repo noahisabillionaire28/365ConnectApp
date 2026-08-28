@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import {
-  MapPin, CheckCheck, XCircle, Bell, DollarSign, Star, UserPlus, Send, AlarmClock, Ban,
+  MapPin, CheckCheck, XCircle, Bell, DollarSign, Star, UserPlus, Send, AlarmClock, Ban, Settings,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { BottomTabNav } from '@/components/BottomTabNav';
@@ -20,6 +20,8 @@ const ICON_META: Record<string, { icon: React.ComponentType<{ size?: number; cla
   direct_shift_request:  { icon: Send,        color: 'navy'  },
   shift_cancelled:       { icon: Ban,         color: 'red'   },
   shift_starting_soon:   { icon: AlarmClock,  color: 'blue'  },
+  booking:               { icon: CheckCheck,  color: 'green' },
+  receipt:               { icon: Bell,        color: 'navy'  },
 };
 
 const COLOR_CLASSES: Record<IconColor, { bg: string; icon: string }> = {
@@ -138,8 +140,9 @@ export function NotificationsScreen() {
             )}
           </div>
           <button type="button" aria-label="Notification settings"
+            onClick={() => navigate('/notification-settings')}
             className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center active:opacity-60 transition-opacity">
-            <Bell size={15} aria-hidden className="text-[#737373]" />
+            <Settings size={15} aria-hidden className="text-[#737373]" />
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { createNotification } from './notifications.js';
 
 const router = Router();
 
@@ -79,6 +80,20 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(409).json({ error: 'Request already exists' });
+
+    // Receipt to the requester (client/staffer) confirming the request was sent.
+    const [{ data: w }, { data: sh }] = await Promise.all([
+      adminDb.from('users').select('username').eq('id', worker_id).maybeSingle(),
+      adminDb.from('shifts').select('title').eq('id', shift_id).maybeSingle(),
+    ]);
+    await createNotification({
+      userId: req.userId!,
+      fromUserId: worker_id,
+      type: 'receipt',
+      title: 'Request sent',
+      body: `You requested ${w?.username ? `@${w.username}` : 'a worker'} for ${sh?.title ? `"${sh.title}"` : 'a shift'}.`,
+      shiftId: shift_id,
+    });
     return res.status(201).json(data);
   } catch (e) {
     return res.status(500).json({ error: String(e) });

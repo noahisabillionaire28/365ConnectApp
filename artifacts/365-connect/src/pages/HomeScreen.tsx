@@ -365,7 +365,14 @@ function ClientShiftCard({
             <span className="inline-block bg-[#0A1628] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide mb-1.5">
               {shift.jobType}
             </span>
-            <p className="text-[#111827] font-bold text-[15px] leading-snug">{shift.companyName}</p>
+            <p className="text-[#111827] font-bold text-[17px] leading-snug truncate">
+              {shift.eventType || shift.companyName || shift.jobType || 'Shift'}
+            </p>
+            {shift.companyName && shift.companyName !== (shift.eventType || '') && (
+              <p className="text-[#6B7280] text-[13px] font-medium leading-snug truncate">
+                {shift.companyName}
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-3 mt-1">
               {dateStr && (
                 <span className="text-[#6B7280] text-[12px] flex items-center gap-1">

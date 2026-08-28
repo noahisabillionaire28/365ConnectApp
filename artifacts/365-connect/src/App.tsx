@@ -35,6 +35,7 @@ import { ExploreScreen }         from '@/pages/ExploreScreen';
 import { MessagesScreen }        from '@/pages/MessagesScreen';
 import { ChatScreen }            from '@/pages/ChatScreen';
 import { NotificationsScreen }   from '@/pages/NotificationsScreen';
+import { NotificationSettingsScreen } from '@/pages/NotificationSettingsScreen';
 import { ProfileScreen }         from '@/pages/ProfileScreen';
 
 // Detail screens
@@ -136,6 +137,7 @@ function MobileRouter() {
             <Route path="/messages"      component={MessagesScreen}      />
             <Route path="/messages/:conversationId" component={ChatScreen} />
             <Route path="/notifications" component={NotificationsScreen} />
+            <Route path="/notification-settings" component={NotificationSettingsScreen} />
             <Route path="/profile"       component={ProfileScreen}       />
 
             {/* ── Detail & misc ─────────────────────────────────── */}
