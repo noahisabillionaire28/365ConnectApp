@@ -2,7 +2,7 @@
  * Step 2 of 5 — Location
  * Address autocomplete + Apple-light map preview + optional unit/suite.
  */
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { ChevronLeft, MapPin, Building2 } from 'lucide-react';
@@ -39,6 +39,29 @@ const INPUT_CLS =
   'focus:outline-none focus:border-[#0A1628] transition-colors';
 
 const DEFAULT_COORDS = { lat: 25.7825, lng: -80.1298 };
+
+/**
+ * Turn a typed address into real map coordinates (free OpenStreetMap / Nominatim).
+ * Used so the shift maps to the VENUE the staffer typed — not their own location —
+ * even when they never tap a dropdown suggestion. Returns null on no-match/failure.
+ */
+async function geocode(query: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const res = await fetch(
+      'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=' +
+        encodeURIComponent(query),
+      { headers: { Accept: 'application/json' } },
+    );
+    const data = (await res.json()) as Array<{ lat: string; lon: string }>;
+    const hit = Array.isArray(data) ? data[0] : undefined;
+    if (hit) {
+      const lat = parseFloat(hit.lat);
+      const lng = parseFloat(hit.lon);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+    }
+  } catch { /* network / geocode failure — caller falls back */ }
+  return null;
+}
 
 // ─── Address autocomplete (free OpenStreetMap / Nominatim type-ahead) ─────────
 type Suggestion = { display_name: string; lat: string; lon: string };
@@ -128,15 +151,36 @@ export function PostShiftStep2Screen() {
   const [mapCoords,  setMapCoords]  = useState({ lat: initial.lat, lng: initial.lng });
   const [unitInfo,   setUnitInfo]   = useState(initial.unit_info);
   const [errors,     setErrors]     = useState<Record<string, string>>({});
+  const [geoLoading, setGeoLoading] = useState(false);
+
+  // The exact address string that `mapCoords` currently represents. Starts as the
+  // draft's saved location so an unchanged (e.g. edited) shift keeps its coords.
+  const [resolvedFor, setResolvedFor] = useState(initial.location);
 
   const handlePlacePicked = useCallback(
     (coords: { lat: number; lng: number }, address: string) => {
       setMapCoords(coords);
       setLocation(address);
+      setResolvedFor(address);
       setErrors((p) => ({ ...p, location: '' }));
     },
     [],
   );
+
+  // Live-geocode the typed address so the map preview shows the VENUE, not the
+  // staffer's own location — even when they never tap a suggestion. Debounced and
+  // guarded so only the latest lookup wins.
+  const geoReq = useRef(0);
+  useEffect(() => {
+    const q = location.trim();
+    if (!q || q === resolvedFor.trim() || q.length < 5) return;
+    const id = ++geoReq.current;
+    const t = setTimeout(async () => {
+      const g = await geocode(q);
+      if (g && id === geoReq.current) { setMapCoords(g); setResolvedFor(q); }
+    }, 700);
+    return () => clearTimeout(t);
+  }, [location, resolvedFor]);
 
   function validate() {
     const e: Record<string, string> = {};
@@ -145,12 +189,22 @@ export function PostShiftStep2Screen() {
     return Object.keys(e).length === 0;
   }
 
-  function handleContinue() {
+  async function handleContinue() {
     if (!validate()) return;
+    let coords = mapCoords;
+    const q = location.trim();
+    // Safety net: if the typed address hasn't been resolved to coords yet
+    // (user typed fast and hit Continue before the live lookup ran), geocode now.
+    if (q && q !== resolvedFor.trim()) {
+      setGeoLoading(true);
+      const g = await geocode(q);
+      setGeoLoading(false);
+      if (g) { coords = g; setMapCoords(g); setResolvedFor(q); }
+    }
     setDraft({
-      location: location.trim(),
-      lat:      mapCoords.lat,
-      lng:      mapCoords.lng,
+      location: q,
+      lat:      coords.lat,
+      lng:      coords.lng,
       unit_info: unitInfo.trim(),
     });
     navigate('/post-shift/step3');
@@ -250,10 +304,17 @@ export function PostShiftStep2Screen() {
         <motion.button
           type="button" whileTap={{ scale: 0.97 }}
           onClick={handleContinue}
+          disabled={geoLoading}
+          aria-busy={geoLoading}
           aria-label="Continue to schedule"
-          className="w-full h-[52px] rounded-[12px] bg-[#0A1628] text-white font-bold text-[16px]"
+          className="w-full h-[52px] rounded-[12px] bg-[#0A1628] text-white font-bold text-[16px] disabled:opacity-70 flex items-center justify-center gap-2"
         >
-          Continue
+          {geoLoading ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              Locating…
+            </>
+          ) : 'Continue'}
         </motion.button>
       </div>
 

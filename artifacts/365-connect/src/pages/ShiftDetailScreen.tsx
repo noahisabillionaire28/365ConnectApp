@@ -282,7 +282,7 @@ export function ShiftDetailScreen() {
   }
 
   async function handlePayWorker(workerId: string) {
-    if (!user?.id || payingId) return;
+    if (!user?.id || payingId || !shift) return;
     const hrs = calcDurationHours(shift.startTime, shift.endTime);
     const amount = Math.round(shift.payRate * hrs * 100) / 100;
     if (amount <= 0) { showToast('Set a pay rate before paying.'); return; }
