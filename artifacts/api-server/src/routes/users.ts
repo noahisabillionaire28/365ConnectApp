@@ -4,6 +4,8 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
+// Note: notification preferences are private and read via GET /me (select *),
+// so they are intentionally NOT part of the public column set.
 const PUBLIC_COLS =
   'id, email, role, username, photo_url, bio, job_types, certifications, ' +
   'rating, primary_job_type, secondary_job_types, availability, ' +
@@ -60,6 +62,7 @@ router.patch('/me', requireAuth, async (req, res) => {
     'email', 'username', 'photo_url', 'bio', 'job_types', 'certifications',
     'primary_job_type', 'secondary_job_types', 'availability',
     'lat', 'lng', 'company_name', 'is_pro', 'is_available',
+    'in_app_notifications', 'email_notifications',
   ];
   const body = req.body as Record<string, unknown>;
   const updates: Record<string, unknown> = {};

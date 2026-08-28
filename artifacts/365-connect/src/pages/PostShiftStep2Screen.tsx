@@ -127,11 +127,12 @@ function LocationAutocomplete({
         className={INPUT_CLS + (error ? ' border-[#EF4444]' : '')}
       />
       {open && suggestions.length > 0 && (
-        <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-[#E5E7EB] rounded-[10px] shadow-lg max-h-[220px] overflow-y-auto">
+        <div className="absolute z-[1000] left-0 right-0 mt-1.5 bg-white border border-[#E5E7EB] rounded-[12px] shadow-xl max-h-[260px] overflow-y-auto overflow-hidden">
           {suggestions.map((s, i) => (
             <button key={i} type="button" onClick={() => pick(s)}
-              className="w-full text-left px-3 py-2.5 text-[13px] leading-snug text-[#111827] active:bg-[#F5F5F5] border-b border-[#F3F4F6] last:border-0">
-              {s.display_name}
+              className="w-full flex items-start gap-2.5 text-left px-4 py-3 text-[13px] leading-snug text-[#111827] hover:bg-[#F5F5F5] active:bg-[#EFEFEF] border-b border-[#F3F4F6] last:border-0">
+              <MapPin size={14} aria-hidden className="text-[#9CA3AF] flex-shrink-0 mt-0.5" />
+              <span className="min-w-0">{s.display_name}</span>
             </button>
           ))}
         </div>
@@ -259,7 +260,7 @@ export function PostShiftStep2Screen() {
             <div>
               <FieldLabel>Map preview</FieldLabel>
               <div
-                className="rounded-[10px] overflow-hidden border border-[#E5E7EB]"
+                className="relative z-0 rounded-[10px] overflow-hidden border border-[#E5E7EB]"
                 style={{ height: 180 }}
                 aria-label="Map showing shift location"
                 role="img"

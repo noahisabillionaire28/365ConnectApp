@@ -90,6 +90,15 @@ export async function createNotification(params: {
 }): Promise<void> {
   const { userId, fromUserId, type, title, body, shiftId } = params;
   try {
+    // Respect the recipient's in-app notification preference. (A DB-level gate
+    // trigger enforces the same rule for notifications created by SQL triggers.)
+    const { data: pref } = await adminDb
+      .from('users')
+      .select('in_app_notifications')
+      .eq('id', userId)
+      .maybeSingle();
+    if (pref && pref.in_app_notifications === false) return;
+
     const { data, error } = await adminDb
       .from('notifications')
       .insert({
@@ -101,10 +110,10 @@ export async function createNotification(params: {
         shift_id: shiftId ?? null,
       })
       .select()
-      .single();
+      .maybeSingle();
     if (error) throw error;
-    // Push live to the recipient if they're online
-    broadcastToUser(userId, 'new_notification', data);
+    // Push live to the recipient if they're online (skip if the row was gated out).
+    if (data) broadcastToUser(userId, 'new_notification', data);
   } catch (e) {
     // Notifications are non-critical — log but don't throw
     console.error('[createNotification] failed:', e);

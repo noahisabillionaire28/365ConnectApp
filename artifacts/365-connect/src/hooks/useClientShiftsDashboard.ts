@@ -7,6 +7,7 @@ type RawShift = {
   id: string;
   client_id: string;
   title: string;
+  event_type: string | null;
   job_type: string | null;
   company_name: string | null;
   status: string;
@@ -25,6 +26,7 @@ export type ClientShift = RawShift & {
   /** Alias for applicationCount */
   applicantCount: number;
   /** camelCase aliases */
+  eventType: string | null;
   jobType: string | null;
   companyName: string | null;
   startTime: string;
@@ -41,6 +43,7 @@ function toClientShift(s: RawShift, appCount: number): ClientShift {
     ...s,
     applicationCount: appCount,
     applicantCount:   appCount,
+    eventType:        s.event_type  ?? null,
     jobType:          s.job_type    ?? null,
     companyName:      s.company_name ?? null,
     startTime:        formatTime(s.start_time),
