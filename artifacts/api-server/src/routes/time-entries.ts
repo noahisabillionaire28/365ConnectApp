@@ -19,6 +19,21 @@ router.get('/:shiftId', requireAuth, async (req, res) => {
 /** POST /api/time-entries — clock in */
 router.post('/', requireAuth, async (req, res) => {
   const { shift_id } = req.body as Record<string, unknown>;
+  if (!shift_id || typeof shift_id !== 'string') {
+    return res.status(400).json({ error: 'shift_id is required' });
+  }
+
+  // Only a worker booked (accepted) onto this shift may clock in.
+  const { count } = await adminDb
+    .from('applications')
+    .select('*', { count: 'exact', head: true })
+    .eq('shift_id', shift_id)
+    .eq('worker_id', req.userId)
+    .eq('status', 'accepted');
+  if (!count) {
+    return res.status(403).json({ error: 'You are not booked for this shift.' });
+  }
+
   const payload = { shift_id, worker_id: req.userId, clock_in: new Date().toISOString() };
   const { data, error } = await adminDb
     .from('time_entries')

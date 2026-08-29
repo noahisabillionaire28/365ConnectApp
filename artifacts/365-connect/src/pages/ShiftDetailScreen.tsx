@@ -58,6 +58,18 @@ function calcDurationHours(start: string, end: string): number {
   return (e - s) / 60;
 }
 
+/** Format a number as USD currency, e.g. 123.5 → "$123.50". */
+const usd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+
+/** Attendance status pill styling for the "who's coming" crew list. */
+const ATT_META: Record<'applied' | 'booked' | 'on_site' | 'done' | 'no_show', { label: string; cls: string }> = {
+  applied: { label: 'Applied', cls: 'bg-slate-50    border-[#DBDBDB]    text-[#737373]'  },
+  booked:  { label: 'Booked',  cls: 'bg-blue-50     border-blue-200     text-blue-700'   },
+  on_site: { label: 'On-site', cls: 'bg-emerald-50  border-emerald-200  text-emerald-700' },
+  done:    { label: 'Done',    cls: 'bg-[#0A1628]/5 border-[#0A1628]/20 text-[#0A1628]'  },
+  no_show: { label: 'No-show', cls: 'bg-red-50      border-red-200      text-red-600'    },
+};
+
 /* ─── Loading skeleton ───────────────────────────────────────────────────── */
 function ShiftDetailSkeleton() {
   return (
@@ -281,11 +293,14 @@ export function ShiftDetailScreen() {
     }
   }
 
-  async function handlePayWorker(workerId: string) {
+  async function handlePayWorker(workerId: string, actualPay?: number | null) {
     if (!user?.id || payingId || !shift) return;
-    const hrs = calcDurationHours(shift.startTime, shift.endTime);
-    const amount = Math.round(shift.payRate * hrs * 100) / 100;
-    if (amount <= 0) { showToast('Set a pay rate before paying.'); return; }
+    // Prefer the worker's ACTUAL clocked pay; fall back to the scheduled estimate
+    // only if a clocked total isn't available yet.
+    const amount = actualPay != null && actualPay > 0
+      ? Math.round(actualPay * 100) / 100
+      : Math.round(shift.payRate * calcDurationHours(shift.startTime, shift.endTime) * 100) / 100;
+    if (amount <= 0) { showToast('No hours to pay yet.'); return; }
     setPayingId(workerId);
     try {
       // Redirects to Stripe Checkout; returns to /earnings on success.
@@ -662,9 +677,16 @@ export function ShiftDetailScreen() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-black font-semibold text-[14px] truncate">{w.username ? `@${w.username}` : 'Worker'}</p>
-                    <p className="text-[#737373] text-[12px]">
-                      {w.completed ? 'Shift completed' : 'In progress'}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${ATT_META[w.attendance].cls}`}>
+                        {ATT_META[w.attendance].label}
+                      </span>
+                      {w.completed && w.totalHours != null && (
+                        <span className="text-[#737373] text-[11px]">
+                          {w.totalHours}h · {usd(w.totalPay ?? 0)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   {w.completed && (
                     <div className="flex flex-col items-end gap-2 flex-shrink-0">
@@ -676,7 +698,7 @@ export function ShiftDetailScreen() {
                       ) : (
                         <motion.button type="button" whileTap={{ scale: 0.95 }}
                           disabled={payingId === w.workerId}
-                          onClick={() => void handlePayWorker(w.workerId)}
+                          onClick={() => void handlePayWorker(w.workerId, w.totalPay)}
                           aria-label={`Pay ${w.username ?? 'this worker'}`}
                           className="bg-emerald-600 text-white text-[12px] font-semibold px-3.5 py-2 rounded-[8px] flex items-center gap-1.5 disabled:opacity-60">
                           <DollarSign size={13} aria-hidden />

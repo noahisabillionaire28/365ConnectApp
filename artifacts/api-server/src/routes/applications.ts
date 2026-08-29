@@ -52,16 +52,32 @@ router.get('/', requireAuth, async (req, res) => {
       if (uErr) return res.status(500).json({ error: uErr.message });
       const userMap = new Map((users ?? []).map((u) => [u.id, u]));
 
-      // Completion state — a time entry with a clock_out for this shift+worker.
-      const clockOutMap = new Map<string, string | null>();
+      // Time-entry state — clock in/out + the ACTUAL hours & pay for this shift.
+      const entryMap = new Map<string, {
+        clock_in: string | null; clock_out: string | null;
+        total_hours: number | null; total_pay: number | null;
+      }>();
       if (workerIds.length) {
         const { data: entries } = await adminDb
           .from('time_entries')
-          .select('worker_id, clock_out')
+          .select('worker_id, clock_in, clock_out, total_hours, total_pay')
           .eq('shift_id', shift_id)
           .in('worker_id', workerIds);
-        for (const t of entries ?? []) clockOutMap.set(t.worker_id, t.clock_out);
+        for (const t of entries ?? []) {
+          entryMap.set(t.worker_id, {
+            clock_in: t.clock_in ?? null,
+            clock_out: t.clock_out ?? null,
+            total_hours: t.total_hours ?? null,
+            total_pay: t.total_pay ?? null,
+          });
+        }
       }
+
+      // Shift end time — used to flag a booked worker who never showed as no-show.
+      const { data: shiftTimes } = await adminDb
+        .from('shifts').select('end_time').eq('id', shift_id).maybeSingle();
+      const shiftEndMs = shiftTimes?.end_time ? Date.parse(shiftTimes.end_time) : NaN;
+      const nowMs = Date.now();
 
       // Whether the owner has already reviewed each worker for this shift.
       const reviewedSet = new Set<string>();
@@ -90,6 +106,17 @@ router.get('/', requireAuth, async (req, res) => {
 
       const merged = (apps ?? []).map((a) => {
         const u = userMap.get(a.worker_id);
+        const e = entryMap.get(a.worker_id);
+        // Attendance: where this worker is in the shift lifecycle.
+        //   applied → not booked yet · booked → accepted, not on-site
+        //   on_site → clocked in · done → clocked out
+        //   no_show → booked but the shift ended and they never clocked in
+        let attendance: 'applied' | 'booked' | 'on_site' | 'done' | 'no_show';
+        if (a.status !== 'accepted') attendance = 'applied';
+        else if (e?.clock_out) attendance = 'done';
+        else if (e?.clock_in) attendance = 'on_site';
+        else if (Number.isFinite(shiftEndMs) && nowMs > shiftEndMs) attendance = 'no_show';
+        else attendance = 'booked';
         return {
           ...a,
           username: u?.username ?? null,
@@ -99,7 +126,11 @@ router.get('/', requireAuth, async (req, res) => {
           primary_job_type: u?.primary_job_type ?? null,
           certifications: u?.certifications ?? null,
           bio: u?.bio ?? null,
-          clock_out: clockOutMap.get(a.worker_id) ?? null,
+          clock_in: e?.clock_in ?? null,
+          clock_out: e?.clock_out ?? null,
+          total_hours: e?.total_hours ?? null,
+          total_pay: e?.total_pay ?? null,
+          attendance,
           already_reviewed: reviewedSet.has(a.worker_id),
           paid: paidSet.has(a.worker_id),
         };
