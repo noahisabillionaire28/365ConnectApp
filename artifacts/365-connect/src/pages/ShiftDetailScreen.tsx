@@ -11,6 +11,7 @@ import { useApplications } from '@/hooks/useApplications';
 import { useToast } from '@/contexts/ToastContext';
 import { useApplicationStatus } from '@/hooks/useApplicationStatus';
 import { LeafletMap } from '@/components/LeafletMap';
+import { geocodeAddress, type Coords } from '@/lib/geocode';
 import { useShiftById } from '@/hooks/useShifts';
 import { useProfile } from '@/hooks/useProfile';
 import { useMyLocation } from '@/hooks/useMyLocation';
@@ -160,6 +161,10 @@ export function ShiftDetailScreen() {
   const [directionsOpen, setDirectionsOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
+  // Coordinates resolved from the shift's ADDRESS TEXT — used so the map, pin,
+  // distance, and directions match the address even when the stored lat/lng are
+  // wrong (older shifts saved with the poster's own location).
+  const [venueCoords, setVenueCoords] = useState<Coords | null>(null);
   // ── No more hooks below this line ────────────────────────────────────────────
 
   useEffect(() => {
@@ -168,6 +173,15 @@ export function ShiftDetailScreen() {
     void hasCompletedTimeEntry(shift.id, user.id).then((done) => { if (!cancelled) setHasCompleted(done); });
     return () => { cancelled = true; };
   }, [shift?.id, user?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setVenueCoords(null);
+    const addr = shift?.location?.trim();
+    if (!addr) return;
+    void geocodeAddress(addr).then((c) => { if (!cancelled && c) setVenueCoords(c); });
+    return () => { cancelled = true; };
+  }, [shift?.location]);
 
   if (isLoading) return <ShiftDetailSkeleton />;
 
@@ -217,7 +231,10 @@ export function ShiftDetailScreen() {
       })
     : null;
 
-  const distanceFromShift = haversineMiles(myCoords.lat, myCoords.lng, shift.lat, shift.lng);
+  // Prefer coordinates resolved from the address text; fall back to stored.
+  const shiftCoords = venueCoords ?? { lat: shift.lat, lng: shift.lng };
+  const distanceFromShift = haversineMiles(myCoords.lat, myCoords.lng, shiftCoords.lat, shiftCoords.lng);
+  const distanceMilesLabel = Math.round(distanceFromShift * 10) / 10;
   const withinClockInRange = distanceFromShift <= 1;
 
   // Real CTA states, per applications.status + time_entries completion:
@@ -405,7 +422,7 @@ export function ShiftDetailScreen() {
             <p className="text-black font-bold text-[17px] leading-tight truncate">{shift.companyName}</p>
             <div className="flex items-center gap-1.5 mt-1">
               <MapPin size={12} aria-hidden className="text-[#737373] flex-shrink-0" />
-              <p className="text-[#737373] text-[13px] truncate">{shift.location} · {shift.distanceMiles} mi away</p>
+              <p className="text-[#737373] text-[13px] truncate">{shift.location} · {distanceMilesLabel} mi away</p>
             </div>
           </div>
         </div>
@@ -519,19 +536,19 @@ export function ShiftDetailScreen() {
             aria-label="Get directions to this shift" className="block w-full text-left">
             <div className="rounded-[12px] overflow-hidden border border-[#DBDBDB] relative" style={{ height: 180 }}>
               <LeafletMap
-                center={{ lat: shift.lat, lng: shift.lng }}
+                center={shiftCoords}
                 zoom={15}
                 interactive={false}
                 recenter
                 ariaLabel="Shift location map"
-                markers={[{ id: shift.id, lat: shift.lat, lng: shift.lng, selected: true }]}
+                markers={[{ id: shift.id, lat: shiftCoords.lat, lng: shiftCoords.lng, selected: true }]}
               />
               {/* Transparent tap layer so a tap anywhere on the map opens directions */}
               <div aria-hidden className="absolute inset-0" />
             </div>
             <div className="flex items-center gap-2 mt-2.5">
               <MapPin size={13} aria-hidden className="text-[#737373] flex-shrink-0" />
-              <p className="text-[#737373] text-[13px]">{shift.location} · {shift.distanceMiles} mi from your location</p>
+              <p className="text-[#737373] text-[13px]">{shift.location} · {distanceMilesLabel} mi from your location</p>
             </div>
           </button>
           <button type="button" onClick={() => setDirectionsOpen(true)}
@@ -544,7 +561,7 @@ export function ShiftDetailScreen() {
         {/* Directions chooser */}
         <AnimatePresence>
           {directionsOpen && (() => {
-            const links = directionsLinks(shift.lat, shift.lng, shift.location);
+            const links = directionsLinks(shiftCoords.lat, shiftCoords.lng, shift.location);
             const opts = [
               { label: 'Apple Maps',  href: links.apple  },
               { label: 'Google Maps', href: links.google },
