@@ -9,7 +9,7 @@ const router = Router();
 const PUBLIC_COLS =
   'id, email, role, username, photo_url, bio, job_types, certifications, ' +
   'rating, primary_job_type, secondary_job_types, availability, ' +
-  'lat, lng, is_pro, company_name, created_at';
+  'lat, lng, is_pro, company_name, hourly_rate, created_at';
 
 /** GET /api/users/me — current user's full profile */
 router.get('/me', requireAuth, async (req, res) => {
@@ -39,7 +39,7 @@ router.post('/', requireAuth, async (req, res) => {
   const optional = [
     'email', 'username', 'photo_url', 'bio', 'job_types', 'certifications',
     'primary_job_type', 'secondary_job_types', 'availability',
-    'lat', 'lng', 'is_pro', 'company_name', 'status',
+    'lat', 'lng', 'is_pro', 'company_name', 'status', 'hourly_rate',
   ];
   const payload: Record<string, unknown> = { id: req.userId };
   for (const f of optional) {
@@ -62,7 +62,7 @@ router.patch('/me', requireAuth, async (req, res) => {
     'email', 'username', 'photo_url', 'bio', 'job_types', 'certifications',
     'primary_job_type', 'secondary_job_types', 'availability',
     'lat', 'lng', 'company_name', 'is_pro', 'is_available',
-    'in_app_notifications', 'email_notifications',
+    'in_app_notifications', 'email_notifications', 'hourly_rate',
   ];
   const body = req.body as Record<string, unknown>;
   const updates: Record<string, unknown> = {};

@@ -127,6 +127,7 @@ export function WorkerSetupScreen() {
 
   // Step 4 — primary job
   const [primaryJob, setPrimaryJob] = useState<string | null>(null);
+  const [hourlyRate, setHourlyRate] = useState('');
 
   // Step 5 — secondary jobs
   const [secondaryJobs, setSecondaryJobs] = useState<string[]>([]);
@@ -149,7 +150,7 @@ export function WorkerSetupScreen() {
   // ── Load & resume ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) { navigate('/'); return; }
-    apiClient(user.id).get<{ username?: string | null; photo_url?: string | null; bio?: string | null; primary_job_type?: string | null; secondary_job_types?: string[]; certifications?: string[]; availability?: unknown }>('/users/me')
+    apiClient(user.id).get<{ username?: string | null; photo_url?: string | null; bio?: string | null; primary_job_type?: string | null; secondary_job_types?: string[]; certifications?: string[]; availability?: unknown; hourly_rate?: number | null }>('/users/me')
       .then(async (data) => {
         if (!data) { setInitialized(true); return; }
 
@@ -164,6 +165,7 @@ export function WorkerSetupScreen() {
         if (data.photo_url)          setPhotoPreview(data.photo_url);
         if (data.bio)                setBio(data.bio);
         if (data.primary_job_type)   setPrimaryJob(data.primary_job_type);
+        if (data.hourly_rate != null) setHourlyRate(String(data.hourly_rate));
         if (Array.isArray(data.secondary_job_types)) setSecondaryJobs(data.secondary_job_types);
         if (Array.isArray(data.certifications))      setCerts(data.certifications);
         if (data.availability && typeof data.availability === 'object') {
@@ -261,7 +263,11 @@ export function WorkerSetupScreen() {
 
   async function continueStep4() {
     if (!primaryJob) return;
-    await saveAndAdvance(5, { primary_job_type: primaryJob });
+    const rate = parseFloat(hourlyRate);
+    await saveAndAdvance(5, {
+      primary_job_type: primaryJob,
+      hourly_rate: Number.isFinite(rate) && rate > 0 ? Math.round(rate * 100) / 100 : null,
+    });
   }
 
   async function continueStep5() {
@@ -524,6 +530,34 @@ export function WorkerSetupScreen() {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Hourly rate — the worker sets what they'd like to earn. */}
+            <div className="mt-7">
+              <label htmlFor="hourly-rate" className="text-[15px] font-bold" style={{ color: TEXT }}>
+                Your hourly rate
+              </label>
+              <p className="text-[13px] mt-0.5 mb-2.5" style={{ color: MUTED }}>
+                What you'd like to earn per hour. You can change this anytime.
+              </p>
+              <div className="flex items-center rounded-[12px] px-4 h-[54px]"
+                style={{ border: `1px solid ${BORDER}`, background: '#FFFFFF' }}>
+                <span className="text-[18px] font-bold" style={{ color: TEXT }}>$</span>
+                <input
+                  id="hourly-rate"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="1"
+                  value={hourlyRate}
+                  onChange={(e) => setHourlyRate(e.target.value)}
+                  placeholder="25"
+                  className="flex-1 ml-2 outline-none bg-transparent text-[17px] font-semibold"
+                  style={{ color: TEXT }}
+                />
+                <span className="text-[14px] font-medium" style={{ color: MUTED }}>/hr</span>
+              </div>
+              <p className="text-[12px] mt-2" style={{ color: MUTED }}>Optional — leave blank to skip.</p>
             </div>
           </div>
         )}

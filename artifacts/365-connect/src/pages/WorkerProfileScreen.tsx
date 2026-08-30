@@ -22,6 +22,7 @@ type PublicUserRow = {
   job_types: string[];
   certifications: string[];
   rating: number;
+  hourly_rate: number | null;
   created_at: string;
 };
 
@@ -438,6 +439,12 @@ export function WorkerProfileScreen() {
         </div>
 
         <p className="text-[#737373] text-[13px] font-medium mb-1 capitalize">{profile.role}</p>
+
+        {profile.role === 'worker' && profile.hourly_rate != null && (
+          <div className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[12px] font-bold px-2.5 py-1 rounded-full mt-1">
+            ${profile.hourly_rate}/hr
+          </div>
+        )}
 
         {profile.bio && (
           <p className="text-[14px] text-black leading-relaxed mt-3 mb-5">{profile.bio}</p>
