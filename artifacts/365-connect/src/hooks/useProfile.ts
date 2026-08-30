@@ -18,6 +18,7 @@ type UserProfileRow = {
   lng:                 number | null;
   is_pro:              boolean;
   is_available:        boolean;
+  hourly_rate:         number | null;
 };
 
 function deriveDisplayName(authUser: SimpleUser, row: UserProfileRow | null): string {
@@ -48,6 +49,7 @@ export type ProfileResult = {
   lng:               number | null;
   isPro:             boolean;
   isAvailable:       boolean;
+  hourlyRate:        number | null;
 };
 
 export function useProfile(): ProfileResult {
@@ -101,5 +103,6 @@ export function useProfile(): ProfileResult {
     lng:               row?.lng               ?? null,
     isPro:             row?.is_pro            ?? false,
     isAvailable:       row?.is_available      ?? true,
+    hourlyRate:        row?.hourly_rate       ?? null,
   };
 }

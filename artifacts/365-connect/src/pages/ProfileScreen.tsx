@@ -347,6 +347,12 @@ export function ProfileScreen() {
           {username ? `@${username}` : <span className="italic text-[#AAAAAA]">No username set</span>}
         </p>
 
+        {profile.role === 'worker' && profile.hourlyRate != null && (
+          <div className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[12px] font-bold px-2.5 py-1 rounded-full mb-2">
+            ${profile.hourlyRate}/hr
+          </div>
+        )}
+
         {bio ? (
           <p className="text-[#737373] text-[14px] leading-relaxed mb-3">{bio}</p>
         ) : (
