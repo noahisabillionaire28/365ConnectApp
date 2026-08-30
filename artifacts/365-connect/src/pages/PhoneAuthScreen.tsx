@@ -108,9 +108,10 @@ export function PhoneAuthScreen() {
       if (verifyErr) throw verifyErr;
       if (!data.session) throw new Error('Verification failed. Please try again.');
 
-      // Upsert minimal users row for new phone-auth users (ignored if exists)
+      // Ensure a users row exists; do NOT send a role here — the user picks it on
+      // Role Select, and sending 'worker' would reset a previously-chosen role.
       await apiClient(data.session.user.id).post('/users', {
-        id: data.session.user.id, email: null, role: 'worker',
+        id: data.session.user.id, email: null,
       }).catch((e) => console.warn('[PhoneAuth] upsert warning:', e));
 
       // Route based on profile completeness

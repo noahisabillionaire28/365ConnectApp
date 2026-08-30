@@ -35,12 +35,14 @@ export function AuthCallbackScreen() {
     handled.current = true;
 
     try {
-      // Upsert minimal row for new OAuth users (ignored if exists)
+      // Ensure a row exists for new OAuth users. NEVER send role here — the auth
+      // trigger already defaults new rows to 'worker', and the user's real role
+      // is only ever set on the Role Select screen. Sending a role here would
+      // reset a previously-chosen staffer/client back to worker.
       try {
         await apiClient(session.user.id).post('/users', {
           id:        session.user.id,
           email:     session.user.email ?? null,
-          role:      'worker',
           photo_url: (session.user.user_metadata?.['avatar_url'] as string | undefined) ?? null,
         });
       } catch (e) {
@@ -54,6 +56,9 @@ export function AuthCallbackScreen() {
         console.warn('[AuthCallback] profile load warning:', e);
       }
 
+      // A user who hasn't finished onboarding (no username yet) must pick their
+      // role first — otherwise they'd be silently routed down the worker path.
+      if (!profile?.username) { navigate('/role-select'); return; }
       navigate(await resolveSetupRoute(session.user.id, profile));
     } catch (err) {
       handled.current = false; // allow retry

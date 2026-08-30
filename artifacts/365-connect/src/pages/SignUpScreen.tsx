@@ -66,8 +66,10 @@ export function SignUpScreen() {
       if (signInErr) throw signInErr;
 
       if (data.session) {
+        // Ensure the row exists; do NOT send a role here — the user picks it on
+        // the next screen, and sending 'worker' would pre-set/reset their role.
         await apiClient(data.session.user.id).post('/users', {
-          id: data.session.user.id, email: email.trim(), role: 'worker',
+          id: data.session.user.id, email: email.trim(),
         }).catch(() => {}); // ignore if already exists
         setSignupState('done');
         setTimeout(() => navigate('/role-select'), 600);
