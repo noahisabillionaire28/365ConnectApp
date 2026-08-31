@@ -2,10 +2,11 @@ import { useState, useMemo } from 'react';
 import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Users, DollarSign, Calendar, XCircle, AlertCircle } from 'lucide-react';
+import { Search, X, Users, DollarSign, Calendar, XCircle, AlertCircle, MapPin } from 'lucide-react';
 import { isAdminAuthenticated, initAdminSession } from '@/store/adminStore';
 import { useAdminShifts, useCancelShift, useReopenShift } from '@/hooks/useAdminData';
-import type { AdminShiftRow } from '@/lib/adminApi';
+import { adminApi, type AdminShiftRow } from '@/lib/adminApi';
+import { geocodeAddress } from '@/lib/geocode';
 
 /* ── Status badge ────────────────────────────────────────────────────────── */
 type ShiftStatus = AdminShiftRow['status'];
@@ -169,10 +170,40 @@ export function AdminShifts() {
   const [, navigate] = useLocation();
   const [filter, setFilter] = useState<ShiftFilter>('all');
   const [search, setSearch] = useState('');
+  const [fixing, setFixing] = useState(false);
+  const [fixMsg, setFixMsg] = useState<string | null>(null);
 
   useEffect(() => { initAdminSession().then((ok) => { if (!ok) navigate('/admin/login'); }); }, [navigate]);
 
-  const { data: shifts = [], isLoading, isError } = useAdminShifts();
+  const { data: shifts = [], isLoading, isError, refetch } = useAdminShifts();
+
+  // One-time map cleanup: geocode each shift's address (in-browser, reliable)
+  // and save the corrected coordinates, fixing older shifts saved with the
+  // poster's own location. Rate-limited to respect OpenStreetMap (~1 req/sec).
+  async function handleFixLocations() {
+    if (fixing) return;
+    const withLoc = shifts.filter((s) => (s.location ?? '').trim().length > 3);
+    if (!withLoc.length) { setFixMsg('No shift addresses to fix.'); return; }
+    setFixing(true);
+    setFixMsg(`Locating 0 / ${withLoc.length}…`);
+    const updates: Array<{ id: string; lat: number; lng: number }> = [];
+    for (let i = 0; i < withLoc.length; i++) {
+      const s = withLoc[i];
+      const c = await geocodeAddress((s.location ?? '').trim());
+      if (c) updates.push({ id: s.id, lat: c.lat, lng: c.lng });
+      setFixMsg(`Locating ${i + 1} / ${withLoc.length}…`);
+      await new Promise((r) => setTimeout(r, 1100));
+    }
+    try {
+      const { updated } = await adminApi.backfillShiftCoords(updates);
+      setFixMsg(`✓ Fixed ${updated} of ${withLoc.length} shift locations.`);
+      void refetch();
+    } catch {
+      setFixMsg('Could not save — try again.');
+    } finally {
+      setFixing(false);
+    }
+  }
 
   const filtered = useMemo(() => shifts.filter((s) => {
     const matchFilter = filter === 'all' || s.status === filter;
@@ -212,9 +243,22 @@ export function AdminShifts() {
           ))}
         </div>
         {!isLoading && (
-          <p className="text-[#737373] text-[11px] font-medium mt-2">
-            {filtered.length} of {shifts.length} shift{shifts.length !== 1 ? 's' : ''}
-          </p>
+          <div className="flex items-center justify-between gap-2 mt-2">
+            <p className="text-[#737373] text-[11px] font-medium">
+              {filtered.length} of {shifts.length} shift{shifts.length !== 1 ? 's' : ''}
+            </p>
+            <button type="button" onClick={handleFixLocations} disabled={fixing}
+              aria-label="Fix shift map locations"
+              className="flex items-center gap-1.5 h-[30px] px-3 rounded-full border border-[#DBDBDB] bg-white text-[#0A1628] text-[11px] font-bold disabled:opacity-60">
+              {fixing
+                ? <div className="w-3 h-3 border-2 border-[#0A1628]/30 border-t-[#0A1628] rounded-full animate-spin" />
+                : <MapPin size={12} aria-hidden />}
+              {fixing ? 'Fixing…' : 'Fix map locations'}
+            </button>
+          </div>
+        )}
+        {fixMsg && (
+          <p className="text-[11px] font-medium mt-1.5 text-[#0A1628]">{fixMsg}</p>
         )}
       </div>
 
