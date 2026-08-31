@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Star, ChevronRight, Settings,
   CreditCard, Bell, Shield, HelpCircle, LogOut,
   Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
-  BadgeCheck, Zap, Eye,
+  BadgeCheck, Zap, Eye, ChevronLeft,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useAuth } from '@/contexts/AuthContext';
@@ -235,6 +235,7 @@ export function ProfileScreen() {
 
   const [available, setAvailable]     = useState(true);
   const [comingSoonLabel, setComingSoon] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Seed the toggle from the saved value once the profile loads.
   useEffect(() => {
@@ -309,10 +310,10 @@ export function ProfileScreen() {
       <div className="relative">
         <div aria-hidden className="h-[96px] w-full bg-gradient-to-br from-[#0A1628] via-[#152742] to-[#0A1628]" />
 
-        {/* Edit button */}
-        <button type="button" aria-label="Edit profile" onClick={() => navigate('/profile-setup?edit=1')}
+        {/* Settings gear — opens all settings */}
+        <button type="button" aria-label="Settings" onClick={() => setSettingsOpen(true)}
           className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white border border-[#DBDBDB] flex items-center justify-center">
-          <Edit3 size={15} aria-hidden className="text-black" />
+          <Settings size={16} aria-hidden className="text-black" />
         </button>
 
         {/* Avatar */}
@@ -382,6 +383,15 @@ export function ProfileScreen() {
             <p className="text-[#AAAAAA] text-[10px] mt-0.5">{sub}</p>
           </div>
         ))}
+      </div>
+
+      {/* Edit Profile — Instagram-style */}
+      <div className="px-4 mb-5">
+        <button type="button" onClick={() => navigate('/profile-setup?edit=1')}
+          aria-label="Edit profile"
+          className="w-full h-[38px] rounded-[10px] bg-[#FAFAFA] border border-[#DBDBDB] text-[#111827] text-[14px] font-semibold flex items-center justify-center gap-2">
+          <Edit3 size={14} aria-hidden /> Edit Profile
+        </button>
       </div>
 
       {/* Specialties */}
@@ -531,36 +541,61 @@ export function ProfileScreen() {
       {/* My Applications — worker-only */}
       {profile.role === 'worker' && <MyApplicationsSection />}
 
-      {/* Workforce — staffer-only */}
-      {profile.role === 'staffer' && (
-        <div className="px-4 mb-4">
-          <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Workforce</p>
-          <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
-            <SettingRow icon={Users} label="My Roster" onTap={() => navigate('/roster')} />
-          </div>
-        </div>
-      )}
-
-      {/* Settings */}
-      <div className="px-4 mb-4">
-        <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Account</p>
-        <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
-          {username && (
-            <SettingRow icon={Eye} label="View My Public Profile" onTap={() => navigate(`/worker/${username}`)} />
-          )}
-          <SettingRow icon={Settings}    label="Account Settings"    onTap={() => navigate('/profile-setup?edit=1')} />
-          <SettingRow icon={CreditCard}  label="Payments & Earnings"  onTap={() => navigate('/earnings')} />
-          <SettingRow icon={Bell}        label="Notifications"         onTap={() => navigate('/notifications')} />
-        </div>
-      </div>
-
-      <div className="px-4 mb-6">
-        <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
-          <SettingRow icon={LogOut} label="Log Out" onTap={handleSignOut} danger />
-        </div>
-      </div>
-
       <BottomTabNav />
+
+      {/* Settings panel — opened by the gear; holds every setting in one place */}
+      <AnimatePresence>
+        {settingsOpen && (() => {
+          const go = (path: string) => { setSettingsOpen(false); navigate(path); };
+          return (
+            <motion.div
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              transition={{ type: 'tween', duration: 0.22, ease: 'easeOut' }}
+              className="fixed inset-0 z-[95] bg-white flex flex-col max-w-[430px] mx-auto"
+              role="dialog" aria-label="Settings"
+            >
+              <div className="sticky top-0 bg-white border-b border-[#EFEFEF] px-4 pt-[52px] pb-3 flex items-center gap-3">
+                <button type="button" aria-label="Close settings" onClick={() => setSettingsOpen(false)}
+                  className="w-9 h-9 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center">
+                  <ChevronLeft size={18} aria-hidden className="text-[#0A1628]" />
+                </button>
+                <h1 className="text-[#111827] font-bold text-[20px]">Settings</h1>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 py-4">
+                <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Account</p>
+                <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-4">
+                  <SettingRow icon={Edit3} label="Edit Profile" onTap={() => go('/profile-setup?edit=1')} />
+                  {username && (
+                    <SettingRow icon={Eye} label="View My Public Profile" onTap={() => go(`/worker/${username}`)} />
+                  )}
+                  <SettingRow icon={CreditCard} label="Payments & Earnings" onTap={() => go('/earnings')} />
+                  <SettingRow icon={Bell} label="Notifications" onTap={() => go('/notification-settings')} />
+                </div>
+
+                {profile.role === 'staffer' && (
+                  <>
+                    <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Workforce</p>
+                    <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-4">
+                      <SettingRow icon={Users} label="My Roster" onTap={() => go('/roster')} />
+                    </div>
+                  </>
+                )}
+
+                {!profile.isPro && (
+                  <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-4">
+                    <SettingRow icon={Zap} label="Upgrade to Pro" onTap={() => go('/pro-upgrade')} />
+                  </div>
+                )}
+
+                <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
+                  <SettingRow icon={LogOut} label="Log Out" onTap={handleSignOut} danger />
+                </div>
+              </div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
     </div>
   );
 }
