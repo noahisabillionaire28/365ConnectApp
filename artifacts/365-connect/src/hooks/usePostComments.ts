@@ -21,6 +21,19 @@ export function usePostComments(postId?: string) {
   return { comments: q.data ?? [], isLoading: q.isLoading, refetch: q.refetch };
 }
 
+export function useDeleteComment(postId?: string) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: string) => apiClient(user!.id).delete(`/posts/comments/${commentId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['comments', postId] });
+      qc.invalidateQueries({ queryKey: ['post', postId] });
+      qc.invalidateQueries({ queryKey: ['feed'] });
+    },
+  });
+}
+
 export function useAddComment(postId?: string) {
   const { user } = useAuth();
   const qc = useQueryClient();

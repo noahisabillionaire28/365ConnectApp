@@ -1,17 +1,22 @@
 import { useState } from 'react';
 import { useParams, useLocation } from 'wouter';
-import { ChevronLeft, Send } from 'lucide-react';
+import { ChevronLeft, Send, Trash2 } from 'lucide-react';
 import { usePost, useToggleLike } from '@/hooks/useFeed';
-import { usePostComments, useAddComment, type PostComment } from '@/hooks/usePostComments';
+import { usePostComments, useAddComment, useDeleteComment, type PostComment } from '@/hooks/usePostComments';
 import { PostCard } from '@/components/PostCard';
 import { relativeTime } from '@/hooks/useNotifications';
+import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
 
-function CommentRow({ c }: { c: PostComment }) {
+function CommentRow({ c, canDelete, onDelete }: {
+  c: PostComment; canDelete: boolean; onDelete: (id: string) => void;
+}) {
   const [, navigate] = useLocation();
+  const [confirming, setConfirming] = useState(false);
   const initials = (c.author_username ?? 'W').slice(0, 2).toUpperCase();
   const goAuthor = () => { if (c.author_username) navigate(`/worker/${c.author_username}`); };
   return (
-    <div className="flex items-start gap-2.5 px-4 py-3">
+    <div className="flex items-start gap-2.5 px-4 py-3 group">
       <button type="button" onClick={goAuthor}
         className="w-8 h-8 rounded-full overflow-hidden bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
         {c.author_photo_url
@@ -25,7 +30,22 @@ function CommentRow({ c }: { c: PostComment }) {
           </button>{' '}
           {c.body}
         </p>
-        <p className="text-[#9CA3AF] text-[11px] mt-0.5">{relativeTime(c.created_at)}</p>
+        <div className="flex items-center gap-3 mt-0.5">
+          <p className="text-[#9CA3AF] text-[11px]">{relativeTime(c.created_at)}</p>
+          {canDelete && (confirming
+            ? (
+              <>
+                <button type="button" onClick={() => onDelete(c.id)} className="text-[#EF4444] text-[11px] font-bold">Delete</button>
+                <button type="button" onClick={() => setConfirming(false)} className="text-[#9CA3AF] text-[11px]">Cancel</button>
+              </>
+            )
+            : (
+              <button type="button" aria-label="Delete comment" onClick={() => setConfirming(true)}
+                className="text-[#9CA3AF]">
+                <Trash2 size={13} aria-hidden />
+              </button>
+            ))}
+        </div>
       </div>
     </div>
   );
@@ -38,8 +58,15 @@ export function PostScreen() {
   const { post, isLoading } = usePost(postId);
   const { comments, isLoading: commentsLoading } = usePostComments(postId);
   const addComment = useAddComment(postId);
+  const deleteComment = useDeleteComment(postId);
   const toggleLike = useToggleLike();
+  const { user } = useAuth();
+  const { role } = useProfile();
   const [text, setText] = useState('');
+
+  // A comment can be deleted by its author, the post's author, or an admin.
+  const canDeleteComment = (c: PostComment) =>
+    c.user_id === user?.id || post?.user_id === user?.id || role === 'admin';
 
   function submit() {
     const body = text.trim();
@@ -64,7 +91,9 @@ export function PostScreen() {
           <p className="text-center text-[#737373] text-[14px] py-20">This post is no longer available.</p>
         )}
         {post && (
-          <PostCard post={post} onLike={(id) => toggleLike.mutate(id)} onOpenComments={() => { /* already here */ }} />
+          <PostCard post={post} onLike={(id) => toggleLike.mutate(id)}
+            onOpenComments={() => { /* already here */ }}
+            onDeleted={() => { if (window.history.length > 1) window.history.back(); else navigate('/explore'); }} />
         )}
 
         {post && (
@@ -76,7 +105,11 @@ export function PostScreen() {
             {!commentsLoading && comments.length === 0 && (
               <p className="px-4 py-6 text-[#9CA3AF] text-[13px] text-center">Be the first to comment.</p>
             )}
-            {comments.map((c) => <CommentRow key={c.id} c={c} />)}
+            {comments.map((c) => (
+              <CommentRow key={c.id} c={c}
+                canDelete={canDeleteComment(c)}
+                onDelete={(id) => deleteComment.mutate(id)} />
+            ))}
           </div>
         )}
       </div>
