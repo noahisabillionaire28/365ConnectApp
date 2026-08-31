@@ -41,6 +41,17 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: await makeHeaders(),
+    credentials: 'include',
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Admin API POST ${path} → ${res.status}`);
+  return res.json() as Promise<T>;
+}
+
 async function del<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'DELETE',
@@ -134,6 +145,8 @@ export const adminApi = {
     patch<{ ok: boolean }>(`/shifts/${id}/cancel`, {}),
   reopenShift:   (id: string) =>
     patch<{ ok: boolean }>(`/shifts/${id}/reopen`, {}),
+  backfillShiftCoords: (updates: Array<{ id: string; lat: number; lng: number }>) =>
+    post<{ updated: number }>(`/shifts/backfill-coords`, { updates }),
   deleteUser:    (id: string) =>
     del<{ ok: boolean }>(`/users/${id}`),
   updateDispute: (id: string, status: string, note?: string) =>

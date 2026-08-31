@@ -143,6 +143,29 @@ router.get('/shifts', async (_req, res) => {
   }
 });
 
+/* ── POST /api/admin/shifts/backfill-coords ──────────────────────────────────
+ * One-time cleanup: the client geocodes each shift's address and sends the
+ * resolved {id, lat, lng} here to overwrite stale/wrong stored coordinates
+ * (older shifts were saved with the poster's own location). Admin-only. */
+router.post('/shifts/backfill-coords', async (req, res) => {
+  try {
+    const updates = (req.body?.updates ?? []) as Array<{ id: string; lat: number; lng: number }>;
+    if (!Array.isArray(updates)) { res.status(400).json({ error: 'updates[] required' }); return; }
+    let updated = 0;
+    for (const u of updates) {
+      if (!u || typeof u.id !== 'string') continue;
+      const lat = Number(u.lat), lng = Number(u.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      const { error } = await adminDb.from('shifts').update({ lat, lng }).eq('id', u.id);
+      if (!error) updated++;
+    }
+    res.json({ updated });
+  } catch (err) {
+    console.error('[admin/shifts/backfill-coords]', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 /* ── PATCH /api/admin/shifts/:id/cancel ──────────────────────────────────── */
 router.patch('/shifts/:id/cancel', async (req, res) => {
   try {
