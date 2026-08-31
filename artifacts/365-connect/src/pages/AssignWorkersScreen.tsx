@@ -4,6 +4,7 @@ import { ChevronLeft, Star, BadgeCheck, UserPlus, CheckCircle2, Users } from 'lu
 import { useAssignWorkers, type AssignableWorker } from '@/hooks/useAssignWorkers';
 import { useShiftById } from '@/hooks/useShifts';
 import { useRole } from '@/contexts/RoleContext';
+import { useToast } from '@/contexts/ToastContext';
 import { BottomTabNav } from '@/components/BottomTabNav';
 
 const GOLD = '#FFD700';
@@ -78,6 +79,14 @@ export function AssignWorkersScreen() {
   const { role, roleLoading } = useRole();
   const { data: shift, isLoading: shiftLoading } = useShiftById(id);
   const { workers, isLoading, error, assign, assigningId } = useAssignWorkers(id);
+  const { showToast } = useToast();
+
+  function handleAssign(workerId: string) {
+    void assign(workerId).then((err) => {
+      if (err) showToast(err);
+      else showToast('Worker assigned to this shift.');
+    });
+  }
 
   useEffect(() => {
     if (!roleLoading && role !== 'staffer') navigate('/home');
@@ -146,7 +155,7 @@ export function AssignWorkersScreen() {
         ) : (
           <div className="flex flex-col gap-3">
             {workers.map((w) => (
-              <AssignCard key={w.id} worker={w} shiftFull={shiftFull} isAssigning={assigningId === w.id} onAssign={assign} />
+              <AssignCard key={w.id} worker={w} shiftFull={shiftFull} isAssigning={assigningId === w.id} onAssign={handleAssign} />
             ))}
           </div>
         )}

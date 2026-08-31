@@ -26,7 +26,12 @@ export function useApplications() {
   }, [user?.id]);
 
   const submitApplication = useCallback(
-    async (shiftId: string, matchScore?: number, onSuccess?: () => void): Promise<void> => {
+    async (
+      shiftId: string,
+      matchScore?: number,
+      onSuccess?: () => void,
+      onError?: (msg: string) => void,
+    ): Promise<void> => {
       if (!user?.id) return;
       if (appliedShiftIds.has(shiftId) || inFlight.current.has(shiftId)) return;
 
@@ -43,14 +48,16 @@ export function useApplications() {
       } catch (e: unknown) {
         inFlight.current.delete(shiftId);
         const msg = e instanceof Error ? e.message : String(e);
+        // Roll back the optimistic "applied" state on any failure.
+        setAppliedShiftIds((prev) => {
+          const next = new Set(prev); next.delete(shiftId); return next;
+        });
         if (msg.includes('Already applied')) {
           console.info('[Applications] Duplicate insert ignored:', shiftId);
           return;
         }
         console.error('[Applications] Insert failed:', msg);
-        setAppliedShiftIds((prev) => {
-          const next = new Set(prev); next.delete(shiftId); return next;
-        });
+        onError?.(msg);
       }
     },
     [user?.id, appliedShiftIds],

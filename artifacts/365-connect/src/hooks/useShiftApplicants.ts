@@ -72,20 +72,22 @@ export function useShiftApplicants(shiftId: string | undefined) {
     }
   }, [user?.id]);
 
-  const approve = useCallback(async (applicationId: string): Promise<boolean> => {
+  // Return null on success, or the server's error message on failure (e.g. a
+  // double-booking conflict) so the screen can show it.
+  const approve = useCallback(async (applicationId: string): Promise<string | null> => {
     try {
       await updateStatus(applicationId, 'accepted');
       setApplicants((prev) => prev.filter((a) => a.id !== applicationId));
-      return true;
-    } catch { return false; }
+      return null;
+    } catch (e) { return e instanceof Error ? e.message : 'Could not confirm this worker.'; }
   }, [updateStatus]);
 
-  const decline = useCallback(async (applicationId: string): Promise<boolean> => {
+  const decline = useCallback(async (applicationId: string): Promise<string | null> => {
     try {
       await updateStatus(applicationId, 'declined');
       setApplicants((prev) => prev.filter((a) => a.id !== applicationId));
-      return true;
-    } catch { return false; }
+      return null;
+    } catch (e) { return e instanceof Error ? e.message : 'Could not decline this applicant.'; }
   }, [updateStatus]);
 
   return { applicants, isLoading, approve, decline, updateStatus, refetch: load };

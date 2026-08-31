@@ -17,6 +17,38 @@ async function shiftLabel(id: string): Promise<string> {
   return data?.title ? `"${data.title}"` : 'a shift';
 }
 
+/**
+ * Returns a conflicting already-booked shift if `targetShiftId` overlaps in time
+ * with any shift the worker is already accepted for (double-booking guard), else
+ * null. Two shifts overlap when tStart < otherEnd && otherStart < tEnd.
+ */
+async function findTimeConflict(
+  workerId: string,
+  targetShiftId: string,
+): Promise<{ title: string | null; start: string; end: string } | null> {
+  const { data: target } = await adminDb
+    .from('shifts').select('start_time, end_time').eq('id', targetShiftId).maybeSingle();
+  if (!target?.start_time || !target?.end_time) return null;
+  const tStart = Date.parse(target.start_time), tEnd = Date.parse(target.end_time);
+  if (!Number.isFinite(tStart) || !Number.isFinite(tEnd)) return null;
+
+  const { data: apps } = await adminDb
+    .from('applications').select('shift_id').eq('worker_id', workerId).eq('status', 'accepted');
+  const otherIds = [...new Set((apps ?? []).map((a) => a.shift_id))].filter((id) => id !== targetShiftId);
+  if (!otherIds.length) return null;
+
+  const { data: shifts } = await adminDb
+    .from('shifts').select('id, title, start_time, end_time, status')
+    .in('id', otherIds as string[]);
+  for (const s of shifts ?? []) {
+    if (s.status === 'cancelled') continue;
+    const sStart = Date.parse(s.start_time), sEnd = Date.parse(s.end_time);
+    if (!Number.isFinite(sStart) || !Number.isFinite(sEnd)) continue;
+    if (tStart < sEnd && sStart < tEnd) return { title: s.title, start: s.start_time, end: s.end_time };
+  }
+  return null;
+}
+
 /** Returns true if userId is the client that owns the given shift. */
 async function ownsShift(userId: string, shiftId: string): Promise<boolean> {
   const { count } = await adminDb
@@ -213,6 +245,12 @@ router.get('/my-shift-ids', requireAuth, async (req, res) => {
 router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
   const { shift_id, match_score, message } = req.body as Record<string, unknown>;
   try {
+    const conflict = await findTimeConflict(req.userId!, shift_id as string);
+    if (conflict) {
+      return res.status(409).json({
+        error: `This overlaps a shift you're already booked for${conflict.title ? ` ("${conflict.title}")` : ''}.`,
+      });
+    }
     const { data, error } = await adminDb
       .from('applications')
       .upsert(
@@ -277,6 +315,17 @@ router.patch('/:id', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
+    // Double-booking guard: don't confirm a worker who's already booked for an
+    // overlapping shift.
+    if (status === 'accepted') {
+      const conflict = await findTimeConflict(appRow.worker_id, appRow.shift_id);
+      if (conflict) {
+        return res.status(409).json({
+          error: `This worker is already booked for an overlapping shift${conflict.title ? ` ("${conflict.title}")` : ''}.`,
+        });
+      }
+    }
+
     const { data, error } = await adminDb
       .from('applications')
       .update({ status })
@@ -338,6 +387,13 @@ router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req
     if (req.userRole === 'client' && !(await ownsShift(req.userId!, shift_id))) {
       return res.status(403).json({ error: 'Forbidden' });
     }
+    // Double-booking guard.
+    const assignConflict = await findTimeConflict(worker_id, shift_id);
+    if (assignConflict) {
+      return res.status(409).json({
+        error: `This worker is already booked for an overlapping shift${assignConflict.title ? ` ("${assignConflict.title}")` : ''}.`,
+      });
+    }
     const { data, error } = await adminDb
       .from('applications')
       .upsert(
@@ -366,6 +422,74 @@ router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req
       body: `You booked ${await workerName(worker_id)} for ${label}.`,
       shiftId: shift_id,
     });
+    return res.status(201).json(data);
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
+/**
+ * POST /api/applications/claim - a worker instantly claims an open-claim shift.
+ * No approval step: if the shift is marked instant_claim and has an open spot,
+ * the worker is confirmed immediately (first-come, first-served).
+ */
+router.post('/claim', requireAuth, requireRole('worker'), async (req, res) => {
+  const { shift_id } = req.body as Record<string, string>;
+  if (!shift_id) return res.status(400).json({ error: 'shift_id is required' });
+  try {
+    const { data: shift, error: sErr } = await adminDb
+      .from('shifts')
+      .select('id, title, client_id, status, spots_available, spots_filled, instant_claim')
+      .eq('id', shift_id)
+      .maybeSingle();
+    if (sErr) return res.status(500).json({ error: sErr.message });
+    if (!shift) return res.status(404).json({ error: 'Shift not found' });
+    if (!shift.instant_claim) return res.status(403).json({ error: 'This shift is not open for instant claim.' });
+    if (shift.status !== 'open') return res.status(409).json({ error: 'This shift is no longer open.' });
+    const spotsLeft = (shift.spots_available ?? 1) - (shift.spots_filled ?? 0);
+    if (spotsLeft <= 0) return res.status(409).json({ error: 'This shift is already full.' });
+
+    // Double-booking guard: can't claim a shift overlapping one you're booked for.
+    const claimConflict = await findTimeConflict(req.userId!, shift_id);
+    if (claimConflict) {
+      return res.status(409).json({
+        error: `This overlaps a shift you're already booked for${claimConflict.title ? ` ("${claimConflict.title}")` : ''}.`,
+      });
+    }
+
+    // Confirm the worker directly. The DB trigger on an accepted insert
+    // increments spots_filled and notifies the worker.
+    const { data, error } = await adminDb
+      .from('applications')
+      .upsert(
+        { shift_id, worker_id: req.userId, status: 'accepted' },
+        { onConflict: 'shift_id,worker_id' },
+      )
+      .select()
+      .single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    const label = await shiftLabel(shift_id);
+    // Confirmation to the worker who claimed it.
+    await createNotification({
+      userId: req.userId!,
+      fromUserId: shift.client_id,
+      type: 'booking',
+      title: "You're booked!",
+      body: `You claimed ${label}. You're confirmed.`,
+      shiftId: shift_id,
+    });
+    // Alert the shift owner that a worker grabbed the shift.
+    if (shift.client_id) {
+      await createNotification({
+        userId: shift.client_id,
+        fromUserId: req.userId,
+        type: 'receipt',
+        title: 'Shift claimed',
+        body: `${await workerName(req.userId!)} claimed ${label}.`,
+        shiftId: shift_id,
+      });
+    }
     return res.status(201).json(data);
   } catch (e) {
     return res.status(500).json({ error: String(e) });

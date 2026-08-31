@@ -116,6 +116,7 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
     parking_notes: b.parking_notes ?? null,
     special_instructions: b.special_instructions ?? null,
     repeat_type: b.repeat_type ?? 'once',
+    instant_claim: b.instant_claim ?? false,
   };
   const { data, error } = await adminDb
     .from('shifts')
@@ -133,7 +134,7 @@ router.patch('/:id', requireAuth, requireRole('client', 'staffer'), async (req, 
     'start_time','end_time','spots_available','status','lat','lng','cover_image',
     'company_name','requirements','dress_code','dress_code_items',
     'point_of_contact','contact_phone','unit_info','parking_notes',
-    'special_instructions','repeat_type',
+    'special_instructions','repeat_type','instant_claim',
   ];
   const body = req.body as Record<string, unknown>;
   const updates: Record<string, unknown> = {};

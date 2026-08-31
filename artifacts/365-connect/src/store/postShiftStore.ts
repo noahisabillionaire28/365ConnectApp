@@ -29,6 +29,9 @@ export type PostShiftDraft = {
   pay_rate:     number;
   description:  string;
   requirements: string[]; // one requirement per line → string[]
+
+  // ── Booking mode ─────────────────────────────────────────────────────────
+  instant_claim: boolean; // true = any qualified worker can grab it, no approval
 };
 
 // ─── Default location (updated by initDraftLocation; survives resetDraft) ────
@@ -53,6 +56,7 @@ function empty(): PostShiftDraft {
     pay_rate:        0,
     description:     '',
     requirements:    [],
+    instant_claim:   false,
   };
 }
 

@@ -50,6 +50,7 @@ export function PostShiftStep4Screen() {
   const [description,  setDescription]  = useState(initial.description);
   // requirements stored as newline-separated string in the textarea
   const [reqText,      setReqText]      = useState(initial.requirements.join('\n'));
+  const [instantClaim, setInstantClaim] = useState(initial.instant_claim);
   const [errors,       setErrors]       = useState<Record<string, string>>({});
 
   const payNum = Number(payRateStr);
@@ -74,6 +75,7 @@ export function PostShiftStep4Screen() {
       pay_rate:     payNum,
       description:  description.trim(),
       requirements,
+      instant_claim: instantClaim,
     });
     navigate('/post-shift/step5');
   }
@@ -184,6 +186,33 @@ export function PostShiftStep4Screen() {
               {reqText.split('\n').filter((l) => l.trim()).length !== 1 ? 's' : ''} listed
             </p>
           )}
+        </div>
+
+        {/* Open Claim — instant grab, no approval */}
+        <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-4 mt-4">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-[#111827] font-bold text-[15px]">Let workers claim instantly</h2>
+              <p className="text-[#6B7280] text-[12px] leading-snug mt-1">
+                Any qualified worker can grab this shift with no approval — great for
+                filling last-minute gaps fast. Off = you review applicants first.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={instantClaim}
+              aria-label="Let workers claim this shift instantly"
+              onClick={() => setInstantClaim((v) => !v)}
+              className={`inline-flex items-center w-[50px] h-[30px] rounded-full p-[3px] flex-shrink-0 transition-colors duration-200 ${
+                instantClaim ? 'bg-emerald-600' : 'bg-[#D1D5DB]'
+              }`}
+            >
+              <span className={`inline-block w-[24px] h-[24px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.3)] transition-transform duration-200 ${
+                instantClaim ? 'translate-x-[20px]' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
         </div>
 
       </div>

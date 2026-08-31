@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, Star, UserPlus,
-  Edit3, Trash2, DollarSign, Navigation, X,
+  Edit3, Trash2, DollarSign, Navigation, X, Zap,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -158,6 +158,7 @@ export function ShiftDetailScreen() {
   const { showToast } = useToast();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [claiming, setClaiming] = useState(false);
   const [directionsOpen, setDirectionsOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
@@ -242,7 +243,8 @@ export function ShiftDetailScreen() {
   //   accepted+not clocked out → Clock In (gold, 1mi gate) | accepted+clocked out → Completed
   // Completion is tracked per-worker via time_entries.clock_out rather than
   // shifts.status, since RLS only lets the shift's client owner update shifts.
-  type CtaState = 'apply' | 'pending' | 'declined' | 'clock-in' | 'completed';
+  const canClaim = shift.instantClaim && shift.spotsAvailable > 0;
+  type CtaState = 'apply' | 'claim' | 'pending' | 'declined' | 'clock-in' | 'completed';
   const ctaState: CtaState =
     applicationStatus === 'accepted'
       ? (hasCompleted ? 'completed' : 'clock-in')
@@ -250,14 +252,34 @@ export function ShiftDetailScreen() {
       ? 'pending'
       : applicationStatus === 'declined'
       ? 'declined'
+      : canClaim
+      ? 'claim'
       : 'apply';
+
+  async function handleClaim() {
+    if (!user?.id || claiming) return;
+    setClaiming(true);
+    try {
+      await apiClient(user.id).post('/applications/claim', { shift_id: shiftId });
+      showToast("You're booked! Shift claimed.");
+      navigate('/home');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not claim — it may already be full.');
+    } finally {
+      setClaiming(false);
+    }
+  }
 
   function handleCta() {
     if (ctaState === 'apply') {
-      void submitApplication(shiftId, matchScore ?? undefined, () => {
-        showToast('Applied! The client will review your application.');
-      });
+      void submitApplication(
+        shiftId,
+        matchScore ?? undefined,
+        () => showToast('Applied! The client will review your application.'),
+        (msg) => showToast(msg),
+      );
     }
+    if (ctaState === 'claim') void handleClaim();
     if (ctaState === 'clock-in' && withinClockInRange) navigate(`/clock/${shiftId}`);
   }
 
@@ -761,6 +783,18 @@ export function ShiftDetailScreen() {
             aria-label={`Apply to ${shift.companyName}`}
             className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] tracking-wide">
             Apply Now
+          </motion.button>
+        )}
+
+        {ctaState === 'claim' && !isOwner && (
+          <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleCta}
+            disabled={claiming}
+            aria-label={`Claim this shift at ${shift.companyName} — instant confirmation`}
+            className="w-full h-[52px] rounded-[8px] bg-emerald-600 text-white font-bold text-[16px] tracking-wide flex items-center justify-center gap-2 disabled:opacity-70">
+            {claiming
+              ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              : <Zap size={18} aria-hidden className="fill-white" />}
+            {claiming ? 'Claiming…' : 'Claim This Shift'}
           </motion.button>
         )}
 

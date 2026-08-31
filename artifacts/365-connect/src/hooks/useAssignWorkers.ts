@@ -49,18 +49,20 @@ export function useAssignWorkers(shiftId: string | undefined) {
     }).finally(() => setLoading(false));
   }, [shiftId, user?.id]);
 
-  const assign = useCallback(async (workerId: string): Promise<boolean> => {
-    if (!shiftId || !user?.id) return false;
+  // Returns null on success, or the server's error message (e.g. a double-booking
+  // conflict) on failure so the screen can surface it.
+  const assign = useCallback(async (workerId: string): Promise<string | null> => {
+    if (!shiftId || !user?.id) return 'Not signed in.';
     setAssigningId(workerId);
     try {
       await apiClient(user.id).post('/applications/assign', { shift_id: shiftId, worker_id: workerId });
       setWorkers((prev) => prev.map((w) =>
         w.id === workerId ? { ...w, applicationStatus: 'accepted' } : w,
       ));
-      return true;
+      return null;
     } catch (e) {
       console.error('[useAssignWorkers] assign failed:', e);
-      return false;
+      return e instanceof Error ? e.message : 'Could not assign this worker.';
     } finally {
       setAssigningId(null);
     }
