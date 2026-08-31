@@ -29,6 +29,8 @@ export type MockShift = {
   distanceMiles: number;
   spotsAvailable: number;
   spotsTotal: number;
+  /** true when workers can grab this shift instantly with no approval. */
+  instantClaim: boolean;
   location: string;
   aiMatchPct: number;
   description: string;
@@ -129,6 +131,7 @@ export type ShiftRow = {
   date: string | null;      // optional display-date override; usually null — derive from start_time
   spots_available: number;  // total slots posted (despite the name, this is the total, not the remainder — remainder = spots_available - spots_filled)
   spots_filled: number;
+  instant_claim?: boolean | null;
   status: 'open' | 'filled' | 'cancelled' | 'completed';
   created_at: string;
   // Phase 2 extended columns
@@ -360,6 +363,7 @@ export function shiftRowToMockShift(
     distanceMiles:  Math.round(haversineMiles(refCoords.lat, refCoords.lng, lat, lng) * 10) / 10,
     spotsAvailable,
     spotsTotal:     row.spots_available ?? 1,
+    instantClaim:   !!row.instant_claim,
     location:       row.location        ?? 'Miami, FL',
     aiMatchPct:     row.ai_match_pct    ?? 85,
     description:    row.description     ?? '',

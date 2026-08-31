@@ -372,4 +372,64 @@ router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req
   }
 });
 
+/**
+ * POST /api/applications/claim - a worker instantly claims an open-claim shift.
+ * No approval step: if the shift is marked instant_claim and has an open spot,
+ * the worker is confirmed immediately (first-come, first-served).
+ */
+router.post('/claim', requireAuth, requireRole('worker'), async (req, res) => {
+  const { shift_id } = req.body as Record<string, string>;
+  if (!shift_id) return res.status(400).json({ error: 'shift_id is required' });
+  try {
+    const { data: shift, error: sErr } = await adminDb
+      .from('shifts')
+      .select('id, title, client_id, status, spots_available, spots_filled, instant_claim')
+      .eq('id', shift_id)
+      .maybeSingle();
+    if (sErr) return res.status(500).json({ error: sErr.message });
+    if (!shift) return res.status(404).json({ error: 'Shift not found' });
+    if (!shift.instant_claim) return res.status(403).json({ error: 'This shift is not open for instant claim.' });
+    if (shift.status !== 'open') return res.status(409).json({ error: 'This shift is no longer open.' });
+    const spotsLeft = (shift.spots_available ?? 1) - (shift.spots_filled ?? 0);
+    if (spotsLeft <= 0) return res.status(409).json({ error: 'This shift is already full.' });
+
+    // Confirm the worker directly. The DB trigger on an accepted insert
+    // increments spots_filled and notifies the worker.
+    const { data, error } = await adminDb
+      .from('applications')
+      .upsert(
+        { shift_id, worker_id: req.userId, status: 'accepted' },
+        { onConflict: 'shift_id,worker_id' },
+      )
+      .select()
+      .single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    const label = await shiftLabel(shift_id);
+    // Confirmation to the worker who claimed it.
+    await createNotification({
+      userId: req.userId!,
+      fromUserId: shift.client_id,
+      type: 'booking',
+      title: "You're booked!",
+      body: `You claimed ${label}. You're confirmed.`,
+      shiftId: shift_id,
+    });
+    // Alert the shift owner that a worker grabbed the shift.
+    if (shift.client_id) {
+      await createNotification({
+        userId: shift.client_id,
+        fromUserId: req.userId,
+        type: 'receipt',
+        title: 'Shift claimed',
+        body: `${await workerName(req.userId!)} claimed ${label}.`,
+        shiftId: shift_id,
+      });
+    }
+    return res.status(201).json(data);
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
 export default router;

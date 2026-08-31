@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   Search, MapPin, Plus,
-  List as ListIcon, Map as MapIcon, CalendarDays, Clock, DollarSign, Users, CheckCircle2,
+  List as ListIcon, Map as MapIcon, CalendarDays, Clock, DollarSign, Users, CheckCircle2, Zap,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { LeafletMap } from '@/components/LeafletMap';
@@ -61,6 +61,11 @@ function ShiftRow({ shift, applied, onTap }: {
             <Users size={11} aria-hidden />
             {shift.spotsAvailable} left
           </span>
+          {shift.instantClaim && (
+            <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-0.5 flex-shrink-0">
+              <Zap size={9} aria-hidden className="fill-emerald-600 text-emerald-600" /> Claim
+            </span>
+          )}
         </div>
         {applied && (
           <div aria-label="Already applied" className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
