@@ -159,6 +159,8 @@ export function ShiftDetailScreen() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [claiming, setClaiming] = useState(false);
+  const [reportingId, setReportingId] = useState<string | null>(null);
+  const [reportedNoShow, setReportedNoShow] = useState<Set<string>>(new Set());
   const [directionsOpen, setDirectionsOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
@@ -267,6 +269,20 @@ export function ShiftDetailScreen() {
       showToast(e instanceof Error ? e.message : 'Could not claim — it may already be full.');
     } finally {
       setClaiming(false);
+    }
+  }
+
+  async function handleReportNoShow(workerId: string) {
+    if (!user?.id || reportingId) return;
+    setReportingId(workerId);
+    try {
+      await apiClient(user.id).post('/applications/no-show', { shift_id: shiftId, worker_id: workerId });
+      setReportedNoShow((prev) => new Set(prev).add(workerId));
+      showToast('No-show reported — our team will review it.');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not report this no-show.');
+    } finally {
+      setReportingId(null);
     }
   }
 
@@ -727,6 +743,22 @@ export function ShiftDetailScreen() {
                       )}
                     </div>
                   </div>
+                  {w.attendance === 'no_show' && (
+                    <div className="flex-shrink-0">
+                      {reportedNoShow.has(w.workerId) ? (
+                        <span className="bg-red-50 border border-red-200 text-red-600 text-[12px] font-semibold px-3 py-2 rounded-[8px]">
+                          Reported
+                        </span>
+                      ) : (
+                        <button type="button" disabled={reportingId === w.workerId}
+                          onClick={() => void handleReportNoShow(w.workerId)}
+                          aria-label={`Report ${w.username ?? 'this worker'} as a no-show`}
+                          className="bg-white border border-red-200 text-red-600 text-[12px] font-semibold px-3 py-2 rounded-[8px] disabled:opacity-60">
+                          {reportingId === w.workerId ? 'Reporting…' : 'Report no-show'}
+                        </button>
+                      )}
+                    </div>
+                  )}
                   {w.completed && (
                     <div className="flex flex-col items-end gap-2 flex-shrink-0">
                       {w.paid ? (
