@@ -272,9 +272,12 @@ export function ShiftDetailScreen() {
 
   function handleCta() {
     if (ctaState === 'apply') {
-      void submitApplication(shiftId, matchScore ?? undefined, () => {
-        showToast('Applied! The client will review your application.');
-      });
+      void submitApplication(
+        shiftId,
+        matchScore ?? undefined,
+        () => showToast('Applied! The client will review your application.'),
+        (msg) => showToast(msg),
+      );
     }
     if (ctaState === 'claim') void handleClaim();
     if (ctaState === 'clock-in' && withinClockInRange) navigate(`/clock/${shiftId}`);

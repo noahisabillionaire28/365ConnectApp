@@ -142,8 +142,8 @@ export function ApplicantsScreen() {
                     isTop={i === arr.length - 1}
                     onDecide={(decision) => {
                       void (decision === 'accepted' ? approve(a.applicationId) : decline(a.applicationId))
-                        .then((ok) => {
-                          if (!ok) return;
+                        .then((err) => {
+                          if (err) { showToast(err); return; }
                           if (decision === 'accepted') { showToast('Worker confirmed for your shift!'); navigate('/home'); }
                           else showToast('Applicant declined.');
                         });
@@ -157,7 +157,7 @@ export function ApplicantsScreen() {
                 aria-label="Decline applicant"
                 onClick={() => {
                   const top = applicants[0];
-                  if (top) void decline(top.applicationId).then((ok) => { if (ok) showToast('Applicant declined.'); });
+                  if (top) void decline(top.applicationId).then((err) => showToast(err ?? 'Applicant declined.'));
                 }}
                 className="w-16 h-16 rounded-full bg-white border-2 border-[#DBDBDB] flex items-center justify-center">
                 <X size={26} aria-hidden className="text-[#737373]" />
@@ -166,7 +166,7 @@ export function ApplicantsScreen() {
                 aria-label="Approve applicant"
                 onClick={() => {
                   const top = applicants[0];
-                  if (top) void approve(top.applicationId).then((ok) => { if (ok) { showToast('Worker confirmed for your shift!'); navigate('/home'); } });
+                  if (top) void approve(top.applicationId).then((err) => { if (err) { showToast(err); return; } showToast('Worker confirmed for your shift!'); navigate('/home'); });
                 }}
                 className="w-16 h-16 rounded-full bg-[#10B981] flex items-center justify-center">
                 <Check size={28} aria-hidden className="text-white" />
