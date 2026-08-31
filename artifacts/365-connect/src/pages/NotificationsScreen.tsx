@@ -22,6 +22,9 @@ const ICON_META: Record<string, { icon: React.ComponentType<{ size?: number; cla
   shift_starting_soon:   { icon: AlarmClock,  color: 'blue'  },
   booking:               { icon: CheckCheck,  color: 'green' },
   receipt:               { icon: Bell,        color: 'navy'  },
+  no_show:               { icon: Ban,         color: 'red'   },
+  no_show_alert:         { icon: AlarmClock,  color: 'red'   },
+  late_clock_in:         { icon: AlarmClock,  color: 'red'   },
 };
 
 const COLOR_CLASSES: Record<IconColor, { bg: string; icon: string }> = {

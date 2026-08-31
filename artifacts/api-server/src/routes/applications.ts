@@ -496,4 +496,69 @@ router.post('/claim', requireAuth, requireRole('worker'), async (req, res) => {
   }
 });
 
+/**
+ * POST /api/applications/no-show - the shift owner reports a booked worker who
+ * never clocked in. Files a 'no-show' dispute (feeds the admin queue) and
+ * notifies the worker. Guards: caller owns the shift, worker was accepted, the
+ * shift has started, the worker has no clock-in, and no prior no-show on file.
+ */
+router.post('/no-show', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
+  const { shift_id, worker_id } = req.body as Record<string, string>;
+  if (!shift_id || !worker_id) {
+    return res.status(400).json({ error: 'shift_id and worker_id are required' });
+  }
+  try {
+    const { data: shift } = await adminDb
+      .from('shifts').select('id, title, client_id, start_time').eq('id', shift_id).maybeSingle();
+    if (!shift) return res.status(404).json({ error: 'Shift not found' });
+    // Clients may only report on their own shifts; staffers on any shift.
+    if (req.userRole === 'client' && shift.client_id !== req.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    // The worker must be booked (accepted) for this shift.
+    const { count: acceptedCount } = await adminDb
+      .from('applications').select('*', { count: 'exact', head: true })
+      .eq('shift_id', shift_id).eq('worker_id', worker_id).eq('status', 'accepted');
+    if (!acceptedCount) return res.status(409).json({ error: 'That worker is not booked for this shift.' });
+    // The shift must have started.
+    const startMs = shift.start_time ? Date.parse(shift.start_time) : NaN;
+    if (Number.isFinite(startMs) && Date.now() < startMs) {
+      return res.status(409).json({ error: "The shift hasn't started yet." });
+    }
+    // They must not have clocked in.
+    const { data: entry } = await adminDb
+      .from('time_entries').select('clock_in').eq('shift_id', shift_id).eq('worker_id', worker_id).maybeSingle();
+    if (entry?.clock_in) return res.status(409).json({ error: 'That worker already clocked in.' });
+    // No duplicate no-show report.
+    const { count: dupes } = await adminDb
+      .from('disputes').select('*', { count: 'exact', head: true })
+      .eq('shift_id', shift_id).eq('reported_user_id', worker_id).eq('type', 'no-show');
+    if (dupes) return res.status(409).json({ error: 'A no-show is already on file for this worker.' });
+
+    const label = await shiftLabel(shift_id);
+    const { error: dErr } = await adminDb.from('disputes').insert({
+      type: 'no-show',
+      reason: `Worker did not clock in for ${label}.`,
+      reported_user_id: worker_id,
+      reported_by_user_id: req.userId,
+      shift_id,
+      status: 'open',
+    });
+    if (dErr) return res.status(500).json({ error: dErr.message });
+
+    // Let the worker know a no-show was reported.
+    await createNotification({
+      userId: worker_id,
+      fromUserId: req.userId,
+      type: 'no_show',
+      title: 'No-show reported',
+      body: `A no-show was reported for ${label}. Contact the organizer if this is a mistake.`,
+      shiftId: shift_id,
+    });
+    return res.status(201).json({ ok: true });
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
 export default router;
