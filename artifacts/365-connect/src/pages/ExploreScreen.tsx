@@ -1,8 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { Search, BadgeCheck } from 'lucide-react';
+import { Search, BadgeCheck, ImagePlus } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
+import { PostCard } from '@/components/PostCard';
 import { usePeopleFeed, type WorkerPerson } from '@/hooks/usePeopleFeed';
+import { useFeed, useToggleLike, useCreatePost } from '@/hooks/useFeed';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
+import { uploadPostPhoto } from '@/lib/storage';
 import { JOB_TYPES } from '@/lib/jobTypes';
 
 const GOLD = '#FFD700';
@@ -37,74 +42,163 @@ function ExploreTileSkeleton() {
 
 export function ExploreScreen() {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const [tab, setTab] = useState<'feed' | 'people'>('feed');
+
+  // People tab
   const { people, isLoading, error } = usePeopleFeed();
   const [query, setQuery]     = useState('');
   const [jobType, setJobType] = useState<string | null>(null);
-
   const filtered = people.filter((p) => {
     if (jobType && p.primaryJobType !== jobType) return false;
     if (query && !(p.username ?? '').toLowerCase().includes(query.toLowerCase())) return false;
     return true;
   });
 
+  // Feed tab
+  const { posts, isLoading: feedLoading } = useFeed();
+  const toggleLike = useToggleLike();
+  const createPost = useCreatePost();
+  const [posting, setPosting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handlePick(file: File | undefined) {
+    if (!file || !user?.id) return;
+    setPosting(true);
+    try {
+      const url = await uploadPostPhoto(user.id, file);
+      await createPost.mutateAsync({ photo_url: url, caption: null });
+      showToast('Posted to the feed!');
+    } catch {
+      showToast('Could not post — try again.');
+    } finally {
+      setPosting(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[56px]">
       <div className="sticky top-0 z-20 bg-white border-b border-[#DBDBDB]">
-        <div className="px-4 pt-4 pb-3">
-          <div className="flex items-center gap-2 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[10px] px-3.5 h-[42px]">
-            <Search size={15} aria-hidden className="text-[#737373] flex-shrink-0" />
-            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search workers" aria-label="Search workers"
-              className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] outline-none" />
+        {/* Feed / People toggle */}
+        <div className="flex items-center gap-2 px-4 pt-4 pb-3">
+          <div className="flex bg-[#F3F4F6] rounded-full p-[3px] flex-1" role="tablist" aria-label="Explore view">
+            <button type="button" role="tab" aria-selected={tab === 'feed'} onClick={() => setTab('feed')}
+              className={`flex-1 h-[34px] rounded-full text-[13px] font-bold transition-all ${
+                tab === 'feed' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280]'}`}>
+              Feed
+            </button>
+            <button type="button" role="tab" aria-selected={tab === 'people'} onClick={() => setTab('people')}
+              className={`flex-1 h-[34px] rounded-full text-[13px] font-bold transition-all ${
+                tab === 'people' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280]'}`}>
+              People
+            </button>
           </div>
         </div>
-        <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none" role="radiogroup" aria-label="Filter by job type"
-          style={{ WebkitOverflowScrolling: 'touch' }}>
-          <button type="button" role="radio" aria-checked={jobType === null} onClick={() => setJobType(null)}
-            className={`flex-shrink-0 h-[30px] px-3.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
-              jobType === null ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'
-            }`}>
-            All
-          </button>
-          {JOB_TYPES.map((t) => (
-            <button key={t} type="button" role="radio" aria-checked={jobType === t}
-              onClick={() => setJobType(t)}
-              className={`flex-shrink-0 h-[30px] px-3.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
-                jobType === t ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'
-              }`}>
-              {t}
-            </button>
-          ))}
-        </div>
+
+        {/* People search + filters */}
+        {tab === 'people' && (
+          <>
+            <div className="px-4 pb-3">
+              <div className="flex items-center gap-2 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[10px] px-3.5 h-[42px]">
+                <Search size={15} aria-hidden className="text-[#737373] flex-shrink-0" />
+                <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search workers" aria-label="Search workers"
+                  className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] outline-none" />
+              </div>
+            </div>
+            <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none" role="radiogroup" aria-label="Filter by job type"
+              style={{ WebkitOverflowScrolling: 'touch' }}>
+              <button type="button" role="radio" aria-checked={jobType === null} onClick={() => setJobType(null)}
+                className={`flex-shrink-0 h-[30px] px-3.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
+                  jobType === null ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'}`}>
+                All
+              </button>
+              {JOB_TYPES.map((t) => (
+                <button key={t} type="button" role="radio" aria-checked={jobType === t}
+                  onClick={() => setJobType(t)}
+                  className={`flex-shrink-0 h-[30px] px-3.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
+                    jobType === t ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       <main className="flex-1 overflow-y-auto">
-        {error && !isLoading && (
-          <div className="mx-4 mt-6 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-            <p className="text-[#737373] text-[14px]">Couldn't load workers right now.</p>
-          </div>
-        )}
-
-        {isLoading && (
-          <div className="grid grid-cols-3 gap-[2px]" aria-busy="true" aria-label="Loading workers">
-            {Array.from({ length: 12 }).map((_, i) => <ExploreTileSkeleton key={i} />)}
-          </div>
-        )}
-
-        {!isLoading && !error && filtered.length > 0 && (
-          <div className="grid grid-cols-3 gap-[2px]" role="grid" aria-label="Worker profiles">
-            {filtered.map((p) => (
-              <ExploreTile key={p.id} person={p} onTap={() => navigate(`/worker/${p.username}`)} />
+        {tab === 'people' ? (
+          <>
+            {error && !isLoading && (
+              <div className="mx-4 mt-6 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
+                <p className="text-[#737373] text-[14px]">Couldn't load workers right now.</p>
+              </div>
+            )}
+            {isLoading && (
+              <div className="grid grid-cols-3 gap-[2px]" aria-busy="true" aria-label="Loading workers">
+                {Array.from({ length: 12 }).map((_, i) => <ExploreTileSkeleton key={i} />)}
+              </div>
+            )}
+            {!isLoading && !error && filtered.length > 0 && (
+              <div className="grid grid-cols-3 gap-[2px]" role="grid" aria-label="Worker profiles">
+                {filtered.map((p) => (
+                  <ExploreTile key={p.id} person={p} onTap={() => navigate(`/worker/${p.username}`)} />
+                ))}
+              </div>
+            )}
+            {!isLoading && !error && filtered.length === 0 && (
+              <div className="mx-4 mt-6 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
+                <p className="text-[#737373] text-[14px]">No workers found. Try adjusting your filters.</p>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {feedLoading && (
+              <div className="flex flex-col">
+                {[1, 2].map((n) => (
+                  <div key={n} className="border-b border-[#EFEFEF] pb-4">
+                    <div className="flex items-center gap-2.5 px-4 py-3">
+                      <div className="w-9 h-9 rounded-full bg-[#EFEFEF] animate-pulse" />
+                      <div className="w-24 h-3 rounded bg-[#EFEFEF] animate-pulse" />
+                    </div>
+                    <div className="w-full h-[320px] bg-[#EFEFEF] animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            )}
+            {!feedLoading && posts.length === 0 && (
+              <div className="mx-4 mt-8 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-12 text-center">
+                <p className="text-[#111827] text-[15px] font-semibold">No posts yet</p>
+                <p className="text-[#737373] text-[13px] mt-1">Be the first — tap the camera to share a moment from a shift.</p>
+              </div>
+            )}
+            {!feedLoading && posts.map((post) => (
+              <PostCard key={post.id} post={post}
+                onLike={(id) => toggleLike.mutate(id)}
+                onOpenComments={(id) => navigate(`/post/${id}`)} />
             ))}
-          </div>
-        )}
-
-        {!isLoading && !error && filtered.length === 0 && (
-          <div className="mx-4 mt-6 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-            <p className="text-[#737373] text-[14px]">No workers found. Try adjusting your filters.</p>
-          </div>
+          </>
         )}
       </main>
+
+      {/* Compose FAB (feed tab) */}
+      {tab === 'feed' && (
+        <>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden"
+            onChange={(e) => void handlePick(e.target.files?.[0])} />
+          <button type="button" aria-label="Share a photo"
+            disabled={posting}
+            onClick={() => fileRef.current?.click()}
+            className="fixed bottom-[72px] right-4 z-40 w-14 h-14 rounded-full bg-[#0A1628] text-white shadow-lg flex items-center justify-center disabled:opacity-70">
+            {posting
+              ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              : <ImagePlus size={22} aria-hidden />}
+          </button>
+        </>
+      )}
 
       <BottomTabNav />
     </div>

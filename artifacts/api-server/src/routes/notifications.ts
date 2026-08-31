@@ -87,8 +87,9 @@ export async function createNotification(params: {
   title:       string;
   body:        string;
   shiftId?:    string | null;
+  postId?:     string | null;
 }): Promise<void> {
-  const { userId, fromUserId, type, title, body, shiftId } = params;
+  const { userId, fromUserId, type, title, body, shiftId, postId } = params;
   try {
     // Respect the recipient's in-app notification preference. (A DB-level gate
     // trigger enforces the same rule for notifications created by SQL triggers.)
@@ -108,6 +109,7 @@ export async function createNotification(params: {
         title,
         body,
         shift_id: shiftId ?? null,
+        post_id: postId ?? null,
       })
       .select()
       .maybeSingle();

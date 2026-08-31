@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import {
   MapPin, CheckCheck, XCircle, Bell, DollarSign, Star, UserPlus, Send, AlarmClock, Ban, Settings,
+  Heart, MessageCircle,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { BottomTabNav } from '@/components/BottomTabNav';
@@ -25,6 +26,8 @@ const ICON_META: Record<string, { icon: React.ComponentType<{ size?: number; cla
   no_show:               { icon: Ban,         color: 'red'   },
   no_show_alert:         { icon: AlarmClock,  color: 'red'   },
   late_clock_in:         { icon: AlarmClock,  color: 'red'   },
+  post_like:             { icon: Heart,          color: 'red'  },
+  post_comment:          { icon: MessageCircle,  color: 'blue' },
 };
 
 const COLOR_CLASSES: Record<IconColor, { bg: string; icon: string }> = {

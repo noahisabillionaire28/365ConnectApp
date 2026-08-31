@@ -439,10 +439,12 @@ export function ProfileScreen() {
         {posts.filter((p) => p.photo_url).length > 0 ? (
           <div className="grid grid-cols-3 gap-[3px]">
             {posts.filter((p) => p.photo_url).map((p) => (
-              <div key={p.id} className="relative aspect-square overflow-hidden bg-[#EFEFEF] rounded-[4px]">
+              <button type="button" key={p.id} onClick={() => navigate(`/post/${p.id}`)}
+                aria-label="Open post"
+                className="relative aspect-square overflow-hidden bg-[#EFEFEF] rounded-[4px]">
                 <img src={p.photo_url as string} alt={p.caption ?? 'Post'}
                   loading="lazy" decoding="async" className="w-full h-full object-cover" />
-              </div>
+              </button>
             ))}
           </div>
         ) : (

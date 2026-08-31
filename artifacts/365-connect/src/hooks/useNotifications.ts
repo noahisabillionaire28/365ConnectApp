@@ -30,6 +30,7 @@ export function notificationDeepLink(
 ): string {
   // A booking (worker accepted for a shift) sends the worker to their home.
   if (n.type === 'booking') return '/home';
+  if (n.post_id) return `/post/${n.post_id}`;
   if (n.shift_id) return `/shift/${n.shift_id}`;
   if (n.type === 'new_message') return '/messages';
   return '/notifications';
