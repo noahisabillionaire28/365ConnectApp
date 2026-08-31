@@ -64,6 +64,19 @@ export function useToggleLike() {
   });
 }
 
+/** Delete a post (author or admin). Removes it from the feed cache. */
+export function useDeletePost() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (postId: string) => apiClient(user!.id).delete(`/posts/${postId}`),
+    onSuccess: (_data, postId) => {
+      qc.setQueryData<FeedPost[]>(['feed'], (old) => (old ?? []).filter((p) => p.id !== postId));
+      qc.invalidateQueries({ queryKey: ['posts'] });
+    },
+  });
+}
+
 /** Create a new photo post from the feed composer. */
 export function useCreatePost() {
   const { user } = useAuth();

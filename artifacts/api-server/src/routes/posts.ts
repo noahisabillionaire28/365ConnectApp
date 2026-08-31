@@ -157,6 +157,26 @@ router.post('/:postId/comments', requireAuth, async (req, res) => {
   });
 });
 
+/* ── DELETE /api/posts/comments/:commentId — comment author, post author, or admin ── */
+router.delete('/comments/:commentId', requireAuth, async (req, res) => {
+  const { data: c } = await adminDb
+    .from('post_comments').select('id, user_id, post_id').eq('id', req.params.commentId).maybeSingle();
+  if (!c) return res.status(404).json({ error: 'Not found' });
+  let allowed = c.user_id === req.userId;
+  if (!allowed) {
+    const { data: post } = await adminDb.from('posts').select('user_id').eq('id', c.post_id).maybeSingle();
+    if (post?.user_id === req.userId) allowed = true;
+  }
+  if (!allowed) {
+    const { data: me } = await adminDb.from('users').select('role').eq('id', req.userId).maybeSingle();
+    if (me?.role === 'admin') allowed = true;
+  }
+  if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+  const { error } = await adminDb.from('post_comments').delete().eq('id', c.id);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ ok: true });
+});
+
 /* ── DELETE /api/posts/:postId — author or admin (moderation) ───────────────── */
 router.delete('/:postId', requireAuth, async (req, res) => {
   const { data: post } = await adminDb
