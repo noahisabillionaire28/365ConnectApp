@@ -181,6 +181,7 @@ export type NotificationRow = {
   title: string;
   body: string | null;
   shift_id: string | null;
+  post_id: string | null;
   from_user_id: string | null;
   amount: number | null;
   read_at: string | null;

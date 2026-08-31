@@ -36,6 +36,7 @@ import { MessagesScreen }        from '@/pages/MessagesScreen';
 import { ChatScreen }            from '@/pages/ChatScreen';
 import { NotificationsScreen }   from '@/pages/NotificationsScreen';
 import { NotificationSettingsScreen } from '@/pages/NotificationSettingsScreen';
+import { PostScreen }             from '@/pages/PostScreen';
 import { ProfileScreen }         from '@/pages/ProfileScreen';
 
 // Detail screens
@@ -145,6 +146,7 @@ function MobileRouter() {
             <Route path="/shift/:id/applicants" component={ApplicantsScreen} />
             <Route path="/requests"         component={ShiftRequestsScreen}  />
             <Route path="/worker/:username" component={WorkerProfileScreen}  />
+            <Route path="/post/:id"      component={PostScreen}          />
             <Route path="/clock/:id"        component={ClockInScreen}        />
             <Route path="/review/:shiftId/:toUserId" component={ReviewScreen} />
             <Route path="/pro-upgrade"              component={ProUpgradeScreen} />
