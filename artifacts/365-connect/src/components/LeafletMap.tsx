@@ -12,14 +12,14 @@ import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { navyPinUrl } from '@/lib/mapStyles';
 
-// Free, key-less light-gray basemap (Esri "World Light Gray"). Clean/minimal
-// like Apple Maps, no API key, no watermark. (CARTO now watermarks keyless tiles.)
+// Free, key-less street basemap (Esri "World Street Map") — richer than the
+// blank light-gray canvas (roads, places, labels), no API key, no watermark.
 const TILE_URL =
-  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
 const TILE_ATTR = 'Tiles &copy; Esri';
-const TILE_MAX_ZOOM = 16;
+const TILE_MAX_ZOOM = 18;
 
-export type MapMarker = { id: string; lat: number; lng: number; selected?: boolean };
+export type MapMarker = { id: string; lat: number; lng: number; selected?: boolean; label?: string };
 
 function pinIcon(selected: boolean): L.Icon {
   const size = selected ? 38 : 30;
@@ -29,6 +29,22 @@ function pinIcon(selected: boolean): L.Icon {
     iconSize: [size, height],
     iconAnchor: [size / 2, height], // tip of the teardrop
     className: 'leaflet-navy-pin',
+  });
+}
+
+/** Airbnb-style price pill pin — shows the shift's pay right on the map. */
+function priceIcon(label: string, selected: boolean): L.DivIcon {
+  const bg = selected ? '#0A1628' : '#FFFFFF';
+  const fg = selected ? '#FFFFFF' : '#0A1628';
+  const bd = selected ? '#0A1628' : '#D1D5DB';
+  return L.divIcon({
+    className: 'leaflet-price-pin',
+    html:
+      `<div style="transform:translate(-50%,-100%);display:inline-block;background:${bg};color:${fg};` +
+      `border:1.5px solid ${bd};border-radius:9999px;padding:5px 11px;font-weight:800;font-size:12px;` +
+      `line-height:1;white-space:nowrap;box-shadow:0 2px 6px rgba(16,24,40,0.22);">${label}</div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
   });
 }
 
@@ -95,7 +111,8 @@ export function LeafletMap({
         <Marker
           key={m.id}
           position={[m.lat, m.lng]}
-          icon={pinIcon(!!m.selected)}
+          icon={m.label ? priceIcon(m.label, !!m.selected) : pinIcon(!!m.selected)}
+          zIndexOffset={m.selected ? 1000 : 0}
           eventHandlers={onMarkerClick ? { click: () => onMarkerClick(m.id) } : undefined}
         />
       ))}
