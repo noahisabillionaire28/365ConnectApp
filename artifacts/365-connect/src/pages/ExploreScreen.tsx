@@ -61,20 +61,38 @@ export function ExploreScreen() {
   const toggleLike = useToggleLike();
   const createPost = useCreatePost();
   const [posting, setPosting] = useState(false);
+  const [composeFile, setComposeFile] = useState<File | null>(null);
+  const [composePreview, setComposePreview] = useState<string | null>(null);
+  const [composeCaption, setComposeCaption] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  async function handlePick(file: File | undefined) {
-    if (!file || !user?.id) return;
+  function handlePick(file: File | undefined) {
+    if (!file) return;
+    setComposeFile(file);
+    setComposePreview(URL.createObjectURL(file));
+    setComposeCaption('');
+    if (fileRef.current) fileRef.current.value = '';
+  }
+
+  function closeCompose() {
+    if (composePreview) URL.revokeObjectURL(composePreview);
+    setComposeFile(null);
+    setComposePreview(null);
+    setComposeCaption('');
+  }
+
+  async function handlePost() {
+    if (!composeFile || !user?.id || posting) return;
     setPosting(true);
     try {
-      const url = await uploadPostPhoto(user.id, file);
-      await createPost.mutateAsync({ photo_url: url, caption: null });
+      const url = await uploadPostPhoto(user.id, composeFile);
+      await createPost.mutateAsync({ photo_url: url, caption: composeCaption.trim() || null });
       showToast('Posted to the feed!');
+      closeCompose();
     } catch {
       showToast('Could not post — try again.');
     } finally {
       setPosting(false);
-      if (fileRef.current) fileRef.current.value = '';
     }
   }
 
@@ -188,16 +206,43 @@ export function ExploreScreen() {
       {tab === 'feed' && (
         <>
           <input ref={fileRef} type="file" accept="image/*" className="hidden"
-            onChange={(e) => void handlePick(e.target.files?.[0])} />
+            onChange={(e) => handlePick(e.target.files?.[0])} />
           <button type="button" aria-label="Share a photo"
-            disabled={posting}
             onClick={() => fileRef.current?.click()}
-            className="fixed bottom-[72px] right-4 z-40 w-14 h-14 rounded-full bg-[#0A1628] text-white shadow-lg flex items-center justify-center disabled:opacity-70">
-            {posting
-              ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              : <ImagePlus size={22} aria-hidden />}
+            className="fixed bottom-[72px] right-4 z-40 w-14 h-14 rounded-full bg-[#0A1628] text-white shadow-lg flex items-center justify-center">
+            <ImagePlus size={22} aria-hidden />
           </button>
         </>
+      )}
+
+      {/* Compose sheet — photo preview + caption with #hashtags */}
+      {composeFile && (
+        <div className="fixed inset-0 z-[80] flex flex-col bg-white max-w-[430px] mx-auto" role="dialog" aria-label="New post">
+          <div className="flex items-center justify-between px-4 pt-[52px] pb-3 border-b border-[#EFEFEF]">
+            <button type="button" onClick={closeCompose} disabled={posting}
+              className="text-[#111827] text-[15px] font-medium disabled:opacity-50">Cancel</button>
+            <h1 className="text-[#111827] font-bold text-[16px]">New post</h1>
+            <button type="button" onClick={() => void handlePost()} disabled={posting}
+              className="text-[#2563EB] text-[15px] font-bold disabled:opacity-50">
+              {posting ? 'Posting…' : 'Share'}
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            {composePreview && (
+              <img src={composePreview} alt="Preview"
+                className="w-full max-h-[340px] object-cover rounded-[12px] border border-[#E5E7EB] mb-3" />
+            )}
+            <textarea
+              value={composeCaption}
+              onChange={(e) => setComposeCaption(e.target.value)}
+              placeholder="Write a caption… add #hashtags like #bartender #miami #wedding"
+              rows={4}
+              aria-label="Caption"
+              className="w-full bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 text-[14px] text-[#111827] placeholder:text-[#9CA3AF] outline-none focus:border-[#0A1628]"
+            />
+            <p className="text-[#9CA3AF] text-[12px] mt-2">Tip: #hashtags make your post discoverable by clients searching for talent.</p>
+          </div>
+        </div>
       )}
 
       <BottomTabNav />

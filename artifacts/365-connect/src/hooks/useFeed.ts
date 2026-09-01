@@ -27,6 +27,18 @@ export function useFeed() {
   return { posts: q.data ?? [], isLoading: q.isLoading, isError: q.isError, refetch: q.refetch };
 }
 
+/** Posts tagged with a given hashtag. */
+export function useHashtagFeed(tag?: string) {
+  const { user } = useAuth();
+  const q = useQuery({
+    queryKey: ['hashtag', tag],
+    enabled: !!tag && !!user?.id,
+    staleTime: 30_000,
+    queryFn: () => apiClient(user!.id).get<FeedPost[]>(`/posts/hashtag/${tag}`),
+  });
+  return { posts: q.data ?? [], isLoading: q.isLoading };
+}
+
 /** Single post (used by the post-detail / comments screen). */
 export function usePost(postId?: string) {
   const { user } = useAuth();
