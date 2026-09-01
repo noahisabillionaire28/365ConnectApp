@@ -15,6 +15,7 @@ import { usePayments } from '@/hooks/usePayments';
 import { useReviews } from '@/hooks/useReviews';
 import { usePosts } from '@/hooks/usePosts';
 import { useFollowCounts } from '@/hooks/useFollowCounts';
+import { ProfileBadges } from '@/components/ProfileBadges';
 import { useQueryClient } from '@tanstack/react-query';
 import { uploadPostPhoto } from '@/lib/storage';
 import { apiClient } from '@/lib/api';
@@ -355,6 +356,9 @@ export function ProfileScreen() {
             ${profile.hourlyRate}/hr
           </div>
         )}
+
+        <ProfileBadges isPro={profile.isPro} rating={rating} shifts={shiftsCompleted} reviews={reviews.length}
+          className="mb-3" />
 
         {bio ? (
           <p className="text-[#737373] text-[14px] leading-relaxed mb-3">{bio}</p>
