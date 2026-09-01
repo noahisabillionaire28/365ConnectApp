@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
@@ -111,28 +111,39 @@ function ShiftRowSkeleton() {
   );
 }
 
-/* ── MapPane — free Leaflet map, mounted only in map view ────────────────── */
-function MapPane({ shifts, selectedId, onPinClick }: {
-  shifts: MockShift[]; selectedId: string | null; onPinClick: (s: MockShift) => void;
+/* ── MapPane — Leaflet map with price pins + a card carousel (Airbnb-style) ── */
+function MapPane({ shifts, selectedId, onPinClick, onOpenShift }: {
+  shifts: MockShift[];
+  selectedId: string | null;
+  onPinClick: (s: MockShift) => void;
+  onOpenShift: (s: MockShift) => void;
 }) {
-  const selectedShift = shifts.find((s) => s.id === selectedId) ?? null;
   const byId = new Map(shifts.map((s) => [s.id, s]));
+  const selectedShift = shifts.find((s) => s.id === selectedId) ?? shifts[0] ?? null;
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // Center on the selected shift, else the first shift, else the Miami default.
+  // Keep the carousel in sync with the selected pin.
+  useEffect(() => {
+    if (!selectedId) return;
+    cardRefs.current[selectedId]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [selectedId]);
+
   const center = selectedShift
     ? { lat: selectedShift.lat, lng: selectedShift.lng }
-    : shifts[0]
-      ? { lat: shifts[0].lat, lng: shifts[0].lng }
-      : { lat: 25.7913, lng: -80.145 };
+    : { lat: 25.7913, lng: -80.145 };
 
   return (
-    <div className="flex-1 relative bg-[#f5f5f5]">
+    <div className="flex-1 relative bg-[#eef1f4]">
       <LeafletMap
         center={center}
         zoom={12}
         recenter={!!selectedShift}
         ariaLabel="Map of available shifts"
-        markers={shifts.map((s) => ({ id: s.id, lat: s.lat, lng: s.lng, selected: s.id === selectedId }))}
+        markers={shifts.map((s) => ({
+          id: s.id, lat: s.lat, lng: s.lng,
+          selected: s.id === (selectedId ?? selectedShift?.id),
+          label: `$${s.payRate}`,
+        }))}
         onMarkerClick={(id) => { const s = byId.get(id); if (s) onPinClick(s); }}
       />
 
@@ -144,21 +155,45 @@ function MapPane({ shifts, selectedId, onPinClick }: {
         </div>
       )}
 
-      {/* Selected-shift chip — tap to open detail */}
-      {selectedShift && (
-        <button type="button" onClick={() => onPinClick(selectedShift)}
-          className="absolute left-1/2 -translate-x-1/2 bottom-4 z-20 w-[88%] max-w-[360px] bg-white rounded-[14px] border border-[#E5E7EB] shadow-lg px-4 py-3 flex items-center justify-between gap-3 text-left">
-          <div className="min-w-0">
-            <span className="text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
-              style={{ background: NAVY }}>{selectedShift.jobType}</span>
-            <p className="text-[#111827] font-bold text-[14px] truncate mt-1">{selectedShift.companyName}</p>
-            <p className="text-[#6B7280] text-[11px] truncate">{selectedShift.date} · {selectedShift.startTime}</p>
-          </div>
-          <div className="flex items-baseline gap-0.5 flex-shrink-0">
-            <span className="text-[#111827] font-bold text-[18px]">${selectedShift.payRate}</span>
-            <span className="text-[#6B7280] text-[11px]">/{selectedShift.payPeriod}</span>
-          </div>
-        </button>
+      {/* Card carousel — one card per pin, swipeable, tap to open */}
+      {shifts.length > 0 && (
+        <div className="absolute left-0 right-0 bottom-4 z-20 flex gap-3 overflow-x-auto snap-x snap-mandatory px-4 pb-1 scrollbar-none"
+          style={{ WebkitOverflowScrolling: 'touch' }} aria-label="Shifts on the map">
+          {shifts.map((shift) => {
+            const active = shift.id === (selectedId ?? selectedShift?.id);
+            return (
+              <div key={shift.id} ref={(el) => { cardRefs.current[shift.id] = el; }}
+                className="snap-center flex-shrink-0 w-[80%] max-w-[320px]">
+                <button type="button"
+                  onClick={() => { onPinClick(shift); onOpenShift(shift); }}
+                  className={`w-full text-left bg-white rounded-[16px] px-4 py-3.5 flex items-center justify-between gap-3 border transition-all ${
+                    active ? 'border-[#0A1628] shadow-xl' : 'border-[#E5E7EB] shadow-md'}`}>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
+                        style={{ background: NAVY }}>{shift.jobType}</span>
+                      {shift.instantClaim && (
+                        <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase">Claim</span>
+                      )}
+                    </div>
+                    <p className="text-[#111827] font-bold text-[15px] truncate">{shift.companyName}</p>
+                    <p className="text-[#6B7280] text-[11px] truncate flex items-center gap-1">
+                      <MapPin size={10} aria-hidden />{shift.location} · {shift.distanceMiles} mi
+                    </p>
+                    <p className="text-[#9CA3AF] text-[11px] truncate mt-0.5">{shift.date} · {shift.startTime}</p>
+                  </div>
+                  <div className="flex flex-col items-end flex-shrink-0">
+                    <div className="flex items-baseline gap-0.5">
+                      <span className="text-[#111827] font-bold text-[19px]">${shift.payRate}</span>
+                      <span className="text-[#6B7280] text-[11px]">/{shift.payPeriod}</span>
+                    </div>
+                    <span className="text-[#0A1628] text-[11px] font-semibold mt-1">View →</span>
+                  </div>
+                </button>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -309,7 +344,8 @@ export function JobsScreen() {
           </div>
         </main>
       ) : (
-        <MapPane shifts={visibleShifts} selectedId={selectedId} onPinClick={handlePinClick} />
+        <MapPane shifts={visibleShifts} selectedId={selectedId}
+          onPinClick={handlePinClick} onOpenShift={handleSelectShift} />
       )}
 
       {/* SR-only shift list for keyboard/screen-reader users */}
