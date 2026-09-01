@@ -140,7 +140,7 @@ export function PhoneAuthScreen() {
 
   /* ── UI ─────────────────────────────────────────── */
   return (
-    <div className="min-h-[100dvh] flex flex-col px-6 py-10 pb-12 bg-black text-white overflow-y-auto">
+    <div className="min-h-[100dvh] flex flex-col px-6 py-10 pb-12 bg-white text-[#111827] overflow-y-auto">
 
       {/* Header */}
       <div className="flex flex-col">
@@ -148,19 +148,19 @@ export function PhoneAuthScreen() {
           onClick={() => step === 'otp' ? (setStep('phone'), setOtp(''), setError(null)) : navigate('/login')}
           className="w-10 h-10 flex items-center justify-center -ml-2 mb-4"
         >
-          <ChevronLeft className="w-6 h-6 text-white" />
+          <ChevronLeft className="w-6 h-6 text-[#111827]" />
         </button>
         <div className="flex items-center gap-1.5">
           <span className="text-primary font-bold text-[28px] leading-none tracking-tight">365</span>
-          <span className="text-white font-bold text-[28px] leading-none tracking-tight">CONNECT</span>
+          <span className="text-[#111827] font-bold text-[28px] leading-none tracking-tight">CONNECT</span>
         </div>
       </div>
 
       <div className="mt-6 mb-8">
-        <h1 className="text-white font-bold text-[24px]">
+        <h1 className="text-[#111827] font-bold text-[24px]">
           {step === 'phone' ? 'Enter your number' : 'Enter the code'}
         </h1>
-        <p className="text-[#888] text-[14px] mt-1">
+        <p className="text-[#6B7280] text-[14px] mt-1">
           {step === 'phone'
             ? "We'll text you a one-time verification code."
             : `Sent to ${phone}. Check your messages.`}
@@ -187,9 +187,9 @@ export function PhoneAuthScreen() {
       {step === 'phone' && (
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
-            <label className="text-[#888] text-[12px] font-medium ml-1">Phone number</label>
-            <div className="flex items-center bg-[#0E0E0E] border border-[#2A2A2A] rounded-[14px] px-4 h-[56px] focus-within:border-primary transition-colors">
-              <Phone size={18} className="text-[#555] mr-3 flex-shrink-0" />
+            <label className="text-[#6B7280] text-[12px] font-medium ml-1">Phone number</label>
+            <div className="flex items-center bg-[#FAFAFA] border border-[#E5E7EB] rounded-[14px] px-4 h-[56px] focus-within:border-primary transition-colors">
+              <Phone size={18} className="text-[#9CA3AF] mr-3 flex-shrink-0" />
               <input
                 type="tel"
                 value={phone}
@@ -197,10 +197,10 @@ export function PhoneAuthScreen() {
                 onKeyDown={e => e.key === 'Enter' && handleSendOtp()}
                 placeholder="+1 (555) 000-0000"
                 autoFocus
-                className="flex-1 bg-transparent text-white placeholder:text-[#3A3A3A] outline-none font-sans text-[15px]"
+                className="flex-1 bg-transparent text-[#111827] placeholder:text-[#9CA3AF] outline-none font-sans text-[15px]"
               />
             </div>
-            <p className="text-[#555] text-[11px] ml-1 mt-0.5">
+            <p className="text-[#9CA3AF] text-[11px] ml-1 mt-0.5">
               Include your country code · e.g. +1 for US, +44 for UK
             </p>
           </div>
@@ -208,7 +208,7 @@ export function PhoneAuthScreen() {
           <button
             onClick={handleSendOtp}
             disabled={loading || phone.trim().length < 7}
-            className="w-full bg-primary text-black font-bold text-[16px] py-[18px] rounded-[14px] active:scale-[0.98] transition-transform disabled:opacity-40"
+            className="w-full bg-[#0A1628] text-white font-bold text-[16px] py-[18px] rounded-[14px] active:scale-[0.98] transition-transform disabled:opacity-40"
           >
             {loading ? 'Sending…' : 'Send Code'}
           </button>
@@ -219,7 +219,7 @@ export function PhoneAuthScreen() {
       {step === 'otp' && (
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
-            <label className="text-[#888] text-[12px] font-medium ml-1">6-digit code</label>
+            <label className="text-[#6B7280] text-[12px] font-medium ml-1">6-digit code</label>
             <input
               type="text"
               inputMode="numeric"
@@ -229,14 +229,14 @@ export function PhoneAuthScreen() {
               onKeyDown={e => e.key === 'Enter' && handleVerify()}
               placeholder="000000"
               autoFocus
-              className="w-full bg-[#0E0E0E] border border-[#2A2A2A] text-white placeholder:text-[#3A3A3A] rounded-[14px] px-4 py-5 font-sans text-[28px] text-center tracking-[0.45em] focus:outline-none focus:border-primary transition-colors"
+              className="w-full bg-[#FAFAFA] border border-[#E5E7EB] text-[#111827] placeholder:text-[#9CA3AF] rounded-[14px] px-4 py-5 font-sans text-[28px] text-center tracking-[0.45em] focus:outline-none focus:border-primary transition-colors"
             />
           </div>
 
           <button
             onClick={handleVerify}
             disabled={loading || otp.length < 6}
-            className="w-full bg-primary text-black font-bold text-[16px] py-[18px] rounded-[14px] active:scale-[0.98] transition-transform disabled:opacity-40"
+            className="w-full bg-[#0A1628] text-white font-bold text-[16px] py-[18px] rounded-[14px] active:scale-[0.98] transition-transform disabled:opacity-40"
           >
             {loading ? 'Verifying…' : 'Verify Code'}
           </button>
@@ -244,7 +244,7 @@ export function PhoneAuthScreen() {
           <button
             onClick={handleResend}
             disabled={loading}
-            className="w-full text-center text-[14px] text-[#888] font-medium hover:text-white transition-colors py-1 disabled:opacity-40"
+            className="w-full text-center text-[14px] text-[#6B7280] font-medium hover:text-[#0A1628] transition-colors py-1 disabled:opacity-40"
           >
             Didn't receive it? Resend code
           </button>
