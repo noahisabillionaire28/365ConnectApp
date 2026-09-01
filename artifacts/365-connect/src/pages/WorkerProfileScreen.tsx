@@ -5,6 +5,7 @@ import { apiClient } from '@/lib/api';
 import { friendlyDate } from '@/lib/supabase';
 import { useFollow } from '@/hooks/useFollow';
 import { usePosts } from '@/hooks/usePosts';
+import { ProfileBadges } from '@/components/ProfileBadges';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/contexts/RoleContext';
 import { getOrCreateDirectConversation } from '@/hooks/useConversations';
@@ -23,6 +24,7 @@ type PublicUserRow = {
   certifications: string[];
   rating: number;
   hourly_rate: number | null;
+  is_pro: boolean;
   created_at: string;
 };
 
@@ -445,6 +447,10 @@ export function WorkerProfileScreen() {
             ${profile.hourly_rate}/hr
           </div>
         )}
+
+        <ProfileBadges isPro={profile.is_pro} rating={profile.rating}
+          shifts={profile.pastShifts.length} reviews={profile.pastShifts.length}
+          className="mt-2" />
 
         {profile.bio && (
           <p className="text-[14px] text-black leading-relaxed mt-3 mb-5">{profile.bio}</p>
