@@ -67,6 +67,21 @@ router.get('/feed', requireAuth, async (req, res) => {
   return res.json(await enrichPosts(data ?? [], req.userId));
 });
 
+/* ── GET /api/posts/hashtag/:tag — posts tagged with #tag (precede /:userId) ── */
+router.get('/hashtag/:tag', requireAuth, async (req, res) => {
+  const tag = String(req.params.tag).replace(/[^a-z0-9_]/gi, '').toLowerCase();
+  if (!tag) return res.json([]);
+  const { data, error } = await adminDb
+    .from('posts')
+    .select('*')
+    .not('photo_url', 'is', null)
+    .ilike('caption', `%#${tag}%`)
+    .order('created_at', { ascending: false })
+    .limit(60);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json(await enrichPosts(data ?? [], req.userId));
+});
+
 /* ── GET /api/posts/detail/:postId — single post (must precede /:userId) ────── */
 router.get('/detail/:postId', requireAuth, async (req, res) => {
   const { data, error } = await adminDb

@@ -6,6 +6,7 @@ import { useDeletePost, type FeedPost } from '@/hooks/useFeed';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useToast } from '@/contexts/ToastContext';
+import { Caption } from '@/components/Caption';
 
 /** A single feed post — author header, photo, like + comment actions, caption. */
 export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
@@ -79,8 +80,7 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
       {post.caption
         ? (
           <p className="px-4 pt-2 pb-3.5 text-[13px] text-[#111827] leading-snug">
-            {post.author_username && <span className="font-semibold">@{post.author_username} </span>}
-            {post.caption}
+            <Caption text={post.caption} author={post.author_username} />
           </p>
         )
         : <div className="pb-3.5" />}
