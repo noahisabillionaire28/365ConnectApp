@@ -32,19 +32,22 @@ function pinIcon(selected: boolean): L.Icon {
   });
 }
 
-/** Airbnb-style price pill pin — shows the shift's pay right on the map. */
+/** Airbnb-style price pill pin — shows the shift's pay right on the map.
+ * The icon size matches the pill so the whole pill is the clickable hit area. */
 function priceIcon(label: string, selected: boolean): L.DivIcon {
   const bg = selected ? '#0A1628' : '#FFFFFF';
   const fg = selected ? '#FFFFFF' : '#0A1628';
   const bd = selected ? '#0A1628' : '#D1D5DB';
+  const w = Math.max(44, Math.round(18 + label.length * 8.5));
+  const h = 28;
   return L.divIcon({
     className: 'leaflet-price-pin',
     html:
-      `<div style="transform:translate(-50%,-100%);display:inline-block;background:${bg};color:${fg};` +
-      `border:1.5px solid ${bd};border-radius:9999px;padding:5px 11px;font-weight:800;font-size:12px;` +
-      `line-height:1;white-space:nowrap;box-shadow:0 2px 6px rgba(16,24,40,0.22);">${label}</div>`,
-    iconSize: [0, 0],
-    iconAnchor: [0, 0],
+      `<div style="width:${w}px;height:${h}px;display:flex;align-items:center;justify-content:center;` +
+      `background:${bg};color:${fg};border:1.5px solid ${bd};border-radius:9999px;font-weight:800;` +
+      `font-size:12px;line-height:1;box-shadow:0 2px 6px rgba(16,24,40,0.22);cursor:pointer;">${label}</div>`,
+    iconSize: [w, h],
+    iconAnchor: [w / 2, h / 2],
   });
 }
 

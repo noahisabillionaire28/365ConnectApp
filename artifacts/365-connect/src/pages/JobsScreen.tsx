@@ -144,7 +144,7 @@ function MapPane({ shifts, selectedId, onPinClick, onOpenShift }: {
           selected: s.id === (selectedId ?? selectedShift?.id),
           label: `$${s.payRate}`,
         }))}
-        onMarkerClick={(id) => { const s = byId.get(id); if (s) onPinClick(s); }}
+        onMarkerClick={(id) => { const s = byId.get(id); if (s) { onPinClick(s); onOpenShift(s); } }}
       />
 
       {shifts.length === 0 && (
