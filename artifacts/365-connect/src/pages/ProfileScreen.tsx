@@ -14,6 +14,7 @@ import { useMyApplications, type MyApplication } from '@/hooks/useMyApplications
 import { usePayments } from '@/hooks/usePayments';
 import { useReviews } from '@/hooks/useReviews';
 import { usePosts } from '@/hooks/usePosts';
+import { useFollowCounts } from '@/hooks/useFollowCounts';
 import { useQueryClient } from '@tanstack/react-query';
 import { uploadPostPhoto } from '@/lib/storage';
 import { apiClient } from '@/lib/api';
@@ -206,6 +207,7 @@ export function ProfileScreen() {
   const { payments } = usePayments();
   const { reviews }  = useReviews(); // defaults to the logged-in user's reviews
   const { data: posts = [] } = usePosts(user?.id);
+  const { followers, following } = useFollowCounts(user?.id);
   const queryClient = useQueryClient();
   const postFileRef = useRef<HTMLInputElement>(null);
   const [postingMoment, setPostingMoment] = useState(false);
@@ -368,7 +370,21 @@ export function ProfileScreen() {
         )}
       </div>
 
-      {/* Stats */}
+      {/* Instagram-style social stats */}
+      <div className="px-5 mb-4 flex items-center">
+        {[
+          { label: 'Posts',     value: posts.filter((p) => p.photo_url).length },
+          { label: 'Followers', value: followers },
+          { label: 'Following', value: following },
+        ].map((s, i) => (
+          <div key={s.label} className={`flex-1 flex flex-col items-center ${i < 2 ? 'border-r border-[#EFEFEF]' : ''}`}>
+            <span className="text-[#111827] font-bold text-[19px] leading-none">{s.value}</span>
+            <span className="text-[#6B7280] text-[12px] mt-1">{s.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Work stats */}
       <div className="mx-4 grid grid-cols-3 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] mb-5 overflow-hidden"
         role="list" aria-label="Profile statistics">
         {[

@@ -64,6 +64,16 @@ router.get('/followers/:userId', async (req, res) => {
   return res.json(users ?? []);
 });
 
+/** GET /api/follows/counts/:userId — follower + following counts */
+router.get('/counts/:userId', async (req, res) => {
+  const id = req.params.userId;
+  const [followers, following] = await Promise.all([
+    adminDb.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', id),
+    adminDb.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', id),
+  ]);
+  return res.json({ followers: followers.count ?? 0, following: following.count ?? 0 });
+});
+
 /** POST /api/follows — follow a user */
 router.post('/', requireAuth, async (req, res) => {
   const { following_id } = req.body as { following_id: string };
