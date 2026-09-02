@@ -1,11 +1,12 @@
 import { useParams, useLocation } from 'wouter';
-import { BadgeCheck, Star, ChevronLeft, Heart, CalendarPlus, X, CheckCircle2, Flag } from 'lucide-react';
+import { BadgeCheck, Star, ChevronLeft, Heart, CalendarPlus, X, CheckCircle2, Flag, Bookmark } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api';
 import { friendlyDate } from '@/lib/supabase';
 import { useFollow } from '@/hooks/useFollow';
 import { usePosts } from '@/hooks/usePosts';
 import { ProfileBadges } from '@/components/ProfileBadges';
+import { useSavedWorker } from '@/hooks/useSavedWorkers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/contexts/RoleContext';
 import { getOrCreateDirectConversation } from '@/hooks/useConversations';
@@ -322,6 +323,9 @@ export function WorkerProfileScreen() {
   const canRequestShift =
     !!authUser && !!profile && authUser.id !== profile.id &&
     (role === 'client' || role === 'staffer') && profile.role === 'worker';
+  const { saved, toggle: toggleSaved, isPending: savePending } = useSavedWorker(
+    canRequestShift ? profile?.id : undefined,
+  );
 
   useEffect(() => {
     if (!params.username) return;
@@ -494,10 +498,18 @@ export function WorkerProfileScreen() {
               {isStartingChat ? 'Opening…' : 'Message'}
             </button>
           )}
-          <button type="button" aria-label="More options"
-            className="w-[52px] bg-white border border-[#DBDBDB] text-black font-bold py-[14px] rounded-[8px] active:scale-[0.98] transition-transform flex items-center justify-center">
-            <span className="text-[16px] leading-none tracking-widest">···</span>
-          </button>
+          {canRequestShift ? (
+            <button type="button" aria-label={saved ? 'Unsave worker' : 'Save worker'}
+              onClick={() => toggleSaved()} disabled={savePending}
+              className="w-[52px] bg-white border border-[#DBDBDB] py-[14px] rounded-[8px] active:scale-[0.98] transition-transform flex items-center justify-center disabled:opacity-60">
+              <Bookmark size={18} aria-hidden className={saved ? 'fill-[#0A1628] text-[#0A1628]' : 'text-black'} />
+            </button>
+          ) : (
+            <button type="button" aria-label="More options"
+              className="w-[52px] bg-white border border-[#DBDBDB] text-black font-bold py-[14px] rounded-[8px] active:scale-[0.98] transition-transform flex items-center justify-center">
+              <span className="text-[16px] leading-none tracking-widest">···</span>
+            </button>
+          )}
         </div>
 
         {canRequestShift && (

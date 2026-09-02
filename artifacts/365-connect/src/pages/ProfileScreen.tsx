@@ -5,7 +5,7 @@ import {
   Star, ChevronRight, Settings,
   CreditCard, Bell, Shield, HelpCircle, LogOut,
   Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
-  BadgeCheck, Zap, Eye, ChevronLeft,
+  BadgeCheck, Zap, Eye, ChevronLeft, Bookmark,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useAuth } from '@/contexts/AuthContext';
@@ -593,11 +593,14 @@ export function ProfileScreen() {
                   <SettingRow icon={Bell} label="Notifications" onTap={() => go('/notification-settings')} />
                 </div>
 
-                {profile.role === 'staffer' && (
+                {(profile.role === 'client' || profile.role === 'staffer') && (
                   <>
                     <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Workforce</p>
                     <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-4">
-                      <SettingRow icon={Users} label="My Roster" onTap={() => go('/roster')} />
+                      <SettingRow icon={Bookmark} label="Saved Workers" onTap={() => go('/saved')} />
+                      {profile.role === 'staffer' && (
+                        <SettingRow icon={Users} label="My Roster" onTap={() => go('/roster')} />
+                      )}
                     </div>
                   </>
                 )}
