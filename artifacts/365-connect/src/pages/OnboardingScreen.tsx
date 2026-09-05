@@ -93,14 +93,19 @@ export function OnboardingScreen() {
 
   const slides = SLIDES[role];
 
-  // After the walkthrough, go straight to the app. Profile setup is optional and
-  // can be completed later (Profile → Edit); a bare profile still works.
+  // After the walkthrough, send the user to the setup built for THEIR role — a
+  // staffing agency gets the agency setup, not the worker job-type picker.
+  const setupDest =
+    role === 'staffer' ? '/staffer-setup'
+    : role === 'client' ? '/client-setup'
+    : '/worker-setup';
+
   function advance() {
     if (slide < slides.length - 1) { setSlide(s => s + 1); return; }
-    navigate('/home');
+    navigate(setupDest);
   }
 
-  function skip() { navigate('/home'); }
+  function skip() { navigate(setupDest); }
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-white overflow-hidden">

@@ -185,7 +185,7 @@ function SimulatedCardInput({
 }
 
 // ── StepHeader ─────────────────────────────────────────────────────────────────
-function StepHeader({ step, onBack }: { step: number; onBack: () => void }) {
+function StepHeader({ step, total, onBack }: { step: number; total: number; onBack: () => void }) {
   return (
     <>
       <div className="flex items-center px-5 pt-12 pb-4">
@@ -198,11 +198,11 @@ function StepHeader({ step, onBack }: { step: number; onBack: () => void }) {
         ) : (
           <div className="w-9 h-9 mr-3" />
         )}
-        <span className="text-[13px] font-medium" style={{ color: MUTED }}>Step {step} of {TOTAL}</span>
+        <span className="text-[13px] font-medium" style={{ color: MUTED }}>Step {step} of {total}</span>
       </div>
       <div className="mx-5 h-[3px] rounded-full mb-8" style={{ background: BORDER }}>
         <div className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${(step / TOTAL) * 100}%`, background: NAVY }} />
+          style={{ width: `${(step / total) * 100}%`, background: NAVY }} />
       </div>
     </>
   );
@@ -212,6 +212,12 @@ function StepHeader({ step, onBack }: { step: number; onBack: () => void }) {
 export function ClientSetupScreen() {
   const [, navigate] = useLocation();
   const { user }     = useAuth();
+
+  // Edit mode (from Profile → Edit): skip the one-time billing step and let an
+  // already-set-up client change their name / company / event types.
+  const isEdit = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('edit') === '1';
+  const total = isEdit ? 3 : TOTAL;
 
   const [initialized, setInitialized] = useState(false);
   const [step,        setStep]        = useState(1);
@@ -233,7 +239,7 @@ export function ClientSetupScreen() {
     if (!user) { navigate('/'); return; }
     apiClient(user.id).get<{ username?: string | null; bio?: string | null; secondary_job_types?: string[] }>('/users/me')
       .then((data) => {
-        if (data?.username) { navigate('/home'); return; }
+        if (data?.username && !isEdit) { navigate('/home'); return; }
         if (data?.bio)                setFullName(data.bio);
         if (Array.isArray(data?.secondary_job_types)) setEventTypes(data.secondary_job_types);
 
@@ -244,7 +250,7 @@ export function ClientSetupScreen() {
         if (Array.isArray(data?.secondary_job_types)) inferred = Math.max(inferred, 4);
 
         const stored = loadStep(user.id);
-        setStep(Math.max(inferred, stored));
+        setStep(isEdit ? 1 : Math.max(inferred, stored));
         setInitialized(true);
       });
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -306,6 +312,17 @@ export function ClientSetupScreen() {
   }
 
   async function continueStep3() {
+    if (isEdit) {
+      if (!user) return;
+      setSaving(true); setError(null);
+      try {
+        await apiClient(user.id).patch('/users/me', { secondary_job_types: eventTypes });
+        navigate('/home');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not save. Please try again.');
+      } finally { setSaving(false); }
+      return;
+    }
     await saveAndAdvance({ secondary_job_types: eventTypes }, 4);
   }
 
@@ -357,7 +374,7 @@ export function ClientSetupScreen() {
         />
       )}
 
-      <StepHeader step={step} onBack={() => { if (step > 1) { storeStep(user!.id, step - 1); setStep(s => s - 1); } }} />
+      <StepHeader step={step} total={total} onBack={() => { if (step > 1) { storeStep(user!.id, step - 1); setStep(s => s - 1); } }} />
 
       {error && (
         <div className="mx-5 mb-4 flex items-start gap-2 rounded-[12px] px-4 py-3"
@@ -528,7 +545,7 @@ export function ClientSetupScreen() {
             style={{ background: NAVY }}
             data-testid="btn-client-continue"
           >
-            {saving ? 'Saving…' : 'Continue'}
+            {saving ? 'Saving…' : (isEdit && step === 3 ? 'Save changes' : 'Continue')}
           </button>
           {step === 2 && (
             <button onClick={continueStep2} className="w-full text-center py-2 text-[14px] font-medium" style={{ color: MUTED }}>

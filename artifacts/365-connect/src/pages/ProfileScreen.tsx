@@ -296,6 +296,13 @@ export function ProfileScreen() {
   const ratingDisplay  = rating > 0 ? rating.toFixed(1) : '—';
   const ratingSubLabel = rating > 0 ? 'avg rating' : 'no reviews';
 
+  // Editing routes to the role's own setup — a staffing agency edits agency
+  // details (name/logo/events), not worker job types.
+  const editProfilePath =
+    profile.role === 'staffer' ? '/staffer-setup?edit=1'
+    : profile.role === 'client' ? '/client-setup?edit=1'
+    : '/profile-setup?edit=1';
+
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px] overflow-y-auto">
 
@@ -407,7 +414,7 @@ export function ProfileScreen() {
 
       {/* Edit Profile — Instagram-style */}
       <div className="px-4 mb-5">
-        <button type="button" onClick={() => navigate('/profile-setup?edit=1')}
+        <button type="button" onClick={() => navigate(editProfilePath)}
           aria-label="Edit profile"
           className="w-full h-[38px] rounded-[10px] bg-[#FAFAFA] border border-[#DBDBDB] text-[#111827] text-[14px] font-semibold flex items-center justify-center gap-2">
           <Edit3 size={14} aria-hidden /> Edit Profile
@@ -585,7 +592,7 @@ export function ProfileScreen() {
               <div className="flex-1 overflow-y-auto px-4 py-4">
                 <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Account</p>
                 <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-4">
-                  <SettingRow icon={Edit3} label="Edit Profile" onTap={() => go('/profile-setup?edit=1')} />
+                  <SettingRow icon={Edit3} label="Edit Profile" onTap={() => go(editProfilePath)} />
                   {username && (
                     <SettingRow icon={Eye} label="View My Public Profile" onTap={() => go(`/worker/${username}`)} />
                   )}
