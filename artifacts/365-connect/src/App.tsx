@@ -38,6 +38,7 @@ import { NotificationsScreen }   from '@/pages/NotificationsScreen';
 import { NotificationSettingsScreen } from '@/pages/NotificationSettingsScreen';
 import { PostScreen }             from '@/pages/PostScreen';
 import { HashtagScreen }          from '@/pages/HashtagScreen';
+import { SavedWorkersScreen }     from '@/pages/SavedWorkersScreen';
 import { ProfileScreen }         from '@/pages/ProfileScreen';
 
 // Detail screens
@@ -149,6 +150,7 @@ function MobileRouter() {
             <Route path="/worker/:username" component={WorkerProfileScreen}  />
             <Route path="/post/:id"      component={PostScreen}          />
             <Route path="/hashtag/:tag"  component={HashtagScreen}        />
+            <Route path="/saved"         component={SavedWorkersScreen}   />
             <Route path="/clock/:id"        component={ClockInScreen}        />
             <Route path="/review/:shiftId/:toUserId" component={ReviewScreen} />
             <Route path="/pro-upgrade"              component={ProUpgradeScreen} />
