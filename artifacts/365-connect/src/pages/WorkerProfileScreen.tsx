@@ -97,7 +97,7 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
     if (!authUser?.id || sendingId || noteTooLong) return;
     setSendingId(shiftId);
     setErrorMessage(null);
-    const result = await createShiftRequest(authUser.id, workerId, shiftId, note);
+    const result = await createShiftRequest(authUser.id, shiftId, workerId, note);
     setSendingId(null);
     if (result.ok) {
       setSentId(shiftId);
