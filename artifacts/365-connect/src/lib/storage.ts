@@ -51,6 +51,13 @@ export async function uploadPostPhoto(userId: string, file: File): Promise<strin
   return url;
 }
 
+/** Upload a story photo. Returns the serving URL (stored in stories.photo_url). */
+export async function uploadStoryPhoto(userId: string, file: File): Promise<string> {
+  const ext = file.name.split('.').pop() ?? 'jpg';
+  const { url } = await uploadFile(file, `story.${ext}`, userId);
+  return url;
+}
+
 /** Upload a chat image. Returns the serving URL (stored in message.image_url). */
 export async function uploadChatImage(
   conversationId: string, file: File, userId?: string | null,

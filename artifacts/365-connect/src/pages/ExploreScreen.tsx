@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { Search, BadgeCheck, ImagePlus } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { PostCard } from '@/components/PostCard';
+import { StoryTray } from '@/components/StoryTray';
 import { usePeopleFeed, type WorkerPerson } from '@/hooks/usePeopleFeed';
 import { useFeed, useToggleLike, useCreatePost } from '@/hooks/useFeed';
 import { useAuth } from '@/contexts/AuthContext';
@@ -174,6 +175,7 @@ export function ExploreScreen() {
           </>
         ) : (
           <>
+            <StoryTray />
             {feedLoading && (
               <div className="flex flex-col">
                 {[1, 2].map((n) => (
