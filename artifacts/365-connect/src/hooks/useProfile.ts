@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth, type SimpleUser } from '@/contexts/AuthContext';
+import { useRole } from '@/contexts/RoleContext';
 
 type UserProfileRow = {
   username:            string | null;
@@ -11,6 +12,7 @@ type UserProfileRow = {
   rating:              number;
   created_at:          string;
   role:                'worker' | 'client' | 'admin' | 'staffer';
+  is_admin?:           boolean | null;
   primary_job_type:    string | null;
   secondary_job_types: string[];
   availability:        Record<string, boolean> | null;
@@ -41,7 +43,10 @@ export type ProfileResult = {
   rating:            number;
   memberSince:       string;
   email:             string | null;
+  /** Effective role — for admins this follows the in-app "view as" switcher. */
   role:              UserProfileRow['role'] | null;
+  /** True for admin-capable accounts, regardless of the preview role. */
+  isAdmin:           boolean;
   primaryJobType:    string | null;
   secondaryJobTypes: string[];
   availability:      Record<string, boolean> | null;
@@ -54,6 +59,7 @@ export type ProfileResult = {
 
 export function useProfile(): ProfileResult {
   const { user, loading: authLoading } = useAuth();
+  const { isAdmin: ctxIsAdmin, previewRole } = useRole();
 
   const { data: row, isLoading: rowLoading, isError } = useQuery<UserProfileRow | null>({
     queryKey: ['profile', user?.id ?? 'anon'],
@@ -83,6 +89,12 @@ export function useProfile(): ProfileResult {
     ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
     : '';
 
+  // Admin is both a DB fact and a context signal (context reflects the flag too).
+  const isAdmin = ctxIsAdmin || row?.role === 'admin' || row?.is_admin === true;
+  // Admins render the app as their chosen preview role so screens behave like a
+  // normal worker/client/staffer; everyone else uses their real role.
+  const effectiveRole = isAdmin ? previewRole : (row?.role ?? null);
+
   return {
     isLoading,
     isError: !authLoading && !!user && isError,
@@ -95,7 +107,8 @@ export function useProfile(): ProfileResult {
     rating:            row?.rating            ?? 0,
     memberSince,
     email:             user?.email            ?? null,
-    role:              row?.role              ?? null,
+    role:              effectiveRole,
+    isAdmin,
     primaryJobType:    row?.primary_job_type  ?? null,
     secondaryJobTypes: row?.secondary_job_types ?? [],
     availability:      row?.availability      ?? null,
