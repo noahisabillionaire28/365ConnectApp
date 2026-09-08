@@ -7,7 +7,8 @@ import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { AuthProvider } from '@/contexts/AuthContext';
-import { RoleProvider } from '@/contexts/RoleContext';
+import { RoleProvider, useRole } from '@/contexts/RoleContext';
+import { SuspendedGate } from '@/components/SuspendedGate';
 import { useSSE } from '@/hooks/useSSE';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -95,6 +96,13 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 // ── SSE mount — opens a live event stream once the user is authenticated ──────
 function SSEMount() { useSSE(); return null; }
+
+// ── Suspended-account gate — blocks banned (non-admin) users from the app ─────
+function SuspendedGuard() {
+  const { status, role } = useRole();
+  if (status === 'suspended' && role !== 'admin') return <SuspendedGate />;
+  return null;
+}
 
 // ── Mobile router — 390 px centred column ─────────────────────────────────────
 function MobileRouter() {
@@ -227,6 +235,7 @@ function AppShell() {
           <TooltipProvider>
             <ErrorBoundary>
               <AppRouter />
+              <SuspendedGuard />
             </ErrorBoundary>
           </TooltipProvider>
         </ToastProvider>

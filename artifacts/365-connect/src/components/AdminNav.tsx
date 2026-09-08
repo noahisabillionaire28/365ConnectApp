@@ -7,12 +7,15 @@ import { Link, useLocation } from 'wouter';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   LayoutDashboard, Users, Briefcase, AlertTriangle,
-  DollarSign, Settings, LogOut, ShieldCheck, Menu, X,
+  DollarSign, Settings, LogOut, ShieldCheck, Menu, X, ExternalLink,
 } from 'lucide-react';
 import { adminLogout } from '@/store/adminStore';
 
 const NAVY   = '#0A1628';
 const ACTIVE = '#1E3A5F';
+
+/** The live app's home, opened in a new tab so the admin panel stays put. */
+const APP_URL = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/home`;
 
 const NAV_ITEMS = [
   { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -53,19 +56,32 @@ export function AdminNav() {
           </div>
         </div>
 
-        {/* Hamburger */}
-        <button
-          type="button"
-          aria-label={open ? 'Close navigation menu' : 'Open navigation menu'}
-          aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
-          className="w-10 h-10 rounded-[8px] flex items-center justify-center transition-colors"
-          style={{ background: open ? ACTIVE : 'transparent' }}
-        >
-          {open
-            ? <X    size={20} className="text-white" aria-hidden />
-            : <Menu size={20} className="text-white" aria-hidden />}
-        </button>
+        <div className="flex items-center gap-1.5">
+          {/* View the live app (opens in a new tab) */}
+          <a
+            href={APP_URL} target="_blank" rel="noopener noreferrer"
+            aria-label="View the app in a new tab"
+            className="h-10 px-3 rounded-[8px] flex items-center gap-1.5 text-white/90 text-[13px] font-semibold transition-colors"
+            style={{ background: ACTIVE }}
+          >
+            <ExternalLink size={15} aria-hidden />
+            View App
+          </a>
+
+          {/* Hamburger */}
+          <button
+            type="button"
+            aria-label={open ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+            className="w-10 h-10 rounded-[8px] flex items-center justify-center transition-colors"
+            style={{ background: open ? ACTIVE : 'transparent' }}
+          >
+            {open
+              ? <X    size={20} className="text-white" aria-hidden />
+              : <Menu size={20} className="text-white" aria-hidden />}
+          </button>
+        </div>
       </header>
 
       {/* ── Slide-out drawer ──────────────────────────────────────────────── */}
@@ -135,6 +151,22 @@ export function AdminNav() {
                     </Link>
                   );
                 })}
+              </div>
+
+              {/* View the app */}
+              <div className="px-3 pb-2 flex-shrink-0">
+                <a
+                  href={APP_URL} target="_blank" rel="noopener noreferrer"
+                  onClick={() => setOpen(false)}
+                  aria-label="View the app in a new tab"
+                  className="flex items-center gap-3 px-3 h-[48px] w-full rounded-[10px] transition-colors"
+                  style={{ background: ACTIVE }}
+                >
+                  <ExternalLink size={18} aria-hidden style={{ color: '#FFFFFF', flexShrink: 0 }} />
+                  <span className="text-[15px] font-semibold" style={{ color: '#FFFFFF' }}>
+                    View App
+                  </span>
+                </a>
               </div>
 
               {/* Logout */}
