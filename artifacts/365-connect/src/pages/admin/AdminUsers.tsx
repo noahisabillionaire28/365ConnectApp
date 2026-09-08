@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, X, Ban, Flag, ChevronRight, Star, BadgeCheck, AlertCircle, Trash2,
+  Search, X, Ban, Flag, ChevronRight, Star, BadgeCheck, AlertCircle, Trash2, ExternalLink,
 } from 'lucide-react';
 import { isAdminAuthenticated, initAdminSession } from '@/store/adminStore';
 import { useAdminUsers, useUpdateUser, useDeleteUser } from '@/hooks/useAdminData';
@@ -193,6 +193,16 @@ function UserDetailSheet({
 
           {/* Actions */}
           <div className="flex flex-col gap-2">
+            {user.username && (
+              <a
+                href={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/worker/${user.username}`}
+                target="_blank" rel="noopener noreferrer"
+                aria-label={`View @${user.username}'s public profile in the app`}
+                className="w-full h-[48px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[14px] flex items-center justify-center gap-2">
+                <ExternalLink size={15} aria-hidden />
+                View Public Profile
+              </a>
+            )}
             <button type="button" disabled={busy}
               aria-label={isFlagged ? 'Remove flag' : 'Flag user with a warning'}
               onClick={() => setConfirmOp(isFlagged ? 'unflag' : 'flag')}

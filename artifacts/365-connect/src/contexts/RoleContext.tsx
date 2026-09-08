@@ -13,9 +13,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 
 export type UserRole = 'worker' | 'client' | 'staffer' | 'admin' | null;
+export type UserStatus = 'active' | 'suspended' | 'flagged' | null;
 
 type RoleContextType = {
   role:        UserRole;
+  /** Admin moderation status — 'suspended' means the account is banned. */
+  status:      UserStatus;
   roleLoading: boolean;
   /** Re-queries the users table. Returns a Promise so callers can await it. */
   refetchRole: () => Promise<void>;
@@ -23,6 +26,7 @@ type RoleContextType = {
 
 const RoleContext = createContext<RoleContextType>({
   role:        null,
+  status:      null,
   roleLoading: true,
   refetchRole: async () => {},
 });
@@ -30,20 +34,24 @@ const RoleContext = createContext<RoleContextType>({
 export function RoleProvider({ children }: { children: ReactNode }) {
   const { user }                      = useAuth();
   const [role, setRole]               = useState<UserRole>(null);
+  const [status, setStatus]           = useState<UserStatus>(null);
   const [roleLoading, setRoleLoading] = useState(true);
 
   const fetchRole = useCallback(async () => {
     if (!user) {
       setRole(null);
+      setStatus(null);
       setRoleLoading(false);
       return;
     }
     setRoleLoading(true);
     try {
-      const data = await apiClient(user.id).get<{ role: string | null }>('/users/me');
+      const data = await apiClient(user.id).get<{ role: string | null; status: string | null }>('/users/me');
       setRole((data?.role as UserRole) ?? null);
+      setStatus((data?.status as UserStatus) ?? 'active');
     } catch {
       setRole(null);
+      setStatus(null);
     }
     setRoleLoading(false);
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -52,7 +60,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   useEffect(() => { fetchRole(); }, [fetchRole]);
 
   return (
-    <RoleContext.Provider value={{ role, roleLoading, refetchRole: fetchRole }}>
+    <RoleContext.Provider value={{ role, status, roleLoading, refetchRole: fetchRole }}>
       {children}
     </RoleContext.Provider>
   );

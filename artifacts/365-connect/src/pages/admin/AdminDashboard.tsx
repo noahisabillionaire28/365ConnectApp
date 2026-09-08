@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
-  Users, Briefcase, DollarSign, TrendingUp, AlertTriangle, FileText,
+  Users, Briefcase, DollarSign, TrendingUp, AlertTriangle, FileText, ChevronRight,
 } from 'lucide-react';
 import { isAdminAuthenticated, initAdminSession } from '@/store/adminStore';
 import { useAdminStats } from '@/hooks/useAdminData';
@@ -23,18 +23,16 @@ function SkeletonCard() {
 
 /* ── Stat card ───────────────────────────────────────────────────────────── */
 function StatCard({
-  label, value, sub, icon: Icon, delay = 0,
+  label, value, sub, icon: Icon, delay = 0, to,
 }: {
   label: string; value: string; sub: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   delay?: number;
+  /** When set, the whole card becomes a link to this admin route. */
+  to?: string;
 }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, delay, ease: 'easeOut' }}
-      className="bg-white border border-[#DBDBDB] rounded-[12px] p-4 flex flex-col gap-3"
-    >
+  const inner = (
+    <>
       <div className="flex items-center justify-between">
         <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.16em]">{label}</p>
         <div className="w-8 h-8 rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
@@ -42,7 +40,28 @@ function StatCard({
         </div>
       </div>
       <p className="text-black font-bold leading-none" style={{ fontSize: 30 }}>{value}</p>
-      <p className="text-[#737373] text-[12px] font-medium">{sub}</p>
+      <div className="flex items-center justify-between">
+        <p className="text-[#737373] text-[12px] font-medium">{sub}</p>
+        {to && <ChevronRight size={14} aria-hidden className="text-[#C7C7C7]" />}
+      </div>
+    </>
+  );
+
+  const base = 'bg-white border border-[#DBDBDB] rounded-[12px] p-4 flex flex-col gap-3';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, delay, ease: 'easeOut' }}
+    >
+      {to ? (
+        <a href={to} aria-label={`${label} — view details`}
+          className={`${base} transition-colors hover:bg-[#FAFAFA] active:scale-[0.99] block`}>
+          {inner}
+        </a>
+      ) : (
+        <div className={base}>{inner}</div>
+      )}
     </motion.div>
   );
 }
@@ -95,17 +114,17 @@ export function AdminDashboard() {
           ) : stats ? (
             <>
               <StatCard label="Total Users"    value={stats.totalUsers.toLocaleString()}
-                sub={`+${stats.newSignupsToday} today`} icon={Users} delay={0} />
+                sub={`+${stats.newSignupsToday} today`} icon={Users} delay={0} to="/admin/users" />
               <StatCard label="Total Shifts"   value={stats.totalShifts.toLocaleString()}
-                sub={`${stats.activeShifts} active`} icon={Briefcase} delay={0.05} />
+                sub={`${stats.activeShifts} active`} icon={Briefcase} delay={0.05} to="/admin/shifts" />
               <StatCard label="Applications"   value={stats.totalApps.toLocaleString()}
-                sub="across all shifts" icon={FileText} delay={0.1} />
+                sub="across all shifts" icon={FileText} delay={0.1} to="/admin/shifts" />
               <StatCard label="Platform Fees"  value={fmtK(stats.platformFeeRev)}
-                sub="8% of gross revenue" icon={DollarSign} delay={0.15} />
+                sub="8% of gross revenue" icon={DollarSign} delay={0.15} to="/admin/revenue" />
               <StatCard label="Gross Revenue"  value={fmtK(stats.totalRevenue)}
-                sub="all payments" icon={TrendingUp} delay={0.2} />
+                sub="all payments" icon={TrendingUp} delay={0.2} to="/admin/revenue" />
               <StatCard label="Open Disputes"  value={String(stats.openDisputes)}
-                sub="require attention" icon={AlertTriangle} delay={0.25} />
+                sub="require attention" icon={AlertTriangle} delay={0.25} to="/admin/disputes" />
             </>
           ) : null}
         </div>
