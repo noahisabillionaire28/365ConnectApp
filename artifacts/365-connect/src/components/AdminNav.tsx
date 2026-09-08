@@ -59,8 +59,8 @@ export function AdminNav() {
         <div className="flex items-center gap-1.5">
           {/* View the live app (opens in a new tab) */}
           <a
-            href={APP_URL} target="_blank" rel="noopener noreferrer"
-            aria-label="View the app in a new tab"
+            href={APP_URL}
+            aria-label="View the app as a normal user"
             className="h-10 px-3 rounded-[8px] flex items-center gap-1.5 text-white/90 text-[13px] font-semibold transition-colors"
             style={{ background: ACTIVE }}
           >
@@ -156,9 +156,9 @@ export function AdminNav() {
               {/* View the app */}
               <div className="px-3 pb-2 flex-shrink-0">
                 <a
-                  href={APP_URL} target="_blank" rel="noopener noreferrer"
+                  href={APP_URL}
                   onClick={() => setOpen(false)}
-                  aria-label="View the app in a new tab"
+                  aria-label="View the app as a normal user"
                   className="flex items-center gap-3 px-3 h-[48px] w-full rounded-[10px] transition-colors"
                   style={{ background: ACTIVE }}
                 >
