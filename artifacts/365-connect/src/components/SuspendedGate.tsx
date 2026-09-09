@@ -11,10 +11,10 @@ import { useRole } from '@/contexts/RoleContext';
  */
 export function SuspendedGate() {
   const { signOut } = useAuth();
-  const { role } = useRole();
+  const { isAdmin } = useRole();
 
   // Never lock an admin out of their own panel.
-  if (role === 'admin') return null;
+  if (isAdmin) return null;
 
   return (
     <div className="fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center px-8 text-center">

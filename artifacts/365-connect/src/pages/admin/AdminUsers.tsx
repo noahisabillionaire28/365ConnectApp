@@ -344,6 +344,7 @@ const FILTERS: { key: FilterOpt; label: string }[] = [
   { key: 'all',       label: 'All'       },
   { key: 'worker',    label: 'Workers'   },
   { key: 'client',    label: 'Clients'   },
+  { key: 'staffer',   label: 'Staffers'  },
   { key: 'admin',     label: 'Admins'    },
   { key: 'active',    label: 'Active'    },
   { key: 'flagged',   label: 'Flagged'   },

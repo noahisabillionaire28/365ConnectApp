@@ -15,8 +15,9 @@ export function isAdminAuthenticated(): boolean {
  */
 export async function initAdminSession(): Promise<boolean> {
   try {
-    const profile = await apiClient(null).get<{ role?: string }>('/users/me');
-    _adminAuthenticated = profile?.role === 'admin';
+    const profile = await apiClient(null).get<{ role?: string; is_admin?: boolean }>('/users/me');
+    // Admin is a capability: the is_admin flag OR the legacy role='admin'.
+    _adminAuthenticated = profile?.is_admin === true || profile?.role === 'admin';
     return _adminAuthenticated;
   } catch {
     _adminAuthenticated = false;

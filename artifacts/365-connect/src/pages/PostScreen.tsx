@@ -61,12 +61,12 @@ export function PostScreen() {
   const deleteComment = useDeleteComment(postId);
   const toggleLike = useToggleLike();
   const { user } = useAuth();
-  const { role } = useProfile();
+  const { isAdmin } = useProfile();
   const [text, setText] = useState('');
 
   // A comment can be deleted by its author, the post's author, or an admin.
   const canDeleteComment = (c: PostComment) =>
-    c.user_id === user?.id || post?.user_id === user?.id || role === 'admin';
+    c.user_id === user?.id || post?.user_id === user?.id || isAdmin;
 
   function submit() {
     const body = text.trim();

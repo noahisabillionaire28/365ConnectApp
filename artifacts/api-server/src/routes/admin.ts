@@ -15,12 +15,15 @@ async function requireAdminSession(req: Request, res: Response, next: NextFuncti
   try {
     const { data, error } = await adminDb
       .from('users')
-      .select('role')
+      .select('role, is_admin')
       .eq('id', userId)
       .maybeSingle();
     if (error) { res.status(500).json({ error: 'Auth check failed' }); return; }
-    if (!data || data.role !== 'admin') {
-      res.status(403).json({ error: 'Forbidden — admin role required' });
+    // Admin is a capability: either the legacy role='admin' OR the is_admin flag.
+    // The flag lets an account keep a normal role (worker/client/staffer) and
+    // still reach the admin panel.
+    if (!data || (data.role !== 'admin' && data.is_admin !== true)) {
+      res.status(403).json({ error: 'Forbidden — admin access required' });
       return;
     }
     next();

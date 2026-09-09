@@ -18,14 +18,14 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
 }) {
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const { role } = useProfile();
+  const { isAdmin } = useProfile();
   const { showToast } = useToast();
   const deletePost = useDeletePost();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const goAuthor = () => { if (post.author_username) navigate(`/worker/${post.author_username}`); };
   const initials = (post.author_username ?? 'W').slice(0, 2).toUpperCase();
-  const canDelete = post.user_id === user?.id || role === 'admin';
+  const canDelete = post.user_id === user?.id || isAdmin;
 
   function handleDelete() {
     deletePost.mutate(post.id, {

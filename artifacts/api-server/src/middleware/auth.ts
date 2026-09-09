@@ -103,9 +103,17 @@ export function requireRole(...roles: string[]) {
       return;
     }
     try {
-      const role = await getUserRole(req.userId);
+      const { data } = await adminDb
+        .from("users")
+        .select("role, is_admin")
+        .eq("id", req.userId)
+        .maybeSingle();
+      const role = (data?.role as string | undefined) ?? null;
       req.userRole = role;
-      if (!role || !roles.includes(role)) {
+      // Admins are superusers: they can act in any role (this powers the
+      // in-app "view as worker/client/staffer" switcher).
+      const isAdmin = role === "admin" || data?.is_admin === true;
+      if (!isAdmin && (!role || !roles.includes(role))) {
         res.status(403).json({ error: "Forbidden — insufficient role" });
         return;
       }

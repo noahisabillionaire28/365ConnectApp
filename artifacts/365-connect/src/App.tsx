@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { RoleProvider, useRole } from '@/contexts/RoleContext';
 import { SuspendedGate } from '@/components/SuspendedGate';
+import { AdminFab } from '@/components/AdminFab';
 import { useSSE } from '@/hooks/useSSE';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -99,8 +100,8 @@ function SSEMount() { useSSE(); return null; }
 
 // ── Suspended-account gate — blocks banned (non-admin) users from the app ─────
 function SuspendedGuard() {
-  const { status, role } = useRole();
-  if (status === 'suspended' && role !== 'admin') return <SuspendedGate />;
+  const { status, isAdmin } = useRole();
+  if (status === 'suspended' && !isAdmin) return <SuspendedGate />;
   return null;
 }
 
@@ -235,6 +236,7 @@ function AppShell() {
           <TooltipProvider>
             <ErrorBoundary>
               <AppRouter />
+              <AdminFab />
               <SuspendedGuard />
             </ErrorBoundary>
           </TooltipProvider>
