@@ -2,6 +2,19 @@ import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { broadcastToUser } from '../lib/sseManager.js';
+import { sendEmail, renderNotificationEmail, appUrl } from '../lib/email.js';
+
+/** Notification types that should NOT trigger an email (too high-frequency). */
+const EMAIL_SKIP_TYPES = new Set(['post_like', 'post_comment', 'follow']);
+
+/** Best-effort deep link into the app for a notification, for the email CTA. */
+function emailCta(type: string, shiftId?: string | null, postId?: string | null):
+  { label: string; href: string } {
+  const base = appUrl();
+  if (shiftId) return { label: 'View shift', href: `${base}/shift/${shiftId}` };
+  if (postId)  return { label: 'View post',  href: `${base}/post/${postId}` };
+  return { label: 'Open 365 Connect', href: `${base}/notifications` };
+}
 
 const router = Router();
 
@@ -91,31 +104,46 @@ export async function createNotification(params: {
 }): Promise<void> {
   const { userId, fromUserId, type, title, body, shiftId, postId } = params;
   try {
-    // Respect the recipient's in-app notification preference. (A DB-level gate
-    // trigger enforces the same rule for notifications created by SQL triggers.)
+    // Respect the recipient's preferences + grab their email in one read.
+    // (A DB-level gate trigger enforces the in-app rule for SQL-trigger rows.)
     const { data: pref } = await adminDb
       .from('users')
-      .select('in_app_notifications')
+      .select('in_app_notifications, email_notifications, email')
       .eq('id', userId)
       .maybeSingle();
-    if (pref && pref.in_app_notifications === false) return;
 
-    const { data, error } = await adminDb
-      .from('notifications')
-      .insert({
-        user_id: userId,
-        from_user_id: fromUserId ?? null,
-        type,
-        title,
-        body,
-        shift_id: shiftId ?? null,
-        post_id: postId ?? null,
-      })
-      .select()
-      .maybeSingle();
-    if (error) throw error;
-    // Push live to the recipient if they're online (skip if the row was gated out).
-    if (data) broadcastToUser(userId, 'new_notification', data);
+    // In-app notification (skipped if the user turned in-app off).
+    if (!pref || pref.in_app_notifications !== false) {
+      const { data, error } = await adminDb
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          from_user_id: fromUserId ?? null,
+          type,
+          title,
+          body,
+          shift_id: shiftId ?? null,
+          post_id: postId ?? null,
+        })
+        .select()
+        .maybeSingle();
+      if (error) throw error;
+      // Push live to the recipient if they're online.
+      if (data) broadcastToUser(userId, 'new_notification', data);
+    }
+
+    // Email notification — best-effort, gated by the email preference and type.
+    if (
+      pref?.email &&
+      pref.email_notifications !== false &&
+      !EMAIL_SKIP_TYPES.has(type)
+    ) {
+      const cta = emailCta(type, shiftId, postId);
+      const { html, text } = renderNotificationEmail({
+        title, body, ctaLabel: cta.label, ctaHref: cta.href, preheader: body,
+      });
+      await sendEmail({ to: pref.email as string, subject: title, html, text });
+    }
   } catch (e) {
     // Notifications are non-critical — log but don't throw
     console.error('[createNotification] failed:', e);
