@@ -5,6 +5,7 @@
  */
 import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
+import { sendEmail, renderNotificationEmail, appUrl } from '../lib/email.js';
 import type { Request, Response, NextFunction } from 'express';
 
 const router = Router();
@@ -165,6 +166,30 @@ router.post('/shifts/backfill-coords', async (req, res) => {
     res.json({ updated });
   } catch (err) {
     console.error('[admin/shifts/backfill-coords]', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/* ── POST /api/admin/test-email ──────────────────────────────────────────────
+ * Sends a test email to the admin's own address to verify Resend is configured.
+ * Returns { sent, to, configured }. Admin-only. */
+router.post('/test-email', async (req, res) => {
+  try {
+    const { data: me } = await adminDb
+      .from('users').select('email').eq('id', req.userId).maybeSingle();
+    const to = me?.email as string | undefined;
+    if (!to) { res.status(400).json({ error: 'Your account has no email on file' }); return; }
+
+    const { html, text } = renderNotificationEmail({
+      title: 'Test email from 365 Connect',
+      body: 'If you can read this, transactional email is working. Bookings, requests, and alerts will now reach your users’ inboxes.',
+      ctaLabel: 'Open 365 Connect',
+      ctaHref: appUrl(),
+    });
+    const sent = await sendEmail({ to, subject: 'Test email from 365 Connect', html, text });
+    res.json({ sent, to, configured: !!process.env['RESEND_API_KEY'] });
+  } catch (err) {
+    console.error('[admin/test-email]', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
