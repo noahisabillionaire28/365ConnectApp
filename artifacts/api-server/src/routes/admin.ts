@@ -175,10 +175,14 @@ router.post('/shifts/backfill-coords', async (req, res) => {
  * Returns { sent, to, configured }. Admin-only. */
 router.post('/test-email', async (req, res) => {
   try {
-    const { data: me } = await adminDb
-      .from('users').select('email').eq('id', req.userId).maybeSingle();
-    const to = me?.email as string | undefined;
-    if (!to) { res.status(400).json({ error: 'Your account has no email on file' }); return; }
+    const override = typeof req.body?.to === 'string' ? req.body.to.trim() : '';
+    let to = override || undefined;
+    if (!to) {
+      const { data: me } = await adminDb
+        .from('users').select('email').eq('id', req.userId).maybeSingle();
+      to = me?.email as string | undefined;
+    }
+    if (!to) { res.status(400).json({ error: 'No recipient email available' }); return; }
 
     const { html, text } = renderNotificationEmail({
       title: 'Test email from 365 Connect',

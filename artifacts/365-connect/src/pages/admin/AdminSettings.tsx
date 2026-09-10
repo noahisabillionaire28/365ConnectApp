@@ -24,6 +24,7 @@ export function AdminSettings() {
   const [, navigate] = useLocation();
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailMsg, setEmailMsg]   = useState<string | null>(null);
+  const [testTo, setTestTo]       = useState('');
 
   useEffect(() => { initAdminSession().then((ok) => { if (!ok) navigate('/admin/login'); }); }, [navigate]);
   if (!isAdminAuthenticated()) return null;
@@ -31,7 +32,7 @@ export function AdminSettings() {
   async function handleTestEmail() {
     setEmailBusy(true); setEmailMsg(null);
     try {
-      const r = await adminApi.sendTestEmail();
+      const r = await adminApi.sendTestEmail(testTo.trim() || undefined);
       if (r.sent) setEmailMsg(`✓ Sent to ${r.to}. Check your inbox (and spam).`);
       else if (!r.configured) setEmailMsg('✗ RESEND_API_KEY is not set on the API server yet.');
       else setEmailMsg('✗ Resend rejected the send — check your domain/From address.');
@@ -67,20 +68,28 @@ export function AdminSettings() {
         <div className="px-4 py-3 border-b border-[#DBDBDB]">
           <p className="text-[#737373] text-[10px] font-bold uppercase tracking-[0.16em]">Email</p>
         </div>
-        <div className="flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
+        <div className="px-4 py-4">
+          <div className="flex items-center gap-3 mb-3">
             <div className="w-8 h-8 rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
               <Mail size={14} aria-hidden className="text-black" />
             </div>
             <div>
               <p className="text-black text-[14px] font-semibold">Transactional Email</p>
-              <p className="text-[#737373] text-[12px]">Send a test to your own address</p>
+              <p className="text-[#737373] text-[12px]">
+                While unverified, Resend only delivers to your Resend signup email.
+              </p>
             </div>
           </div>
-          <button type="button" onClick={() => void handleTestEmail()} disabled={emailBusy}
-            className="px-3.5 h-[36px] rounded-[8px] bg-[#0A1628] text-white text-[13px] font-bold disabled:opacity-60">
-            {emailBusy ? 'Sending…' : 'Send test'}
-          </button>
+          <div className="flex items-center gap-2">
+            <input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)}
+              placeholder="Send to… (blank = your account email)"
+              aria-label="Test recipient email"
+              className="flex-1 h-[38px] rounded-[8px] border border-[#DBDBDB] bg-[#FAFAFA] px-3 text-[13px] text-black placeholder:text-[#AAAAAA] outline-none focus:border-black" />
+            <button type="button" onClick={() => void handleTestEmail()} disabled={emailBusy}
+              className="px-3.5 h-[38px] rounded-[8px] bg-[#0A1628] text-white text-[13px] font-bold disabled:opacity-60 flex-shrink-0">
+              {emailBusy ? 'Sending…' : 'Send test'}
+            </button>
+          </div>
         </div>
         {emailMsg && (
           <p className={`px-4 pb-4 text-[12px] font-medium ${emailMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>

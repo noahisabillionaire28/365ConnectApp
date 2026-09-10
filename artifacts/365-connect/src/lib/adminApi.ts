@@ -147,8 +147,8 @@ export const adminApi = {
     patch<{ ok: boolean }>(`/shifts/${id}/reopen`, {}),
   backfillShiftCoords: (updates: Array<{ id: string; lat: number; lng: number }>) =>
     post<{ updated: number }>(`/shifts/backfill-coords`, { updates }),
-  sendTestEmail: () =>
-    post<{ sent: boolean; to: string; configured: boolean }>(`/test-email`, {}),
+  sendTestEmail: (to?: string) =>
+    post<{ sent: boolean; to: string; configured: boolean }>(`/test-email`, to ? { to } : {}),
   deleteUser:    (id: string) =>
     del<{ ok: boolean }>(`/users/${id}`),
   updateDispute: (id: string, status: string, note?: string) =>
