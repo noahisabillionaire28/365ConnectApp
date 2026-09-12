@@ -23,15 +23,21 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'shift_id is required' });
   }
 
-  // Only a worker booked (accepted) onto this shift may clock in.
-  const { count } = await adminDb
-    .from('applications')
-    .select('*', { count: 'exact', head: true })
-    .eq('shift_id', shift_id)
-    .eq('worker_id', req.userId)
-    .eq('status', 'accepted');
-  if (!count) {
-    return res.status(403).json({ error: 'You are not booked for this shift.' });
+  // Only a worker booked (accepted) onto this shift may clock in — unless the
+  // caller is an admin (superuser), so admins can test the flow on any shift.
+  const { data: me } = await adminDb
+    .from('users').select('role, is_admin').eq('id', req.userId).maybeSingle();
+  const isAdmin = me?.role === 'admin' || me?.is_admin === true;
+  if (!isAdmin) {
+    const { count } = await adminDb
+      .from('applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('shift_id', shift_id)
+      .eq('worker_id', req.userId)
+      .eq('status', 'accepted');
+    if (!count) {
+      return res.status(403).json({ error: 'You are not booked for this shift.' });
+    }
   }
 
   const payload = { shift_id, worker_id: req.userId, clock_in: new Date().toISOString() };
