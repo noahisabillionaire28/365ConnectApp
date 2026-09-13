@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, Star, UserPlus,
-  Edit3, Trash2, DollarSign, Navigation, X, Zap,
+  Edit3, Trash2, DollarSign, Navigation, X, Zap, Send,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -23,6 +23,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { hasCompletedTimeEntry } from '@/hooks/useTimeEntry';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
 import { useAcceptedWorkers } from '@/hooks/useAcceptedWorkers';
+import { broadcastShiftRequest } from '@/hooks/useShiftRequests';
 import { startShiftPayment } from '@/lib/checkout';
 
 /** Deep links to open a destination in each navigation app. */
@@ -164,6 +165,16 @@ export function ShiftDetailScreen() {
   const [directionsOpen, setDirectionsOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
+  const [inviting, setInviting] = useState(false);
+
+  async function handleBroadcast() {
+    if (!user?.id || !id || inviting) return;
+    setInviting(true);
+    const r = await broadcastShiftRequest(user.id, id);
+    setInviting(false);
+    if (r.ok) showToast(`Invited ${r.invited ?? 0} worker${r.invited === 1 ? '' : 's'}! They can accept to claim a spot.`);
+    else showToast(r.message ?? 'Could not send invites.');
+  }
   // Coordinates resolved from the shift's ADDRESS TEXT — used so the map, pin,
   // distance, and directions match the address even when the stored lat/lng are
   // wrong (older shifts saved with the poster's own location).
@@ -880,6 +891,16 @@ export function ShiftDetailScreen() {
             className="w-full h-[46px] mb-2 rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[14px] tracking-wide flex items-center justify-center gap-2">
             <UserPlus size={16} aria-hidden />
             Assign Workers
+          </motion.button>
+        )}
+
+        {isOwner && (shift.status === 'open' || shift.status === 'filled') && (
+          <motion.button type="button" whileTap={{ scale: 0.97 }}
+            onClick={() => void handleBroadcast()} disabled={inviting}
+            aria-label="Request all workers for this shift"
+            className="w-full h-[46px] mb-2 rounded-[8px] bg-[#0095F6] text-white font-bold text-[14px] tracking-wide flex items-center justify-center gap-2 disabled:opacity-60">
+            <Send size={16} aria-hidden />
+            {inviting ? 'Sending invites…' : 'Request All Workers'}
           </motion.button>
         )}
 
