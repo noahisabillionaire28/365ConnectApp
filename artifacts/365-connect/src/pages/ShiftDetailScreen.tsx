@@ -249,8 +249,7 @@ export function ShiftDetailScreen() {
   const shiftCoords = venueCoords ?? { lat: shift.lat, lng: shift.lng };
   const distanceFromShift = haversineMiles(myCoords.lat, myCoords.lng, shiftCoords.lat, shiftCoords.lng);
   const distanceMilesLabel = Math.round(distanceFromShift * 10) / 10;
-  // Admins (testing) bypass the 1-mile clock-in geofence.
-  const withinClockInRange = profile.isAdmin || distanceFromShift <= 1;
+  const withinClockInRange = distanceFromShift <= 1;
 
   // Real CTA states, per applications.status + time_entries completion:
   //   no row → apply | pending → Pending Approval | declined → Not Selected
@@ -260,9 +259,7 @@ export function ShiftDetailScreen() {
   const canClaim = shift.instantClaim && shift.spotsAvailable > 0;
   type CtaState = 'apply' | 'claim' | 'pending' | 'declined' | 'clock-in' | 'completed';
   const ctaState: CtaState =
-    profile.isAdmin
-      ? (hasCompleted ? 'completed' : 'clock-in')   // admins can clock into any shift to test
-      : applicationStatus === 'accepted'
+    applicationStatus === 'accepted'
       ? (hasCompleted ? 'completed' : 'clock-in')
       : applicationStatus === 'pending'
       ? 'pending'
@@ -811,9 +808,66 @@ export function ShiftDetailScreen() {
             </div>
           </div>
         )}
+        {/* Owner management — inline, scrolls with content (never overlaps) */}
+        {isOwner && (
+          <div className="px-5 pt-2 pb-8 flex flex-col gap-2 border-t border-[#DBDBDB] mt-2">
+            {profile.role === 'staffer' && (
+              <motion.button type="button" whileTap={{ scale: 0.97 }}
+                onClick={() => navigate(`/shift/${shiftId}/assign`)}
+                aria-label="Assign workers from your roster"
+                className="w-full h-[46px] rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[14px] tracking-wide flex items-center justify-center gap-2">
+                <UserPlus size={16} aria-hidden />
+                Assign Workers
+              </motion.button>
+            )}
+            {(shift.status === 'open' || shift.status === 'filled') && (
+              <motion.button type="button" whileTap={{ scale: 0.97 }}
+                onClick={() => void handleBroadcast()} disabled={inviting}
+                aria-label="Request all workers for this shift"
+                className="w-full h-[46px] rounded-[8px] bg-[#0095F6] text-white font-bold text-[14px] tracking-wide flex items-center justify-center gap-2 disabled:opacity-60">
+                <Send size={16} aria-hidden />
+                {inviting ? 'Sending invites…' : 'Request All Workers'}
+              </motion.button>
+            )}
+            <motion.button type="button" whileTap={{ scale: 0.97 }}
+              onClick={() => navigate(`/shift/${shiftId}/applicants`)}
+              aria-label={`View applicants${pendingApplicants.length > 0 ? `, ${pendingApplicants.length} pending` : ''}`}
+              className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] tracking-wide flex items-center justify-center gap-2.5">
+              <Users size={18} aria-hidden />
+              View Applicants
+              {pendingApplicants.length > 0 && (
+                <span className="bg-white/20 text-white text-[12px] font-bold px-2 py-0.5 rounded-full">
+                  {pendingApplicants.length}
+                </span>
+              )}
+            </motion.button>
+            {(shift.status === 'open' || shift.status === 'filled') && (
+              <div className="flex gap-2">
+                <motion.button type="button" whileTap={{ scale: 0.97 }}
+                  onClick={() => void handleEditShift()}
+                  disabled={editLoading}
+                  aria-label="Edit this shift"
+                  className="flex-1 h-[44px] rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-60">
+                  {editLoading
+                    ? <span className="text-[13px]">Loading…</span>
+                    : <><Edit3 size={15} aria-hidden />Edit</>
+                  }
+                </motion.button>
+                <motion.button type="button" whileTap={{ scale: 0.97 }}
+                  onClick={() => setShowCancelConfirm(true)}
+                  aria-label="Cancel this shift"
+                  className="flex-1 h-[44px] rounded-[8px] border border-[#EF4444] text-[#EF4444] font-bold text-[14px] flex items-center justify-center gap-2">
+                  <Trash2 size={15} aria-hidden />
+                  Cancel
+                </motion.button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Fixed CTA */}
+      {/* Fixed CTA — worker actions only (owners manage via the inline block above) */}
+      {!isOwner && (
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] px-5 pb-9 pt-4 bg-gradient-to-t from-white via-white/98 to-transparent z-30 border-t border-[#DBDBDB]">
         <AnimatePresence>
           {ctaState === 'pending' && (
@@ -883,64 +937,8 @@ export function ShiftDetailScreen() {
             <span className="text-emerald-600 font-bold text-[15px]">Completed</span>
           </div>
         )}
-
-        {isOwner && profile.role === 'staffer' && (
-          <motion.button type="button" whileTap={{ scale: 0.97 }}
-            onClick={() => navigate(`/shift/${shiftId}/assign`)}
-            aria-label="Assign workers from your roster"
-            className="w-full h-[46px] mb-2 rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[14px] tracking-wide flex items-center justify-center gap-2">
-            <UserPlus size={16} aria-hidden />
-            Assign Workers
-          </motion.button>
-        )}
-
-        {isOwner && (shift.status === 'open' || shift.status === 'filled') && (
-          <motion.button type="button" whileTap={{ scale: 0.97 }}
-            onClick={() => void handleBroadcast()} disabled={inviting}
-            aria-label="Request all workers for this shift"
-            className="w-full h-[46px] mb-2 rounded-[8px] bg-[#0095F6] text-white font-bold text-[14px] tracking-wide flex items-center justify-center gap-2 disabled:opacity-60">
-            <Send size={16} aria-hidden />
-            {inviting ? 'Sending invites…' : 'Request All Workers'}
-          </motion.button>
-        )}
-
-        {isOwner && (
-          <motion.button type="button" whileTap={{ scale: 0.97 }}
-            onClick={() => navigate(`/shift/${shiftId}/applicants`)}
-            aria-label={`View applicants${pendingApplicants.length > 0 ? `, ${pendingApplicants.length} pending` : ''}`}
-            className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] tracking-wide flex items-center justify-center gap-2.5">
-            <Users size={18} aria-hidden />
-            View Applicants
-            {pendingApplicants.length > 0 && (
-              <span className="bg-white/20 text-white text-[12px] font-bold px-2 py-0.5 rounded-full">
-                {pendingApplicants.length}
-              </span>
-            )}
-          </motion.button>
-        )}
-
-        {isOwner && (shift.status === 'open' || shift.status === 'filled') && (
-          <div className="flex gap-2 mt-2">
-            <motion.button type="button" whileTap={{ scale: 0.97 }}
-              onClick={() => void handleEditShift()}
-              disabled={editLoading}
-              aria-label="Edit this shift"
-              className="flex-1 h-[44px] rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-60">
-              {editLoading
-                ? <span className="text-[13px]">Loading…</span>
-                : <><Edit3 size={15} aria-hidden />Edit</>
-              }
-            </motion.button>
-            <motion.button type="button" whileTap={{ scale: 0.97 }}
-              onClick={() => setShowCancelConfirm(true)}
-              aria-label="Cancel this shift"
-              className="flex-1 h-[44px] rounded-[8px] border border-[#EF4444] text-[#EF4444] font-bold text-[14px] flex items-center justify-center gap-2">
-              <Trash2 size={15} aria-hidden />
-              Cancel
-            </motion.button>
-          </div>
-        )}
       </div>
+      )}
     </div>
     </>
   );
