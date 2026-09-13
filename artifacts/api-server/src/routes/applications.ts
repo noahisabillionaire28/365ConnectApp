@@ -22,7 +22,7 @@ async function shiftLabel(id: string): Promise<string> {
  * with any shift the worker is already accepted for (double-booking guard), else
  * null. Two shifts overlap when tStart < otherEnd && otherStart < tEnd.
  */
-async function findTimeConflict(
+export async function findTimeConflict(
   workerId: string,
   targetShiftId: string,
 ): Promise<{ title: string | null; start: string; end: string } | null> {

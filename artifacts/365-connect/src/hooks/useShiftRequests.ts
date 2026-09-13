@@ -54,6 +54,22 @@ export async function createShiftRequest(
   }
 }
 
+/** Invite every worker on the platform to a shift (Nowsta-style blast). */
+export async function broadcastShiftRequest(
+  userId: string,
+  shiftId: string,
+  message?: string,
+): Promise<{ ok: boolean; invited?: number; message?: string }> {
+  try {
+    const r = await apiClient(userId).post<{ invited: number }>(
+      '/shift-requests/broadcast', { shift_id: shiftId, message },
+    );
+    return { ok: true, invited: r.invited };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : 'Failed to send invites' };
+  }
+}
+
 function mapRow(r: ShiftRequestRow): ShiftRequestRow {
   return {
     ...r,
