@@ -238,7 +238,8 @@ export function ShiftDetailScreen() {
   const shiftCoords = venueCoords ?? { lat: shift.lat, lng: shift.lng };
   const distanceFromShift = haversineMiles(myCoords.lat, myCoords.lng, shiftCoords.lat, shiftCoords.lng);
   const distanceMilesLabel = Math.round(distanceFromShift * 10) / 10;
-  const withinClockInRange = distanceFromShift <= 1;
+  // Admins (testing) bypass the 1-mile clock-in geofence.
+  const withinClockInRange = profile.isAdmin || distanceFromShift <= 1;
 
   // Real CTA states, per applications.status + time_entries completion:
   //   no row → apply | pending → Pending Approval | declined → Not Selected
@@ -248,7 +249,9 @@ export function ShiftDetailScreen() {
   const canClaim = shift.instantClaim && shift.spotsAvailable > 0;
   type CtaState = 'apply' | 'claim' | 'pending' | 'declined' | 'clock-in' | 'completed';
   const ctaState: CtaState =
-    applicationStatus === 'accepted'
+    profile.isAdmin
+      ? (hasCompleted ? 'completed' : 'clock-in')   // admins can clock into any shift to test
+      : applicationStatus === 'accepted'
       ? (hasCompleted ? 'completed' : 'clock-in')
       : applicationStatus === 'pending'
       ? 'pending'
