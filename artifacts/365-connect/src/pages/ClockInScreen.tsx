@@ -9,7 +9,6 @@ import type { MockShift } from '@/lib/supabase';
 import { markClockedIn } from '@/store/feedStore';
 import { useShiftById } from '@/hooks/useShifts';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRole } from '@/contexts/RoleContext';
 import { haversineMiles } from '@/lib/supabase';
 import { apiClient } from '@/lib/api';
 import { useTimeEntry } from '@/hooks/useTimeEntry';
@@ -442,7 +441,6 @@ export function ClockInScreen() {
   const { id }             = useParams<{ id: string }>();
   const [, navigate]       = useLocation();
   const { user }            = useAuth();
-  const { isAdmin }         = useRole();
   const { data: shift, isLoading, error } = useShiftById(id);
   const { startOrResume, completeEntry } = useTimeEntry(id);
   const { showToast } = useToast();
@@ -501,12 +499,6 @@ export function ClockInScreen() {
       }, wait);
     };
 
-    // Admins (testing) bypass the on-site geofence entirely.
-    if (isAdmin) {
-      finish({ ok: true });
-      return;
-    }
-
     if (!navigator.geolocation) {
       finish({ ok: false, reason: 'unavailable', distance: null });
       return;
@@ -523,7 +515,7 @@ export function ClockInScreen() {
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
     );
-  }, [shift, user?.id, startOrResume, isAdmin]);
+  }, [shift, user?.id, startOrResume]);
 
   useEffect(() => {
     if (startedRef.current || !shift || !user?.id) return;
