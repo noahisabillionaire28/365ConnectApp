@@ -31,7 +31,14 @@ function RequestSkeleton() {
 export function ShiftRequestsScreen() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const { requests, isLoading, error, accept, decline } = useShiftRequests(user?.id);
+  const { requests: allRequests, isLoading, error, accept, decline } = useShiftRequests(user?.id);
+  // Only genuine offers TO this worker (rows where they're the invited worker),
+  // still pending, and not for a shift that has already started.
+  const requests = allRequests.filter((r) => {
+    if (r.worker_id !== user?.id || r.status !== 'pending') return false;
+    const t = r.startTime ?? r.start_time;
+    return !t || !Number.isFinite(Date.parse(t)) || Date.parse(t) > Date.now();
+  });
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
