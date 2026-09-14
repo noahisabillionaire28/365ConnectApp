@@ -837,7 +837,7 @@ export function ShiftDetailScreen() {
               aria-label={`View applicants${pendingApplicants.length > 0 ? `, ${pendingApplicants.length} pending` : ''}`}
               className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] tracking-wide flex items-center justify-center gap-2.5">
               <Users size={18} aria-hidden />
-              View Applicants
+              Manage Roster
               {pendingApplicants.length > 0 && (
                 <span className="bg-white/20 text-white text-[12px] font-bold px-2 py-0.5 rounded-full">
                   {pendingApplicants.length}
