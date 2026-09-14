@@ -1,237 +1,309 @@
 import { useState } from 'react';
 import { useParams, useLocation } from 'wouter';
-import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { ChevronLeft, X, Check, Star, Sparkles } from 'lucide-react';
-import { useShiftApplicants, type ApplicantCard } from '@/hooks/useShiftApplicants';
+import { motion } from 'framer-motion';
+import {
+  ChevronLeft, Check, X, Star, Send, UserPlus, Users, AlarmClock,
+  CheckCircle2, Flag, DollarSign, Clock3,
+} from 'lucide-react';
+import { useShiftApplicants } from '@/hooks/useShiftApplicants';
+import { useAcceptedWorkers, type AcceptedWorker, type Attendance } from '@/hooks/useAcceptedWorkers';
 import { useShiftInvites, type ShiftInvite } from '@/hooks/useShiftInvites';
 import { useShiftById } from '@/hooks/useShifts';
+import { broadcastShiftRequest } from '@/hooks/useShiftRequests';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
+import { apiClient } from '@/lib/api';
+import { startShiftPayment } from '@/lib/checkout';
 
-/** Status chip for an invited worker (Requested list). */
-function InviteStatusChip({ status }: { status: ShiftInvite['status'] }) {
-  const map = {
-    pending:  { label: 'Invited',  cls: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]' },
-    accepted: { label: 'Accepted', cls: 'bg-emerald-50 border-emerald-200 text-emerald-600' },
-    declined: { label: 'Declined', cls: 'bg-red-50 border-red-200 text-red-500' },
-  }[status];
+/* ── Small UI atoms ──────────────────────────────────────────────────────── */
+function Avatar({ url, name, size = 40 }: { url: string | null; name: string | null; size?: number }) {
+  const initials = (name ?? 'W').replace('@', '').slice(0, 2).toUpperCase();
   return (
-    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${map.cls}`}>
-      {map.label}
-    </span>
-  );
-}
-
-/** List of workers invited via "Request All Workers", with their response. */
-function InvitedRoster({ invites }: { invites: ShiftInvite[] }) {
-  const accepted = invites.filter((i) => i.status === 'accepted').length;
-  return (
-    <div className="mt-2">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-black font-bold text-[15px]">Requested workers</h2>
-        <span className="text-[#737373] text-[12px] font-medium">
-          {accepted}/{invites.length} accepted
-        </span>
-      </div>
-      <div className="flex flex-col gap-2">
-        {invites.map((inv) => {
-          const initials = (inv.worker_username ?? 'W').replace('@', '').slice(0, 2).toUpperCase();
-          return (
-            <div key={inv.id} className="flex items-center gap-3 bg-white border border-[#DBDBDB] rounded-[12px] px-3.5 py-3">
-              <div className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center overflow-hidden flex-shrink-0">
-                {inv.worker_photo
-                  ? <img src={inv.worker_photo} alt="" className="w-full h-full object-cover" />
-                  : <span className="text-black font-bold text-[13px]">{initials}</span>}
-              </div>
-              <p className="flex-1 min-w-0 text-black font-semibold text-[14px] truncate">
-                {inv.worker_username ? `@${inv.worker_username}` : 'Worker'}
-              </p>
-              <InviteStatusChip status={inv.status} />
-            </div>
-          );
-        })}
-      </div>
+    <div style={{ width: size, height: size }}
+      className="rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center overflow-hidden flex-shrink-0">
+      {url ? <img src={url} alt="" className="w-full h-full object-cover" />
+           : <span className="text-black font-bold text-[13px]">{initials}</span>}
     </div>
   );
 }
 
-const SWIPE_THRESHOLD = 120;
+const ATTENDANCE: Record<Attendance, { label: string; cls: string }> = {
+  applied: { label: 'Applied',  cls: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]' },
+  booked:  { label: 'Booked',   cls: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]' },
+  on_site: { label: 'On-site',  cls: 'bg-blue-50 border-blue-200 text-blue-600' },
+  done:    { label: 'Done',     cls: 'bg-emerald-50 border-emerald-200 text-emerald-600' },
+  no_show: { label: 'No-show',  cls: 'bg-red-50 border-red-200 text-red-500' },
+};
 
-function StarRow({ rating }: { rating: number | string }) {
-  const r = Number(rating);
+function AttendanceChip({ a }: { a: Attendance }) {
+  const m = ATTENDANCE[a];
+  return <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${m.cls}`}>{m.label}</span>;
+}
+
+function SectionHeader({ label, count }: { label: string; count: number }) {
   return (
-    <div className="flex items-center gap-1" aria-label={`${r.toFixed(1)} star rating`}>
-      <Star size={13} aria-hidden className="text-[#FFD700] fill-[#FFD700]" />
-      <span className="text-black text-[13px] font-semibold">{r > 0 ? r.toFixed(1) : 'New'}</span>
+    <div className="flex items-center gap-2 mb-2.5 mt-6 first:mt-0">
+      <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.16em]">{label}</p>
+      <span className="text-[#9CA3AF] text-[12px] font-semibold">{count}</span>
     </div>
   );
 }
 
-function ApplicantCardView({ applicant, onDecide, isTop }: {
-  applicant: ApplicantCard; onDecide: (decision: 'accepted' | 'declined') => void; isTop: boolean;
+/* ── Confirmed worker row (attendance + pay / no-show / remove) ───────────── */
+function ConfirmedRow({ w, onPay, onNoShow, onRemove, onReview, busy }: {
+  w: AcceptedWorker;
+  onPay: () => void; onNoShow: () => void; onRemove: () => void; onReview: () => void;
+  busy: boolean;
 }) {
-  const x = useMotionValue(0);
-  const rotate = useTransform(x, [-200, 200], [-14, 14]);
-  const approveOpacity = useTransform(x, [20, SWIPE_THRESHOLD], [0, 1]);
-  const declineOpacity = useTransform(x, [-SWIPE_THRESHOLD, -20], [1, 0]);
-  const [exitX, setExitX] = useState(0);
-
-  const initials = (applicant.username ?? 'W').replace('@', '').slice(0, 2).toUpperCase();
-
+  const scheduledPay = w.totalPay ?? null;
   return (
-    <motion.div
-      className="absolute inset-0"
-      style={isTop ? { x, rotate } : undefined}
-      drag={isTop ? 'x' : false}
-      dragConstraints={{ left: 0, right: 0 }}
-      dragElastic={0.9}
-      onDragEnd={(_, info) => {
-        if (info.offset.x > SWIPE_THRESHOLD) { setExitX(500); onDecide('accepted'); }
-        else if (info.offset.x < -SWIPE_THRESHOLD) { setExitX(-500); onDecide('declined'); }
-      }}
-      animate={exitX !== 0 ? { x: exitX, opacity: 0, rotate: exitX > 0 ? 20 : -20 } : { x: 0, opacity: 1 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-      role="group"
-      aria-label={`Applicant ${applicant.username ?? 'worker'}`}
-    >
-      <div className="w-full h-full bg-white border border-[#DBDBDB] rounded-[20px] shadow-lg overflow-hidden flex flex-col relative">
-        {isTop && (
-          <>
-            <motion.div style={{ opacity: approveOpacity }}
-              className="absolute top-6 left-6 z-10 border-[3px] border-[#10B981] rounded-[10px] px-3 py-1 -rotate-12">
-              <span className="text-[#10B981] font-black text-[18px] uppercase tracking-wide">Approve</span>
-            </motion.div>
-            <motion.div style={{ opacity: declineOpacity }}
-              className="absolute top-6 right-6 z-10 border-[3px] border-[#737373] rounded-[10px] px-3 py-1 rotate-12">
-              <span className="text-[#737373] font-black text-[18px] uppercase tracking-wide">Pass</span>
-            </motion.div>
-          </>
-        )}
-
-        <div className="h-[46%] bg-[#FAFAFA] flex items-center justify-center flex-shrink-0 relative">
-          {applicant.photoUrl ? (
-            <img src={applicant.photoUrl} alt={applicant.username ?? 'Applicant'} draggable={false}
-              className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-24 h-24 rounded-full bg-white border border-[#DBDBDB] flex items-center justify-center">
-              <span className="text-black font-bold text-[28px]">{initials}</span>
-            </div>
-          )}
-          {applicant.matchScore !== null && (
-            <div className="absolute top-4 right-4 bg-[#0095F6]/10 border border-[#0095F6]/30 rounded-full px-3 py-1 flex items-center gap-1.5">
-              <Sparkles size={12} aria-hidden className="text-[#0095F6]" />
-              <span className="text-[#0095F6] font-bold text-[12px]">{applicant.matchScore}% Match</span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1 px-5 py-4 flex flex-col gap-3 overflow-y-auto">
-          <div className="flex items-center justify-between">
-            <p className="text-black font-bold text-[19px]">{applicant.username ? `@${applicant.username}` : 'Applicant'}</p>
-            <StarRow rating={applicant.rating} />
+    <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 flex flex-col gap-2.5">
+      <div className="flex items-center gap-3">
+        <Avatar url={w.photoUrl} name={w.username} />
+        <div className="flex-1 min-w-0">
+          <p className="text-[#111827] font-semibold text-[14px] truncate">
+            {w.username ? `@${w.username}` : 'Worker'}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            {Number(w.rating) > 0 && (
+              <span className="flex items-center gap-0.5 text-[11px] text-[#6B7280]">
+                <Star size={10} aria-hidden className="text-[#FFD700] fill-[#FFD700]" />
+                {Number(w.rating).toFixed(1)}
+              </span>
+            )}
+            {w.clock_in && (
+              <span className="flex items-center gap-1 text-[11px] text-[#6B7280]">
+                <Clock3 size={10} aria-hidden />
+                {new Date(w.clock_in).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                {w.clock_out && ` – ${new Date(w.clock_out).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
+              </span>
+            )}
           </div>
-          {applicant.jobTypes.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {applicant.jobTypes.slice(0, 3).map((jt) => (
-                <span key={jt} className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-full px-3 py-1 text-[11px] font-semibold text-black">
-                  {jt}
-                </span>
-              ))}
-            </div>
-          )}
-          {applicant.bio && <p className="text-[#737373] text-[13px] leading-relaxed">{applicant.bio}</p>}
         </div>
+        <AttendanceChip a={w.attendance} />
       </div>
-    </motion.div>
+
+      <div className="flex gap-2">
+        {w.attendance === 'done' && !w.paid && (
+          <button type="button" disabled={busy} onClick={onPay}
+            className="flex-1 h-9 rounded-[8px] bg-emerald-600 text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
+            <DollarSign size={13} aria-hidden />
+            Pay ${(scheduledPay ?? 0).toFixed(2)}
+          </button>
+        )}
+        {w.paid && (
+          <span className="flex-1 h-9 rounded-[8px] bg-emerald-50 border border-emerald-200 text-emerald-600 text-[12px] font-bold flex items-center justify-center gap-1.5">
+            <CheckCircle2 size={13} aria-hidden /> Paid
+          </span>
+        )}
+        {w.attendance === 'done' && !w.alreadyReviewed && (
+          <button type="button" onClick={onReview}
+            className="flex-1 h-9 rounded-[8px] border border-[#E5E7EB] text-[#111827] text-[12px] font-bold flex items-center justify-center gap-1.5">
+            <Star size={13} aria-hidden /> Rate
+          </button>
+        )}
+        {w.attendance === 'no_show' && (
+          <button type="button" disabled={busy} onClick={onNoShow}
+            className="flex-1 h-9 rounded-[8px] border border-red-200 bg-red-50 text-red-500 text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
+            <Flag size={13} aria-hidden /> Report no-show
+          </button>
+        )}
+        {(w.attendance === 'booked') && (
+          <button type="button" disabled={busy} onClick={onRemove}
+            className="flex-1 h-9 rounded-[8px] border border-[#E5E7EB] text-[#6B7280] text-[12px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60">
+            <X size={13} aria-hidden /> Remove
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
+/* ── Roster screen ───────────────────────────────────────────────────────── */
 export function ApplicantsScreen() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
-  const { data: shift, isLoading: shiftLoading } = useShiftById(id);
-  const { applicants, isLoading, approve, decline } = useShiftApplicants(id);
-  const { invites } = useShiftInvites(id);
+  const { user } = useAuth();
   const { showToast } = useToast();
+  const { data: shift, isLoading: shiftLoading } = useShiftById(id);
+  const { applicants, isLoading: appsLoading, approve, decline, refetch: refetchApps } = useShiftApplicants(id);
+  const { workers: confirmed, isLoading: confLoading, refetch: refetchConfirmed } = useAcceptedWorkers(id);
+  const { invites, refetch: refetchInvites } = useShiftInvites(id);
 
-  const isLoadingAny = shiftLoading || isLoading;
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [inviting, setInviting] = useState(false);
+
+  const loading = shiftLoading || appsLoading || confLoading;
+  const pending = applicants.filter((a) => a.status === 'pending');
+  const invitedPending = invites.filter(
+    (i) => i.status === 'pending' && !confirmed.some((c) => c.workerId === i.worker_id),
+  );
+  const total = shift?.spotsTotal ?? confirmed.length;
+  const fillPct = Math.min(100, Math.round((confirmed.length / Math.max(total, 1)) * 100));
+
+  function refetchAll() { void refetchApps(); void refetchConfirmed(); void refetchInvites(); }
+
+  async function handleBroadcast() {
+    if (!user?.id || !id || inviting) return;
+    setInviting(true);
+    const r = await broadcastShiftRequest(user.id, id);
+    setInviting(false);
+    if (r.ok) { showToast(`Invited ${r.invited ?? 0} workers!`); refetchInvites(); }
+    else showToast(r.message ?? 'Could not send invites.');
+  }
+
+  async function handleRemove(w: AcceptedWorker) {
+    if (!user?.id || busyId) return;
+    setBusyId(w.id);
+    try {
+      await apiClient(user.id).patch(`/applications/${w.id}`, { status: 'declined' });
+      showToast('Worker removed.');
+      refetchAll();
+    } catch { showToast('Could not remove worker.'); }
+    finally { setBusyId(null); }
+  }
+
+  async function handleNoShow(w: AcceptedWorker) {
+    if (!user?.id || busyId) return;
+    setBusyId(w.id);
+    try {
+      await apiClient(user.id).post('/applications/no-show', { shift_id: id, worker_id: w.workerId });
+      showToast('No-show reported — our team will review it.');
+      refetchAll();
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Could not report no-show.'); }
+    finally { setBusyId(null); }
+  }
+
+  async function handlePay(w: AcceptedWorker) {
+    if (!user?.id || !id || busyId) return;
+    setBusyId(w.id);
+    try {
+      await startShiftPayment(user.id, { shift_id: id, worker_id: w.workerId, amount: w.totalPay ?? 0 });
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Could not start payment.'); }
+    finally { setBusyId(null); }
+  }
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
-      <div className="px-4 pt-[52px] pb-4 border-b border-[#DBDBDB] flex items-center gap-3">
+      {/* Header */}
+      <div className="px-4 pt-[52px] pb-4 border-b border-[#DBDBDB] flex items-center gap-3 flex-shrink-0">
         <button type="button" aria-label="Go back"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate(`/shift/${id ?? ''}`); }}
           className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} aria-hidden className="text-black" />
         </button>
         <div className="min-w-0">
-          <h1 className="text-black font-bold text-[18px] leading-tight truncate">Applicants</h1>
-          <p className="text-[#737373] text-[12px] truncate">{shift?.jobType ?? 'Loading…'}</p>
+          <h1 className="text-black font-bold text-[18px] leading-tight truncate">Roster</h1>
+          <p className="text-[#737373] text-[12px] truncate">{shift?.jobType ?? shift?.companyName ?? 'Shift'}</p>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto flex flex-col px-5 pt-6 pb-8">
-        {isLoadingAny ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="w-8 h-8 rounded-full border-2 border-[#DBDBDB] border-t-[#0A1628] animate-spin" role="status" aria-label="Loading applicants" />
+      <div className="flex-1 overflow-y-auto px-5 pt-5 pb-10">
+        {/* Fill bar */}
+        <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[14px] px-4 py-4 mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[#111827] font-bold text-[15px] flex items-center gap-1.5">
+              <Users size={15} aria-hidden className="text-[#6B7280]" />
+              {confirmed.length} / {total} confirmed
+            </span>
+            <span className="text-[#6B7280] text-[12px] font-semibold">{fillPct}% filled</span>
           </div>
-        ) : applicants.length === 0 ? (
-          <>
-            {invites.length === 0 && (
-              <div className="flex flex-col items-center justify-center gap-3 text-center px-6 py-16">
-                <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
-                  <Check size={26} aria-hidden className="text-[#737373]" />
-                </div>
-                <p className="text-black font-semibold text-[16px]">No applicants yet</p>
-                <p className="text-[#737373] text-[13px]">Tap “Request All Workers” on the shift to invite people, or wait for applications.</p>
-              </div>
-            )}
-            {invites.length > 0 && <InvitedRoster invites={invites} />}
-          </>
+          <div className="w-full h-2 rounded-full bg-[#E5E7EB] overflow-hidden">
+            <div className="h-full rounded-full bg-[#10B981] transition-all duration-500" style={{ width: `${fillPct}%` }} />
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2 mb-2">
+          <button type="button" onClick={() => void handleBroadcast()} disabled={inviting}
+            className="flex-1 h-[46px] rounded-[8px] bg-[#0095F6] text-white font-bold text-[13px] flex items-center justify-center gap-2 disabled:opacity-60">
+            <Send size={15} aria-hidden />
+            {inviting ? 'Sending…' : 'Request All Workers'}
+          </button>
+          <button type="button" onClick={() => navigate(`/shift/${id}/assign`)}
+            className="flex-1 h-[46px] rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[13px] flex items-center justify-center gap-2">
+            <UserPlus size={15} aria-hidden />
+            Assign from Roster
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="w-8 h-8 rounded-full border-2 border-[#DBDBDB] border-t-[#0A1628] animate-spin" role="status" aria-label="Loading roster" />
+          </div>
         ) : (
           <>
-            <div className="relative" style={{ minHeight: 420 }}>
-              <AnimatePresence>
-                {applicants.slice(0, 3).reverse().map((a, i, arr) => (
-                  <ApplicantCardView key={a.applicationId} applicant={a}
-                    isTop={i === arr.length - 1}
-                    onDecide={(decision) => {
-                      void (decision === 'accepted' ? approve(a.applicationId) : decline(a.applicationId))
-                        .then((err) => {
-                          if (err) { showToast(err); return; }
-                          if (decision === 'accepted') { showToast('Worker confirmed for your shift!'); navigate('/home'); }
-                          else showToast('Applicant declined.');
-                        });
-                    }} />
+            {/* Confirmed */}
+            <SectionHeader label="Confirmed" count={confirmed.length} />
+            {confirmed.length === 0 ? (
+              <p className="text-[#9CA3AF] text-[13px] px-1">No one confirmed yet.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {confirmed.map((w) => (
+                  <ConfirmedRow key={w.id} w={w} busy={busyId === w.id}
+                    onPay={() => void handlePay(w)}
+                    onNoShow={() => void handleNoShow(w)}
+                    onRemove={() => void handleRemove(w)}
+                    onReview={() => navigate(`/review/${id}/${w.workerId}`)} />
                 ))}
-              </AnimatePresence>
-            </div>
+              </div>
+            )}
 
-            <div className="flex items-center justify-center gap-6 pt-5" role="group" aria-label="Approve or decline applicant">
-              <motion.button type="button" whileTap={{ scale: 0.9 }}
-                aria-label="Decline applicant"
-                onClick={() => {
-                  const top = applicants[0];
-                  if (top) void decline(top.applicationId).then((err) => showToast(err ?? 'Applicant declined.'));
-                }}
-                className="w-16 h-16 rounded-full bg-white border-2 border-[#DBDBDB] flex items-center justify-center">
-                <X size={26} aria-hidden className="text-[#737373]" />
-              </motion.button>
-              <motion.button type="button" whileTap={{ scale: 0.9 }}
-                aria-label="Approve applicant"
-                onClick={() => {
-                  const top = applicants[0];
-                  if (top) void approve(top.applicationId).then((err) => { if (err) { showToast(err); return; } showToast('Worker confirmed for your shift!'); navigate('/home'); });
-                }}
-                className="w-16 h-16 rounded-full bg-[#10B981] flex items-center justify-center">
-                <Check size={28} aria-hidden className="text-white" />
-              </motion.button>
-            </div>
-            <p className="text-center text-[#AAAAAA] text-[11px] mt-3">
-              Swipe right to approve · swipe left to pass
-            </p>
-            {invites.length > 0 && (
-              <div className="mt-8 border-t border-[#DBDBDB] pt-5">
-                <InvitedRoster invites={invites} />
+            {/* Pending applications */}
+            {pending.length > 0 && (
+              <>
+                <SectionHeader label="Applied — needs review" count={pending.length} />
+                <div className="flex flex-col gap-2">
+                  {pending.map((a) => (
+                    <div key={a.applicationId} className="bg-white border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 flex items-center gap-3">
+                      <Avatar url={a.photoUrl} name={a.username} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[#111827] font-semibold text-[14px] truncate">
+                          {a.username ? `@${a.username}` : 'Applicant'}
+                        </p>
+                        {a.matchScore !== null && (
+                          <p className="text-[#0095F6] text-[11px] font-bold">{a.matchScore}% match</p>
+                        )}
+                      </div>
+                      <button type="button" aria-label="Decline"
+                        onClick={() => void decline(a.applicationId).then((err) => { showToast(err ?? 'Declined.'); refetchAll(); })}
+                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center">
+                        <X size={16} aria-hidden className="text-[#6B7280]" />
+                      </button>
+                      <button type="button" aria-label="Approve"
+                        onClick={() => void approve(a.applicationId).then((err) => { if (err) { showToast(err); return; } showToast('Worker confirmed!'); refetchAll(); })}
+                        className="w-9 h-9 rounded-full bg-[#10B981] flex items-center justify-center">
+                        <Check size={17} aria-hidden className="text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Requested (invited, awaiting response) */}
+            {invitedPending.length > 0 && (
+              <>
+                <SectionHeader label="Requested" count={invitedPending.length} />
+                <div className="flex flex-col gap-2">
+                  {invitedPending.map((inv: ShiftInvite) => (
+                    <div key={inv.id} className="bg-white border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 flex items-center gap-3">
+                      <Avatar url={inv.worker_photo} name={inv.worker_username} />
+                      <p className="flex-1 min-w-0 text-[#111827] font-semibold text-[14px] truncate">
+                        {inv.worker_username ? `@${inv.worker_username}` : 'Worker'}
+                      </p>
+                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-[#FAFAFA] border-[#DBDBDB] text-[#737373] flex items-center gap-1">
+                        <AlarmClock size={11} aria-hidden /> Invited
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {confirmed.length === 0 && pending.length === 0 && invitedPending.length === 0 && (
+              <div className="text-center py-10">
+                <p className="text-[#6B7280] text-[13px]">No one on the roster yet. Tap “Request All Workers” to invite people.</p>
               </div>
             )}
           </>

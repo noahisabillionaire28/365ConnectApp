@@ -14,7 +14,11 @@ import { usePeopleFeed } from '@/hooks/usePeopleFeed';
 import { useApplications } from '@/hooks/useApplications';
 import { useMyApplications, type MyApplication } from '@/hooks/useMyApplications';
 import { useClientShiftsDashboard, type ClientShift } from '@/hooks/useClientShiftsDashboard';
+import { useShiftRequests } from '@/hooks/useShiftRequests';
 import { useRole } from '@/contexts/RoleContext';
+import { useToast } from '@/contexts/ToastContext';
+import { friendlyDate, formatTime } from '@/lib/supabase';
+import { Check, X, Inbox } from 'lucide-react';
 import { JOB_TYPES } from '@/lib/jobTypes';
 import { resetStafferDraft } from '@/store/stafferPostShiftStore';
 
@@ -208,62 +212,139 @@ function WorkerMyShiftsView() {
   );
 }
 
-/* ─── (A) Worker Home Feed ───────────────────────────────────────────────────── */
-function WorkerHomeFeed() {
+/* ─── Worker: Available shifts (open shifts near you) ────────────────────────── */
+function WorkerAvailableView() {
   const [, navigate] = useLocation();
-  const [tab, setTab] = useState<'discover' | 'my-shifts'>('discover');
   const { shifts, isLoading, error } = useWorkerHomeShifts();
   const { appliedShiftIds } = useApplications();
 
   return (
-    <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
-      <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
-        <FeedHeader subtitle={tab === 'discover' ? 'Shifts near you' : 'My applications'} />
-        <SegmentControl
-          tabs={[
-            { value: 'discover', label: 'Discover Shifts' },
-            { value: 'my-shifts', label: 'My Shifts' },
-          ]}
-          value={tab}
-          onChange={(v) => setTab(v as 'discover' | 'my-shifts')}
-        />
-      </div>
-
-      {tab === 'discover' ? (
-        <main className="flex-1 overflow-y-auto" aria-label="Shift feed">
-          <div className="pt-4 pb-4">
-            {isLoading && (
-              <div className="flex flex-col gap-4" aria-busy="true">
-                {[1, 2, 3].map((n) => <ShiftListCardSkeleton key={n} />)}
-              </div>
-            )}
-            {error && !isLoading && (
+    <main className="flex-1 overflow-y-auto" aria-label="Available shifts">
+      <div className="pt-4 pb-4">
+        {isLoading && (
+          <div className="flex flex-col gap-4" aria-busy="true">
+            {[1, 2, 3].map((n) => <ShiftListCardSkeleton key={n} />)}
+          </div>
+        )}
+        {error && !isLoading && (
+          <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
+            <p className="text-[#737373] text-[14px]">Couldn't load shifts right now.</p>
+          </div>
+        )}
+        {!isLoading && !error && (
+          <div className="flex flex-col gap-4" role="feed" aria-label="Available shifts near you">
+            {shifts.map((shift, i) => (
+              <motion.div key={shift.id}
+                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05, duration: 0.3, ease: 'easeOut' }}>
+                <ShiftListCard shift={shift} applied={appliedShiftIds.has(shift.id)}
+                  onTap={() => navigate(`/shift/${shift.id}`)} />
+              </motion.div>
+            ))}
+            {shifts.length === 0 && (
               <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-                <p className="text-[#737373] text-[14px]">Couldn't load shifts right now.</p>
-              </div>
-            )}
-            {!isLoading && !error && (
-              <div className="flex flex-col gap-4" role="feed" aria-label="Available shifts near you">
-                {shifts.map((shift, i) => (
-                  <motion.div key={shift.id}
-                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05, duration: 0.3, ease: 'easeOut' }}>
-                    <ShiftListCard shift={shift} applied={appliedShiftIds.has(shift.id)}
-                      onTap={() => navigate(`/shift/${shift.id}`)} />
-                  </motion.div>
-                ))}
-                {shifts.length === 0 && (
-                  <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-                    <p className="text-[#737373] text-[14px]">No shifts near you right now. Check back soon.</p>
-                  </div>
-                )}
+                <p className="text-[#737373] text-[14px]">No shifts near you right now. Check back soon.</p>
               </div>
             )}
           </div>
-        </main>
-      ) : (
-        <WorkerMyShiftsView />
-      )}
+        )}
+      </div>
+    </main>
+  );
+}
+
+/* ─── Worker: Requests (direct shift offers to accept/decline) ───────────────── */
+function WorkerRequestsView() {
+  const [, navigate] = useLocation();
+  const { showToast } = useToast();
+  const { requests, isLoading, accept, decline } = useShiftRequests();
+  const pending = requests.filter((r) => r.status === 'pending');
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 overflow-y-auto pt-4 pb-4 px-4 flex flex-col gap-3" aria-busy="true">
+        {[1, 2].map((n) => (
+          <div key={n} className="h-[120px] rounded-[14px] bg-[#FAFAFA] border border-[#E5E7EB] animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (pending.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-8 pt-20">
+        <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
+          <Inbox size={26} aria-hidden className="text-[#9CA3AF]" />
+        </div>
+        <p className="text-[#111827] font-semibold text-[16px]">No shift offers</p>
+        <p className="text-[#6B7280] text-[13px] max-w-[240px]">
+          When a staffer requests you for a shift, it shows up here to accept or decline.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto pt-4 pb-4 px-4 flex flex-col gap-3">
+      {pending.map((r) => (
+        <div key={r.id} className="rounded-[14px] border border-[#E5E7EB] p-4 bg-white">
+          <button type="button" onClick={() => navigate(`/shift/${r.shift_id}`)} className="w-full text-left">
+            <p className="text-[#111827] font-bold text-[15px] truncate">{r.shiftTitle ?? 'Shift'}</p>
+            <p className="text-[#6B7280] text-[12px] mt-[2px]">
+              {r.companyName ? `${r.companyName} · ` : ''}
+              {r.startTime ? `${friendlyDate(r.startTime)} · ${formatTime(r.startTime)}` : ''}
+              {r.payRate != null ? ` · $${r.payRate}/${r.payPeriod ?? 'hr'}` : ''}
+            </p>
+          </button>
+          <div className="flex gap-2 mt-3.5">
+            <button type="button"
+              onClick={() => void decline(r.id).then((ok) => showToast(ok ? 'Declined.' : 'Could not decline.'))}
+              className="flex-1 h-10 rounded-[8px] border border-[#E5E7EB] bg-white text-[#111827] font-semibold text-[13px] flex items-center justify-center gap-1.5">
+              <X size={15} aria-hidden />
+              Decline
+            </button>
+            <button type="button"
+              onClick={() => void accept(r.id).then((ok) => showToast(ok ? "You're booked! Clock in when you arrive." : 'Could not accept — it may be full.'))}
+              className="flex-1 h-10 rounded-[8px] bg-[#10B981] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5">
+              <Check size={15} aria-hidden />
+              Accept
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── (A) Worker Home Feed — Nowsta-style Schedule / Requests / Available ─────── */
+function WorkerHomeFeed() {
+  const [tab, setTab] = useState<'schedule' | 'requests' | 'available'>('schedule');
+  const { requests } = useShiftRequests();
+  const pendingCount = requests.filter((r) => r.status === 'pending').length;
+
+  const subtitle =
+    tab === 'schedule' ? 'Your upcoming shifts' :
+    tab === 'requests' ? 'Shift offers for you' :
+    'Shifts near you';
+
+  return (
+    <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
+      <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
+        <FeedHeader subtitle={subtitle} />
+        <SegmentControl
+          tabs={[
+            { value: 'schedule',  label: 'Schedule' },
+            { value: 'requests',  label: pendingCount > 0 ? `Requests (${pendingCount})` : 'Requests' },
+            { value: 'available', label: 'Available' },
+          ]}
+          value={tab}
+          onChange={(v) => setTab(v as 'schedule' | 'requests' | 'available')}
+        />
+      </div>
+
+      {tab === 'schedule'  && <WorkerMyShiftsView />}
+      {tab === 'requests'  && <WorkerRequestsView />}
+      {tab === 'available' && <WorkerAvailableView />}
 
       <BottomTabNav />
     </div>
