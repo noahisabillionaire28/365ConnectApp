@@ -15,11 +15,12 @@
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 
-type ToastItem = { id: string; message: string };
+type ToastVariant = 'success' | 'error';
+type ToastItem = { id: string; message: string; variant: ToastVariant };
 
-type ToastContextValue = { showToast: (message: string) => void };
+type ToastContextValue = { showToast: (message: string, variant?: ToastVariant) => void };
 
 const ToastContext = createContext<ToastContextValue>({ showToast: () => {} });
 
@@ -60,11 +61,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, [current?.id]);
 
   /** Add a message to the queue — called from any screen via useToast(). */
-  const showToast = useCallback((message: string) => {
+  const showToast = useCallback((message: string, variant: ToastVariant = 'success') => {
     const id = typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2);
-    setQueue((prev) => [...prev, { id, message }]);
+    setQueue((prev) => [...prev, { id, message, variant }]);
   }, []);
 
   return (
@@ -96,11 +97,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                   animate={{ y: 0,   opacity: 1 }}
                   exit={{ opacity: 0, y: -16, transition: { duration: 0.22, ease: 'easeIn' } }}
                   transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                  className="pointer-events-auto w-full flex items-center gap-3 bg-[#10B981] rounded-[14px] px-4 py-3.5 shadow-lg"
+                  className={`pointer-events-auto w-full flex items-center gap-3 rounded-[14px] px-4 py-3.5 shadow-lg ${
+                    current.variant === 'error' ? 'bg-[#EF4444]' : 'bg-[#10B981]'
+                  }`}
                   style={{ WebkitTapHighlightColor: 'transparent' }}
                   aria-label={`${current.message} — tap to dismiss`}
                 >
-                  <CheckCircle2 size={20} className="text-white flex-shrink-0" aria-hidden />
+                  {current.variant === 'error'
+                    ? <XCircle size={20} className="text-white flex-shrink-0" aria-hidden />
+                    : <CheckCircle2 size={20} className="text-white flex-shrink-0" aria-hidden />}
                   <p className="text-white font-bold text-[14px] leading-snug text-left">
                     {current.message}
                   </p>

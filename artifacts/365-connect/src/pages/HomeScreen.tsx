@@ -17,6 +17,7 @@ import { useClientShiftsDashboard, type ClientShift } from '@/hooks/useClientShi
 import { useShiftRequests } from '@/hooks/useShiftRequests';
 import { useRole } from '@/contexts/RoleContext';
 import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { friendlyDate, formatTime } from '@/lib/supabase';
 import { Check, X, Inbox } from 'lucide-react';
 import { JOB_TYPES } from '@/lib/jobTypes';
@@ -254,11 +255,22 @@ function WorkerAvailableView() {
 }
 
 /* ─── Worker: Requests (direct shift offers to accept/decline) ───────────────── */
+/** A shift offer is stale once it has already started. */
+function isFutureOffer(startTime: string | null | undefined): boolean {
+  if (!startTime) return true;
+  const t = Date.parse(startTime);
+  return !Number.isFinite(t) || t > Date.now();
+}
+
 function WorkerRequestsView() {
   const [, navigate] = useLocation();
   const { showToast } = useToast();
+  const { user } = useAuth();
   const { requests, isLoading, accept, decline } = useShiftRequests();
-  const pending = requests.filter((r) => r.status === 'pending');
+  // Only genuine offers TO this worker (not invites they sent), and not past.
+  const pending = requests.filter(
+    (r) => r.status === 'pending' && r.worker_id === user?.id && isFutureOffer(r.startTime ?? r.start_time),
+  );
 
   if (isLoading) {
     return (
@@ -298,13 +310,13 @@ function WorkerRequestsView() {
           </button>
           <div className="flex gap-2 mt-3.5">
             <button type="button"
-              onClick={() => void decline(r.id).then((ok) => showToast(ok ? 'Declined.' : 'Could not decline.'))}
+              onClick={() => void decline(r.id).then((ok) => showToast(ok ? 'Declined.' : 'Could not decline.', ok ? 'success' : 'error'))}
               className="flex-1 h-10 rounded-[8px] border border-[#E5E7EB] bg-white text-[#111827] font-semibold text-[13px] flex items-center justify-center gap-1.5">
               <X size={15} aria-hidden />
               Decline
             </button>
             <button type="button"
-              onClick={() => void accept(r.id).then((ok) => showToast(ok ? "You're booked! Clock in when you arrive." : 'Could not accept — it may be full.'))}
+              onClick={() => void accept(r.id).then((ok) => showToast(ok ? "You're booked! Clock in when you arrive." : 'Could not accept — it may be full.', ok ? 'success' : 'error'))}
               className="flex-1 h-10 rounded-[8px] bg-[#10B981] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5">
               <Check size={15} aria-hidden />
               Accept
@@ -319,8 +331,11 @@ function WorkerRequestsView() {
 /* ─── (A) Worker Home Feed — Nowsta-style Schedule / Requests / Available ─────── */
 function WorkerHomeFeed() {
   const [tab, setTab] = useState<'schedule' | 'requests' | 'available'>('schedule');
+  const { user } = useAuth();
   const { requests } = useShiftRequests();
-  const pendingCount = requests.filter((r) => r.status === 'pending').length;
+  const pendingCount = requests.filter(
+    (r) => r.status === 'pending' && r.worker_id === user?.id && isFutureOffer(r.startTime ?? r.start_time),
+  ).length;
 
   const subtitle =
     tab === 'schedule' ? 'Your upcoming shifts' :

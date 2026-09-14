@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { shiftRowToMockShift, type ShiftRow, type MockShift } from '@/lib/supabase';
 import { apiClient } from '@/lib/api';
+import { isShiftOver } from './useShifts';
 import { useProfile } from './useProfile';
 import { useMyLocation } from './useMyLocation';
 
@@ -16,7 +17,7 @@ export function useWorkerHomeShifts() {
     queryKey: ['worker-home-shifts', coords.lat, coords.lng],
     queryFn: async () => {
       const rows = await apiClient(null).get<ShiftRow[]>('/shifts?status=open');
-      return rows.map((row) => shiftRowToMockShift(row, coords));
+      return rows.filter((r) => !isShiftOver(r)).map((row) => shiftRowToMockShift(row, coords));
     },
     staleTime: 30_000,
     enabled: !locLoading,

@@ -4,13 +4,21 @@ import { apiClient } from '@/lib/api';
 
 export const SHIFTS_QUERY_KEY = ['shifts'] as const;
 
-/** Fetches all open shifts from the API. */
+/** True once a shift is over (its end — or start, if no end — is in the past). */
+export function isShiftOver(row: { start_time?: string | null; end_time?: string | null }): boolean {
+  const ref = row.end_time ?? row.start_time;
+  if (!ref) return false;
+  const t = Date.parse(ref);
+  return Number.isFinite(t) && t < Date.now();
+}
+
+/** Fetches all open shifts from the API (past/over shifts are dropped). */
 export function useShifts() {
   const query = useQuery<MockShift[], Error>({
     queryKey: SHIFTS_QUERY_KEY,
     queryFn: async () => {
       const rows = await apiClient(null).get<ShiftRow[]>('/shifts?status=open');
-      return rows.map((row) => shiftRowToMockShift(row));
+      return rows.filter((r) => !isShiftOver(r)).map((row) => shiftRowToMockShift(row));
     },
     staleTime: 30_000,
   });
