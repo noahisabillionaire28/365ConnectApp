@@ -234,6 +234,9 @@ export function ShiftDetailScreen() {
   const spotsFilled = shift.spotsTotal - shift.spotsAvailable;
   const fillPct     = Math.round((spotsFilled / Math.max(shift.spotsTotal, 1)) * 100);
   const isOwner     = !!user?.id && user.id === shift.clientId;
+  // Only clients/staffers may manage a shift. A worker (incl. an admin viewing
+  // the app as a worker) never sees owner controls, even on a shift they own.
+  const canManage   = isOwner && (profile.role === 'client' || profile.role === 'staffer');
   const isWorker    = profile.role === 'worker';
 
   const matchScore = isWorker
@@ -809,7 +812,7 @@ export function ShiftDetailScreen() {
           </div>
         )}
         {/* Owner management — inline, scrolls with content (never overlaps) */}
-        {isOwner && (
+        {canManage && (
           <div className="px-5 pt-2 pb-8 flex flex-col gap-2 border-t border-[#DBDBDB] mt-2">
             {profile.role === 'staffer' && (
               <motion.button type="button" whileTap={{ scale: 0.97 }}
