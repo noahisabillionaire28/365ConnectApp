@@ -12,6 +12,7 @@ import {
 import { EVENT_TYPES } from '@/lib/eventTypes';
 import { getDraft, setDraft, resetDraft, getEditShiftId, setEditShiftId } from '@/store/postShiftStore';
 import { BottomTabNav } from '@/components/BottomTabNav';
+import { useRole } from '@/contexts/RoleContext';
 
 function StepBar({ current, total }: { current: number; total: number }) {
   return (
@@ -38,6 +39,13 @@ const EVENT_ICONS: Record<string, React.ComponentType<{ size: number; className?
 
 export function PostShiftEventTypeScreen() {
   const [, navigate] = useLocation();
+  const { role, roleLoading } = useRole();
+
+  // Only clients/staffers may post shifts. A worker who lands here (e.g. a
+  // stale link) is sent home.
+  useEffect(() => {
+    if (!roleLoading && role === 'worker') navigate('/home');
+  }, [role, roleLoading, navigate]);
 
   // Fresh start for a new post; preserve the draft when editing an existing shift.
   useEffect(() => {
