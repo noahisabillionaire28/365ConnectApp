@@ -869,8 +869,9 @@ export function ShiftDetailScreen() {
         )}
       </div>
 
-      {/* Fixed CTA — worker actions only (owners manage via the inline block above) */}
-      {!isOwner && (
+      {/* Fixed CTA — worker actions only (apply/claim/clock-in). Clients and
+          staffers never apply or clock in; owners manage via the inline block. */}
+      {profile.role === 'worker' && !isOwner && (
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] px-5 pb-9 pt-4 bg-gradient-to-t from-white via-white/98 to-transparent z-30 border-t border-[#DBDBDB]">
         <AnimatePresence>
           {ctaState === 'pending' && (

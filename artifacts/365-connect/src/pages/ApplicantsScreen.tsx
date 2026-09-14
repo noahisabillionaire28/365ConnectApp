@@ -3,8 +3,56 @@ import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { ChevronLeft, X, Check, Star, Sparkles } from 'lucide-react';
 import { useShiftApplicants, type ApplicantCard } from '@/hooks/useShiftApplicants';
+import { useShiftInvites, type ShiftInvite } from '@/hooks/useShiftInvites';
 import { useShiftById } from '@/hooks/useShifts';
 import { useToast } from '@/contexts/ToastContext';
+
+/** Status chip for an invited worker (Requested list). */
+function InviteStatusChip({ status }: { status: ShiftInvite['status'] }) {
+  const map = {
+    pending:  { label: 'Invited',  cls: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]' },
+    accepted: { label: 'Accepted', cls: 'bg-emerald-50 border-emerald-200 text-emerald-600' },
+    declined: { label: 'Declined', cls: 'bg-red-50 border-red-200 text-red-500' },
+  }[status];
+  return (
+    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${map.cls}`}>
+      {map.label}
+    </span>
+  );
+}
+
+/** List of workers invited via "Request All Workers", with their response. */
+function InvitedRoster({ invites }: { invites: ShiftInvite[] }) {
+  const accepted = invites.filter((i) => i.status === 'accepted').length;
+  return (
+    <div className="mt-2">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-black font-bold text-[15px]">Requested workers</h2>
+        <span className="text-[#737373] text-[12px] font-medium">
+          {accepted}/{invites.length} accepted
+        </span>
+      </div>
+      <div className="flex flex-col gap-2">
+        {invites.map((inv) => {
+          const initials = (inv.worker_username ?? 'W').replace('@', '').slice(0, 2).toUpperCase();
+          return (
+            <div key={inv.id} className="flex items-center gap-3 bg-white border border-[#DBDBDB] rounded-[12px] px-3.5 py-3">
+              <div className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center overflow-hidden flex-shrink-0">
+                {inv.worker_photo
+                  ? <img src={inv.worker_photo} alt="" className="w-full h-full object-cover" />
+                  : <span className="text-black font-bold text-[13px]">{initials}</span>}
+              </div>
+              <p className="flex-1 min-w-0 text-black font-semibold text-[14px] truncate">
+                {inv.worker_username ? `@${inv.worker_username}` : 'Worker'}
+              </p>
+              <InviteStatusChip status={inv.status} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 const SWIPE_THRESHOLD = 120;
 
@@ -102,6 +150,7 @@ export function ApplicantsScreen() {
   const [, navigate] = useLocation();
   const { data: shift, isLoading: shiftLoading } = useShiftById(id);
   const { applicants, isLoading, approve, decline } = useShiftApplicants(id);
+  const { invites } = useShiftInvites(id);
   const { showToast } = useToast();
 
   const isLoadingAny = shiftLoading || isLoading;
@@ -120,22 +169,27 @@ export function ApplicantsScreen() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col px-5 pt-6 pb-4">
+      <div className="flex-1 overflow-y-auto flex flex-col px-5 pt-6 pb-8">
         {isLoadingAny ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="w-8 h-8 rounded-full border-2 border-[#DBDBDB] border-t-[#0A1628] animate-spin" role="status" aria-label="Loading applicants" />
           </div>
         ) : applicants.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
-            <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
-              <Check size={26} aria-hidden className="text-[#737373]" />
-            </div>
-            <p className="text-black font-semibold text-[16px]">No applicants waiting</p>
-            <p className="text-[#737373] text-[13px]">You've reviewed everyone who applied. Check back later for more.</p>
-          </div>
+          <>
+            {invites.length === 0 && (
+              <div className="flex flex-col items-center justify-center gap-3 text-center px-6 py-16">
+                <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+                  <Check size={26} aria-hidden className="text-[#737373]" />
+                </div>
+                <p className="text-black font-semibold text-[16px]">No applicants yet</p>
+                <p className="text-[#737373] text-[13px]">Tap “Request All Workers” on the shift to invite people, or wait for applications.</p>
+              </div>
+            )}
+            {invites.length > 0 && <InvitedRoster invites={invites} />}
+          </>
         ) : (
           <>
-            <div className="relative flex-1" style={{ minHeight: 420 }}>
+            <div className="relative" style={{ minHeight: 420 }}>
               <AnimatePresence>
                 {applicants.slice(0, 3).reverse().map((a, i, arr) => (
                   <ApplicantCardView key={a.applicationId} applicant={a}
@@ -175,6 +229,11 @@ export function ApplicantsScreen() {
             <p className="text-center text-[#AAAAAA] text-[11px] mt-3">
               Swipe right to approve · swipe left to pass
             </p>
+            {invites.length > 0 && (
+              <div className="mt-8 border-t border-[#DBDBDB] pt-5">
+                <InvitedRoster invites={invites} />
+              </div>
+            )}
           </>
         )}
       </div>
