@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
@@ -50,8 +50,8 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
 }
 
 /* ── Confirmed worker row (attendance + pay / no-show / remove) ───────────── */
-function ConfirmedRow({ w, onApprove, onPay, onNoShow, onRemove, onReview, busy }: {
-  w: AcceptedWorker;
+function ConfirmedRow({ w, late, onApprove, onPay, onNoShow, onRemove, onReview, busy }: {
+  w: AcceptedWorker; late: boolean;
   onApprove: () => void; onPay: () => void; onNoShow: () => void; onRemove: () => void; onReview: () => void;
   busy: boolean;
 }) {
@@ -84,7 +84,9 @@ function ConfirmedRow({ w, onApprove, onPay, onNoShow, onRemove, onReview, busy 
             )}
           </div>
         </div>
-        <AttendanceChip a={w.attendance} />
+        {late
+          ? <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-red-50 border-red-200 text-red-500">Late</span>
+          : <AttendanceChip a={w.attendance} />}
       </div>
 
       <div className="flex gap-2">
@@ -209,7 +211,22 @@ export function ApplicantsScreen() {
   const total = shift?.spotsTotal ?? confirmed.length;
   const fillPct = Math.min(100, Math.round((confirmed.length / Math.max(total, 1)) * 100));
 
+  // Live day-of attendance.
+  const startMs = shift?.startTimeISO ? Date.parse(shift.startTimeISO) : NaN;
+  const started = Number.isFinite(startMs) && Date.now() > startMs;
+  const isLate = (w: AcceptedWorker) => w.attendance === 'booked' && started && !w.clock_in;
+  const onSiteCount = confirmed.filter((w) => w.attendance === 'on_site').length;
+  const doneCount   = confirmed.filter((w) => w.attendance === 'done').length;
+  const noShowCount = confirmed.filter((w) => w.attendance === 'no_show').length;
+  const lateCount   = confirmed.filter(isLate).length;
+
   function refetchAll() { void refetchApps(); void refetchConfirmed(); void refetchInvites(); }
+
+  // Auto-refresh every 30s so the roster stays live during a shift.
+  useEffect(() => {
+    const t = setInterval(() => { void refetchApps(); void refetchConfirmed(); }, 30_000);
+    return () => clearInterval(t);
+  }, [refetchApps, refetchConfirmed]);
 
   async function handleBroadcast() {
     if (!user?.id || !id || inviting) return;
@@ -293,6 +310,15 @@ export function ApplicantsScreen() {
           <div className="w-full h-2 rounded-full bg-[#E5E7EB] overflow-hidden">
             <div className="h-full rounded-full bg-[#10B981] transition-all duration-500" style={{ width: `${fillPct}%` }} />
           </div>
+          {/* Live attendance summary */}
+          {confirmed.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200">{onSiteCount} on-site</span>
+              {lateCount > 0 && <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-500 border border-red-200">{lateCount} late</span>}
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">{doneCount} done</span>
+              {noShowCount > 0 && <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#FAFAFA] text-[#737373] border border-[#DBDBDB]">{noShowCount} no-show</span>}
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -322,7 +348,7 @@ export function ApplicantsScreen() {
             ) : (
               <div className="flex flex-col gap-2">
                 {confirmed.map((w) => (
-                  <ConfirmedRow key={w.id} w={w} busy={busyId === w.id}
+                  <ConfirmedRow key={w.id} w={w} late={isLate(w)} busy={busyId === w.id}
                     onApprove={() => setReviewing(w)}
                     onPay={() => void handlePay(w)}
                     onNoShow={() => void handleNoShow(w)}
