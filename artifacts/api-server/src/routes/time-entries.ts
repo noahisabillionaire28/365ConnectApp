@@ -34,6 +34,14 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(403).json({ error: 'You are not booked for this shift.' });
   }
 
+  // Clock-in window: not more than 1 hour before the shift's start (call time).
+  const { data: sh } = await adminDb
+    .from('shifts').select('start_time').eq('id', shift_id).maybeSingle();
+  const startMs = sh?.start_time ? Date.parse(sh.start_time) : NaN;
+  if (Number.isFinite(startMs) && Date.now() < startMs - 60 * 60 * 1000) {
+    return res.status(409).json({ error: 'Clock-in has not opened for this shift yet.' });
+  }
+
   const payload = { shift_id, worker_id: req.userId, clock_in: new Date().toISOString() };
   const { data, error } = await adminDb
     .from('time_entries')

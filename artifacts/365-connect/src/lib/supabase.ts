@@ -26,6 +26,8 @@ export type MockShift = {
   endTime: string;
   /** Raw ISO timestamptz for the shift start — used for day-of-week matching, never displayed directly. */
   startTimeISO: string;
+  /** Raw ISO timestamptz for the shift end — used for lifecycle state. */
+  endTimeISO: string;
   distanceMiles: number;
   spotsAvailable: number;
   spotsTotal: number;
@@ -361,6 +363,7 @@ export function shiftRowToMockShift(
     startTime:      formatTime(row.start_time),
     endTime:        formatTime(row.end_time),
     startTimeISO:   row.start_time,
+    endTimeISO:     row.end_time,
     distanceMiles:  Math.round(haversineMiles(refCoords.lat, refCoords.lng, lat, lng) * 10) / 10,
     spotsAvailable,
     spotsTotal:     row.spots_available ?? 1,
