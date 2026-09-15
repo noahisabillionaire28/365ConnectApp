@@ -19,6 +19,7 @@ import storiesRouter     from './stories.js';
 import followsRouter     from './follows.js';
 import savedWorkersRouter from './saved-workers.js';
 import shiftRequestsRouter from './shift-requests.js';
+import shiftUpdatesRouter from './shift-updates.js';
 import workersRouter     from './workers.js';
 import disputesRouter    from './disputes.js';
 
@@ -55,6 +56,7 @@ router.use('/stories',        storiesRouter);
 router.use('/follows',        followsRouter);
 router.use('/saved-workers',  savedWorkersRouter);
 router.use('/shift-requests', shiftRequestsRouter);
+router.use('/shift-updates',  shiftUpdatesRouter);
 router.use('/workers',        workersRouter);
 router.use('/disputes',       disputesRouter);
 

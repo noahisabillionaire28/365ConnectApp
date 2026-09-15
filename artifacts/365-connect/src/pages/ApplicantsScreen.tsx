@@ -135,6 +135,7 @@ export function ApplicantsScreen() {
 
   const loading = shiftLoading || appsLoading || confLoading;
   const pending = applicants.filter((a) => a.status === 'pending');
+  const standby = applicants.filter((a) => a.status === 'standby');
   const invitedPending = invites.filter(
     (i) => i.status === 'pending' && !confirmed.some((c) => c.workerId === i.worker_id),
   );
@@ -281,6 +282,33 @@ export function ApplicantsScreen() {
               </>
             )}
 
+            {/* Standby (accepted while full — confirm when a spot opens) */}
+            {standby.length > 0 && (
+              <>
+                <SectionHeader label="Standby — waitlist" count={standby.length} />
+                <div className="flex flex-col gap-2">
+                  {standby.map((a) => (
+                    <div key={a.applicationId} className="bg-white border border-amber-200 rounded-[12px] px-3.5 py-3 flex items-center gap-3">
+                      <Avatar url={a.photoUrl} name={a.username} />
+                      <p className="flex-1 min-w-0 text-[#111827] font-semibold text-[14px] truncate">
+                        {a.username ? `@${a.username}` : 'Worker'}
+                      </p>
+                      <button type="button"
+                        onClick={() => void decline(a.applicationId).then((err) => { showToast(err ?? 'Removed from waitlist.', err ? 'error' : 'success'); refetchAll(); })}
+                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center">
+                        <X size={16} aria-hidden className="text-[#6B7280]" />
+                      </button>
+                      <button type="button"
+                        onClick={() => void approve(a.applicationId).then((err) => { showToast(err ?? 'Worker confirmed!', err ? 'error' : 'success'); refetchAll(); })}
+                        className="h-9 px-3 rounded-full bg-[#10B981] text-white text-[12px] font-bold flex items-center gap-1">
+                        <Check size={14} aria-hidden /> Confirm
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
             {/* Requested (invited, awaiting response) */}
             {invitedPending.length > 0 && (
               <>
@@ -301,7 +329,7 @@ export function ApplicantsScreen() {
               </>
             )}
 
-            {confirmed.length === 0 && pending.length === 0 && invitedPending.length === 0 && (
+            {confirmed.length === 0 && pending.length === 0 && invitedPending.length === 0 && standby.length === 0 && (
               <div className="text-center py-10">
                 <p className="text-[#6B7280] text-[13px]">No one on the roster yet. Tap “Request All Workers” to invite people.</p>
               </div>
