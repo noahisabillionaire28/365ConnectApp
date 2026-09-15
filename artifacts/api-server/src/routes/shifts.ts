@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'crypto';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 
@@ -6,10 +7,13 @@ const router = Router();
 
 /** GET /api/shifts — open shifts, optional filters */
 router.get('/', async (req, res) => {
-  const { job_type, status = 'open', limit = '50', offset = '0' } = req.query as Record<string, string>;
+  const { job_type, status = 'open', limit = '50', offset = '0', event_id } = req.query as Record<string, string>;
   const lim = parseInt(limit);
   const off = parseInt(offset);
-  let q = adminDb.from('shifts').select('*').eq('status', status);
+  // event_id lists all positions of one event, regardless of status.
+  let q = event_id
+    ? adminDb.from('shifts').select('*').eq('event_id', event_id)
+    : adminDb.from('shifts').select('*').eq('status', status);
   if (job_type) {
     q = q.or(`job_type.eq.${job_type},job_types.cs.{${job_type}}`);
   }
@@ -125,6 +129,49 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
     .single();
   if (error) return res.status(500).json({ error: error.message });
   return res.status(201).json(data);
+});
+
+/**
+ * POST /api/shifts/event — create a multi-position event. Shared event details
+ * apply to every position; each position becomes its own shift (own role, pay
+ * rate, headcount) grouped by a shared event_id.
+ * Body: { ...sharedShiftFields, positions: [{ job_type, pay_rate, spots }] }
+ */
+router.post('/event', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
+  const b = req.body as Record<string, unknown>;
+  const positions = Array.isArray(b.positions) ? b.positions as Array<Record<string, unknown>> : [];
+  if (!positions.length) return res.status(400).json({ error: 'At least one position is required' });
+
+  const event_id = randomUUID();
+  const shared = {
+    client_id: req.userId,
+    title: b.title,
+    description: b.description ?? null,
+    location: b.location ?? null,
+    event_type: b.event_type ?? null,
+    pay_period: b.pay_period ?? 'hr',
+    start_time: b.start_time,
+    end_time: b.end_time,
+    lat: b.lat ?? null,
+    lng: b.lng ?? null,
+    cover_image: b.cover_image ?? null,
+    company_name: b.company_name ?? null,
+    dress_code: b.dress_code ?? null,
+    special_instructions: b.special_instructions ?? null,
+    instant_claim: b.instant_claim ?? false,
+    event_id,
+  };
+  const rows = positions.map((p) => ({
+    ...shared,
+    job_type: p.job_type,
+    job_types: p.job_type ? [p.job_type] : [],
+    pay_rate: p.pay_rate ?? null,
+    spots_available: Number(p.spots ?? 1) || 1,
+  }));
+
+  const { data, error } = await adminDb.from('shifts').insert(rows).select();
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(201).json({ event_id, positions: data });
 });
 
 /** PATCH /api/shifts/:id — update shift (owner only) */

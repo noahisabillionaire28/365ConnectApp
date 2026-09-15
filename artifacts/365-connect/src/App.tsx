@@ -57,6 +57,7 @@ import { AssignWorkersScreen }   from '@/pages/AssignWorkersScreen';
 
 // Wizards (post-shift builders)
 import { PostShiftEventTypeScreen } from '@/pages/PostShiftEventTypeScreen';
+import { PostEventScreen }         from '@/pages/PostEventScreen';
 import { PostShiftSuccessScreen } from '@/pages/PostShiftSuccessScreen';
 import { PostShiftStep1Screen }  from '@/pages/PostShiftStep1Screen';
 import { PostShiftStep2Screen }  from '@/pages/PostShiftStep2Screen';
@@ -175,6 +176,7 @@ function MobileRouter() {
 
             {/* ── Client post-shift wizard ──────────────────────── */}
             <Route path="/post-shift/event" component={PostShiftEventTypeScreen} />
+            <Route path="/post-event"       component={PostEventScreen} />
             <Route path="/post-shift/step1" component={PostShiftStep1Screen} />
             <Route path="/post-shift/step2" component={PostShiftStep2Screen} />
             <Route path="/post-shift/step3" component={PostShiftStep3Screen} />

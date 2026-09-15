@@ -28,6 +28,8 @@ export type MockShift = {
   startTimeISO: string;
   /** Raw ISO timestamptz for the shift end — used for lifecycle state. */
   endTimeISO: string;
+  /** When set, this shift is one position of a multi-position event. */
+  eventId: string | null;
   distanceMiles: number;
   spotsAvailable: number;
   spotsTotal: number;
@@ -364,6 +366,7 @@ export function shiftRowToMockShift(
     endTime:        formatTime(row.end_time),
     startTimeISO:   row.start_time,
     endTimeISO:     row.end_time,
+    eventId:        (row as { event_id?: string | null }).event_id ?? null,
     distanceMiles:  Math.round(haversineMiles(refCoords.lat, refCoords.lng, lat, lng) * 10) / 10,
     spotsAvailable,
     spotsTotal:     row.spots_available ?? 1,
