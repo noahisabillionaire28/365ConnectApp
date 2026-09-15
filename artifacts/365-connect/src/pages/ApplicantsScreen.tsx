@@ -50,12 +50,11 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
 }
 
 /* ── Confirmed worker row (attendance + pay / no-show / remove) ───────────── */
-function ConfirmedRow({ w, onPay, onNoShow, onRemove, onReview, busy }: {
+function ConfirmedRow({ w, onApprove, onPay, onNoShow, onRemove, onReview, busy }: {
   w: AcceptedWorker;
-  onPay: () => void; onNoShow: () => void; onRemove: () => void; onReview: () => void;
+  onApprove: () => void; onPay: () => void; onNoShow: () => void; onRemove: () => void; onReview: () => void;
   busy: boolean;
 }) {
-  const scheduledPay = w.totalPay ?? null;
   return (
     <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 flex flex-col gap-2.5">
       <div className="flex items-center gap-3">
@@ -78,17 +77,29 @@ function ConfirmedRow({ w, onPay, onNoShow, onRemove, onReview, busy }: {
                 {w.clock_out && ` – ${new Date(w.clock_out).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
               </span>
             )}
+            {(w.overtimeHours ?? 0) > 0 && (
+              <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0.5">
+                {w.overtimeHours}h OT
+              </span>
+            )}
           </div>
         </div>
         <AttendanceChip a={w.attendance} />
       </div>
 
       <div className="flex gap-2">
-        {w.attendance === 'done' && !w.paid && (
+        {w.attendance === 'done' && !w.approved && (
+          <button type="button" disabled={busy} onClick={onApprove}
+            className="flex-1 h-9 rounded-[8px] bg-[#0A1628] text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
+            <Clock3 size={13} aria-hidden />
+            Review &amp; Approve
+          </button>
+        )}
+        {w.attendance === 'done' && w.approved && !w.paid && (
           <button type="button" disabled={busy} onClick={onPay}
             className="flex-1 h-9 rounded-[8px] bg-emerald-600 text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
             <DollarSign size={13} aria-hidden />
-            Pay ${(scheduledPay ?? 0).toFixed(2)}
+            Pay ${(w.approvedPay ?? 0).toFixed(2)}
           </button>
         )}
         {w.paid && (
@@ -119,6 +130,61 @@ function ConfirmedRow({ w, onPay, onNoShow, onRemove, onReview, busy }: {
   );
 }
 
+/* ── Timesheet review sheet (approve hours + overtime) ───────────────────── */
+function ReviewSheet({ w, payRate, busy, onApprove, onClose }: {
+  w: AcceptedWorker; payRate: number; busy: boolean;
+  onApprove: (breakMinutes: number) => void; onClose: () => void;
+}) {
+  const grossH = w.clock_in && w.clock_out
+    ? (Date.parse(w.clock_out) - Date.parse(w.clock_in)) / 3_600_000 : 0;
+  const [breakMin, setBreakMin] = useState<number>(Math.round(w.breakMinutes ?? 0));
+  const billable = Math.max(0, grossH - breakMin / 60);
+  const regular = Math.min(billable, 8);
+  const overtime = Math.max(0, billable - 8);
+  const pay = regular * payRate + overtime * payRate * 1.5;
+  const fmt = (h: number) => `${h.toFixed(2)}h`;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-[430px] bg-white rounded-t-[20px] px-5 pt-4 pb-8">
+        <div className="w-10 h-1 rounded-full bg-[#DBDBDB] mx-auto mb-4" />
+        <p className="text-[#111827] font-bold text-[17px] mb-1">Review timesheet</p>
+        <p className="text-[#6B7280] text-[13px] mb-4">
+          {w.username ? `@${w.username}` : 'Worker'} · {payRate ? `$${payRate}/hr` : ''}
+        </p>
+
+        <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-4 py-3 mb-4 flex flex-col gap-2.5">
+          <div className="flex justify-between text-[14px]"><span className="text-[#6B7280]">Clocked time</span><span className="text-[#111827] font-semibold">{fmt(grossH)}</span></div>
+          <div className="flex items-center justify-between">
+            <span className="text-[#6B7280] text-[14px]">Unpaid break (min)</span>
+            <input type="number" min={0} value={breakMin}
+              onChange={(e) => setBreakMin(Math.max(0, parseInt(e.target.value || '0') || 0))}
+              className="w-20 h-9 rounded-[8px] border border-[#E5E7EB] bg-white px-2.5 text-[14px] text-[#111827] text-right outline-none focus:border-[#0A1628]" />
+          </div>
+          {billable > 6 && breakMin < 30 && (
+            <p className="text-[11px] text-amber-600">Tip: shifts over 6h usually include a 30-min unpaid break.</p>
+          )}
+          <div className="border-t border-[#E5E7EB] my-0.5" />
+          <div className="flex justify-between text-[14px]"><span className="text-[#6B7280]">Regular hours</span><span className="text-[#111827] font-semibold">{fmt(regular)}</span></div>
+          {overtime > 0 && (
+            <div className="flex justify-between text-[14px]"><span className="text-amber-600">Overtime (1.5×)</span><span className="text-amber-600 font-semibold">{fmt(overtime)}</span></div>
+          )}
+          <div className="flex justify-between text-[15px] pt-1"><span className="text-[#111827] font-bold">Approved pay</span><span className="text-[#111827] font-bold">${pay.toFixed(2)}</span></div>
+        </div>
+
+        <button type="button" disabled={busy} onClick={() => onApprove(breakMin)}
+          className="w-full h-[50px] rounded-[10px] bg-[#0A1628] text-white font-bold text-[15px] disabled:opacity-60">
+          {busy ? 'Approving…' : 'Approve timesheet'}
+        </button>
+        <button type="button" onClick={onClose} className="w-full h-11 mt-1 text-[#6B7280] font-semibold text-[14px]">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ── Roster screen ───────────────────────────────────────────────────────── */
 export function ApplicantsScreen() {
   const { id } = useParams<{ id: string }>();
@@ -132,6 +198,7 @@ export function ApplicantsScreen() {
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
+  const [reviewing, setReviewing] = useState<AcceptedWorker | null>(null);
 
   const loading = shiftLoading || appsLoading || confLoading;
   const pending = applicants.filter((a) => a.status === 'pending');
@@ -179,8 +246,22 @@ export function ApplicantsScreen() {
     if (!user?.id || !id || busyId) return;
     setBusyId(w.id);
     try {
-      await startShiftPayment(user.id, { shift_id: id, worker_id: w.workerId, amount: w.totalPay ?? 0 });
-    } catch (e) { showToast(e instanceof Error ? e.message : 'Could not start payment.'); }
+      await startShiftPayment(user.id, { shift_id: id, worker_id: w.workerId, amount: w.approvedPay ?? w.totalPay ?? 0 });
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Could not start payment.', 'error'); }
+    finally { setBusyId(null); }
+  }
+
+  async function handleApprove(w: AcceptedWorker, breakMinutes: number) {
+    if (!user?.id || !id) return;
+    setBusyId(w.id);
+    try {
+      await apiClient(user.id).post('/time-entries/approve', {
+        shift_id: id, worker_id: w.workerId, break_minutes: breakMinutes,
+      });
+      showToast('Timesheet approved. You can pay this worker now.');
+      setReviewing(null);
+      refetchAll();
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Could not approve.', 'error'); }
     finally { setBusyId(null); }
   }
 
@@ -242,6 +323,7 @@ export function ApplicantsScreen() {
               <div className="flex flex-col gap-2">
                 {confirmed.map((w) => (
                   <ConfirmedRow key={w.id} w={w} busy={busyId === w.id}
+                    onApprove={() => setReviewing(w)}
                     onPay={() => void handlePay(w)}
                     onNoShow={() => void handleNoShow(w)}
                     onRemove={() => void handleRemove(w)}
@@ -337,6 +419,12 @@ export function ApplicantsScreen() {
           </>
         )}
       </div>
+
+      {reviewing && (
+        <ReviewSheet w={reviewing} payRate={shift?.payRate ?? 0} busy={busyId === reviewing.id}
+          onApprove={(brk) => void handleApprove(reviewing, brk)}
+          onClose={() => setReviewing(null)} />
+      )}
     </div>
   );
 }

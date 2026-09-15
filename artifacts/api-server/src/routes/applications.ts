@@ -88,11 +88,13 @@ router.get('/', requireAuth, async (req, res) => {
       const entryMap = new Map<string, {
         clock_in: string | null; clock_out: string | null;
         total_hours: number | null; total_pay: number | null;
+        approved: boolean; approved_pay: number | null; overtime_hours: number | null;
+        break_minutes: number | null;
       }>();
       if (workerIds.length) {
         const { data: entries } = await adminDb
           .from('time_entries')
-          .select('worker_id, clock_in, clock_out, total_hours, total_pay')
+          .select('worker_id, clock_in, clock_out, total_hours, total_pay, approved, approved_pay, overtime_hours, break_minutes')
           .eq('shift_id', shift_id)
           .in('worker_id', workerIds);
         for (const t of entries ?? []) {
@@ -101,6 +103,10 @@ router.get('/', requireAuth, async (req, res) => {
             clock_out: t.clock_out ?? null,
             total_hours: t.total_hours ?? null,
             total_pay: t.total_pay ?? null,
+            approved: t.approved ?? false,
+            approved_pay: t.approved_pay ?? null,
+            overtime_hours: t.overtime_hours ?? null,
+            break_minutes: t.break_minutes ?? null,
           });
         }
       }
@@ -162,6 +168,10 @@ router.get('/', requireAuth, async (req, res) => {
           clock_out: e?.clock_out ?? null,
           total_hours: e?.total_hours ?? null,
           total_pay: e?.total_pay ?? null,
+          break_minutes: e?.break_minutes ?? null,
+          approved: e?.approved ?? false,
+          approved_pay: e?.approved_pay ?? null,
+          overtime_hours: e?.overtime_hours ?? null,
           attendance,
           already_reviewed: reviewedSet.has(a.worker_id),
           paid: paidSet.has(a.worker_id),
