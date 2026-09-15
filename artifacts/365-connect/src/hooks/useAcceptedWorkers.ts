@@ -41,6 +41,14 @@ export type AcceptedWorker = RawAccepted & {
   alreadyReviewed: boolean;
   /** true when this worker has already been paid for the shift */
   paid: boolean;
+  /** true when the timesheet has been approved by the manager */
+  approved: boolean;
+  /** manager-approved final pay (null until approved) */
+  approvedPay: number | null;
+  /** overtime hours computed at approval */
+  overtimeHours: number | null;
+  /** break minutes recorded on the timesheet */
+  breakMinutes: number | null;
 };
 
 export function useAcceptedWorkers(
@@ -69,6 +77,10 @@ export function useAcceptedWorkers(
         totalPay:        r.total_pay ?? null,
         alreadyReviewed: !!(r.already_reviewed),
         paid:            !!(r.paid),
+        approved:        !!(r.approved),
+        approvedPay:     (r.approved_pay as number | null) ?? null,
+        overtimeHours:   (r.overtime_hours as number | null) ?? null,
+        breakMinutes:    (r.break_minutes as number | null) ?? null,
       })));
     } catch (e) {
       console.error('[useAcceptedWorkers] load failed:', e);

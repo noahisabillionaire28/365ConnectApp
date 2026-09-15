@@ -10,7 +10,6 @@ import { markClockedIn } from '@/store/feedStore';
 import { useShiftById } from '@/hooks/useShifts';
 import { useAuth } from '@/contexts/AuthContext';
 import { haversineMiles } from '@/lib/supabase';
-import { apiClient } from '@/lib/api';
 import { useTimeEntry } from '@/hooks/useTimeEntry';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -363,7 +362,10 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
 
         <div className="flex flex-col gap-3.5 pt-4">
           <div className="flex items-center justify-between mt-1 pt-4 border-t border-[#DBDBDB]">
-            <p className="text-black font-bold text-[16px]">Your pay</p>
+            <div>
+              <p className="text-black font-bold text-[16px]">Estimated pay</p>
+              <p className="text-[#AAAAAA] text-[11px]">Final after manager approval</p>
+            </div>
             <p className="text-black font-bold" style={{ fontSize: 28 }}>{fmtMoney(netPay)}</p>
           </div>
         </div>
@@ -376,7 +378,7 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
         role="status" aria-label="Timesheet submitted">
         <CheckCircle2 size={18} aria-hidden className="text-[#10B981] flex-shrink-0" />
         <p className="text-[#10B981] text-[14px] font-medium">
-          Timesheet sent to {shift.companyName}
+          Timesheet sent to {shift.companyName} for approval
         </p>
       </motion.div>
 
@@ -587,25 +589,11 @@ export function ClockInScreen() {
       return;
     }
 
-    try {
-      await apiClient(user.id).post('/payments', {
-        shift_id:     shift.id,
-        payment_type: 'shift_payment',
-        amount:       Math.round(grossPay * 100) / 100,
-        fee:          Math.round(serviceFee * 100) / 100,
-        net_amount:   Math.round(netPay * 100) / 100,
-        status:       'completed',
-      });
-    } catch (payErr) {
-      console.error('[ClockIn] failed to record payment:', payErr);
-      setEndShiftError("Your timesheet was saved, but the payout couldn't be processed. It will be retried shortly.");
-      setPhase('end-error');
-      return;
-    }
-
+    // No instant payout — the timesheet is submitted for the manager to
+    // review/approve, and pay is released after approval (Nowsta-style).
     if (id) markClockedIn(id);
-    showToast('Shift complete! Your timesheet has been sent.');
-    setPhase('transfer');
+    showToast('Shift complete! Timesheet sent for approval.');
+    setPhase('summary');
   }
 
   if (isLoading) {
