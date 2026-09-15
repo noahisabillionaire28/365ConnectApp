@@ -26,8 +26,15 @@ type PublicUserRow = {
   rating: number;
   hourly_rate: number | null;
   is_pro: boolean;
+  availability: Record<string, boolean> | null;
   created_at: string;
 };
+
+const DAY_ORDER: { key: string; label: string }[] = [
+  { key: 'mon', label: 'Mon' }, { key: 'tue', label: 'Tue' }, { key: 'wed', label: 'Wed' },
+  { key: 'thu', label: 'Thu' }, { key: 'fri', label: 'Fri' }, { key: 'sat', label: 'Sat' },
+  { key: 'sun', label: 'Sun' },
+];
 
 type ShiftRef = {
   title: string;
@@ -469,6 +476,26 @@ export function WorkerProfileScreen() {
                 {job}
               </span>
             ))}
+          </div>
+        )}
+
+        {/* Availability — days this worker can work */}
+        {profile.role === 'worker' && profile.availability && DAY_ORDER.some((d) => profile.availability?.[d.key]) && (
+          <div className="mb-6">
+            <p className="text-[13px] font-semibold text-[#737373] uppercase tracking-widest mb-2">Availability</p>
+            <div className="flex flex-wrap gap-1.5">
+              {DAY_ORDER.map(({ key, label }) => {
+                const on = !!profile.availability?.[key];
+                return (
+                  <span key={key}
+                    className={`px-2.5 py-1 rounded-full text-[12px] font-semibold border ${
+                      on ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-[#FAFAFA] border-[#DBDBDB] text-[#C7C7C7]'
+                    }`}>
+                    {label}
+                  </span>
+                );
+              })}
+            </div>
           </div>
         )}
 
