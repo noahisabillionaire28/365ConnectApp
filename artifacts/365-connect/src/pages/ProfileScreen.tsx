@@ -5,7 +5,7 @@ import {
   Star, ChevronRight, Settings,
   CreditCard, Bell, Shield, HelpCircle, LogOut,
   Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
-  BadgeCheck, Zap, Eye, ChevronLeft, Bookmark,
+  BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useAuth } from '@/contexts/AuthContext';
@@ -597,6 +597,9 @@ export function ProfileScreen() {
                     <SettingRow icon={Eye} label="View My Public Profile" onTap={() => go(`/worker/${username}`)} />
                   )}
                   <SettingRow icon={CreditCard} label="Payments & Earnings" onTap={() => go('/earnings')} />
+                  {profile.role === 'worker' && (
+                    <SettingRow icon={CalendarCheck} label="Availability" onTap={() => go('/availability')} />
+                  )}
                   <SettingRow icon={Bell} label="Notifications" onTap={() => go('/notification-settings')} />
                 </div>
 
