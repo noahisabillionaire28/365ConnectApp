@@ -253,6 +253,21 @@ export function ShiftDetailScreen() {
   const distanceFromShift = haversineMiles(myCoords.lat, myCoords.lng, shiftCoords.lat, shiftCoords.lng);
   const distanceMilesLabel = Math.round(distanceFromShift * 10) / 10;
   const withinClockInRange = distanceFromShift <= 1;
+  // Clock-in time window: opens 1 hour before the shift's start (call time), so
+  // workers can't clock in days early. Nowsta-style.
+  const startMs      = shift.startTimeISO ? Date.parse(shift.startTimeISO) : NaN;
+  const clockOpensMs = Number.isFinite(startMs) ? startMs - 60 * 60 * 1000 : NaN;
+  const clockOpen    = !Number.isFinite(clockOpensMs) || Date.now() >= clockOpensMs;
+  const clockOpensLabel = Number.isFinite(clockOpensMs)
+    ? new Date(clockOpensMs).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    : '';
+  const canClockIn   = withinClockInRange && clockOpen;
+  // Lifecycle: Upcoming → In progress → Ended (uses start/end timestamps).
+  const endMs = shift.endTimeISO ? Date.parse(shift.endTimeISO) : NaN;
+  const lifecycle: 'upcoming' | 'in_progress' | 'ended' =
+    Number.isFinite(endMs) && Date.now() > endMs ? 'ended'
+    : Number.isFinite(startMs) && Date.now() >= startMs ? 'in_progress'
+    : 'upcoming';
 
   // Real CTA states, per applications.status + time_entries completion:
   //   no row → apply | pending → Pending Approval | declined → Not Selected
@@ -310,7 +325,7 @@ export function ShiftDetailScreen() {
       );
     }
     if (ctaState === 'claim') void handleClaim();
-    if (ctaState === 'clock-in' && withinClockInRange) navigate(`/clock/${shiftId}`);
+    if (ctaState === 'clock-in' && canClockIn) navigate(`/clock/${shiftId}`);
   }
 
   async function handleSaveDressCode() {
@@ -458,6 +473,16 @@ export function ShiftDetailScreen() {
             {shift.eventType && (
               <span className="bg-[#F3F4F6] text-[#0A1628] text-[12px] font-bold px-3 py-1.5 rounded-full border border-[#E5E7EB]">
                 {shift.eventType}
+              </span>
+            )}
+            {lifecycle === 'in_progress' && (
+              <span className="bg-blue-50 text-blue-600 text-[12px] font-bold px-3 py-1.5 rounded-full border border-blue-200">
+                In progress
+              </span>
+            )}
+            {lifecycle === 'ended' && (
+              <span className="bg-[#FAFAFA] text-[#737373] text-[12px] font-bold px-3 py-1.5 rounded-full border border-[#DBDBDB]">
+                Ended
               </span>
             )}
           </div>
@@ -923,15 +948,17 @@ export function ShiftDetailScreen() {
 
         {ctaState === 'clock-in' && (
           <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleCta}
-            disabled={!withinClockInRange}
-            aria-label={withinClockInRange ? 'Clock in to your shift' : 'Clock in unavailable — you must be within 1 mile'}
+            disabled={!canClockIn}
+            aria-label={canClockIn ? 'Clock in to your shift'
+              : !clockOpen ? `Clock in opens at ${clockOpensLabel}` : 'Clock in unavailable — you must be within 1 mile'}
             className={`w-full h-[52px] rounded-[8px] font-bold text-[16px] tracking-wide flex items-center justify-center gap-2.5 ${
-              withinClockInRange ? 'bg-[#FFD700] text-black' : 'bg-[#F0F0F0] text-[#AAAAAA] cursor-not-allowed'
+              canClockIn ? 'bg-[#FFD700] text-black' : 'bg-[#F0F0F0] text-[#AAAAAA] cursor-not-allowed'
             }`}>
-            <motion.div animate={withinClockInRange ? { scale: [1, 1.2, 1] } : {}} transition={{ repeat: Infinity, duration: 1.6 }}>
+            <motion.div animate={canClockIn ? { scale: [1, 1.2, 1] } : {}} transition={{ repeat: Infinity, duration: 1.6 }}>
               <AlarmClock size={20} aria-hidden />
             </motion.div>
-            {withinClockInRange ? 'Clock In' : 'Get within 1 mi to Clock In'}
+            {!clockOpen ? `Clock in opens at ${clockOpensLabel}`
+              : withinClockInRange ? 'Clock In' : 'Get within 1 mi to Clock In'}
           </motion.button>
         )}
 
