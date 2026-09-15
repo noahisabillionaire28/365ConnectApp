@@ -6,7 +6,7 @@ type RawApplication = {
   id: string;
   shift_id: string;
   worker_id: string;
-  status: 'pending' | 'accepted' | 'declined' | 'rejected' | 'withdrawn';
+  status: 'pending' | 'accepted' | 'declined' | 'rejected' | 'withdrawn' | 'standby';
   match_score: number | null;
   applied_at: string;
   created_at: string;
@@ -24,7 +24,7 @@ type RawApplication = {
 };
 
 export type MyApplication = RawApplication & {
-  status: 'pending' | 'accepted' | 'declined' | 'rejected' | 'withdrawn';
+  status: 'pending' | 'accepted' | 'declined' | 'rejected' | 'withdrawn' | 'standby';
   /** camelCase aliases */
   shiftId: string;
   applicationId: string;

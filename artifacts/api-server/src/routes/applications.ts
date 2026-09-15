@@ -429,6 +429,45 @@ router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req
 });
 
 /**
+ * POST /api/applications/withdraw { shift_id } - a worker drops a shift they're
+ * booked for. Sets their application to 'withdrawn'; a DB trigger frees the spot
+ * (decrements spots_filled and reopens a 'filled' shift).
+ */
+router.post('/withdraw', requireAuth, requireRole('worker'), async (req, res) => {
+  const { shift_id } = req.body as Record<string, string>;
+  if (!shift_id) return res.status(400).json({ error: 'shift_id is required' });
+  try {
+    const { data, error } = await adminDb
+      .from('applications')
+      .update({ status: 'withdrawn' })
+      .eq('shift_id', shift_id)
+      .eq('worker_id', req.userId)
+      .in('status', ['accepted', 'standby', 'pending'])
+      .select()
+      .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'You are not booked for this shift.' });
+
+    // Let the owner know a spot opened up.
+    const { data: shift } = await adminDb
+      .from('shifts').select('client_id, title').eq('id', shift_id).maybeSingle();
+    if (shift?.client_id) {
+      await createNotification({
+        userId: shift.client_id,
+        fromUserId: req.userId,
+        type: 'receipt',
+        title: 'Worker dropped',
+        body: `${await workerName(req.userId!)} dropped ${shift.title ? `"${shift.title}"` : 'a shift'}. The spot reopened.`,
+        shiftId: shift_id,
+      });
+    }
+    return res.json({ ok: true });
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
+/**
  * POST /api/applications/claim - a worker instantly claims an open-claim shift.
  * No approval step: if the shift is marked instant_claim and has an open spot,
  * the worker is confirmed immediately (first-come, first-served).

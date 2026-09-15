@@ -91,6 +91,7 @@ function groupApplications(apps: MyApplication[]) {
       (a) => a.status === 'accepted' && a.startTime && new Date(a.startTime) > now,
     ),
     applied: apps.filter((a) => a.status === 'pending'),
+    standby: apps.filter((a) => a.status === 'standby'),
     completed: apps.filter(
       (a) => a.status === 'accepted' && (!a.startTime || new Date(a.startTime) <= now),
     ),
@@ -170,7 +171,7 @@ function MyShiftSection({
 function WorkerMyShiftsView() {
   const [, navigate] = useLocation();
   const { applications, isLoading, error } = useMyApplications();
-  const { upcoming, applied, completed, notSelected } = groupApplications(applications);
+  const { upcoming, applied, standby, completed, notSelected } = groupApplications(applications);
   const goToShift = (a: MyApplication) => navigate(`/shift/${a.shiftId}`);
 
   if (isLoading) {
@@ -206,6 +207,7 @@ function WorkerMyShiftsView() {
   return (
     <div className="flex-1 overflow-y-auto pt-4 pb-4">
       <MyShiftSection label="Upcoming"     items={upcoming}     onTap={goToShift} dotColor="#10B981" emptyText="No confirmed upcoming shifts." />
+      <MyShiftSection label="Standby"      items={standby}      onTap={goToShift} dotColor="#F59E0B" />
       <MyShiftSection label="Applied"      items={applied}      onTap={goToShift} dotColor="#F59E0B" emptyText="No pending applications. Browse Jobs to apply." />
       <MyShiftSection label="Completed"    items={completed}    onTap={goToShift} dotColor="#6B7280" />
       <MyShiftSection label="Not Selected" items={notSelected}  onTap={goToShift} dotColor="#D1D5DB" />
@@ -316,7 +318,7 @@ function WorkerRequestsView() {
               Decline
             </button>
             <button type="button"
-              onClick={() => void accept(r.id).then((ok) => showToast(ok ? "You're booked! Clock in when you arrive." : 'Could not accept — it may be full.', ok ? 'success' : 'error'))}
+              onClick={() => void accept(r.id).then((ok) => showToast(ok ? 'Response sent — check your Schedule (or standby if the shift was full).' : 'Could not accept this offer.', ok ? 'success' : 'error'))}
               className="flex-1 h-10 rounded-[8px] bg-[#10B981] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5">
               <Check size={15} aria-hidden />
               Accept

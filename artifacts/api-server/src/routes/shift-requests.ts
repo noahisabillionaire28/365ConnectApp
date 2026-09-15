@@ -203,14 +203,14 @@ router.patch('/:id', requireAuth, async (req, res) => {
       return res.json(data);
     }
 
-    // Accept → book the worker. Check headcount first.
+    // Accept → book the worker, or waitlist them if the shift is full.
     const { data: shift } = await adminDb
       .from('shifts')
       .select('id, title, client_id, spots_available, spots_filled')
       .eq('id', reqRow.shift_id).maybeSingle();
     if (!shift) return res.status(404).json({ error: 'Shift not found' });
     const spotsLeft = (shift.spots_available ?? 1) - (shift.spots_filled ?? 0);
-    if (spotsLeft <= 0) return res.status(409).json({ error: 'This shift is already full.' });
+    const label = shift.title ? `"${shift.title}"` : 'a shift';
 
     // Don't book into a time-overlapping shift.
     const conflict = await findTimeConflict(req.userId!, reqRow.shift_id);
@@ -223,6 +223,25 @@ router.patch('/:id', requireAuth, async (req, res) => {
     // Mark the request accepted.
     await adminDb.from('shift_requests').update({ status: 'accepted' }).eq('id', reqRow.id);
 
+    // Full → put them on standby (waitlist); a spot opening promotes them.
+    if (spotsLeft <= 0) {
+      const { data: standby, error: stErr } = await adminDb
+        .from('applications')
+        .upsert(
+          { shift_id: reqRow.shift_id, worker_id: req.userId, status: 'standby' },
+          { onConflict: 'shift_id,worker_id' },
+        )
+        .select().single();
+      if (stErr) return res.status(500).json({ error: stErr.message });
+      await createNotification({
+        userId: req.userId!, fromUserId: shift.client_id, type: 'booking',
+        title: "You're on standby",
+        body: `${label} is full — you're on the waitlist. We'll notify you if a spot opens.`,
+        shiftId: reqRow.shift_id,
+      });
+      return res.json({ status: 'standby', booking: standby });
+    }
+
     // Book them: an accepted application (the DB trigger bumps spots_filled).
     const { data: booking, error: bErr } = await adminDb
       .from('applications')
@@ -234,7 +253,6 @@ router.patch('/:id', requireAuth, async (req, res) => {
       .single();
     if (bErr) return res.status(500).json({ error: bErr.message });
 
-    const label = shift.title ? `"${shift.title}"` : 'a shift';
     // Confirm to the worker.
     await createNotification({
       userId: req.userId!,

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, Star, UserPlus,
-  Edit3, Trash2, DollarSign, Navigation, X, Zap, Send,
+  Edit3, Trash2, DollarSign, Navigation, X, Zap, Send, MessageSquareText,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -275,10 +275,12 @@ export function ShiftDetailScreen() {
   // Completion is tracked per-worker via time_entries.clock_out rather than
   // shifts.status, since RLS only lets the shift's client owner update shifts.
   const canClaim = shift.instantClaim && shift.spotsAvailable > 0;
-  type CtaState = 'apply' | 'claim' | 'pending' | 'declined' | 'clock-in' | 'completed';
+  type CtaState = 'apply' | 'claim' | 'pending' | 'declined' | 'clock-in' | 'completed' | 'standby';
   const ctaState: CtaState =
     applicationStatus === 'accepted'
       ? (hasCompleted ? 'completed' : 'clock-in')
+      : applicationStatus === 'standby'
+      ? 'standby'
       : applicationStatus === 'pending'
       ? 'pending'
       : applicationStatus === 'declined'
@@ -286,6 +288,20 @@ export function ShiftDetailScreen() {
       : canClaim
       ? 'claim'
       : 'apply';
+
+  const [dropping, setDropping] = useState(false);
+  async function handleDrop() {
+    if (!user?.id || dropping) return;
+    if (!window.confirm('Drop this shift? Your spot will reopen for someone else.')) return;
+    setDropping(true);
+    try {
+      await apiClient(user.id).post('/applications/withdraw', { shift_id: shiftId });
+      showToast('You dropped this shift.');
+      navigate('/home');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not drop the shift.', 'error');
+    } finally { setDropping(false); }
+  }
 
   async function handleClaim() {
     if (!user?.id || claiming) return;
@@ -836,6 +852,17 @@ export function ShiftDetailScreen() {
             </div>
           </div>
         )}
+        {/* Updates & announcements — owner posts, booked workers read */}
+        {(canManage || applicationStatus === 'accepted' || applicationStatus === 'standby') && (
+          <div className="px-5 pt-2">
+            <button type="button" onClick={() => navigate(`/shift/${shiftId}/updates`)}
+              className="w-full h-[46px] rounded-[8px] border border-[#E5E7EB] text-[#0A1628] font-bold text-[14px] flex items-center justify-center gap-2">
+              <MessageSquareText size={16} aria-hidden />
+              Updates &amp; Announcements
+            </button>
+          </div>
+        )}
+
         {/* Owner management — inline, scrolls with content (never overlaps) */}
         {canManage && (
           <div className="px-5 pt-2 pb-8 flex flex-col gap-2 border-t border-[#DBDBDB] mt-2">
@@ -960,6 +987,26 @@ export function ShiftDetailScreen() {
             {!clockOpen ? `Clock in opens at ${clockOpensLabel}`
               : withinClockInRange ? 'Clock In' : 'Get within 1 mi to Clock In'}
           </motion.button>
+        )}
+
+        {ctaState === 'clock-in' && (
+          <button type="button" onClick={() => void handleDrop()} disabled={dropping}
+            className="w-full h-9 mt-2 text-[#EF4444] font-semibold text-[13px] disabled:opacity-50">
+            {dropping ? 'Dropping…' : 'Drop this shift'}
+          </button>
+        )}
+
+        {ctaState === 'standby' && (
+          <div className="flex flex-col gap-2">
+            <div className="w-full rounded-[8px] bg-amber-50 border border-amber-200 px-4 py-3 text-center">
+              <p className="text-amber-700 font-bold text-[14px]">You're on standby</p>
+              <p className="text-amber-600 text-[12px] mt-0.5">This shift is full — we'll notify you if a spot opens.</p>
+            </div>
+            <button type="button" onClick={() => void handleDrop()} disabled={dropping}
+              className="w-full h-9 text-[#EF4444] font-semibold text-[13px] disabled:opacity-50">
+              {dropping ? 'Leaving…' : 'Leave waitlist'}
+            </button>
+          </div>
         )}
 
         {ctaState === 'completed' && (

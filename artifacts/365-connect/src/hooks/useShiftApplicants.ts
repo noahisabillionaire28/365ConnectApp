@@ -7,7 +7,7 @@ type RawApplicant = {
   id: string;
   shift_id: string;
   worker_id: string;
-  status: 'pending' | 'accepted' | 'declined';
+  status: 'pending' | 'accepted' | 'declined' | 'rejected' | 'withdrawn' | 'standby';
   match_score: number | null;
   applied_at: string;
   created_at: string;

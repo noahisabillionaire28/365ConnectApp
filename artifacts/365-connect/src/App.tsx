@@ -49,6 +49,7 @@ import { WorkerProfileScreen }   from '@/pages/WorkerProfileScreen';
 import { ClockInScreen }         from '@/pages/ClockInScreen';
 import { ApplicantsScreen }      from '@/pages/ApplicantsScreen';
 import { ShiftRequestsScreen }   from '@/pages/ShiftRequestsScreen';
+import { ShiftUpdatesScreen }     from '@/pages/ShiftUpdatesScreen';
 import { ReviewScreen }          from '@/pages/ReviewScreen';
 import { RosterScreen }          from '@/pages/RosterScreen';
 import { AssignWorkersScreen }   from '@/pages/AssignWorkersScreen';
@@ -155,6 +156,7 @@ function MobileRouter() {
             {/* ── Detail & misc ─────────────────────────────────── */}
             <Route path="/shift/:id"        component={ShiftDetailScreen}   />
             <Route path="/shift/:id/applicants" component={ApplicantsScreen} />
+            <Route path="/shift/:id/updates"    component={ShiftUpdatesScreen} />
             <Route path="/requests"         component={ShiftRequestsScreen}  />
             <Route path="/worker/:username" component={WorkerProfileScreen}  />
             <Route path="/post/:id"      component={PostScreen}          />
