@@ -119,15 +119,18 @@ export function useShiftRequests(
     return result.ok;
   }, [user?.id]);
 
-  const accept = useCallback(async (id: string): Promise<boolean> => {
-    if (!user?.id) return false;
+  /** Accept an offer. Resolves to the booking outcome: booked, or waitlisted (standby). */
+  const accept = useCallback(async (id: string): Promise<{ ok: boolean; status?: 'accepted' | 'standby' }> => {
+    if (!user?.id) return { ok: false };
     try {
-      await apiClient(user.id).patch(`/shift-requests/${id}`, { status: 'accepted' });
-      setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status: 'accepted' as const } : r));
-      return true;
+      const r = await apiClient(user.id).patch<{ status?: 'accepted' | 'standby' }>(
+        `/shift-requests/${id}`, { status: 'accepted' },
+      );
+      setRequests((prev) => prev.map((x) => x.id === id ? { ...x, status: 'accepted' as const } : x));
+      return { ok: true, status: r?.status ?? 'accepted' };
     } catch (e) {
       console.error('[useShiftRequests] accept failed:', e);
-      return false;
+      return { ok: false };
     }
   }, [user?.id]);
 
@@ -144,7 +147,7 @@ export function useShiftRequests(
   }, [user?.id]);
 
   const respondToRequest = useCallback(async (id: string, status: 'accepted' | 'declined'): Promise<boolean> => {
-    return status === 'accepted' ? accept(id) : decline(id);
+    return status === 'accepted' ? (await accept(id)).ok : decline(id);
   }, [accept, decline]);
 
   return { requests, isLoading, error, sendRequest, accept, decline, respondToRequest, refetch: load };

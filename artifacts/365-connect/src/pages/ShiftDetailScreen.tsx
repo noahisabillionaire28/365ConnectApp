@@ -3,8 +3,8 @@ import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
-  MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, Star, UserPlus,
-  Edit3, Trash2, DollarSign, Navigation, X, Zap, Send, MessageSquareText,
+  MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, UserPlus,
+  Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -25,7 +25,6 @@ import { useShiftApplicants } from '@/hooks/useShiftApplicants';
 import { useAcceptedWorkers } from '@/hooks/useAcceptedWorkers';
 import { useEventPositions } from '@/hooks/useEventPositions';
 import { broadcastShiftRequest } from '@/hooks/useShiftRequests';
-import { startShiftPayment } from '@/lib/checkout';
 
 /** Deep links to open a destination in each navigation app. */
 function directionsLinks(lat: number, lng: number, label: string) {
@@ -65,14 +64,6 @@ function calcDurationHours(start: string, end: string): number {
 const usd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
 /** Attendance status pill styling for the "who's coming" crew list. */
-const ATT_META: Record<'applied' | 'booked' | 'on_site' | 'done' | 'no_show', { label: string; cls: string }> = {
-  applied: { label: 'Applied', cls: 'bg-slate-50    border-[#DBDBDB]    text-[#737373]'  },
-  booked:  { label: 'Booked',  cls: 'bg-blue-50     border-blue-200     text-blue-700'   },
-  on_site: { label: 'On-site', cls: 'bg-emerald-50  border-emerald-200  text-emerald-700' },
-  done:    { label: 'Done',    cls: 'bg-[#0A1628]/5 border-[#0A1628]/20 text-[#0A1628]'  },
-  no_show: { label: 'No-show', cls: 'bg-red-50      border-red-200      text-red-600'    },
-};
-
 /* ─── Loading skeleton ───────────────────────────────────────────────────── */
 function ShiftDetailSkeleton() {
   return (
@@ -160,10 +151,7 @@ export function ShiftDetailScreen() {
   const { positions: eventPositions } = useEventPositions(shift?.eventId ?? undefined);
   const { showToast } = useToast();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [payingId, setPayingId] = useState<string | null>(null);
   const [claiming, setClaiming] = useState(false);
-  const [reportingId, setReportingId] = useState<string | null>(null);
-  const [reportedNoShow, setReportedNoShow] = useState<Set<string>>(new Set());
   const [directionsOpen, setDirectionsOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
@@ -319,20 +307,6 @@ export function ShiftDetailScreen() {
     }
   }
 
-  async function handleReportNoShow(workerId: string) {
-    if (!user?.id || reportingId) return;
-    setReportingId(workerId);
-    try {
-      await apiClient(user.id).post('/applications/no-show', { shift_id: shiftId, worker_id: workerId });
-      setReportedNoShow((prev) => new Set(prev).add(workerId));
-      showToast('No-show reported — our team will review it.');
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not report this no-show.');
-    } finally {
-      setReportingId(null);
-    }
-  }
-
   function handleCta() {
     if (ctaState === 'apply') {
       void submitApplication(
@@ -392,24 +366,6 @@ export function ShiftDetailScreen() {
       console.error('[ShiftDetail] edit prefill failed:', e);
     } finally {
       setEditLoading(false);
-    }
-  }
-
-  async function handlePayWorker(workerId: string, actualPay?: number | null) {
-    if (!user?.id || payingId || !shift) return;
-    // Prefer the worker's ACTUAL clocked pay; fall back to the scheduled estimate
-    // only if a clocked total isn't available yet.
-    const amount = actualPay != null && actualPay > 0
-      ? Math.round(actualPay * 100) / 100
-      : Math.round(shift.payRate * calcDurationHours(shift.startTime, shift.endTime) * 100) / 100;
-    if (amount <= 0) { showToast('No hours to pay yet.'); return; }
-    setPayingId(workerId);
-    try {
-      // Redirects to Stripe Checkout; returns to /earnings on success.
-      await startShiftPayment(user.id, { shift_id: shiftId, worker_id: workerId, amount });
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not start payment.');
-      setPayingId(null);
     }
   }
 
@@ -745,7 +701,7 @@ export function ShiftDetailScreen() {
         </div>
 
         {/* Cost breakdown — owner-only, shows gross / 8% fee / total estimate */}
-        {isOwner && shift.payRate > 0 && (
+        {canManage && shift.payRate > 0 && (
           <div className="px-5 pb-6">
             <SectionHeading>Cost Estimate</SectionHeading>
             {(() => {
@@ -775,83 +731,23 @@ export function ShiftDetailScreen() {
           </div>
         )}
 
-        {/* Accepted workers — owner-only, rate once each worker has clocked out */}
-        {isOwner && acceptedWorkers.length > 0 && (
+        {/* Roster summary — all worker management lives on the Roster screen */}
+        {canManage && acceptedWorkers.length > 0 && (
           <div className="px-5 pb-6">
-            <SectionHeading>Accepted Workers</SectionHeading>
-            <div className="flex flex-col gap-2.5">
-              {acceptedWorkers.map((w) => (
-                <div key={w.workerId} className="flex items-center gap-3 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-3">
-                  <div className="w-10 h-10 rounded-full bg-white border border-[#DBDBDB] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {w.photoUrl
-                      ? <img src={w.photoUrl} alt={w.username ?? 'Worker'} className="w-full h-full object-cover" />
-                      : <span className="text-black font-bold text-[13px]">{(w.username ?? 'W').slice(0, 2).toUpperCase()}</span>}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-black font-semibold text-[14px] truncate">{w.username ? `@${w.username}` : 'Worker'}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${ATT_META[w.attendance].cls}`}>
-                        {ATT_META[w.attendance].label}
-                      </span>
-                      {w.completed && w.totalHours != null && (
-                        <span className="text-[#737373] text-[11px]">
-                          {w.totalHours}h · {usd(w.totalPay ?? 0)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {w.attendance === 'no_show' && (
-                    <div className="flex-shrink-0">
-                      {reportedNoShow.has(w.workerId) ? (
-                        <span className="bg-red-50 border border-red-200 text-red-600 text-[12px] font-semibold px-3 py-2 rounded-[8px]">
-                          Reported
-                        </span>
-                      ) : (
-                        <button type="button" disabled={reportingId === w.workerId}
-                          onClick={() => void handleReportNoShow(w.workerId)}
-                          aria-label={`Report ${w.username ?? 'this worker'} as a no-show`}
-                          className="bg-white border border-red-200 text-red-600 text-[12px] font-semibold px-3 py-2 rounded-[8px] disabled:opacity-60">
-                          {reportingId === w.workerId ? 'Reporting…' : 'Report no-show'}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {w.completed && (
-                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                      {w.paid ? (
-                        <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-[12px] font-semibold px-3.5 py-2 rounded-[8px] flex items-center gap-1.5">
-                          <CheckCircle2 size={13} aria-hidden />
-                          Paid
-                        </span>
-                      ) : (
-                        <motion.button type="button" whileTap={{ scale: 0.95 }}
-                          disabled={payingId === w.workerId}
-                          onClick={() => void handlePayWorker(w.workerId, w.totalPay)}
-                          aria-label={`Pay ${w.username ?? 'this worker'}`}
-                          className="bg-emerald-600 text-white text-[12px] font-semibold px-3.5 py-2 rounded-[8px] flex items-center gap-1.5 disabled:opacity-60">
-                          <DollarSign size={13} aria-hidden />
-                          {payingId === w.workerId ? 'Opening…' : 'Pay'}
-                        </motion.button>
-                      )}
-                      {!w.alreadyReviewed ? (
-                        <motion.button type="button" whileTap={{ scale: 0.95 }}
-                          onClick={() => navigate(`/review/${shiftId}/${w.workerId}`)}
-                          aria-label={`Rate ${w.username ?? 'this worker'}`}
-                          className="bg-[#0A1628] text-white text-[12px] font-semibold px-3.5 py-2 rounded-[8px] flex items-center gap-1.5">
-                          <Star size={13} aria-hidden className="fill-white" />
-                          Rate
-                        </motion.button>
-                      ) : (
-                        <span className="text-emerald-600 text-[12px] font-semibold flex items-center gap-1">
-                          <CheckCircle2 size={13} aria-hidden />
-                          Rated
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <button type="button" onClick={() => navigate(`/shift/${shiftId}/applicants`)}
+              aria-label="Open the roster"
+              className="w-full flex items-center justify-between bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-3.5 text-left">
+              <div className="min-w-0">
+                <p className="text-black font-semibold text-[14px]">
+                  {acceptedWorkers.length} confirmed worker{acceptedWorkers.length === 1 ? '' : 's'}
+                </p>
+                <p className="text-[#737373] text-[12px]">
+                  {acceptedWorkers.filter((w) => w.attendance === 'on_site').length} on-site ·{' '}
+                  {acceptedWorkers.filter((w) => w.attendance === 'done').length} done
+                </p>
+              </div>
+              <span className="text-[#0A1628] font-bold text-[13px] flex-shrink-0">Manage Roster →</span>
+            </button>
           </div>
         )}
         {/* Event positions — other roles in this multi-position event */}

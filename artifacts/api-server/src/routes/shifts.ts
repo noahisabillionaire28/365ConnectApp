@@ -91,6 +91,13 @@ router.get('/:id', async (req, res) => {
   });
 });
 
+/** The poster's display name for a shift: their company, else their @username. */
+async function posterCompanyName(userId: string): Promise<string | null> {
+  const { data } = await adminDb
+    .from('users').select('company_name, username').eq('id', userId).maybeSingle();
+  return data?.company_name || (data?.username ? `@${data.username}` : null);
+}
+
 /** POST /api/shifts — create shift */
 router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const b = req.body as Record<string, unknown>;
@@ -110,7 +117,8 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
     lat: b.lat ?? null,
     lng: b.lng ?? null,
     cover_image: b.cover_image ?? null,
-    company_name: b.company_name ?? null,
+    // Never show "Private Client" for a real poster — default to their name.
+    company_name: (b.company_name as string | null) || await posterCompanyName(req.userId!),
     requirements: b.requirements ?? [],
     dress_code: b.dress_code ?? null,
     dress_code_items: b.dress_code_items ?? [],
@@ -155,7 +163,7 @@ router.post('/event', requireAuth, requireRole('client', 'staffer'), async (req,
     lat: b.lat ?? null,
     lng: b.lng ?? null,
     cover_image: b.cover_image ?? null,
-    company_name: b.company_name ?? null,
+    company_name: (b.company_name as string | null) || await posterCompanyName(req.userId!),
     dress_code: b.dress_code ?? null,
     special_instructions: b.special_instructions ?? null,
     instant_claim: b.instant_claim ?? false,
