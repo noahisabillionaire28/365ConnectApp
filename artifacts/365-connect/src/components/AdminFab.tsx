@@ -30,7 +30,7 @@ export function AdminFab() {
   }
 
   return (
-    <div className="fixed bottom-[72px] left-4 z-40">
+    <div className="fixed bottom-[124px] left-4 z-40">
       <AnimatePresence>
         {open && (
           <motion.div

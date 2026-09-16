@@ -19,6 +19,8 @@ type RawShift = {
   spots_filled: number;
   location: string | null;
   created_at: string;
+  /** Set when this shift is one position of a multi-position event. */
+  event_id?: string | null;
 };
 
 export type ClientShift = RawShift & {

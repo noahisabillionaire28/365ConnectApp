@@ -318,7 +318,12 @@ function WorkerRequestsView() {
               Decline
             </button>
             <button type="button"
-              onClick={() => void accept(r.id).then((ok) => showToast(ok ? 'Response sent — check your Schedule (or standby if the shift was full).' : 'Could not accept this offer.', ok ? 'success' : 'error'))}
+              onClick={() => void accept(r.id).then((res) => {
+                if (!res.ok) { showToast('Could not accept this offer.', 'error'); return; }
+                showToast(res.status === 'standby'
+                  ? "Shift is full — you're on standby. We'll notify you if a spot opens."
+                  : "You're booked! Clock in when you arrive.");
+              })}
               className="flex-1 h-10 rounded-[8px] bg-[#10B981] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5">
               <Check size={15} aria-hidden />
               Accept
@@ -463,6 +468,11 @@ function ClientShiftCard({
             <span className="inline-block bg-[#0A1628] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide mb-1.5">
               {shift.jobType}
             </span>
+            {shift.event_id && (
+              <span className="inline-block ml-1.5 bg-[#F3F4F6] text-[#0A1628] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#E5E7EB] mb-1.5">
+                Event position
+              </span>
+            )}
             <p className="text-[#111827] font-bold text-[17px] leading-snug truncate">
               {shift.eventType || shift.companyName || shift.jobType || 'Shift'}
             </p>

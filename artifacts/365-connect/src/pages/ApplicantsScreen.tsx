@@ -12,6 +12,7 @@ import { useShiftById } from '@/hooks/useShifts';
 import { broadcastShiftRequest } from '@/hooks/useShiftRequests';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
+import { useProfile } from '@/hooks/useProfile';
 import { apiClient } from '@/lib/api';
 import { startShiftPayment } from '@/lib/checkout';
 
@@ -193,6 +194,7 @@ export function ApplicantsScreen() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { role } = useProfile();
   const { data: shift, isLoading: shiftLoading } = useShiftById(id);
   const { applicants, isLoading: appsLoading, approve, decline, refetch: refetchApps } = useShiftApplicants(id);
   const { workers: confirmed, isLoading: confLoading, refetch: refetchConfirmed } = useAcceptedWorkers(id);
@@ -293,7 +295,9 @@ export function ApplicantsScreen() {
         </button>
         <div className="min-w-0">
           <h1 className="text-black font-bold text-[18px] leading-tight truncate">Roster</h1>
-          <p className="text-[#737373] text-[12px] truncate">{shift?.jobType ?? shift?.companyName ?? 'Shift'}</p>
+          <p className="text-[#737373] text-[12px] truncate">
+            {[shift?.jobType, shift?.companyName].filter(Boolean).join(' · ') || 'Shift'}
+          </p>
         </div>
       </div>
 
@@ -328,11 +332,13 @@ export function ApplicantsScreen() {
             <Send size={15} aria-hidden />
             {inviting ? 'Sending…' : 'Request All Workers'}
           </button>
-          <button type="button" onClick={() => navigate(`/shift/${id}/assign`)}
-            className="flex-1 h-[46px] rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[13px] flex items-center justify-center gap-2">
-            <UserPlus size={15} aria-hidden />
-            Assign from Roster
-          </button>
+          {role === 'staffer' && (
+            <button type="button" onClick={() => navigate(`/shift/${id}/assign`)}
+              className="flex-1 h-[46px] rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[13px] flex items-center justify-center gap-2">
+              <UserPlus size={15} aria-hidden />
+              Assign from Roster
+            </button>
+          )}
         </div>
 
         {loading ? (
