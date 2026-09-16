@@ -23,6 +23,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { hasCompletedTimeEntry } from '@/hooks/useTimeEntry';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
 import { useAcceptedWorkers } from '@/hooks/useAcceptedWorkers';
+import { useEventPositions } from '@/hooks/useEventPositions';
 import { broadcastShiftRequest } from '@/hooks/useShiftRequests';
 import { startShiftPayment } from '@/lib/checkout';
 
@@ -156,6 +157,7 @@ export function ShiftDetailScreen() {
     isOwnerForHooks ? id : undefined,
     isOwnerForHooks ? user?.id : undefined,
   );
+  const { positions: eventPositions } = useEventPositions(shift?.eventId ?? undefined);
   const { showToast } = useToast();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
@@ -852,6 +854,38 @@ export function ShiftDetailScreen() {
             </div>
           </div>
         )}
+        {/* Event positions — other roles in this multi-position event */}
+        {eventPositions.length > 1 && (
+          <div className="px-5 pt-2 pb-4">
+            <p className="text-[13px] font-semibold text-[#737373] uppercase tracking-widest mb-2">
+              Event positions ({eventPositions.length})
+            </p>
+            <div className="flex flex-col gap-2">
+              {eventPositions.map((p) => {
+                const isThis = p.id === shiftId;
+                const left = Math.max(0, (p.spots_available ?? 1) - (p.spots_filled ?? 0));
+                return (
+                  <button key={p.id} type="button" disabled={isThis}
+                    onClick={() => navigate(`/shift/${p.id}`)}
+                    className={`w-full flex items-center justify-between rounded-[10px] border px-3.5 py-2.5 text-left ${
+                      isThis ? 'border-[#0A1628] bg-[#0A1628]/5' : 'border-[#E5E7EB] bg-white'
+                    }`}>
+                    <div className="min-w-0">
+                      <p className="text-[#111827] font-semibold text-[14px] truncate">
+                        {p.job_type ?? 'Position'}{isThis && ' · this one'}
+                      </p>
+                      <p className="text-[#6B7280] text-[12px]">
+                        ${p.pay_rate}/{p.pay_period ?? 'hr'} · {left === 0 ? 'Full' : `${left} spot${left === 1 ? '' : 's'} left`}
+                      </p>
+                    </div>
+                    {!isThis && <span className="text-[#9CA3AF] text-[16px] flex-shrink-0">→</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Updates & announcements — owner posts, booked workers read */}
         {(canManage || applicationStatus === 'accepted' || applicationStatus === 'standby') && (
           <div className="px-5 pt-2">

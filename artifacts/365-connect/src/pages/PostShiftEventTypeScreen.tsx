@@ -85,6 +85,14 @@ export function PostShiftEventTypeScreen() {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-4 pt-5 pb-36">
+        <button type="button" onClick={() => navigate('/post-event')}
+          className="w-full mb-4 rounded-[12px] border border-[#0A1628] bg-white px-4 py-3 text-left flex items-center justify-between">
+          <div>
+            <p className="text-[#0A1628] font-bold text-[14px]">Need multiple roles?</p>
+            <p className="text-[#6B7280] text-[12px]">Post one event with several positions (Servers + Bartenders…)</p>
+          </div>
+          <span className="text-[#0A1628] font-bold text-[18px]">→</span>
+        </button>
         <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Select event type">
           {EVENT_TYPES.map((t, i) => {
             const Icon = EVENT_ICONS[t] ?? Sparkles;
