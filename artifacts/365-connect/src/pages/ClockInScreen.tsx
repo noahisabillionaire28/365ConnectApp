@@ -260,12 +260,12 @@ function ConfirmEndOverlay({ companyName, onConfirm, onCancel }: {
   return (
     <motion.div key="confirm" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end"
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end justify-center"
       role="dialog" aria-modal="true" aria-label="Confirm end shift" onClick={onCancel}>
       <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', stiffness: 360, damping: 36 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full bg-white border-t border-[#DBDBDB] rounded-t-[24px] px-5 pt-5 pb-10">
+        className="w-full max-w-[390px] bg-white border-t border-[#DBDBDB] rounded-t-[24px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+40px)]">
         <div aria-hidden className="w-10 h-1 rounded-full bg-[#DBDBDB] mx-auto mb-6" />
         <h2 className="text-black font-bold text-[22px] mb-2">End your shift?</h2>
         <p className="text-[#737373] text-[14px] mb-7 leading-relaxed">
@@ -328,9 +328,9 @@ function SummaryRow({ label, value, valueClass = 'text-black', small = false, bo
 }
 
 /* ── Summary screen ──────────────────────────────────────────────────────── */
-function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serviceFee, netPay, onRate }: {
+function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serviceFee, netPay, onRate, onDone }: {
   shift: MockShift; shiftSecs: number; breakSecs: number; billedSecs: number;
-  grossPay: number; serviceFee: number; netPay: number; onRate: () => void;
+  grossPay: number; serviceFee: number; netPay: number; onRate: () => void; onDone: () => void;
 }) {
   return (
     <motion.div key="summary" initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }}
@@ -389,6 +389,10 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
         <Star size={18} aria-hidden className="fill-white" />
         Rate this Shift
       </motion.button>
+      <button type="button" onClick={onDone} aria-label="Back to your schedule"
+        className="w-full h-[44px] mt-2 text-[#737373] font-semibold text-[14px]">
+        Done — back to Schedule
+      </button>
     </motion.div>
   );
 }
@@ -648,7 +652,8 @@ export function ClockInScreen() {
         {phase === 'summary' && (
           <SummaryScreen key="summary" shift={shift} shiftSecs={shiftSecs} breakSecs={breakSecs}
             billedSecs={billedSecs} grossPay={grossPay} serviceFee={serviceFee} netPay={netPay}
-            onRate={() => navigate(`/review/${shift.id}/${shift.clientId}`)} />
+            onRate={() => navigate(`/review/${shift.id}/${shift.clientId}`)}
+            onDone={() => navigate('/home')} />
         )}
         {phase === 'already-done' && (
           <AlreadyDoneScreen key="already-done" shift={shift} netPay={priorEntry?.netPay ?? null}

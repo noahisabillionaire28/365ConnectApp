@@ -100,7 +100,7 @@ export function AssignWorkersScreen() {
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
-      <div className="px-4 pt-[52px] pb-4 border-b border-[#E5E7EB] flex items-center gap-3 flex-shrink-0">
+      <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-4 border-b border-[#E5E7EB] flex items-center gap-3 flex-shrink-0">
         <button type="button" aria-label="Go back"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate(`/shift/${id}`); }}
           className="w-9 h-9 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">

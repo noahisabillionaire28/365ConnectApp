@@ -85,19 +85,20 @@ function SegmentControl({
 
 /* ─── Worker: My Shifts view ─────────────────────────────────────────────────── */
 function groupApplications(apps: MyApplication[]) {
-  const now = new Date();
+  const now = Date.now();
+  // A booked shift stays "upcoming" until it ENDS (so it doesn't jump to
+  // Completed the moment it starts, while you're still working it).
+  const isOver = (a: MyApplication) => {
+    const ref = a.endTime ?? a.startTime;
+    return !!ref && Date.parse(ref) <= now;
+  };
   return {
-    upcoming: apps.filter(
-      (a) => a.status === 'accepted' && a.startTime && new Date(a.startTime) > now,
-    ),
-    applied: apps.filter((a) => a.status === 'pending'),
-    standby: apps.filter((a) => a.status === 'standby'),
-    completed: apps.filter(
-      (a) => a.status === 'accepted' && (!a.startTime || new Date(a.startTime) <= now),
-    ),
-    notSelected: apps.filter(
-      (a) => a.status === 'declined' || a.status === 'rejected' || a.status === 'withdrawn',
-    ),
+    upcoming:  apps.filter((a) => a.status === 'accepted' && !isOver(a)),
+    applied:   apps.filter((a) => a.status === 'pending'),
+    standby:   apps.filter((a) => a.status === 'standby'),
+    completed: apps.filter((a) => a.status === 'accepted' && isOver(a)),
+    dropped:   apps.filter((a) => a.status === 'withdrawn'),
+    notSelected: apps.filter((a) => a.status === 'declined' || a.status === 'rejected'),
   };
 }
 
@@ -171,7 +172,7 @@ function MyShiftSection({
 function WorkerMyShiftsView() {
   const [, navigate] = useLocation();
   const { applications, isLoading, error } = useMyApplications();
-  const { upcoming, applied, standby, completed, notSelected } = groupApplications(applications);
+  const { upcoming, applied, standby, completed, dropped, notSelected } = groupApplications(applications);
   const goToShift = (a: MyApplication) => navigate(`/shift/${a.shiftId}`);
 
   if (isLoading) {
@@ -210,6 +211,7 @@ function WorkerMyShiftsView() {
       <MyShiftSection label="Standby"      items={standby}      onTap={goToShift} dotColor="#F59E0B" />
       <MyShiftSection label="Applied"      items={applied}      onTap={goToShift} dotColor="#F59E0B" emptyText="No pending applications. Browse Jobs to apply." />
       <MyShiftSection label="Completed"    items={completed}    onTap={goToShift} dotColor="#6B7280" />
+      <MyShiftSection label="Dropped"      items={dropped}      onTap={goToShift} dotColor="#D1D5DB" />
       <MyShiftSection label="Not Selected" items={notSelected}  onTap={goToShift} dotColor="#D1D5DB" />
     </div>
   );
@@ -246,7 +248,17 @@ function WorkerAvailableView() {
             ))}
             {shifts.length === 0 && (
               <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-                <p className="text-[#737373] text-[14px]">No shifts near you right now. Check back soon.</p>
+                <p className="text-[#737373] text-[14px]">No shifts match your job types within 25 miles right now.</p>
+                <div className="flex gap-2 justify-center mt-4">
+                  <button type="button" onClick={() => navigate('/jobs')}
+                    className="h-[38px] px-4 rounded-[10px] bg-[#0A1628] text-white text-[13px] font-semibold">
+                    Browse all jobs
+                  </button>
+                  <button type="button" onClick={() => navigate('/worker-setup?edit=1')}
+                    className="h-[38px] px-4 rounded-[10px] border border-[#DBDBDB] text-[#111827] text-[13px] font-semibold">
+                    Update job types
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -264,11 +276,12 @@ function isFutureOffer(startTime: string | null | undefined): boolean {
   return !Number.isFinite(t) || t > Date.now();
 }
 
-function WorkerRequestsView() {
+/** Receives the single shared useShiftRequests() instance from WorkerHomeFeed so
+ *  the tab badge and this list never disagree. */
+function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType<typeof useShiftRequests>) {
   const [, navigate] = useLocation();
   const { showToast } = useToast();
   const { user } = useAuth();
-  const { requests, isLoading, accept, decline } = useShiftRequests();
   // Only genuine offers TO this worker (not invites they sent), and not past.
   const pending = requests.filter(
     (r) => r.status === 'pending' && r.worker_id === user?.id && isFutureOffer(r.startTime ?? r.start_time),
@@ -339,7 +352,8 @@ function WorkerRequestsView() {
 function WorkerHomeFeed() {
   const [tab, setTab] = useState<'schedule' | 'requests' | 'available'>('schedule');
   const { user } = useAuth();
-  const { requests } = useShiftRequests();
+  const shiftRequests = useShiftRequests();
+  const { requests } = shiftRequests;
   const pendingCount = requests.filter(
     (r) => r.status === 'pending' && r.worker_id === user?.id && isFutureOffer(r.startTime ?? r.start_time),
   ).length;
@@ -365,7 +379,7 @@ function WorkerHomeFeed() {
       </div>
 
       {tab === 'schedule'  && <WorkerMyShiftsView />}
-      {tab === 'requests'  && <WorkerRequestsView />}
+      {tab === 'requests'  && <WorkerRequestsView {...shiftRequests} />}
       {tab === 'available' && <WorkerAvailableView />}
 
       <BottomTabNav />
@@ -474,7 +488,7 @@ function ClientShiftCard({
               </span>
             )}
             <p className="text-[#111827] font-bold text-[17px] leading-snug truncate">
-              {shift.eventType || shift.companyName || shift.jobType || 'Shift'}
+              {shift.title || shift.eventType || shift.companyName || shift.jobType || 'Shift'}
             </p>
             {shift.companyName && shift.companyName !== (shift.eventType || '') && (
               <p className="text-[#6B7280] text-[13px] font-medium leading-snug truncate">

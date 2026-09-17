@@ -134,7 +134,7 @@ export function NotificationsScreen() {
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
       {/* Header */}
-      <div className="px-4 pt-[52px] pb-3 border-b border-[#DBDBDB] bg-white">
+      <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 border-b border-[#DBDBDB] bg-white">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-black font-bold text-[22px] tracking-tight">Notifications</h1>

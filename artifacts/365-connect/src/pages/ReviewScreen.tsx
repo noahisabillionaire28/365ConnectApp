@@ -133,7 +133,7 @@ export function ReviewScreen() {
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
-      <div className="px-4 pt-[52px] pb-3 flex items-center gap-3">
+      <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
         <button type="button" aria-label="Go back" onClick={goBack}
           className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} aria-hidden className="text-black" />

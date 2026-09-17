@@ -274,7 +274,7 @@ function ReportSheet({
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-[430px] bg-white rounded-t-[20px] px-5 pt-4 pb-8">
+      <div className="relative w-full max-w-[390px] bg-white rounded-t-[20px] px-5 pt-4 pb-8">
         <div className="flex items-center justify-between mb-4">
           <p className="text-black font-bold text-[17px]">Report @{username ?? 'user'}</p>
           <button type="button" aria-label="Close" onClick={onClose}

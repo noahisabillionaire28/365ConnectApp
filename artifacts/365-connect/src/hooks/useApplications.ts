@@ -20,7 +20,10 @@ export function useApplications() {
     if (!user?.id) return;
     apiClient(user.id).get<{ shift_id: string; status: string }[]>('/applications/my-shift-ids')
       .then((rows) => {
-        setAppliedShiftIds(new Set(rows.map((r) => r.shift_id)));
+        // Only live applications count as "applied" — a declined/withdrawn
+        // shift must not show the applied checkmark.
+        const live = rows.filter((r) => ['pending', 'accepted', 'standby'].includes(r.status));
+        setAppliedShiftIds(new Set(live.map((r) => r.shift_id)));
       })
       .catch((e) => console.error('[Applications] Initial fetch failed:', e));
   }, [user?.id]);

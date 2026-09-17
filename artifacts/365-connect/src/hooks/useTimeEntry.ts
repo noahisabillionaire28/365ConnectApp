@@ -127,8 +127,10 @@ export function useTimeEntry(shiftId: string | undefined) {
       setEntry(e);
       return e;
     } catch (e) {
+      // Surface the failure — callers (completeEntry) must not report a
+      // successful clock-out when the timesheet was never saved.
       console.error('[useTimeEntry] clockOut failed:', e);
-      return null;
+      throw e;
     }
   }, [entry?.id, user?.id]);
 
