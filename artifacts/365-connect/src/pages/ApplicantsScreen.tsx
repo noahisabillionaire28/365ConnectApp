@@ -195,7 +195,7 @@ export function ApplicantsScreen() {
   const { user } = useAuth();
   const { showToast } = useToast();
   const { role } = useProfile();
-  const { data: shift, isLoading: shiftLoading } = useShiftById(id);
+  const { data: shift, isLoading: shiftLoading, error: shiftError, refetch: refetchShift } = useShiftById(id);
   const { applicants, isLoading: appsLoading, approve, decline, refetch: refetchApps } = useShiftApplicants(id);
   const { workers: confirmed, isLoading: confLoading, refetch: refetchConfirmed } = useAcceptedWorkers(id);
   const { invites, refetch: refetchInvites } = useShiftInvites(id);
@@ -210,6 +210,7 @@ export function ApplicantsScreen() {
   const invitedPending = invites.filter(
     (i) => i.status === 'pending' && !confirmed.some((c) => c.workerId === i.worker_id),
   );
+  const invitedDeclined = invites.filter((i) => i.status === 'declined');
   const total = shift?.spotsTotal ?? confirmed.length;
   const fillPct = Math.min(100, Math.round((confirmed.length / Math.max(total, 1)) * 100));
 
@@ -358,6 +359,15 @@ export function ApplicantsScreen() {
           <div className="flex items-center justify-center py-16">
             <div className="w-8 h-8 rounded-full border-2 border-[#DBDBDB] border-t-[#0A1628] animate-spin" role="status" aria-label="Loading roster" />
           </div>
+        ) : shiftError && !shift ? (
+          <div className="rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-5 py-8 text-center">
+            <p className="text-[#111827] font-semibold text-[14px]">Couldn't load this roster.</p>
+            <p className="text-[#737373] text-[12px] mt-1">Check your connection and try again.</p>
+            <button type="button" onClick={() => { void refetchShift(); refetchAll(); }}
+              className="mt-4 h-[40px] px-5 rounded-full bg-[#0A1628] text-white text-[13px] font-bold">
+              Retry
+            </button>
+          </div>
         ) : (
           <>
             {/* Confirmed */}
@@ -425,6 +435,9 @@ export function ApplicantsScreen() {
             {standby.length > 0 && (
               <>
                 <SectionHeader label="Standby — waitlist" count={standby.length} />
+                <p className="text-[#9CA3AF] text-[12px] px-1 -mt-1 mb-2">
+                  Accepted while the shift was full. Confirm one when a spot opens up.
+                </p>
                 <div className="flex flex-col gap-2">
                   {standby.map((a) => (
                     <div key={a.applicationId} className="bg-white border border-amber-200 rounded-[12px] px-3.5 py-3 flex items-center gap-3">
@@ -461,6 +474,26 @@ export function ApplicantsScreen() {
                       </p>
                       <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-[#FAFAFA] border-[#DBDBDB] text-[#737373] flex items-center gap-1">
                         <AlarmClock size={11} aria-hidden /> Invited
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Declined invites — muted, so managers know who already said no */}
+            {invitedDeclined.length > 0 && (
+              <>
+                <SectionHeader label="Declined invite" count={invitedDeclined.length} />
+                <div className="flex flex-col gap-2 opacity-70">
+                  {invitedDeclined.map((inv: ShiftInvite) => (
+                    <div key={inv.id} className="bg-[#FAFAFA] border border-[#EFEFEF] rounded-[12px] px-3.5 py-3 flex items-center gap-3">
+                      <Avatar url={inv.worker_photo} name={inv.worker_username} />
+                      <p className="flex-1 min-w-0 text-[#6B7280] font-semibold text-[14px] truncate">
+                        {inv.worker_username ? `@${inv.worker_username}` : 'Worker'}
+                      </p>
+                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-white border-[#E5E7EB] text-[#9CA3AF]">
+                        Declined
                       </span>
                     </div>
                   ))}

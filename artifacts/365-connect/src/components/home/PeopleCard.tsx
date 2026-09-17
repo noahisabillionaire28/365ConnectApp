@@ -15,9 +15,11 @@ const NAVY = '#0A1628';
 export function PeopleCard({ person }: { person: WorkerPerson }) {
   const [, navigate] = useLocation();
   const { showToast } = useToast();
+  // For clients/staffers, following a worker is what puts them on your roster
+  // (the list you assign shifts from) — so the button says exactly that.
   const { isFollowing, follow, unfollow, isFollowPending } = useFollow(person.id, {
-    onFollowSuccess:   () => showToast(`Following @${person.username}`),
-    onUnfollowSuccess: () => showToast(`Unfollowed @${person.username}`),
+    onFollowSuccess:   () => showToast(`@${person.username} added to your roster`),
+    onUnfollowSuccess: () => showToast(`@${person.username} removed from your roster`),
   });
 
   return (
@@ -59,9 +61,10 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
         <button type="button" disabled={isFollowPending}
           onClick={() => (isFollowing ? unfollow() : follow())}
           aria-pressed={isFollowing}
-          className="h-[34px] px-3.5 rounded-[8px] text-[12px] font-semibold text-white disabled:opacity-60"
+          aria-label={isFollowing ? `Remove @${person.username} from your roster` : `Add @${person.username} to your roster`}
+          className="h-[34px] px-3.5 rounded-[8px] text-[12px] font-semibold text-white disabled:opacity-60 whitespace-nowrap"
           style={{ background: isFollowing ? '#6B7280' : NAVY }}>
-          {isFollowing ? 'Following' : 'Follow'}
+          {isFollowing ? 'On Roster' : 'Add to Roster'}
         </button>
       </div>
     </div>

@@ -70,8 +70,10 @@ export function useClientShiftsDashboard() {
       const appCountMap = new Map<string, number>();
       await Promise.all(myShifts.map(async (s) => {
         try {
-          const applicants = await apiClient(user.id).get<unknown[]>(`/applications?shift_id=${s.id}`);
-          appCountMap.set(s.id, applicants.length);
+          // Only applications still waiting on a decision count as "applicants"
+          // — booked, declined and withdrawn ones shouldn't inflate the badge.
+          const applicants = await apiClient(user.id).get<{ status?: string }[]>(`/applications?shift_id=${s.id}`);
+          appCountMap.set(s.id, applicants.filter((a) => a.status === 'pending').length);
         } catch {
           appCountMap.set(s.id, 0);
         }

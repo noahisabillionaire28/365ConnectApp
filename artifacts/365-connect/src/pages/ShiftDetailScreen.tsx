@@ -171,6 +171,7 @@ export function ShiftDetailScreen() {
   // wrong (older shifts saved with the poster's own location).
   const [venueCoords, setVenueCoords] = useState<Coords | null>(null);
   const [dropping, setDropping] = useState(false);
+  const [confirmDrop, setConfirmDrop] = useState(false);
   const qc = useQueryClient();
   // ── No more hooks below this line ────────────────────────────────────────────
 
@@ -302,14 +303,15 @@ export function ShiftDetailScreen() {
     void qc.invalidateQueries({ queryKey: ['application-status'] });
   }
 
+  /** Runs after the worker confirms in the drop sheet. */
   async function handleDrop() {
     if (!user?.id || dropping) return;
-    if (!window.confirm('Drop this shift? Your spot will reopen for someone else.')) return;
     setDropping(true);
     try {
       await apiClient(user.id).post('/applications/withdraw', { shift_id: shiftId });
       invalidateShiftCaches();
-      showToast('You dropped this shift.');
+      setConfirmDrop(false);
+      showToast(applicationStatus === 'standby' ? 'You left the waitlist.' : 'You dropped this shift.');
       navigate('/home');
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Could not drop the shift.', 'error');
@@ -976,7 +978,7 @@ export function ShiftDetailScreen() {
         )}
 
         {ctaState === 'clock-in' && (
-          <button type="button" onClick={() => void handleDrop()} disabled={dropping}
+          <button type="button" onClick={() => setConfirmDrop(true)} disabled={dropping}
             className="w-full h-9 mt-2 text-[#EF4444] font-semibold text-[13px] disabled:opacity-50">
             {dropping ? 'Dropping…' : 'Drop this shift'}
           </button>
@@ -988,7 +990,7 @@ export function ShiftDetailScreen() {
               <p className="text-amber-700 font-bold text-[14px]">You're on standby</p>
               <p className="text-amber-600 text-[12px] mt-0.5">This shift is full — we'll notify you if a spot opens.</p>
             </div>
-            <button type="button" onClick={() => void handleDrop()} disabled={dropping}
+            <button type="button" onClick={() => setConfirmDrop(true)} disabled={dropping}
               className="w-full h-9 text-[#EF4444] font-semibold text-[13px] disabled:opacity-50">
               {dropping ? 'Leaving…' : 'Leave waitlist'}
             </button>
@@ -1002,6 +1004,36 @@ export function ShiftDetailScreen() {
           </div>
         )}
       </div>
+      )}
+
+      {/* Drop / leave-waitlist confirmation sheet (replaces the browser confirm) */}
+      {confirmDrop && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40"
+          role="dialog" aria-modal="true" aria-label="Confirm dropping this shift"
+          onClick={() => { if (!dropping) setConfirmDrop(false); }}>
+          <div className="w-full max-w-[390px] bg-white rounded-t-[20px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+20px)]"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-4" />
+            <p className="text-[#111827] font-bold text-[17px]">
+              {applicationStatus === 'standby' ? 'Leave the waitlist?' : 'Drop this shift?'}
+            </p>
+            <p className="text-[#6B7280] text-[13px] mt-1 leading-relaxed">
+              {applicationStatus === 'standby'
+                ? "You'll stop being considered if a spot opens up. You can apply again later."
+                : 'Your spot will reopen for someone else. Dropping close to the start time can affect your reliability.'}
+            </p>
+            <div className="flex flex-col gap-2 mt-5">
+              <button type="button" onClick={() => void handleDrop()} disabled={dropping}
+                className="w-full h-[50px] rounded-[10px] bg-[#EF4444] text-white font-bold text-[15px] disabled:opacity-60">
+                {dropping ? 'Working…' : applicationStatus === 'standby' ? 'Leave waitlist' : 'Yes, drop shift'}
+              </button>
+              <button type="button" onClick={() => setConfirmDrop(false)} disabled={dropping}
+                className="w-full h-[50px] rounded-[10px] bg-white border border-[#DBDBDB] text-[#111827] font-semibold text-[15px] disabled:opacity-60">
+                Keep my spot
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
     </>

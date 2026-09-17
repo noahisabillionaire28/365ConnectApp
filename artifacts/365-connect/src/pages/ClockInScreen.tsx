@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { haversineMiles } from '@/lib/supabase';
 import { useTimeEntry } from '@/hooks/useTimeEntry';
 import { useToast } from '@/contexts/ToastContext';
+import { getOrCreateDirectConversation } from '@/hooks/useConversations';
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 function fmtHMS(secs: number): string {
@@ -101,8 +102,9 @@ const FAIL_COPY: Record<GeoFailReason, { title: string; body: string }> = {
   'unavailable': { title: "Couldn't verify location", body: "Your device didn't return a GPS signal. Try again outdoors or near a window." },
 };
 
-function GeoFailScreen({ reason, distance, shiftLocation, onRetry }: {
+function GeoFailScreen({ reason, distance, shiftLocation, onRetry, onContact, contacting }: {
   reason: GeoFailReason; distance: number | null; shiftLocation: string; onRetry: () => void;
+  onContact: () => void; contacting: boolean;
 }) {
   const copy = FAIL_COPY[reason];
   return (
@@ -144,9 +146,9 @@ function GeoFailScreen({ reason, distance, shiftLocation, onRetry }: {
           className="w-full h-[52px] rounded-[8px] bg-white border border-[#DBDBDB] text-black font-semibold text-[15px]">
           Try Again
         </motion.button>
-        <button type="button" aria-label="Contact your shift manager for location override"
-          className="text-[#737373] text-[13px] underline underline-offset-2 active:text-black">
-          Contact shift manager
+        <button type="button" aria-label="Message your shift manager" onClick={onContact} disabled={contacting}
+          className="text-[#737373] text-[13px] underline underline-offset-2 active:text-black disabled:opacity-50">
+          {contacting ? 'Opening chat…' : 'Contact shift manager'}
         </button>
       </div>
     </motion.div>
@@ -460,9 +462,23 @@ export function ClockInScreen() {
   const [entryId,    setEntryId]    = useState<string | null>(null);
   const [priorEntry, setPriorEntry] = useState<{ netPay: number | null } | null>(null);
   const [endShiftError, setEndShiftError] = useState<string | null>(null);
+  const [contacting, setContacting] = useState(false);
   const shiftRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const breakRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedRef = useRef(false);
+
+  /** Opens (or creates) a direct chat with whoever posted the shift. */
+  async function handleContactManager() {
+    if (!user?.id || !shift?.clientId || contacting) return;
+    setContacting(true);
+    try {
+      const conversationId = await getOrCreateDirectConversation(user.id, shift.clientId);
+      if (conversationId) navigate(`/messages/${conversationId}`);
+      else showToast('Could not open a chat right now.', 'error');
+    } finally {
+      setContacting(false);
+    }
+  }
 
   const runGeoCheck = useCallback(() => {
     if (!shift || !user?.id) return;
@@ -640,7 +656,8 @@ export function ClockInScreen() {
         {phase === 'geo-success' && <GeoSuccessScreen key="geo-success" locationLabel={shift.location} />}
         {phase === 'geo-fail' && (
           <GeoFailScreen key="geo-fail" reason={failReason} distance={failDistance}
-            shiftLocation={shift.location} onRetry={runGeoCheck} />
+            shiftLocation={shift.location} onRetry={runGeoCheck}
+            onContact={() => void handleContactManager()} contacting={contacting} />
         )}
         {(phase === 'active' || phase === 'on-break') && (
           <ActiveScreen key="active" shift={shift} phase={phase}

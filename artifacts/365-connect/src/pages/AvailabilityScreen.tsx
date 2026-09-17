@@ -98,8 +98,12 @@ export function AvailabilityScreen() {
         <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.16em] mb-2">
           Days you can work {activeDays > 0 && <span className="text-[#9CA3AF] normal-case font-semibold tracking-normal">({activeDays})</span>}
         </p>
-        <div className={`flex flex-col gap-2 ${isAvailable ? '' : 'opacity-50 pointer-events-none'}`}>
-          {DAYS.map(({ key, label }) => {
+        <div className={`flex flex-col gap-2 ${isAvailable ? '' : 'opacity-50 pointer-events-none'}`}
+          aria-busy={loading}>
+          {loading && DAYS.map(({ key }) => (
+            <div key={key} className="h-[52px] rounded-[12px] bg-[#F3F4F6] animate-pulse" />
+          ))}
+          {!loading && DAYS.map(({ key, label }) => {
             const on = availability[key] ?? false;
             return (
               <button key={key} type="button" onClick={() => toggleDay(key)}

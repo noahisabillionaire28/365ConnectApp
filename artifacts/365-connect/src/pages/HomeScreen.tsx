@@ -15,6 +15,7 @@ import { useApplications } from '@/hooks/useApplications';
 import { useMyApplications, type MyApplication } from '@/hooks/useMyApplications';
 import { useClientShiftsDashboard, type ClientShift } from '@/hooks/useClientShiftsDashboard';
 import { useShiftRequests } from '@/hooks/useShiftRequests';
+import { useNotifications } from '@/hooks/useNotifications';
 import { useRole } from '@/contexts/RoleContext';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,6 +27,7 @@ import { resetStafferDraft } from '@/store/stafferPostShiftStore';
 /* ─── Shared header ──────────────────────────────────────────────────────────── */
 function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => void }) {
   const [, navigate] = useLocation();
+  const { unreadCount } = useNotifications();
   return (
     <div className="flex items-center justify-between px-4 pt-4 pb-2">
       <div>
@@ -43,10 +45,14 @@ function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => voi
           className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
           <Search size={16} aria-hidden className="text-[#737373]" />
         </button>
-        <button type="button" aria-label="Notifications" onClick={() => navigate('/notifications')}
+        <button type="button"
+          aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+          onClick={() => navigate('/notifications')}
           className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center relative">
           <Bell size={16} aria-hidden className="text-[#737373]" />
-          <span aria-hidden className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#0095F6] border-[1.5px] border-white" />
+          {unreadCount > 0 && (
+            <span aria-hidden className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#0095F6] border-[1.5px] border-white" />
+          )}
         </button>
       </div>
     </div>

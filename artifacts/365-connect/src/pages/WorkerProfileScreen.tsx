@@ -209,11 +209,16 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
   );
 }
 
-function FollowButton({ profileId, username }: { profileId: string; username: string | null }) {
+function FollowButton({ profileId, username, asRoster }: {
+  profileId: string; username: string | null;
+  /** Clients/staffers viewing a worker: following = adding them to your roster. */
+  asRoster?: boolean;
+}) {
   const { showToast } = useToast();
+  const name = `@${username ?? 'user'}`;
   const { isFollowing, followerCount: _count, follow, unfollow, isFollowPending } = useFollow(profileId, {
-    onFollowSuccess:   () => showToast(`Following @${username ?? 'user'}`),
-    onUnfollowSuccess: () => showToast(`Unfollowed @${username ?? 'user'}`),
+    onFollowSuccess:   () => showToast(asRoster ? `${name} added to your roster` : `Following ${name}`),
+    onUnfollowSuccess: () => showToast(asRoster ? `${name} removed from your roster` : `Unfollowed ${name}`),
   });
 
   function handlePress() {
@@ -221,9 +226,15 @@ function FollowButton({ profileId, username }: { profileId: string; username: st
     if (isFollowing) unfollow(); else follow();
   }
 
+  const label = asRoster
+    ? (isFollowing ? 'On Roster' : 'Add to Roster')
+    : (isFollowing ? 'Following' : 'Follow');
+
   return (
     <button type="button"
-      aria-label={isFollowing ? 'Unfollow this worker' : 'Follow this worker'}
+      aria-label={asRoster
+        ? (isFollowing ? 'Remove this worker from your roster' : 'Add this worker to your roster')
+        : (isFollowing ? 'Unfollow this worker' : 'Follow this worker')}
       aria-pressed={isFollowing} disabled={isFollowPending} onClick={handlePress}
       className={`flex-1 font-bold text-[14px] py-[14px] rounded-[8px] active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 ${
         isFollowing
@@ -232,7 +243,7 @@ function FollowButton({ profileId, username }: { profileId: string; username: st
       }`}>
       <Heart size={15} aria-hidden
         className={isFollowing ? 'fill-black text-black' : 'fill-white text-white'} />
-      {isFollowing ? 'Following' : 'Follow'}
+      {label}
     </button>
   );
 }
@@ -518,7 +529,7 @@ export function WorkerProfileScreen() {
 
         {/* Action buttons */}
         <div className="flex gap-3 mb-3">
-          <FollowButton profileId={profile.id} username={profile.username} />
+          <FollowButton profileId={profile.id} username={profile.username} asRoster={canRequestShift} />
           {authUser?.id !== profile.id && (
             <button type="button" onClick={() => void handleMessage()} disabled={isStartingChat}
               className="flex-1 bg-white border border-[#DBDBDB] text-black font-bold text-[14px] py-[14px] rounded-[8px] active:scale-[0.98] transition-transform disabled:opacity-50">
