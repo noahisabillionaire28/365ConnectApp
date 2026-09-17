@@ -100,9 +100,11 @@ function groupApplications(apps: MyApplication[]) {
   };
   return {
     upcoming:  apps.filter((a) => a.status === 'accepted' && !isOver(a)),
-    applied:   apps.filter((a) => a.status === 'pending'),
-    standby:   apps.filter((a) => a.status === 'standby'),
+    applied:   apps.filter((a) => a.status === 'pending' && !isOver(a)),
+    standby:   apps.filter((a) => a.status === 'standby' && !isOver(a)),
     completed: apps.filter((a) => a.status === 'accepted' && isOver(a)),
+    // Applications that were never answered before the shift ended.
+    expired:   apps.filter((a) => (a.status === 'pending' || a.status === 'standby') && isOver(a)),
     dropped:   apps.filter((a) => a.status === 'withdrawn'),
     notSelected: apps.filter((a) => a.status === 'declined' || a.status === 'rejected'),
   };
@@ -178,7 +180,7 @@ function MyShiftSection({
 function WorkerMyShiftsView() {
   const [, navigate] = useLocation();
   const { applications, isLoading, error } = useMyApplications();
-  const { upcoming, applied, standby, completed, dropped, notSelected } = groupApplications(applications);
+  const { upcoming, applied, standby, completed, expired, dropped, notSelected } = groupApplications(applications);
   const goToShift = (a: MyApplication) => navigate(`/shift/${a.shiftId}`);
 
   if (isLoading) {
@@ -217,6 +219,7 @@ function WorkerMyShiftsView() {
       <MyShiftSection label="Standby"      items={standby}      onTap={goToShift} dotColor="#F59E0B" />
       <MyShiftSection label="Applied"      items={applied}      onTap={goToShift} dotColor="#F59E0B" emptyText="No pending applications. Browse Jobs to apply." />
       <MyShiftSection label="Completed"    items={completed}    onTap={goToShift} dotColor="#6B7280" />
+      <MyShiftSection label="Expired"      items={expired}      onTap={goToShift} dotColor="#D1D5DB" />
       <MyShiftSection label="Dropped"      items={dropped}      onTap={goToShift} dotColor="#D1D5DB" />
       <MyShiftSection label="Not Selected" items={notSelected}  onTap={goToShift} dotColor="#D1D5DB" />
     </div>

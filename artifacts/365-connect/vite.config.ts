@@ -27,8 +27,18 @@ if (!basePath) {
   );
 }
 
+// Tags each build so on-device caches written by a previous deploy are
+// discarded instead of hydrated (their object shapes may be out of date).
+const buildId =
+  process.env.VERCEL_GIT_COMMIT_SHA ??
+  process.env.SOURCE_VERSION ??
+  String(Date.now());
+
 export default defineConfig({
   base: basePath,
+  define: {
+    __BUILD_ID__: JSON.stringify(buildId),
+  },
   plugins: [
     react(),
     tailwindcss({ optimize: false }),
