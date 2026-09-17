@@ -282,7 +282,7 @@ export function ShiftDetailScreen() {
       : applicationStatus === 'standby'
       ? 'standby'
       : applicationStatus === 'pending'
-      ? 'pending'
+      ? (lifecycle === 'ended' ? 'past' : 'pending')
       : applicationStatus === 'declined' || applicationStatus === 'rejected'
       ? 'declined'
       : applicationStatus === 'withdrawn'
@@ -466,6 +466,32 @@ export function ShiftDetailScreen() {
             </AnimatePresence>
           </button>
         </div>
+
+        {/* Ended / cancelled notice — past shifts stay viewable, but nobody
+            should mistake them for something they can still act on. */}
+        {(lifecycle === 'ended' || shift.status === 'cancelled') && (
+          <div className={`mx-5 mt-4 rounded-[12px] px-4 py-3 border flex items-start gap-3 ${
+            shift.status === 'cancelled' ? 'bg-red-50 border-red-200' : 'bg-[#FAFAFA] border-[#DBDBDB]'}`}
+            role="status">
+            <Clock size={16} aria-hidden className={`flex-shrink-0 mt-0.5 ${shift.status === 'cancelled' ? 'text-red-500' : 'text-[#737373]'}`} />
+            <div className="min-w-0">
+              <p className={`font-bold text-[14px] ${shift.status === 'cancelled' ? 'text-red-600' : 'text-[#111827]'}`}>
+                {shift.status === 'cancelled' ? 'This shift was cancelled' : 'This shift has ended'}
+              </p>
+              <p className="text-[#6B7280] text-[12px] mt-0.5 leading-relaxed">
+                {shift.status === 'cancelled'
+                  ? 'It is kept here for your records only.'
+                  : canManage
+                  ? 'You can still review the roster and approve timesheets, but it no longer accepts workers.'
+                  : applicationStatus === 'pending'
+                  ? 'It ended before your application was reviewed. It is kept here for your records.'
+                  : applicationStatus === 'accepted'
+                  ? 'Your record of this shift is kept here.'
+                  : 'It is no longer taking applications.'}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Job type + pay */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#DBDBDB]">
@@ -830,7 +856,7 @@ export function ShiftDetailScreen() {
         {/* Owner management — inline, scrolls with content (never overlaps) */}
         {canManage && (
           <div className="px-5 pt-2 pb-8 flex flex-col gap-2 border-t border-[#DBDBDB] mt-2">
-            {profile.role === 'staffer' && (
+            {profile.role === 'staffer' && lifecycle !== 'ended' && shift.status !== 'cancelled' && (
               <motion.button type="button" whileTap={{ scale: 0.97 }}
                 onClick={() => navigate(`/shift/${shiftId}/assign`)}
                 aria-label="Assign workers from your roster"
@@ -839,7 +865,7 @@ export function ShiftDetailScreen() {
                 Assign Workers
               </motion.button>
             )}
-            {(shift.status === 'open' || shift.status === 'filled') && (
+            {(shift.status === 'open' || shift.status === 'filled') && lifecycle !== 'ended' && (
               <motion.button type="button" whileTap={{ scale: 0.97 }}
                 onClick={() => void handleBroadcast()} disabled={inviting}
                 aria-label="Request all workers for this shift"
@@ -860,7 +886,7 @@ export function ShiftDetailScreen() {
                 </span>
               )}
             </motion.button>
-            {(shift.status === 'open' || shift.status === 'filled') && (
+            {(shift.status === 'open' || shift.status === 'filled') && lifecycle !== 'ended' && (
               <div className="flex gap-2">
                 <motion.button type="button" whileTap={{ scale: 0.97 }}
                   onClick={() => void handleEditShift()}

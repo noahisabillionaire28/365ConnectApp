@@ -14,8 +14,9 @@ export type MatchProfile = {
  * + rating 20 + distance 10 = 100 pts max.
  */
 export function computeMatchScore(shift: MockShift, profile: MatchProfile): number {
-  const workerTypes = [profile.primaryJobType, ...profile.secondaryJobTypes].filter(Boolean) as string[];
-  const jobTypePts = shift.jobTypes.some((t) => workerTypes.includes(t)) ? 40 : 0;
+  const workerTypes = [profile.primaryJobType, ...(profile.secondaryJobTypes ?? [])].filter(Boolean) as string[];
+  const shiftTypes = Array.isArray(shift.jobTypes) && shift.jobTypes.length ? shift.jobTypes : [shift.jobType];
+  const jobTypePts = shiftTypes.some((t) => workerTypes.includes(t)) ? 40 : 0;
 
   const dayKey = DAY_KEYS[new Date(shift.startTimeISO).getDay()];
   const availabilityPts = profile.availability && profile.availability[dayKey] ? 30 : 0;

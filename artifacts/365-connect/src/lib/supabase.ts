@@ -387,6 +387,51 @@ export function shiftRowToMockShift(
   };
 }
 
+/**
+ * Guarantee a MockShift has every field the UI dereferences, regardless of
+ * where it came from (fresh API row, or an object restored from an on-device
+ * cache written by an older build that predates some fields). Cheap, and it
+ * turns a would-be render crash into a normal page.
+ */
+export function hardenShift(s: MockShift): MockShift {
+  const raw = s as Partial<MockShift> & { id: string };
+  const primaryType = raw.jobType || 'Event Staff';
+  const strArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  return {
+    ...raw,
+    id:             raw.id,
+    eventType:      raw.eventType ?? null,
+    jobType:        primaryType,
+    jobTypes:       strArr(raw.jobTypes).length ? strArr(raw.jobTypes) : [primaryType],
+    companyName:    raw.companyName || 'Private Client',
+    coverImage:     raw.coverImage || COVER_FALLBACKS[primaryType] || COVER_FALLBACKS.default,
+    payRate:        Number(raw.payRate ?? 0) || 0,
+    payPeriod:      raw.payPeriod ?? 'hr',
+    date:           raw.date ?? '',
+    startTime:      raw.startTime ?? '',
+    endTime:        raw.endTime ?? '',
+    startTimeISO:   raw.startTimeISO ?? '',
+    endTimeISO:     raw.endTimeISO ?? '',
+    eventId:        raw.eventId ?? null,
+    distanceMiles:  Number.isFinite(raw.distanceMiles) ? (raw.distanceMiles as number) : 0,
+    spotsAvailable: Number(raw.spotsAvailable ?? 0) || 0,
+    spotsTotal:     Number(raw.spotsTotal ?? 1) || 1,
+    instantClaim:   !!raw.instantClaim,
+    location:       raw.location ?? '',
+    aiMatchPct:     Number(raw.aiMatchPct ?? 85) || 85,
+    description:    raw.description ?? '',
+    requirements:   strArr(raw.requirements),
+    dressCode:      raw.dressCode ?? '',
+    dressCodeItems: strArr(raw.dressCodeItems),
+    pointOfContact: raw.pointOfContact ?? '',
+    contactPhone:   raw.contactPhone ?? '',
+    lat:            Number.isFinite(raw.lat) ? (raw.lat as number) : MIAMI_BEACH.lat,
+    lng:            Number.isFinite(raw.lng) ? (raw.lng as number) : MIAMI_BEACH.lng,
+    clientId:       raw.clientId ?? '',
+    status:         raw.status ?? 'open',
+  };
+}
+
 // ─── Storage helpers ──────────────────────────────────────────────────────────
 
 export async function uploadAvatar(userId: string, file: File): Promise<string> {

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { shiftRowToMockShift, type ShiftRow, type MockShift } from '@/lib/supabase';
+import { shiftRowToMockShift, hardenShift, type ShiftRow, type MockShift } from '@/lib/supabase';
 import { apiClient } from '@/lib/api';
 
 export const SHIFTS_QUERY_KEY = ['shifts'] as const;
@@ -23,6 +23,9 @@ export function useShifts(refCoords?: { lat: number; lng: number }) {
       const rows = await apiClient(null).get<ShiftRow[]>('/shifts?status=open');
       return rows.filter((r) => !isShiftOver(r)).map((row) => shiftRowToMockShift(row, refCoords));
     },
+    // `select` also runs on cache-restored data, so an entry written by an
+    // older build can never reach the UI with fields missing.
+    select: (list) => list.map(hardenShift),
     staleTime: 30_000,
   });
 
@@ -43,6 +46,7 @@ export function useShiftById(id: string | undefined, refCoords?: { lat: number; 
       const row = await apiClient(null).get<ShiftRow>(`/shifts/${id}`);
       return shiftRowToMockShift(row, refCoords);
     },
+    select: hardenShift,
     enabled: !!id,
     staleTime: 30_000,
   });
