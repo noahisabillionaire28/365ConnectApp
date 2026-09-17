@@ -12,13 +12,16 @@ export function isShiftOver(row: { start_time?: string | null; end_time?: string
   return Number.isFinite(t) && t < Date.now();
 }
 
-/** Fetches all open shifts from the API (past/over shifts are dropped). */
-export function useShifts() {
+/**
+ * Fetches all open shifts from the API (past/over shifts are dropped).
+ * Pass the viewer's coordinates so distances reflect where they actually are.
+ */
+export function useShifts(refCoords?: { lat: number; lng: number }) {
   const query = useQuery<MockShift[], Error>({
-    queryKey: SHIFTS_QUERY_KEY,
+    queryKey: [...SHIFTS_QUERY_KEY, refCoords?.lat, refCoords?.lng],
     queryFn: async () => {
       const rows = await apiClient(null).get<ShiftRow[]>('/shifts?status=open');
-      return rows.filter((r) => !isShiftOver(r)).map((row) => shiftRowToMockShift(row));
+      return rows.filter((r) => !isShiftOver(r)).map((row) => shiftRowToMockShift(row, refCoords));
     },
     staleTime: 30_000,
   });

@@ -30,7 +30,7 @@ function Avatar({ url, name, size = 40 }: { url: string | null; name: string | n
 
 const ATTENDANCE: Record<Attendance, { label: string; cls: string }> = {
   applied: { label: 'Applied',  cls: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]' },
-  booked:  { label: 'Booked',   cls: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]' },
+  booked:  { label: 'Confirmed', cls: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]' },
   on_site: { label: 'On-site',  cls: 'bg-blue-50 border-blue-200 text-blue-600' },
   done:    { label: 'Done',     cls: 'bg-emerald-50 border-emerald-200 text-emerald-600' },
   no_show: { label: 'No-show',  cls: 'bg-red-50 border-red-200 text-red-500' },
@@ -116,7 +116,7 @@ function ConfirmedRow({ w, late, onApprove, onPay, onNoShow, onRemove, onReview,
             <Star size={13} aria-hidden /> Rate
           </button>
         )}
-        {w.attendance === 'no_show' && (
+        {(w.attendance === 'no_show' || late) && (
           <button type="button" disabled={busy} onClick={onNoShow}
             className="flex-1 h-9 rounded-[8px] border border-red-200 bg-red-50 text-red-500 text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
             <Flag size={13} aria-hidden /> Report no-show
@@ -150,7 +150,7 @@ function ReviewSheet({ w, payRate, busy, onApprove, onClose }: {
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-[430px] bg-white rounded-t-[20px] px-5 pt-4 pb-8">
+      <div className="relative w-full max-w-[390px] max-h-[85dvh] overflow-y-auto bg-white rounded-t-[20px] px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+32px)]">
         <div className="w-10 h-1 rounded-full bg-[#DBDBDB] mx-auto mb-4" />
         <p className="text-[#111827] font-bold text-[17px] mb-1">Review timesheet</p>
         <p className="text-[#6B7280] text-[13px] mb-4">
@@ -195,7 +195,7 @@ export function ApplicantsScreen() {
   const { user } = useAuth();
   const { showToast } = useToast();
   const { role } = useProfile();
-  const { data: shift, isLoading: shiftLoading } = useShiftById(id);
+  const { data: shift, isLoading: shiftLoading, error: shiftError, refetch: refetchShift } = useShiftById(id);
   const { applicants, isLoading: appsLoading, approve, decline, refetch: refetchApps } = useShiftApplicants(id);
   const { workers: confirmed, isLoading: confLoading, refetch: refetchConfirmed } = useAcceptedWorkers(id);
   const { invites, refetch: refetchInvites } = useShiftInvites(id);
@@ -210,6 +210,7 @@ export function ApplicantsScreen() {
   const invitedPending = invites.filter(
     (i) => i.status === 'pending' && !confirmed.some((c) => c.workerId === i.worker_id),
   );
+  const invitedDeclined = invites.filter((i) => i.status === 'declined');
   const total = shift?.spotsTotal ?? confirmed.length;
   const fillPct = Math.min(100, Math.round((confirmed.length / Math.max(total, 1)) * 100));
 
@@ -221,6 +222,10 @@ export function ApplicantsScreen() {
   const doneCount   = confirmed.filter((w) => w.attendance === 'done').length;
   const noShowCount = confirmed.filter((w) => w.attendance === 'no_show').length;
   const lateCount   = confirmed.filter(isLate).length;
+  // Shift state gates: no booking actions once cancelled/over; no over-booking.
+  const endMs  = shift?.endTimeISO ? Date.parse(shift.endTimeISO) : NaN;
+  const closed = shift?.status === 'cancelled' || (Number.isFinite(endMs) && Date.now() > endMs);
+  const isFull = !!shift && confirmed.length >= total;
 
   function refetchAll() { void refetchApps(); void refetchConfirmed(); void refetchInvites(); }
 
@@ -235,8 +240,8 @@ export function ApplicantsScreen() {
     setInviting(true);
     const r = await broadcastShiftRequest(user.id, id);
     setInviting(false);
-    if (r.ok) { showToast(`Invited ${r.invited ?? 0} workers!`); refetchInvites(); }
-    else showToast(r.message ?? 'Could not send invites.');
+    if (r.ok) { showToast(`Invited ${r.invited ?? 0} worker${r.invited === 1 ? '' : 's'}! They can accept to claim a spot.`); refetchInvites(); }
+    else showToast(r.message ?? 'Could not send invites.', 'error');
   }
 
   async function handleRemove(w: AcceptedWorker) {
@@ -246,7 +251,7 @@ export function ApplicantsScreen() {
       await apiClient(user.id).patch(`/applications/${w.id}`, { status: 'declined' });
       showToast('Worker removed.');
       refetchAll();
-    } catch { showToast('Could not remove worker.'); }
+    } catch { showToast('Could not remove worker.', 'error'); }
     finally { setBusyId(null); }
   }
 
@@ -257,7 +262,7 @@ export function ApplicantsScreen() {
       await apiClient(user.id).post('/applications/no-show', { shift_id: id, worker_id: w.workerId });
       showToast('No-show reported — our team will review it.');
       refetchAll();
-    } catch (e) { showToast(e instanceof Error ? e.message : 'Could not report no-show.'); }
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Could not report no-show.', 'error'); }
     finally { setBusyId(null); }
   }
 
@@ -287,7 +292,7 @@ export function ApplicantsScreen() {
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
       {/* Header */}
-      <div className="px-4 pt-[52px] pb-4 border-b border-[#DBDBDB] flex items-center gap-3 flex-shrink-0">
+      <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-4 border-b border-[#DBDBDB] flex items-center gap-3 flex-shrink-0">
         <button type="button" aria-label="Go back"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate(`/shift/${id ?? ''}`); }}
           className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
@@ -325,7 +330,15 @@ export function ApplicantsScreen() {
           )}
         </div>
 
-        {/* Actions */}
+        {/* Actions — hidden once the shift is cancelled or over */}
+        {closed && (
+          <div className="mb-3 rounded-[10px] bg-[#FAFAFA] border border-[#DBDBDB] px-4 py-3 text-center">
+            <p className="text-[#737373] text-[13px] font-semibold">
+              {shift?.status === 'cancelled' ? 'This shift was cancelled.' : 'This shift has ended.'}
+            </p>
+          </div>
+        )}
+        {!closed && (
         <div className="flex gap-2 mb-2">
           <button type="button" onClick={() => void handleBroadcast()} disabled={inviting}
             className="flex-1 h-[46px] rounded-[8px] bg-[#0095F6] text-white font-bold text-[13px] flex items-center justify-center gap-2 disabled:opacity-60">
@@ -340,10 +353,20 @@ export function ApplicantsScreen() {
             </button>
           )}
         </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="w-8 h-8 rounded-full border-2 border-[#DBDBDB] border-t-[#0A1628] animate-spin" role="status" aria-label="Loading roster" />
+          </div>
+        ) : shiftError && !shift ? (
+          <div className="rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-5 py-8 text-center">
+            <p className="text-[#111827] font-semibold text-[14px]">Couldn't load this roster.</p>
+            <p className="text-[#737373] text-[12px] mt-1">Check your connection and try again.</p>
+            <button type="button" onClick={() => { void refetchShift(); refetchAll(); }}
+              className="mt-4 h-[40px] px-5 rounded-full bg-[#0A1628] text-white text-[13px] font-bold">
+              Retry
+            </button>
           </div>
         ) : (
           <>
@@ -381,12 +404,15 @@ export function ApplicantsScreen() {
                         )}
                       </div>
                       <button type="button" aria-label="Decline"
-                        onClick={() => void decline(a.applicationId).then((err) => { showToast(err ?? 'Declined.'); refetchAll(); })}
+                        onClick={() => void decline(a.applicationId).then((err) => { showToast(err ?? 'Declined.', err ? 'error' : 'success'); refetchAll(); })}
                         className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center">
                         <X size={16} aria-hidden className="text-[#6B7280]" />
                       </button>
                       <button type="button" aria-label="Approve"
-                        onClick={() => void approve(a.applicationId).then((err) => { if (err) { showToast(err); return; } showToast('Worker confirmed!'); refetchAll(); })}
+                        onClick={() => {
+                          if (isFull) { showToast('Shift is full — remove someone first.', 'error'); return; }
+                          void approve(a.applicationId).then((err) => { if (err) { showToast(err, 'error'); return; } showToast('Worker confirmed!'); refetchAll(); });
+                        }}
                         className="w-9 h-9 rounded-full bg-[#10B981] flex items-center justify-center">
                         <Check size={17} aria-hidden className="text-white" />
                       </button>
@@ -396,10 +422,22 @@ export function ApplicantsScreen() {
               </>
             )}
 
+            {/* A spot freed up and people are waiting — prompt the staffer */}
+            {!isFull && standby.length > 0 && !closed && (
+              <div className="mt-4 rounded-[10px] bg-amber-50 border border-amber-200 px-4 py-3">
+                <p className="text-amber-700 text-[13px] font-semibold">
+                  A spot is open — confirm a standby worker below to fill it.
+                </p>
+              </div>
+            )}
+
             {/* Standby (accepted while full — confirm when a spot opens) */}
             {standby.length > 0 && (
               <>
                 <SectionHeader label="Standby — waitlist" count={standby.length} />
+                <p className="text-[#9CA3AF] text-[12px] px-1 -mt-1 mb-2">
+                  Accepted while the shift was full. Confirm one when a spot opens up.
+                </p>
                 <div className="flex flex-col gap-2">
                   {standby.map((a) => (
                     <div key={a.applicationId} className="bg-white border border-amber-200 rounded-[12px] px-3.5 py-3 flex items-center gap-3">
@@ -426,7 +464,7 @@ export function ApplicantsScreen() {
             {/* Requested (invited, awaiting response) */}
             {invitedPending.length > 0 && (
               <>
-                <SectionHeader label="Requested" count={invitedPending.length} />
+                <SectionHeader label="Invited — awaiting reply" count={invitedPending.length} />
                 <div className="flex flex-col gap-2">
                   {invitedPending.map((inv: ShiftInvite) => (
                     <div key={inv.id} className="bg-white border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 flex items-center gap-3">
@@ -436,6 +474,26 @@ export function ApplicantsScreen() {
                       </p>
                       <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-[#FAFAFA] border-[#DBDBDB] text-[#737373] flex items-center gap-1">
                         <AlarmClock size={11} aria-hidden /> Invited
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Declined invites — muted, so managers know who already said no */}
+            {invitedDeclined.length > 0 && (
+              <>
+                <SectionHeader label="Declined invite" count={invitedDeclined.length} />
+                <div className="flex flex-col gap-2 opacity-70">
+                  {invitedDeclined.map((inv: ShiftInvite) => (
+                    <div key={inv.id} className="bg-[#FAFAFA] border border-[#EFEFEF] rounded-[12px] px-3.5 py-3 flex items-center gap-3">
+                      <Avatar url={inv.worker_photo} name={inv.worker_username} />
+                      <p className="flex-1 min-w-0 text-[#6B7280] font-semibold text-[14px] truncate">
+                        {inv.worker_username ? `@${inv.worker_username}` : 'Worker'}
+                      </p>
+                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-white border-[#E5E7EB] text-[#9CA3AF]">
+                        Declined
                       </span>
                     </div>
                   ))}

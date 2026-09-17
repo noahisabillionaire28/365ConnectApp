@@ -93,7 +93,7 @@ export function NotificationSettingsScreen() {
   return (
     <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[72px]">
       {/* Header */}
-      <div className="bg-white px-4 pt-[52px] pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
+      <div className="bg-white px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <button type="button" aria-label="Back"
             onClick={() => navigate('/notifications')}

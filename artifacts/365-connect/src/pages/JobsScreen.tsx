@@ -9,6 +9,7 @@ import { BottomTabNav } from '@/components/BottomTabNav';
 import { LeafletMap } from '@/components/LeafletMap';
 import { type MockShift } from '@/lib/supabase';
 import { useShifts } from '@/hooks/useShifts';
+import { useMyLocation } from '@/hooks/useMyLocation';
 import { useMyPostedShifts } from '@/hooks/useMyPostedShifts';
 import { useApplications } from '@/hooks/useApplications';
 import { useProfile } from '@/hooks/useProfile';
@@ -157,7 +158,7 @@ function MapPane({ shifts, selectedId, onPinClick, onOpenShift }: {
 
       {/* Card carousel — one card per pin, swipeable, tap to open */}
       {shifts.length > 0 && (
-        <div className="absolute left-0 right-0 bottom-4 z-20 flex gap-3 overflow-x-auto snap-x snap-mandatory px-4 pb-1 scrollbar-none"
+        <div className="absolute left-0 right-0 bottom-[72px] z-20 flex gap-3 overflow-x-auto snap-x snap-mandatory px-4 pb-1 scrollbar-none"
           style={{ WebkitOverflowScrolling: 'touch' }} aria-label="Shifts on the map">
           {shifts.map((shift) => {
             const active = shift.id === (selectedId ?? selectedShift?.id);
@@ -239,7 +240,9 @@ export function JobsScreen() {
   }
 
   // Workers browse all open shifts; clients/staffers see only their own posted shifts.
-  const openShifts   = useShifts();
+  // Distances are measured from the viewer's real location, not a fixed fallback.
+  const { coords: myCoords } = useMyLocation();
+  const openShifts   = useShifts(myCoords);
   const postedShifts = useMyPostedShifts();
   const isWorkerRole = role === 'worker' || role === null;
   const shifts    = isWorkerRole ? openShifts.shifts    : postedShifts.shifts;

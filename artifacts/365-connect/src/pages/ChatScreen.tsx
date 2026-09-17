@@ -247,7 +247,7 @@ export function ChatScreen() {
         />
       )}
       {/* Header */}
-      <div className="flex items-center gap-3 px-3 pt-[52px] pb-3 border-b border-[#DBDBDB] bg-white flex-shrink-0">
+      <div className="flex items-center gap-3 px-3 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 border-b border-[#DBDBDB] bg-white flex-shrink-0">
         <button type="button" aria-label="Back to messages" onClick={() => navigate('/messages')}
           className="w-9 h-9 flex items-center justify-center active:opacity-60 transition-opacity flex-shrink-0">
           <ChevronLeft size={22} className="text-black" />

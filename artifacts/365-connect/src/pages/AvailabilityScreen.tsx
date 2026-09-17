@@ -72,7 +72,7 @@ export function AvailabilityScreen() {
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
-      <div className="px-4 pt-[52px] pb-4 border-b border-[#DBDBDB] flex items-center gap-3 flex-shrink-0">
+      <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-4 border-b border-[#DBDBDB] flex items-center gap-3 flex-shrink-0">
         <button type="button" aria-label="Go back"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/profile'); }}
           className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
@@ -98,8 +98,12 @@ export function AvailabilityScreen() {
         <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.16em] mb-2">
           Days you can work {activeDays > 0 && <span className="text-[#9CA3AF] normal-case font-semibold tracking-normal">({activeDays})</span>}
         </p>
-        <div className={`flex flex-col gap-2 ${isAvailable ? '' : 'opacity-50 pointer-events-none'}`}>
-          {DAYS.map(({ key, label }) => {
+        <div className={`flex flex-col gap-2 ${isAvailable ? '' : 'opacity-50 pointer-events-none'}`}
+          aria-busy={loading}>
+          {loading && DAYS.map(({ key }) => (
+            <div key={key} className="h-[52px] rounded-[12px] bg-[#F3F4F6] animate-pulse" />
+          ))}
+          {!loading && DAYS.map(({ key, label }) => {
             const on = availability[key] ?? false;
             return (
               <button key={key} type="button" onClick={() => toggleDay(key)}
@@ -115,7 +119,7 @@ export function AvailabilityScreen() {
         </div>
       </div>
 
-      <div className="border-t border-[#E5E7EB] px-5 py-4 flex-shrink-0">
+      <div className="border-t border-[#E5E7EB] px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+16px)] flex-shrink-0">
         <button type="button" onClick={() => void save()} disabled={saving || loading}
           className="w-full h-[50px] rounded-[10px] bg-[#0A1628] text-white font-bold text-[15px] disabled:opacity-60">
           {saving ? 'Saving…' : 'Save Availability'}

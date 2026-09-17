@@ -76,7 +76,7 @@ export function PostScreen() {
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
-      <div className="sticky top-0 z-20 bg-white border-b border-[#EFEFEF] px-4 pt-[52px] pb-3 flex items-center gap-3">
+      <div className="sticky top-0 z-20 bg-white border-b border-[#EFEFEF] px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
         <button type="button" aria-label="Back"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/explore'); }}
           className="w-9 h-9 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
@@ -115,7 +115,7 @@ export function PostScreen() {
       </div>
 
       {/* Composer */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-[#EFEFEF] px-3 py-2.5 flex items-center gap-2">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white border-t border-[#EFEFEF] px-3 py-2.5 flex items-center gap-2">
         <input
           type="text"
           value={text}

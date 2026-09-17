@@ -30,6 +30,9 @@ export function notificationDeepLink(
 ): string {
   // A booking (worker accepted for a shift) sends the worker to their home.
   if (n.type === 'booking') return '/home';
+  // A shift offer is accepted/declined on the Home → Requests tab, not on the
+  // shift page (which would only show "Apply").
+  if (n.type === 'shift_invite' || n.type === 'direct_shift_request') return '/home';
   if (n.post_id) return `/post/${n.post_id}`;
   if (n.shift_id) return `/shift/${n.shift_id}`;
   if (n.type === 'new_message') return '/messages';

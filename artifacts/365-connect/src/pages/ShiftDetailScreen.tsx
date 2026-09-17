@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -133,7 +134,7 @@ export function ShiftDetailScreen() {
   const store        = useFeedStore();
   // useApplications: 7 stable hooks (see hook/useApplications.ts inventory comment)
   const { submitApplication }             = useApplications();
-  const { status: applicationStatus }     = useApplicationStatus(id);
+  const { status: applicationStatus, refetch: refetchApplicationStatus } = useApplicationStatus(id);
   const profile                           = useProfile();
   const { coords: myCoords }              = useMyLocation();
   // Distance (and therefore the AI Match Score's distance component) is
@@ -163,12 +164,15 @@ export function ShiftDetailScreen() {
     const r = await broadcastShiftRequest(user.id, id);
     setInviting(false);
     if (r.ok) showToast(`Invited ${r.invited ?? 0} worker${r.invited === 1 ? '' : 's'}! They can accept to claim a spot.`);
-    else showToast(r.message ?? 'Could not send invites.');
+    else showToast(r.message ?? 'Could not send invites.', 'error');
   }
   // Coordinates resolved from the shift's ADDRESS TEXT — used so the map, pin,
   // distance, and directions match the address even when the stored lat/lng are
   // wrong (older shifts saved with the poster's own location).
   const [venueCoords, setVenueCoords] = useState<Coords | null>(null);
+  const [dropping, setDropping] = useState(false);
+  const [confirmDrop, setConfirmDrop] = useState(false);
+  const qc = useQueryClient();
   // ── No more hooks below this line ────────────────────────────────────────────
 
   useEffect(() => {
@@ -265,28 +269,49 @@ export function ShiftDetailScreen() {
   // Completion is tracked per-worker via time_entries.clock_out rather than
   // shifts.status, since RLS only lets the shift's client owner update shifts.
   const canClaim = shift.instantClaim && shift.spotsAvailable > 0;
-  type CtaState = 'apply' | 'claim' | 'pending' | 'declined' | 'clock-in' | 'completed' | 'standby';
+  type CtaState =
+    | 'apply' | 'claim' | 'pending' | 'declined' | 'withdrawn' | 'clock-in' | 'completed'
+    | 'standby' | 'cancelled' | 'past' | 'full';
+  // Order matters: a booked worker still sees clock-in/completed on a past shift,
+  // but an unbooked worker must never be offered Apply on a cancelled/ended/full one.
   const ctaState: CtaState =
-    applicationStatus === 'accepted'
+    shift.status === 'cancelled'
+      ? 'cancelled'
+      : applicationStatus === 'accepted'
       ? (hasCompleted ? 'completed' : 'clock-in')
       : applicationStatus === 'standby'
       ? 'standby'
       : applicationStatus === 'pending'
       ? 'pending'
-      : applicationStatus === 'declined'
+      : applicationStatus === 'declined' || applicationStatus === 'rejected'
       ? 'declined'
+      : applicationStatus === 'withdrawn'
+      ? 'withdrawn'
+      : lifecycle === 'ended'
+      ? 'past'
+      : shift.spotsAvailable <= 0
+      ? 'full'
       : canClaim
       ? 'claim'
       : 'apply';
 
-  const [dropping, setDropping] = useState(false);
+  /** Refresh every cache that reflects this shift's booking state. */
+  function invalidateShiftCaches() {
+    void qc.invalidateQueries({ queryKey: ['worker-home-shifts'] });
+    void qc.invalidateQueries({ queryKey: ['shifts'] });
+    void qc.invalidateQueries({ queryKey: ['shift', shiftId] });
+    void qc.invalidateQueries({ queryKey: ['application-status'] });
+  }
+
+  /** Runs after the worker confirms in the drop sheet. */
   async function handleDrop() {
     if (!user?.id || dropping) return;
-    if (!window.confirm('Drop this shift? Your spot will reopen for someone else.')) return;
     setDropping(true);
     try {
       await apiClient(user.id).post('/applications/withdraw', { shift_id: shiftId });
-      showToast('You dropped this shift.');
+      invalidateShiftCaches();
+      setConfirmDrop(false);
+      showToast(applicationStatus === 'standby' ? 'You left the waitlist.' : 'You dropped this shift.');
       navigate('/home');
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Could not drop the shift.', 'error');
@@ -298,10 +323,11 @@ export function ShiftDetailScreen() {
     setClaiming(true);
     try {
       await apiClient(user.id).post('/applications/claim', { shift_id: shiftId });
+      invalidateShiftCaches();
       showToast("You're booked! Shift claimed.");
       navigate('/home');
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not claim — it may already be full.');
+      showToast(e instanceof Error ? e.message : 'Could not claim — it may already be full.', 'error');
     } finally {
       setClaiming(false);
     }
@@ -312,7 +338,7 @@ export function ShiftDetailScreen() {
       void submitApplication(
         shiftId,
         matchScore ?? undefined,
-        () => showToast('Applied! The client will review your application.'),
+        () => { showToast('Applied! The client will review your application.'); void refetchApplicationStatus(); },
         (msg) => showToast(msg),
       );
     }
@@ -379,6 +405,7 @@ export function ShiftDetailScreen() {
       navigate('/home');
     } catch (e) {
       console.error('[ShiftDetail] cancel failed:', e);
+      showToast(e instanceof Error ? e.message : 'Could not cancel the shift.', 'error');
     } finally {
       setCancelling(false);
     }
@@ -411,7 +438,9 @@ export function ShiftDetailScreen() {
     )}
     <div className="min-h-[100dvh] bg-white flex flex-col">
 
-      <div className="flex-1 overflow-y-auto pb-[104px]">
+      {/* Reserve room for the fixed worker CTA bar only when it renders (it can be
+          up to ~160px tall in the clock-in / standby states); owners get none. */}
+      <div className={`flex-1 overflow-y-auto ${profile.role === 'worker' && !isOwner ? 'pb-[176px]' : 'pb-8'}`}>
 
         {/* Hero photo */}
         <div className="relative w-full h-[300px] flex-shrink-0 overflow-hidden">
@@ -454,9 +483,14 @@ export function ShiftDetailScreen() {
                 In progress
               </span>
             )}
-            {lifecycle === 'ended' && (
+            {lifecycle === 'ended' && shift.status !== 'cancelled' && (
               <span className="bg-[#FAFAFA] text-[#737373] text-[12px] font-bold px-3 py-1.5 rounded-full border border-[#DBDBDB]">
                 Ended
+              </span>
+            )}
+            {shift.status === 'cancelled' && (
+              <span className="bg-red-50 text-red-500 text-[12px] font-bold px-3 py-1.5 rounded-full border border-red-200">
+                Cancelled
               </span>
             )}
           </div>
@@ -903,6 +937,30 @@ export function ShiftDetailScreen() {
           </div>
         )}
 
+        {ctaState === 'withdrawn' && (
+          <div className="w-full h-[52px] rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center gap-2.5">
+            <span className="text-[#737373] font-semibold text-[15px]">You dropped this shift</span>
+          </div>
+        )}
+
+        {ctaState === 'cancelled' && (
+          <div className="w-full h-[52px] rounded-[8px] bg-red-50 border border-red-200 flex items-center justify-center gap-2.5">
+            <span className="text-red-500 font-semibold text-[15px]">This shift was cancelled</span>
+          </div>
+        )}
+
+        {ctaState === 'past' && (
+          <div className="w-full h-[52px] rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center gap-2.5">
+            <span className="text-[#737373] font-semibold text-[15px]">This shift has ended</span>
+          </div>
+        )}
+
+        {ctaState === 'full' && (
+          <div className="w-full h-[52px] rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center gap-2.5">
+            <span className="text-[#737373] font-semibold text-[15px]">This shift is full</span>
+          </div>
+        )}
+
         {ctaState === 'clock-in' && (
           <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleCta}
             disabled={!canClockIn}
@@ -920,7 +978,7 @@ export function ShiftDetailScreen() {
         )}
 
         {ctaState === 'clock-in' && (
-          <button type="button" onClick={() => void handleDrop()} disabled={dropping}
+          <button type="button" onClick={() => setConfirmDrop(true)} disabled={dropping}
             className="w-full h-9 mt-2 text-[#EF4444] font-semibold text-[13px] disabled:opacity-50">
             {dropping ? 'Dropping…' : 'Drop this shift'}
           </button>
@@ -932,7 +990,7 @@ export function ShiftDetailScreen() {
               <p className="text-amber-700 font-bold text-[14px]">You're on standby</p>
               <p className="text-amber-600 text-[12px] mt-0.5">This shift is full — we'll notify you if a spot opens.</p>
             </div>
-            <button type="button" onClick={() => void handleDrop()} disabled={dropping}
+            <button type="button" onClick={() => setConfirmDrop(true)} disabled={dropping}
               className="w-full h-9 text-[#EF4444] font-semibold text-[13px] disabled:opacity-50">
               {dropping ? 'Leaving…' : 'Leave waitlist'}
             </button>
@@ -946,6 +1004,36 @@ export function ShiftDetailScreen() {
           </div>
         )}
       </div>
+      )}
+
+      {/* Drop / leave-waitlist confirmation sheet (replaces the browser confirm) */}
+      {confirmDrop && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40"
+          role="dialog" aria-modal="true" aria-label="Confirm dropping this shift"
+          onClick={() => { if (!dropping) setConfirmDrop(false); }}>
+          <div className="w-full max-w-[390px] bg-white rounded-t-[20px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+20px)]"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-4" />
+            <p className="text-[#111827] font-bold text-[17px]">
+              {applicationStatus === 'standby' ? 'Leave the waitlist?' : 'Drop this shift?'}
+            </p>
+            <p className="text-[#6B7280] text-[13px] mt-1 leading-relaxed">
+              {applicationStatus === 'standby'
+                ? "You'll stop being considered if a spot opens up. You can apply again later."
+                : 'Your spot will reopen for someone else. Dropping close to the start time can affect your reliability.'}
+            </p>
+            <div className="flex flex-col gap-2 mt-5">
+              <button type="button" onClick={() => void handleDrop()} disabled={dropping}
+                className="w-full h-[50px] rounded-[10px] bg-[#EF4444] text-white font-bold text-[15px] disabled:opacity-60">
+                {dropping ? 'Working…' : applicationStatus === 'standby' ? 'Leave waitlist' : 'Yes, drop shift'}
+              </button>
+              <button type="button" onClick={() => setConfirmDrop(false)} disabled={dropping}
+                className="w-full h-[50px] rounded-[10px] bg-white border border-[#DBDBDB] text-[#111827] font-semibold text-[15px] disabled:opacity-60">
+                Keep my spot
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
     </>

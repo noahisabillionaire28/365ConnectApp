@@ -7,6 +7,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useToast } from '@/contexts/ToastContext';
 import { geocodeAddress } from '@/lib/geocode';
 import { JOB_TYPES } from '@/lib/jobTypes';
+import { BottomTabNav } from '@/components/BottomTabNav';
 
 type Position = { job_type: string; pay_rate: string; spots: string };
 
@@ -62,7 +63,7 @@ export function PostEventScreen() {
       const coords = await geocodeAddress(location.trim());
       const start_time = new Date(`${date}T${startTime}`).toISOString();
       const end_time = new Date(`${date}T${endTime}`).toISOString();
-      await apiClient(user.id).post('/shifts/event', {
+      const created = await apiClient(user.id).post<{ event_id: string; positions: Array<{ id: string }> }>('/shifts/event', {
         title: name.trim(),
         location: location.trim(),
         event_type: eventType,
@@ -78,7 +79,9 @@ export function PostEventScreen() {
         })),
       });
       showToast('Event posted! Positions are live.');
-      navigate('/home');
+      // Land the poster on the event they just created, not a generic home.
+      const first = created.positions?.[0]?.id;
+      navigate(first ? `/shift/${first}` : '/home?tab=my-shifts');
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Could not post event.', 'error');
     } finally {
@@ -87,8 +90,8 @@ export function PostEventScreen() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-white flex flex-col">
-      <div className="px-4 pt-[52px] pb-4 border-b border-[#DBDBDB] flex items-center gap-3 flex-shrink-0">
+    <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
+      <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-4 border-b border-[#DBDBDB] flex items-center gap-3 flex-shrink-0">
         <button type="button" aria-label="Go back"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/home'); }}
           className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
@@ -115,10 +118,10 @@ export function PostEventScreen() {
             ))}
           </select>
         </Field>
-        <div className="grid grid-cols-3 gap-2">
-          <Field label="Date"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} /></Field>
-          <Field label="Start"><input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={inputCls} /></Field>
-          <Field label="End"><input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inputCls} /></Field>
+        <Field label="Date"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} /></Field>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Start"><input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={`${inputCls} min-w-0`} /></Field>
+          <Field label="End"><input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={`${inputCls} min-w-0`} /></Field>
         </div>
 
         <div className="flex items-center justify-between mt-2 mb-2">
@@ -165,12 +168,13 @@ export function PostEventScreen() {
         </Field>
       </div>
 
-      <div className="border-t border-[#E5E7EB] px-5 py-4 flex-shrink-0">
+      <div className="border-t border-[#E5E7EB] px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+16px)] flex-shrink-0">
         <button type="button" onClick={() => void submit()} disabled={saving}
           className="w-full h-[50px] rounded-[10px] bg-[#0A1628] text-white font-bold text-[15px] disabled:opacity-60">
           {saving ? 'Posting…' : `Post Event · ${positions.length} position${positions.length === 1 ? '' : 's'}`}
         </button>
       </div>
+      <BottomTabNav />
     </div>
   );
 }

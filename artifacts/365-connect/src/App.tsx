@@ -3,7 +3,7 @@ import { restoreQueryCache, startQueryCachePersistence } from '@/lib/queryPersis
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
+import { Route, Switch, Redirect, Router as WouterRouter, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -49,7 +49,6 @@ import { ShiftDetailScreen }     from '@/pages/ShiftDetailScreen';
 import { WorkerProfileScreen }   from '@/pages/WorkerProfileScreen';
 import { ClockInScreen }         from '@/pages/ClockInScreen';
 import { ApplicantsScreen }      from '@/pages/ApplicantsScreen';
-import { ShiftRequestsScreen }   from '@/pages/ShiftRequestsScreen';
 import { ShiftUpdatesScreen }     from '@/pages/ShiftUpdatesScreen';
 import { ReviewScreen }          from '@/pages/ReviewScreen';
 import { RosterScreen }          from '@/pages/RosterScreen';
@@ -159,7 +158,8 @@ function MobileRouter() {
             <Route path="/shift/:id"        component={ShiftDetailScreen}   />
             <Route path="/shift/:id/applicants" component={ApplicantsScreen} />
             <Route path="/shift/:id/updates"    component={ShiftUpdatesScreen} />
-            <Route path="/requests"         component={ShiftRequestsScreen}  />
+            {/* Legacy: offers now live on Home → Requests */}
+            <Route path="/requests">{() => <Redirect to="/home" />}</Route>
             <Route path="/worker/:username" component={WorkerProfileScreen}  />
             <Route path="/post/:id"      component={PostScreen}          />
             <Route path="/hashtag/:tag"  component={HashtagScreen}        />

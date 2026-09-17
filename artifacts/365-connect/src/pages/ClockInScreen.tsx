@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { haversineMiles } from '@/lib/supabase';
 import { useTimeEntry } from '@/hooks/useTimeEntry';
 import { useToast } from '@/contexts/ToastContext';
+import { getOrCreateDirectConversation } from '@/hooks/useConversations';
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 function fmtHMS(secs: number): string {
@@ -101,8 +102,9 @@ const FAIL_COPY: Record<GeoFailReason, { title: string; body: string }> = {
   'unavailable': { title: "Couldn't verify location", body: "Your device didn't return a GPS signal. Try again outdoors or near a window." },
 };
 
-function GeoFailScreen({ reason, distance, shiftLocation, onRetry }: {
+function GeoFailScreen({ reason, distance, shiftLocation, onRetry, onContact, contacting }: {
   reason: GeoFailReason; distance: number | null; shiftLocation: string; onRetry: () => void;
+  onContact: () => void; contacting: boolean;
 }) {
   const copy = FAIL_COPY[reason];
   return (
@@ -144,9 +146,9 @@ function GeoFailScreen({ reason, distance, shiftLocation, onRetry }: {
           className="w-full h-[52px] rounded-[8px] bg-white border border-[#DBDBDB] text-black font-semibold text-[15px]">
           Try Again
         </motion.button>
-        <button type="button" aria-label="Contact your shift manager for location override"
-          className="text-[#737373] text-[13px] underline underline-offset-2 active:text-black">
-          Contact shift manager
+        <button type="button" aria-label="Message your shift manager" onClick={onContact} disabled={contacting}
+          className="text-[#737373] text-[13px] underline underline-offset-2 active:text-black disabled:opacity-50">
+          {contacting ? 'Opening chat…' : 'Contact shift manager'}
         </button>
       </div>
     </motion.div>
@@ -260,12 +262,12 @@ function ConfirmEndOverlay({ companyName, onConfirm, onCancel }: {
   return (
     <motion.div key="confirm" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end"
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end justify-center"
       role="dialog" aria-modal="true" aria-label="Confirm end shift" onClick={onCancel}>
       <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', stiffness: 360, damping: 36 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full bg-white border-t border-[#DBDBDB] rounded-t-[24px] px-5 pt-5 pb-10">
+        className="w-full max-w-[390px] bg-white border-t border-[#DBDBDB] rounded-t-[24px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+40px)]">
         <div aria-hidden className="w-10 h-1 rounded-full bg-[#DBDBDB] mx-auto mb-6" />
         <h2 className="text-black font-bold text-[22px] mb-2">End your shift?</h2>
         <p className="text-[#737373] text-[14px] mb-7 leading-relaxed">
@@ -328,9 +330,9 @@ function SummaryRow({ label, value, valueClass = 'text-black', small = false, bo
 }
 
 /* ── Summary screen ──────────────────────────────────────────────────────── */
-function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serviceFee, netPay, onRate }: {
+function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serviceFee, netPay, onRate, onDone }: {
   shift: MockShift; shiftSecs: number; breakSecs: number; billedSecs: number;
-  grossPay: number; serviceFee: number; netPay: number; onRate: () => void;
+  grossPay: number; serviceFee: number; netPay: number; onRate: () => void; onDone: () => void;
 }) {
   return (
     <motion.div key="summary" initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }}
@@ -389,6 +391,10 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
         <Star size={18} aria-hidden className="fill-white" />
         Rate this Shift
       </motion.button>
+      <button type="button" onClick={onDone} aria-label="Back to your schedule"
+        className="w-full h-[44px] mt-2 text-[#737373] font-semibold text-[14px]">
+        Done — back to Schedule
+      </button>
     </motion.div>
   );
 }
@@ -456,9 +462,23 @@ export function ClockInScreen() {
   const [entryId,    setEntryId]    = useState<string | null>(null);
   const [priorEntry, setPriorEntry] = useState<{ netPay: number | null } | null>(null);
   const [endShiftError, setEndShiftError] = useState<string | null>(null);
+  const [contacting, setContacting] = useState(false);
   const shiftRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const breakRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedRef = useRef(false);
+
+  /** Opens (or creates) a direct chat with whoever posted the shift. */
+  async function handleContactManager() {
+    if (!user?.id || !shift?.clientId || contacting) return;
+    setContacting(true);
+    try {
+      const conversationId = await getOrCreateDirectConversation(user.id, shift.clientId);
+      if (conversationId) navigate(`/messages/${conversationId}`);
+      else showToast('Could not open a chat right now.', 'error');
+    } finally {
+      setContacting(false);
+    }
+  }
 
   const runGeoCheck = useCallback(() => {
     if (!shift || !user?.id) return;
@@ -636,7 +656,8 @@ export function ClockInScreen() {
         {phase === 'geo-success' && <GeoSuccessScreen key="geo-success" locationLabel={shift.location} />}
         {phase === 'geo-fail' && (
           <GeoFailScreen key="geo-fail" reason={failReason} distance={failDistance}
-            shiftLocation={shift.location} onRetry={runGeoCheck} />
+            shiftLocation={shift.location} onRetry={runGeoCheck}
+            onContact={() => void handleContactManager()} contacting={contacting} />
         )}
         {(phase === 'active' || phase === 'on-break') && (
           <ActiveScreen key="active" shift={shift} phase={phase}
@@ -648,7 +669,8 @@ export function ClockInScreen() {
         {phase === 'summary' && (
           <SummaryScreen key="summary" shift={shift} shiftSecs={shiftSecs} breakSecs={breakSecs}
             billedSecs={billedSecs} grossPay={grossPay} serviceFee={serviceFee} netPay={netPay}
-            onRate={() => navigate(`/review/${shift.id}/${shift.clientId}`)} />
+            onRate={() => navigate(`/review/${shift.id}/${shift.clientId}`)}
+            onDone={() => navigate('/home')} />
         )}
         {phase === 'already-done' && (
           <AlreadyDoneScreen key="already-done" shift={shift} netPay={priorEntry?.netPay ?? null}

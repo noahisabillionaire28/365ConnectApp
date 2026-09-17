@@ -578,10 +578,10 @@ export function ProfileScreen() {
             <motion.div
               initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
               transition={{ type: 'tween', duration: 0.22, ease: 'easeOut' }}
-              className="fixed inset-0 z-[95] bg-white flex flex-col max-w-[430px] mx-auto"
+              className="fixed inset-0 z-[95] bg-white flex flex-col max-w-[390px] mx-auto"
               role="dialog" aria-label="Settings"
             >
-              <div className="sticky top-0 bg-white border-b border-[#EFEFEF] px-4 pt-[52px] pb-3 flex items-center gap-3">
+              <div className="sticky top-0 bg-white border-b border-[#EFEFEF] px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
                 <button type="button" aria-label="Close settings" onClick={() => setSettingsOpen(false)}
                   className="w-9 h-9 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center">
                   <ChevronLeft size={18} aria-hidden className="text-[#0A1628]" />

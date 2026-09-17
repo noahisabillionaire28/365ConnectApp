@@ -292,7 +292,7 @@ export function formatTime(iso: string): string {
   });
 }
 
-/** "Tonight" / "Tomorrow" / "Mon Jul 8" from an ISO timestamptz string */
+/** "Today" / "Tonight" / "Tomorrow" / "Mon Jul 8" from an ISO timestamptz string */
 export function friendlyDate(iso: string): string {
   const d        = new Date(iso);
   const now      = new Date();
@@ -300,7 +300,8 @@ export function friendlyDate(iso: string): string {
   // Compare on the UTC calendar day to stay consistent with formatTime above.
   const key = (x: Date) => `${x.getUTCFullYear()}-${x.getUTCMonth()}-${x.getUTCDate()}`;
 
-  if (key(d) === key(now))      return 'Tonight';
+  // A 9am shift is "Today", not "Tonight" — only evening starts get that label.
+  if (key(d) === key(now))      return d.getUTCHours() >= 17 ? 'Tonight' : 'Today';
   if (key(d) === key(tomorrow)) return 'Tomorrow';
   return d.toLocaleDateString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC',

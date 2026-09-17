@@ -146,3 +146,8 @@
     color: #111827;
   }
 }
+
+/* iOS safe areas (viewport-fit=cover is set in index.html) */
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}

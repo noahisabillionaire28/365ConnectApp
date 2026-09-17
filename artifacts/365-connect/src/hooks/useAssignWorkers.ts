@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -20,6 +21,7 @@ export type AssignableWorker = {
 
 export function useAssignWorkers(shiftId: string | undefined) {
   const { user } = useAuth();
+  const qc = useQueryClient();
   const [workers, setWorkers]       = useState<AssignableWorker[]>([]);
   const [isLoading, setLoading]     = useState(true);
   const [error, setError]           = useState<string | null>(null);
@@ -59,6 +61,10 @@ export function useAssignWorkers(shiftId: string | undefined) {
       setWorkers((prev) => prev.map((w) =>
         w.id === workerId ? { ...w, applicationStatus: 'accepted' } : w,
       ));
+      // The shift's spots-filled count changed — refresh every cached copy so
+      // the detail page and lists don't show a stale "spots left".
+      void qc.invalidateQueries({ queryKey: ['shift', shiftId] });
+      void qc.invalidateQueries({ queryKey: ['shifts'] });
       return null;
     } catch (e) {
       console.error('[useAssignWorkers] assign failed:', e);
@@ -66,7 +72,7 @@ export function useAssignWorkers(shiftId: string | undefined) {
     } finally {
       setAssigningId(null);
     }
-  }, [shiftId, user?.id]);
+  }, [shiftId, user?.id, qc]);
 
   const isAssigning = assigningId !== null;
 
