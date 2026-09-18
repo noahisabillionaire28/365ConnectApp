@@ -41,6 +41,16 @@ export function useSSE(): void {
       try { emitSSE('conversation_update', JSON.parse(e.data)); } catch { /* noop */ }
     });
 
+    // Read receipts: the other person opened my messages.
+    es.addEventListener('messages_read', (e: MessageEvent) => {
+      try { emitSSE('messages_read', JSON.parse(e.data)); } catch { /* noop */ }
+    });
+
+    // A message in an open thread was deleted by its sender.
+    es.addEventListener('message_deleted', (e: MessageEvent) => {
+      try { emitSSE('message_deleted', JSON.parse(e.data)); } catch { /* noop */ }
+    });
+
     es.onerror = () => {
       // EventSource auto-reconnects on error; log quietly
       console.debug('[SSE] connection error — browser will retry');

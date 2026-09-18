@@ -44,6 +44,33 @@ export function useMessages(conversationId: string | null | undefined) {
     );
   }, [conversationId]);
 
+  // Read receipts: the other person opened my messages → stamp read_at live.
+  useEffect(() => {
+    if (!conversationId) return;
+    return onSSE<{ conversationId: string; messageIds: string[]; readAt: string }>(
+      'messages_read',
+      ({ conversationId: cid, messageIds, readAt }) => {
+        if (cid !== conversationId) return;
+        const ids = new Set(messageIds);
+        setMessages((prev) => prev.map((m) => (ids.has(m.id) && !m.read_at ? { ...m, read_at: readAt } : m)));
+      },
+    );
+  }, [conversationId]);
+
+  // Deletions: swap the bubble for a "deleted this message" note in place.
+  useEffect(() => {
+    if (!conversationId) return;
+    return onSSE<{ conversationId: string; messageId: string; deletedAt: string }>(
+      'message_deleted',
+      ({ conversationId: cid, messageId, deletedAt }) => {
+        if (cid !== conversationId) return;
+        setMessages((prev) => prev.map((m) => (m.id === messageId
+          ? { ...m, deleted_at: deletedAt, text: null, image_url: null, video_url: null, voice_url: null }
+          : m)));
+      },
+    );
+  }, [conversationId]);
+
   const loadOlder = useCallback(async () => {
     if (!conversationId || !user?.id || !oldestRef.current) return;
     try {
@@ -62,14 +89,34 @@ export function useMessages(conversationId: string | null | undefined) {
   const markRead = useCallback(async (messageIds: string[]) => {
     if (!user?.id || !messageIds.length) return;
     try {
-      await apiClient(user.id).patch('/messages/read', { message_ids: messageIds });
+      const r = await apiClient(user.id).patch<{ read_at: string; message_ids: string[] }>(
+        '/messages/read', { message_ids: messageIds },
+      );
+      const ids = new Set(r.message_ids ?? messageIds);
       setMessages((prev) => prev.map((m) =>
-        messageIds.includes(m.id) ? { ...m, read_at: new Date().toISOString() } : m,
+        ids.has(m.id) && !m.read_at ? { ...m, read_at: r.read_at ?? new Date().toISOString() } : m,
       ));
     } catch (e) {
       console.error('[useMessages] markRead failed:', e);
     }
   }, [user?.id]);
+
+  /** Delete one of my own messages (soft delete — leaves a note in place). */
+  const deleteMessage = useCallback(async (messageId: string): Promise<string | null> => {
+    if (!user?.id) return 'Not signed in.';
+    const snapshot = messages;
+    // Optimistic: show the note immediately.
+    setMessages((prev) => prev.map((m) => (m.id === messageId
+      ? { ...m, deleted_at: new Date().toISOString(), text: null, image_url: null, video_url: null, voice_url: null }
+      : m)));
+    try {
+      await apiClient(user.id).delete(`/messages/${messageId}`);
+      return null;
+    } catch (e) {
+      setMessages(snapshot);
+      return e instanceof Error ? e.message : 'Could not delete the message.';
+    }
+  }, [user?.id, messages]);
 
   /**
    * Send a message. Accepts camelCase or snake_case media URL keys.
@@ -106,5 +153,5 @@ export function useMessages(conversationId: string | null | undefined) {
     }
   }, [conversationId, user?.id]);
 
-  return { messages, isLoading, hasMore, loadOlder, markRead, sendMessage, refetch: load };
+  return { messages, isLoading, hasMore, loadOlder, markRead, sendMessage, deleteMessage, refetch: load };
 }
