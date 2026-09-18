@@ -3,8 +3,9 @@ import { useParams, useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   ChevronLeft, Check, X, Star, Send, UserPlus, Users, AlarmClock,
-  CheckCircle2, Flag, DollarSign, Clock3,
+  CheckCircle2, Flag, DollarSign, Clock3, MessageCircle, MessagesSquare,
 } from 'lucide-react';
+import { getOrCreateDirectConversation, openShiftGroupChat } from '@/hooks/useConversations';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
 import { useAcceptedWorkers, type AcceptedWorker, type Attendance } from '@/hooks/useAcceptedWorkers';
 import { useShiftInvites, type ShiftInvite } from '@/hooks/useShiftInvites';
@@ -51,15 +52,20 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
 }
 
 /* ── Confirmed worker row (attendance + pay / no-show / remove) ───────────── */
-function ConfirmedRow({ w, late, onApprove, onPay, onNoShow, onRemove, onReview, busy }: {
+function ConfirmedRow({ w, late, onApprove, onPay, onNoShow, onRemove, onReview, onMessage, busy }: {
   w: AcceptedWorker; late: boolean;
   onApprove: () => void; onPay: () => void; onNoShow: () => void; onRemove: () => void; onReview: () => void;
+  onMessage: () => void;
   busy: boolean;
 }) {
   return (
     <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 flex flex-col gap-2.5">
       <div className="flex items-center gap-3">
         <Avatar url={w.photoUrl} name={w.username} />
+        <button type="button" aria-label={`Message ${w.username ? `@${w.username}` : 'worker'}`} onClick={onMessage}
+          className="order-last w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 text-[#0A1628]">
+          <MessageCircle size={15} aria-hidden />
+        </button>
         <div className="flex-1 min-w-0">
           <p className="text-[#111827] font-semibold text-[14px] truncate">
             {w.username ? `@${w.username}` : 'Worker'}
@@ -202,6 +208,25 @@ export function ApplicantsScreen() {
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
+  const [openingChat, setOpeningChat] = useState(false);
+
+  /** Open the shift's group chat (everyone confirmed + the manager). */
+  async function handleShiftChat() {
+    if (!user?.id || !id || openingChat) return;
+    setOpeningChat(true);
+    const r = await openShiftGroupChat(user.id, id);
+    setOpeningChat(false);
+    if (r.id) navigate(`/messages/${r.id}`);
+    else showToast(r.error ?? 'Could not open the shift chat.', 'error');
+  }
+
+  /** One-tap DM with a worker, pinned to this shift. */
+  async function handleMessageWorker(workerId: string) {
+    if (!user?.id || !id) return;
+    const cid = await getOrCreateDirectConversation(user.id, workerId, id);
+    if (cid) navigate(`/messages/${cid}`);
+    else showToast('Could not open a chat with this worker.', 'error');
+  }
   const [reviewing, setReviewing] = useState<AcceptedWorker | null>(null);
 
   const loading = shiftLoading || appsLoading || confLoading;
@@ -338,6 +363,12 @@ export function ApplicantsScreen() {
             </p>
           </div>
         )}
+        {/* Shift chat — one thread with the manager and everyone confirmed */}
+        <button type="button" onClick={() => void handleShiftChat()} disabled={openingChat}
+          className="w-full h-[46px] mb-2 rounded-[8px] bg-[#0A1628] text-white font-bold text-[13px] flex items-center justify-center gap-2 disabled:opacity-60">
+          <MessagesSquare size={15} aria-hidden />
+          {openingChat ? 'Opening…' : `Shift chat${confirmed.length ? ` · ${confirmed.length + 1} people` : ''}`}
+        </button>
         {!closed && (
         <div className="flex gap-2 mb-2">
           <button type="button" onClick={() => void handleBroadcast()} disabled={inviting}
@@ -382,7 +413,8 @@ export function ApplicantsScreen() {
                     onPay={() => void handlePay(w)}
                     onNoShow={() => void handleNoShow(w)}
                     onRemove={() => void handleRemove(w)}
-                    onReview={() => navigate(`/review/${id}/${w.workerId}`)} />
+                    onReview={() => navigate(`/review/${id}/${w.workerId}`)}
+                    onMessage={() => void handleMessageWorker(w.workerId)} />
                 ))}
               </div>
             )}
@@ -395,6 +427,11 @@ export function ApplicantsScreen() {
                   {pending.map((a) => (
                     <div key={a.applicationId} className="bg-white border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 flex items-center gap-3">
                       <Avatar url={a.photoUrl} name={a.username} />
+                      <button type="button" aria-label={`Message ${a.username ? `@${a.username}` : 'applicant'}`}
+                        onClick={() => void handleMessageWorker(a.worker_id)}
+                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 text-[#0A1628]">
+                        <MessageCircle size={15} aria-hidden />
+                      </button>
                       <div className="flex-1 min-w-0">
                         <p className="text-[#111827] font-semibold text-[14px] truncate">
                           {a.username ? `@${a.username}` : 'Applicant'}
@@ -442,6 +479,11 @@ export function ApplicantsScreen() {
                   {standby.map((a) => (
                     <div key={a.applicationId} className="bg-white border border-amber-200 rounded-[12px] px-3.5 py-3 flex items-center gap-3">
                       <Avatar url={a.photoUrl} name={a.username} />
+                      <button type="button" aria-label={`Message ${a.username ? `@${a.username}` : 'applicant'}`}
+                        onClick={() => void handleMessageWorker(a.worker_id)}
+                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 text-[#0A1628]">
+                        <MessageCircle size={15} aria-hidden />
+                      </button>
                       <p className="flex-1 min-w-0 text-[#111827] font-semibold text-[14px] truncate">
                         {a.username ? `@${a.username}` : 'Worker'}
                       </p>

@@ -99,6 +99,20 @@ export async function uploadChatVoice(
   }
 }
 
+/** Upload a chat document (PDF, spreadsheet, …). Returns the serving URL. */
+export async function uploadChatFile(
+  conversationId: string, file: File, userId?: string | null,
+): Promise<string | null> {
+  try {
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-60) || 'file';
+    const { url } = await uploadFile(file, `chat-${conversationId}-file-${safe}`, userId);
+    return url;
+  } catch (e) {
+    console.error('[storage] uploadChatFile failed:', e);
+    return null;
+  }
+}
+
 /**
  * Chat media is stored as a full public URL, so no signed-URL lookup is needed.
  * Returns the URL as-is; legacy non-URL paths return null gracefully.

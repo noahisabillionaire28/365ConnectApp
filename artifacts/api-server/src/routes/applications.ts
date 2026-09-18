@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
+import { addWorkerToShiftChat, removeWorkerFromShiftChat } from '../lib/chat.js';
 
 const router = Router();
 
@@ -345,6 +346,12 @@ router.patch('/:id', requireAuth, async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'Not found' });
 
+    // Keep the shift group chat in step with the roster.
+    if (status === 'accepted') await addWorkerToShiftChat(appRow.shift_id, appRow.worker_id);
+    else if (status === 'declined' || status === 'rejected' || status === 'withdrawn') {
+      await removeWorkerFromShiftChat(appRow.shift_id, appRow.worker_id);
+    }
+
     // Notify the worker when the owner books them, and send the owner a receipt.
     if (status === 'accepted' && isShiftOwner) {
       const label = await shiftLabel(appRow.shift_id);
@@ -413,6 +420,7 @@ router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req
       .select()
       .single();
     if (error) return res.status(500).json({ error: error.message });
+    await addWorkerToShiftChat(shift_id, worker_id);
 
     const label = await shiftLabel(shift_id);
     await createNotification({
@@ -457,6 +465,7 @@ router.post('/withdraw', requireAuth, requireRole('worker'), async (req, res) =>
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'You are not booked for this shift.' });
+    await removeWorkerFromShiftChat(shift_id, req.userId!);
 
     // Let the owner know a spot opened up.
     const { data: shift } = await adminDb
@@ -517,6 +526,7 @@ router.post('/claim', requireAuth, requireRole('worker'), async (req, res) => {
       .select()
       .single();
     if (error) return res.status(500).json({ error: error.message });
+    await addWorkerToShiftChat(shift_id, req.userId!);
 
     const label = await shiftLabel(shift_id);
     // Confirmation to the worker who claimed it.

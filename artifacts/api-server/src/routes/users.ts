@@ -76,6 +76,7 @@ router.patch('/me', requireAuth, async (req, res) => {
     'primary_job_type', 'secondary_job_types', 'availability',
     'lat', 'lng', 'company_name', 'is_pro', 'is_available',
     'in_app_notifications', 'email_notifications', 'hourly_rate',
+    'quick_replies',
   ];
   const body = req.body as Record<string, unknown>;
   const updates: Record<string, unknown> = {};
@@ -117,6 +118,31 @@ router.get('/:id', async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(404).json({ error: 'Not found' });
   return res.json(data);
+});
+
+/** GET /api/users/blocks — ids I've blocked */
+router.get('/blocks', requireAuth, async (req, res) => {
+  const { data, error } = await adminDb.from('user_blocks').select('blocked_id, created_at').eq('blocker_id', req.userId);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json((data ?? []).map((r) => r.blocked_id));
+});
+
+/** POST /api/users/:id/block — block a user (they can no longer message me). */
+router.post('/:id/block', requireAuth, async (req, res) => {
+  if (req.params.id === req.userId) return res.status(400).json({ error: "You can't block yourself" });
+  const { error } = await adminDb
+    .from('user_blocks')
+    .upsert({ blocker_id: req.userId, blocked_id: req.params.id }, { onConflict: 'blocker_id,blocked_id' });
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ ok: true, blocked: true });
+});
+
+/** DELETE /api/users/:id/block — unblock. */
+router.delete('/:id/block', requireAuth, async (req, res) => {
+  const { error } = await adminDb
+    .from('user_blocks').delete().eq('blocker_id', req.userId).eq('blocked_id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ ok: true, blocked: false });
 });
 
 export default router;
