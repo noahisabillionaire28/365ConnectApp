@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, UserPlus,
-  Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText,
+  Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText, MessagesSquare,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -26,6 +26,7 @@ import { useShiftApplicants } from '@/hooks/useShiftApplicants';
 import { useAcceptedWorkers } from '@/hooks/useAcceptedWorkers';
 import { useEventPositions } from '@/hooks/useEventPositions';
 import { broadcastShiftRequest } from '@/hooks/useShiftRequests';
+import { openShiftGroupChat } from '@/hooks/useConversations';
 
 /** Deep links to open a destination in each navigation app. */
 function directionsLinks(lat: number, lng: number, label: string) {
@@ -172,8 +173,18 @@ export function ShiftDetailScreen() {
   const [venueCoords, setVenueCoords] = useState<Coords | null>(null);
   const [dropping, setDropping] = useState(false);
   const [confirmDrop, setConfirmDrop] = useState(false);
+  const [openingChat, setOpeningChat] = useState(false);
   const qc = useQueryClient();
   // ── No more hooks below this line ────────────────────────────────────────────
+
+  async function handleShiftChat() {
+    if (!user?.id || !id || openingChat) return;
+    setOpeningChat(true);
+    const r = await openShiftGroupChat(user.id, id);
+    setOpeningChat(false);
+    if (r.id) navigate(`/messages/${r.id}`);
+    else showToast(r.error ?? 'Could not open the shift chat.', 'error');
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -842,7 +853,16 @@ export function ShiftDetailScreen() {
           </div>
         )}
 
-        {/* Updates & announcements — owner posts, booked workers read */}
+        {/* Shift chat + Updates — owner and booked workers */}
+        {(canManage || applicationStatus === 'accepted') && (
+          <div className="px-5 pt-2">
+            <button type="button" onClick={() => void handleShiftChat()} disabled={openingChat}
+              className="w-full h-[46px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-60">
+              <MessagesSquare size={16} aria-hidden />
+              {openingChat ? 'Opening…' : 'Shift chat'}
+            </button>
+          </div>
+        )}
         {(canManage || applicationStatus === 'accepted' || applicationStatus === 'standby') && (
           <div className="px-5 pt-2">
             <button type="button" onClick={() => navigate(`/shift/${shiftId}/updates`)}

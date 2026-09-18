@@ -3,6 +3,7 @@ import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
 import { findTimeConflict } from './applications.js';
+import { addWorkerToShiftChat } from '../lib/chat.js';
 
 const router = Router();
 
@@ -252,6 +253,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
       .select()
       .single();
     if (bErr) return res.status(500).json({ error: bErr.message });
+    await addWorkerToShiftChat(reqRow.shift_id, req.userId!);
 
     // Confirm to the worker.
     await createNotification({

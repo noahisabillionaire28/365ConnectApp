@@ -22,6 +22,8 @@ import shiftRequestsRouter from './shift-requests.js';
 import shiftUpdatesRouter from './shift-updates.js';
 import workersRouter     from './workers.js';
 import disputesRouter    from './disputes.js';
+import pushRouter        from './push.js';
+import linkPreviewRouter from './link-preview.js';
 
 const router: IRouter = Router();
 
@@ -58,6 +60,8 @@ router.use('/saved-workers',  savedWorkersRouter);
 router.use('/shift-requests', shiftRequestsRouter);
 router.use('/shift-updates',  shiftUpdatesRouter);
 router.use('/workers',        workersRouter);
+router.use('/push',           pushRouter);
+router.use('/link-preview',   linkPreviewRouter);
 router.use('/disputes',       disputesRouter);
 
 export default router;

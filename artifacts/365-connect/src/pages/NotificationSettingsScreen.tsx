@@ -6,9 +6,11 @@
  */
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { ChevronLeft, Bell, Mail } from 'lucide-react';
+import { ChevronLeft, Bell, Mail, Smartphone } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
+import { usePush } from '@/hooks/usePush';
 import { BottomTabNav } from '@/components/BottomTabNav';
 
 type Prefs = { in_app_notifications: boolean; email_notifications: boolean };
@@ -63,6 +65,14 @@ export function NotificationSettingsScreen() {
   const [prefs, setPrefs]     = useState<Prefs | null>(null);
   const [saving, setSaving]   = useState(false);
   const [loadErr, setLoadErr] = useState(false);
+  const { showToast } = useToast();
+  const push = usePush();
+
+  async function togglePush() {
+    if (push.subscribed) { await push.unsubscribe(); showToast('Push notifications off.'); return; }
+    const err = await push.subscribe();
+    if (err) showToast(err, 'error'); else showToast('Push notifications on for this device.');
+  }
 
   useEffect(() => {
     let alive = true;
@@ -139,7 +149,26 @@ export function NotificationSettingsScreen() {
                 onToggle={() => update({ email_notifications: !prefs.email_notifications })}
                 saving={saving}
               />
+              {push.supported && (
+                <Row
+                  divider
+                  icon={(on) => <Smartphone size={17} aria-hidden className={on ? 'text-white' : 'text-[#0A1628]'} />}
+                  title="Push notifications"
+                  subtitle={push.serverReady === false
+                    ? 'Not available yet on the server.'
+                    : push.permission === 'denied'
+                    ? 'Blocked in your browser settings. Allow notifications for this site to turn it on.'
+                    : 'New messages and shift chat alerts on this device, even when the app is closed.'}
+                  on={push.subscribed}
+                  onToggle={() => void togglePush()}
+                  saving={push.busy || push.serverReady === false || push.permission === 'denied'}
+                />
+              )}
             </div>
+            {push.supported && push.subscribed && (
+              <button type="button" onClick={() => void push.sendTest().then((e) => showToast(e ?? 'Test sent — check your notifications.', e ? 'error' : 'success'))}
+                className="mt-3 text-[#0A1628] text-[13px] font-bold px-1">Send a test notification</button>
+            )}
             <p className="text-[#9CA3AF] text-[12px] leading-relaxed px-1 mt-3">
               Turning a channel off stops new alerts on that channel. You can turn it
               back on anytime.

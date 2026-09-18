@@ -224,33 +224,90 @@ export type PaymentRow = {
   client_id?: string | null;
 };
 
+export type ConversationMember = {
+  id: string;
+  username: string | null;
+  photo_url: string | null;
+  role: string | null;
+};
+
 export type ConversationRow = {
   id: string;
-  participant_a_id: string;
-  participant_b_id: string;
+  participant_a_id: string | null;
+  participant_b_id: string | null;
   shift_id: string | null;
   last_message: string | null;
   last_message_at: string | null;
   created_at: string;
-  /** Messages from the other person I haven't opened yet (from the API). */
+  /** Shift group chat (members in participant_ids / members). */
+  is_group?: boolean;
+  title?: string | null;
+  created_by?: string | null;
+  participant_ids?: string[] | null;
+  /** From the API: everyone in the thread. */
+  members?: ConversationMember[];
+  /** Messages from others I haven't opened yet (from the API). */
   unread_count?: number;
+  is_muted?: boolean;
+  is_pinned?: boolean;
+  is_archived?: boolean;
+  shift_title?: string | null;
+  shift_start?: string | null;
+  shift_end?: string | null;
+  shift_status?: string | null;
+  shift_owner_id?: string | null;
+};
+
+export type MessageReplyPreview = {
+  id: string;
+  sender_id: string;
+  sender_username: string | null;
+  preview: string;
+};
+
+export type MessageShiftCard = {
+  id: string;
+  title: string | null;
+  job_type: string | null;
+  start_time: string;
+  end_time: string;
+  pay_rate: number | string | null;
+  pay_period: string | null;
+  location: string | null;
+  status: string;
+  spots_available: number;
+  spots_filled: number;
 };
 
 export type MessageRow = {
   id: string;
   conversation_id: string;
   sender_id: string;
+  /** 'user' | 'system' — system lines are "@x joined the shift chat" etc. */
+  kind?: string;
   text: string | null;
   image_url: string | null;
   video_url: string | null;
   voice_url: string | null;
+  file_url?: string | null;
+  file_name?: string | null;
+  file_size?: number | null;
+  shift_card_id?: string | null;
+  reply_to_id?: string | null;
+  reactions?: Record<string, string[]> | null;
   read_at: string | null;
   /** Set when the sender deleted the message; content fields are cleared. */
   deleted_at?: string | null;
+  edited_at?: string | null;
+  client_key?: string | null;
   created_at: string;
   /** Flattened sender info from the API (not a DB column). */
   sender_username?: string | null;
   sender_photo?: string | null;
+  reply_to?: MessageReplyPreview | null;
+  shift_card?: MessageShiftCard | null;
+  /** Client-only delivery state for optimistic sends. */
+  _status?: 'sending' | 'failed';
 };
 
 export type ReviewRow = {

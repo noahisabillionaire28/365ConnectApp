@@ -9,6 +9,7 @@ import { Link, useLocation } from 'wouter';
 import { Home, Briefcase, Compass, MessageSquare, User, PlusCircle } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { useRole } from '@/contexts/RoleContext';
+import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 
 type Tab = {
   name:        string;
@@ -48,6 +49,7 @@ const INACTIVE_COLOR = '#6B7280';
 export function BottomTabNav() {
   const [location]   = useLocation();
   const { role }     = useRole();
+  const unreadMessages = useUnreadMessages();
 
   // Admin has a sidebar — no bottom bar
   if (role === 'admin') return null;
@@ -78,7 +80,15 @@ export function BottomTabNav() {
               aria-label={tab.name}
               aria-current={isActive ? 'page' : undefined}
             >
-              <Icon size={22} style={{ color }} />
+              <span className="relative">
+                <Icon size={22} style={{ color }} />
+                {tab.path === '/messages' && unreadMessages > 0 && (
+                  <span aria-label={`${unreadMessages} unread messages`}
+                    className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#EF4444] text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
+                    {unreadMessages > 99 ? '99+' : unreadMessages}
+                  </span>
+                )}
+              </span>
               <span
                 className="text-[10px] font-semibold leading-none tracking-wide"
                 style={{ color }}

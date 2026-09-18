@@ -51,6 +51,12 @@ export function useSSE(): void {
       try { emitSSE('message_deleted', JSON.parse(e.data)); } catch { /* noop */ }
     });
 
+    for (const name of ['message_updated', 'message_reaction', 'reader_update'] as const) {
+      es.addEventListener(name, (e: MessageEvent) => {
+        try { emitSSE(name, JSON.parse(e.data)); } catch { /* noop */ }
+      });
+    }
+
     es.onerror = () => {
       // EventSource auto-reconnects on error; log quietly
       console.debug('[SSE] connection error — browser will retry');
