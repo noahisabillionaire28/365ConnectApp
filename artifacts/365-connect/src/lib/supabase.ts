@@ -232,6 +232,8 @@ export type ConversationRow = {
   last_message: string | null;
   last_message_at: string | null;
   created_at: string;
+  /** Messages from the other person I haven't opened yet (from the API). */
+  unread_count?: number;
 };
 
 export type MessageRow = {
@@ -243,7 +245,12 @@ export type MessageRow = {
   video_url: string | null;
   voice_url: string | null;
   read_at: string | null;
+  /** Set when the sender deleted the message; content fields are cleared. */
+  deleted_at?: string | null;
   created_at: string;
+  /** Flattened sender info from the API (not a DB column). */
+  sender_username?: string | null;
+  sender_photo?: string | null;
 };
 
 export type ReviewRow = {

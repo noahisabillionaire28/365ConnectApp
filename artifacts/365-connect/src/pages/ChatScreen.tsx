@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useLocation } from 'wouter';
-import { ChevronLeft, Image as ImageIcon, Video, Mic, Send, Square, Check, CheckCheck } from 'lucide-react';
+import { ChevronLeft, Image as ImageIcon, Video, Mic, Send, Square, Trash2 } from 'lucide-react';
 import { uploadChatImage, uploadChatVideo, uploadChatVoice, getSignedChatMediaUrl } from '@/lib/storage';
 import type { ConversationRow, UserRow, MessageRow } from '@/lib/supabase';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import { useMessages } from '@/hooks/useMessages';
 import { ImageCropper } from '@/components/ImageCropper';
 
@@ -12,6 +13,43 @@ type OtherUser = Pick<UserRow, 'id' | 'username' | 'photo_url'>;
 
 function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+/** "3:42 PM" today, "Yesterday 3:42 PM", or "Mon 3:42 PM" — for read receipts. */
+function receiptTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+  const time = timeLabel(iso);
+  if (sameDay) return time;
+  if (d.toDateString() === yesterday.toDateString()) return `Yesterday ${time}`;
+  const withinWeek = now.getTime() - d.getTime() < 6 * 86_400_000;
+  const day = d.toLocaleDateString('en-US', withinWeek ? { weekday: 'short' } : { month: 'short', day: 'numeric' });
+  return `${day} ${time}`;
+}
+
+/** "Today", "Yesterday", or "Mon, Sep 14" — separators between days in the thread. */
+function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return 'Today';
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+/** Long-press detection for message bubbles (touch and mouse). */
+function useLongPress(onLongPress: () => void, ms = 450) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clear = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } };
+  return {
+    onPointerDown: () => { clear(); timer.current = setTimeout(onLongPress, ms); },
+    onPointerUp: clear,
+    onPointerLeave: clear,
+    onPointerCancel: clear,
+    onContextMenu: (e: React.MouseEvent) => { e.preventDefault(); clear(); onLongPress(); },
+  };
 }
 
 /** Simplified, deterministic waveform bars derived from the recording's byte length — visual only, not a true amplitude analysis. */
@@ -38,7 +76,14 @@ function useSignedUrl(path: string | null): string | null {
   return url;
 }
 
-function Bubble({ msg, isMine, showRead }: { msg: MessageRow; isMine: boolean; showRead: boolean }) {
+function Bubble({ msg, isMine, receipt, otherName, onLongPress }: {
+  msg: MessageRow;
+  isMine: boolean;
+  /** Read receipt line under my latest message ("Read 3:42 PM" / "Delivered"). */
+  receipt: 'read' | 'delivered' | null;
+  otherName: string;
+  onLongPress?: () => void;
+}) {
   const bubbleClasses = isMine
     ? 'bg-[#0A1628] text-white rounded-[16px] rounded-br-[4px]'
     : 'bg-[#F3F4F6] text-black rounded-[16px] rounded-bl-[4px]';
@@ -46,10 +91,29 @@ function Bubble({ msg, isMine, showRead }: { msg: MessageRow; isMine: boolean; s
   const imageUrl = useSignedUrl(msg.image_url);
   const videoUrl = useSignedUrl(msg.video_url);
   const voiceUrl = useSignedUrl(msg.voice_url);
+  const press = useLongPress(() => onLongPress?.());
+
+  // iMessage-style note where the message used to be.
+  if (msg.deleted_at) {
+    return (
+      <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} px-4 mb-1.5`}>
+        <div className="max-w-[78%] px-3.5 py-2 rounded-[16px] border border-dashed border-[#D1D5DB] bg-white">
+          <p className="text-[13px] italic text-[#9CA3AF] flex items-center gap-1.5">
+            <Trash2 size={12} aria-hidden />
+            {isMine ? 'You deleted this message' : `${otherName} deleted this message`}
+          </p>
+        </div>
+        <span className="text-[10.5px] text-[#C4C4C4] font-medium mt-1 px-1">{timeLabel(msg.created_at)}</span>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} px-4 mb-1.5`}>
-      <div className={`max-w-[78%] px-3.5 py-2.5 ${bubbleClasses}`}>
+      <div className={`max-w-[78%] px-3.5 py-2.5 select-none ${bubbleClasses}`}
+        {...(isMine && onLongPress ? press : {})}
+        role={isMine && onLongPress ? 'button' : undefined}
+        aria-label={isMine && onLongPress ? 'Hold for message options' : undefined}>
         {msg.text && <p className="text-[14.5px] leading-[1.4] whitespace-pre-wrap break-words">{msg.text}</p>}
         {msg.image_url && (
           imageUrl
@@ -71,11 +135,44 @@ function Bubble({ msg, isMine, showRead }: { msg: MessageRow; isMine: boolean; s
       </div>
       <div className="flex items-center gap-1 mt-1 px-1">
         <span className="text-[10.5px] text-[#AAAAAA] font-medium">{timeLabel(msg.created_at)}</span>
-        {isMine && showRead && (
-          msg.read_at
-            ? <CheckCheck size={12} aria-label="Read" className="text-[#0A1628]" />
-            : <Check size={12} aria-label="Sent" className="text-[#AAAAAA]" />
-        )}
+      </div>
+      {/* Read receipt — only under my most recent message, like iMessage */}
+      {isMine && receipt && (
+        <p className="text-[11px] font-semibold mt-0.5 px-1 text-[#6B7280]" aria-live="polite">
+          {receipt === 'read' && msg.read_at ? `Read ${receiptTime(msg.read_at)}` : 'Delivered'}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Bottom sheet with actions for one of my messages. */
+function MessageActionSheet({ msg, onDelete, onClose, busy }: {
+  msg: MessageRow; onDelete: () => void; onClose: () => void; busy: boolean;
+}) {
+  const preview = msg.text
+    ? msg.text.length > 80 ? `${msg.text.slice(0, 80)}…` : msg.text
+    : msg.image_url ? 'Photo' : msg.video_url ? 'Video' : msg.voice_url ? 'Voice message' : 'Message';
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40"
+      role="dialog" aria-modal="true" aria-label="Message options"
+      onClick={() => { if (!busy) onClose(); }}>
+      <div className="w-full max-w-[390px] bg-white rounded-t-[20px] px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+16px)]"
+        onClick={(e) => e.stopPropagation()}>
+        <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-4" />
+        <p className="text-[#6B7280] text-[12px] truncate mb-3 px-1">“{preview}”</p>
+        <button type="button" onClick={onDelete} disabled={busy}
+          className="w-full h-[50px] rounded-[10px] bg-red-50 border border-red-200 text-[#EF4444] font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-60">
+          <Trash2 size={16} aria-hidden />
+          {busy ? 'Deleting…' : 'Delete message'}
+        </button>
+        <p className="text-[#9CA3AF] text-[11px] text-center mt-2 mb-3">
+          Both of you will see “deleted this message” in its place.
+        </p>
+        <button type="button" onClick={onClose} disabled={busy}
+          className="w-full h-[48px] rounded-[10px] bg-white border border-[#DBDBDB] text-[#111827] font-semibold text-[15px]">
+          Cancel
+        </button>
       </div>
     </div>
   );
@@ -97,9 +194,12 @@ export function ChatScreen() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const { messages, isLoading, hasMore, loadOlder, markRead, sendMessage } = useMessages(conversationId ?? null);
+  const { showToast } = useToast();
+  const { messages, isLoading, hasMore, loadOlder, markRead, sendMessage, deleteMessage } = useMessages(conversationId ?? null);
 
   const [conversation, setConversation] = useState<ConversationRow | null>(null);
+  const [actionMsg, setActionMsg] = useState<MessageRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [other, setOther]     = useState<OtherUser | null>(null);
   const [shiftTitle, setShiftTitle] = useState<string | null>(null);
   const [text, setText]       = useState('');
@@ -142,12 +242,28 @@ export function ChatScreen() {
   }, [conversationId, user?.id]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ block: 'end' }); }, [messages.length]);
+  // Mark the other person's unread messages as read whenever they appear on
+  // screen (initial load and live arrivals) — this is what sends them a receipt.
   useEffect(() => {
-    if (!isLoading && messages.length > 0) {
-      const ids = messages.map((m) => (m as { id: string }).id).filter(Boolean);
-      if (ids.length) void markRead(ids);
-    }
-  }, [isLoading, messages.length, markRead]);
+    if (isLoading || !user?.id) return;
+    const ids = messages
+      .filter((m) => m.sender_id !== user.id && !m.read_at && !m.deleted_at)
+      .map((m) => m.id);
+    if (ids.length) void markRead(ids);
+  }, [isLoading, messages, user?.id, markRead]);
+
+  async function handleDelete() {
+    if (!actionMsg || deleting) return;
+    setDeleting(true);
+    const err = await deleteMessage(actionMsg.id);
+    setDeleting(false);
+    if (err) { showToast(err, 'error'); return; }
+    setActionMsg(null);
+  }
+
+  // The receipt line belongs under my LAST message only.
+  const lastMine = [...messages].reverse().find((m) => m.sender_id === user?.id && !m.deleted_at);
+  const otherName = other?.username ? `@${other.username}` : 'They';
 
   function handleScroll() {
     if (scrollRef.current && scrollRef.current.scrollTop < 40 && hasMore) void loadOlder();
@@ -275,13 +391,32 @@ export function ChatScreen() {
         ) : (
           <>
             {hasMore && <p className="text-center text-[#AAAAAA] text-[11px] py-2">Scroll up for earlier messages</p>}
-            {messages.map((m) => (
-              <Bubble key={m.id} msg={m} isMine={m.sender_id === user?.id} showRead={m === messages[messages.length - 1]} />
-            ))}
+            {messages.map((m, i) => {
+              const isMine = m.sender_id === user?.id;
+              const prev = messages[i - 1];
+              const newDay = !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString();
+              return (
+                <div key={m.id}>
+                  {newDay && (
+                    <p className="text-center text-[#9CA3AF] text-[11px] font-semibold py-2 select-none">
+                      {dayLabel(m.created_at)}
+                    </p>
+                  )}
+                  <Bubble msg={m} isMine={isMine} otherName={otherName}
+                    receipt={lastMine && m.id === lastMine.id ? (m.read_at ? 'read' : 'delivered') : null}
+                    onLongPress={isMine && !m.deleted_at ? () => setActionMsg(m) : undefined} />
+                </div>
+              );
+            })}
           </>
         )}
         <div ref={bottomRef} />
       </div>
+
+      {actionMsg && (
+        <MessageActionSheet msg={actionMsg} busy={deleting}
+          onDelete={() => void handleDelete()} onClose={() => setActionMsg(null)} />
+      )}
 
       {/* Composer */}
       <div className="flex-shrink-0 border-t border-[#DBDBDB] px-3 py-2.5 bg-white">

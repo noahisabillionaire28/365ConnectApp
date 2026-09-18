@@ -72,7 +72,7 @@ export function useConversations() {
             role:      (otherRole    ?? 'worker') as UserRow['role'],
           } : null,
           shiftTitle: c.shift_title ?? null,
-          unread: false,
+          unread: (c.unread_count ?? 0) > 0,
         };
       });
 

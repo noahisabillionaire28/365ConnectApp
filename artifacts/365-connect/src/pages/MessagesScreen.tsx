@@ -46,7 +46,12 @@ function ConversationRow({ conv, onTap }: { conv: ConversationWithOther; onTap: 
           <p className={`text-[13px] truncate ${conv.unread ? 'text-[#262626]' : 'text-[#737373]'}`}>
             {preview}
           </p>
-          {conv.unread && <span aria-label="Unread messages" className="w-2.5 h-2.5 rounded-full bg-[#0A1628] flex-shrink-0" />}
+          {conv.unread && (
+            <span aria-label={`${conv.unread_count ?? 1} unread message${(conv.unread_count ?? 1) === 1 ? '' : 's'}`}
+              className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#0A1628] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+              {conv.unread_count ?? 1}
+            </span>
+          )}
         </div>
       </div>
     </motion.button>

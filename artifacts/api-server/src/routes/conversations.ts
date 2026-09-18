@@ -55,7 +55,7 @@ async function enrichConversations(
   });
 }
 
-/** GET /api/conversations — my conversations with user+shift info */
+/** GET /api/conversations — my conversations with user+shift info + unread counts */
 router.get('/', requireAuth, async (req, res) => {
   try {
     const { data: convs, error } = await adminDb
@@ -66,7 +66,23 @@ router.get('/', requireAuth, async (req, res) => {
       .order('created_at', { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
     const rows = await enrichConversations(convs ?? [], true);
-    return res.json(rows);
+
+    // Unread = messages from the other person that I haven't opened yet.
+    const unreadMap = new Map<string, number>();
+    const ids = rows.map((c) => c.id as string);
+    if (ids.length) {
+      const { data: unread } = await adminDb
+        .from('messages')
+        .select('conversation_id')
+        .in('conversation_id', ids)
+        .neq('sender_id', req.userId)
+        .is('read_at', null)
+        .is('deleted_at', null);
+      for (const m of unread ?? []) {
+        unreadMap.set(m.conversation_id, (unreadMap.get(m.conversation_id) ?? 0) + 1);
+      }
+    }
+    return res.json(rows.map((c) => ({ ...c, unread_count: unreadMap.get(c.id as string) ?? 0 })));
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }
