@@ -92,11 +92,15 @@ export function LeafletMap({
   style?: React.CSSProperties;
   ariaLabel?: string;
 }) {
+  // Leaflet stacks its panes and controls at z-index 400–1000, which would
+  // otherwise float above the app's fixed bars, sheets and bottom nav while
+  // scrolling. An isolated stacking context keeps all of that inside the map box.
   return (
+    <div style={{ position: 'relative', zIndex: 0, isolation: 'isolate', width: '100%', height: '100%', ...(style ?? {}) }}>
     <MapContainer
       center={[center.lat, center.lng]}
       zoom={zoom}
-      style={style ?? { width: '100%', height: '100%' }}
+      style={{ width: '100%', height: '100%' }}
       zoomControl={false}
       attributionControl={false}
       dragging={interactive}
@@ -120,5 +124,6 @@ export function LeafletMap({
         />
       ))}
     </MapContainer>
+    </div>
   );
 }

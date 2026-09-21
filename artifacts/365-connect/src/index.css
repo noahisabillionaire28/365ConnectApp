@@ -151,3 +151,11 @@
 @utility pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/* Leaflet stacks map panes/controls at z-index 400–1000. Contain that inside
+   the map box so it never paints over fixed bars, sheets or the bottom nav. */
+.leaflet-container {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+}
