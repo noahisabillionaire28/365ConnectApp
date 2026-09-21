@@ -289,7 +289,9 @@ export function ShiftDetailScreen() {
     shift.status === 'cancelled'
       ? 'cancelled'
       : applicationStatus === 'accepted'
-      ? (hasCompleted ? 'completed' : 'clock-in')
+      // Booked: clock in while the shift is live; once it has ended there is
+      // nothing left to do, so never dangle a dead "Clock In" button.
+      ? (hasCompleted ? 'completed' : lifecycle === 'ended' ? 'past' : 'clock-in')
       : applicationStatus === 'standby'
       ? 'standby'
       : applicationStatus === 'pending'
@@ -451,7 +453,7 @@ export function ShiftDetailScreen() {
 
       {/* Reserve room for the fixed worker CTA bar only when it renders (it can be
           up to ~160px tall in the clock-in / standby states); owners get none. */}
-      <div className={`flex-1 overflow-y-auto ${profile.role === 'worker' && !isOwner ? 'pb-[176px]' : 'pb-8'}`}>
+      <div className={`flex-1 overflow-y-auto ${profile.role === 'worker' && !isOwner ? 'pb-[150px]' : 'pb-8'}`}>
 
         {/* Hero photo */}
         <div className="relative w-full h-[300px] flex-shrink-0 overflow-hidden">
@@ -934,7 +936,7 @@ export function ShiftDetailScreen() {
       {/* Fixed CTA — worker actions only (apply/claim/clock-in). Clients and
           staffers never apply or clock in; owners manage via the inline block. */}
       {profile.role === 'worker' && !isOwner && (
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] px-5 pb-9 pt-4 bg-gradient-to-t from-white via-white/98 to-transparent z-30 border-t border-[#DBDBDB]">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+14px)] bg-white z-30 border-t border-[#EFEFEF] shadow-[0_-8px_24px_rgba(0,0,0,0.08)]">
         <AnimatePresence>
           {ctaState === 'pending' && (
             <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
