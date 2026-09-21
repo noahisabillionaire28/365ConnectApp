@@ -104,7 +104,7 @@ export function useProfile(): ProfileResult {
     bio:               row?.bio               ?? null,
     jobTypes:          row?.job_types         ?? [],
     certifications:    row?.certifications    ?? [],
-    rating:            row?.rating            ?? 0,
+    rating:            Number(row?.rating ?? 0) || 0,
     memberSince,
     email:             user?.email            ?? null,
     role:              effectiveRole,

@@ -10,6 +10,16 @@ import { Home, Briefcase, Compass, MessageSquare, User, PlusCircle } from 'lucid
 import type { ComponentType } from 'react';
 import { useRole } from '@/contexts/RoleContext';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
+import { preloadScreen } from '@/lib/lazyRoutes';
+
+/** Which lazy screen each tab opens, so a touch can warm it before the tap lands. */
+const SCREEN_FOR_PATH: Record<string, string> = {
+  '/jobs':            'JobsScreen',
+  '/explore':         'ExploreScreen',
+  '/messages':        'MessagesScreen',
+  '/profile':         'ProfileScreen',
+  '/post-shift/name': 'PostShiftNameScreen',
+};
 
 type Tab = {
   name:        string;
@@ -77,6 +87,7 @@ export function BottomTabNav() {
               key={tab.path}
               href={tab.path}
               className="flex-1 h-full flex flex-col items-center justify-center gap-[3px] select-none"
+              onPointerDown={() => { const s = SCREEN_FOR_PATH[tab.path]; if (s) preloadScreen(s); }}
               aria-label={tab.name}
               aria-current={isActive ? 'page' : undefined}
             >
