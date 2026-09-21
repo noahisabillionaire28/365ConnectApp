@@ -118,7 +118,7 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
     <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true"
       aria-label={`Request ${workerUsername ? '@' + workerUsername : 'this worker'} for a shift`}>
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-[390px] bg-white rounded-t-[20px] max-h-[75vh] flex flex-col overflow-hidden">
+      <div className="relative w-full max-w-app bg-white rounded-t-[20px] max-h-[75vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#DBDBDB] flex-shrink-0">
           <div>
             <h2 className="text-black font-bold text-[17px]">Request for shift</h2>
@@ -285,7 +285,7 @@ function ReportSheet({
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-[390px] bg-white rounded-t-[20px] px-5 pt-4 pb-8">
+      <div className="relative w-full max-w-app bg-white rounded-t-[20px] px-5 pt-4 pb-8">
         <div className="flex items-center justify-between mb-4">
           <p className="text-black font-bold text-[17px]">Report @{username ?? 'user'}</p>
           <button type="button" aria-label="Close" onClick={onClose}

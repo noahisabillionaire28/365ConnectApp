@@ -135,7 +135,7 @@ export function PostShiftEventTypeScreen() {
       </div>
 
       {/* Fixed CTA */}
-      <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-[390px] px-5 pb-4 pt-4
+      <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-4 pt-4
         bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
         {eventType && (
           <motion.p key={eventType} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}

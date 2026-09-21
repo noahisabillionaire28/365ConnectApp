@@ -219,7 +219,7 @@ export function ExploreScreen() {
 
       {/* Compose sheet — photo preview + caption with #hashtags */}
       {composeFile && (
-        <div className="fixed inset-0 z-[80] flex flex-col bg-white max-w-[390px] mx-auto" role="dialog" aria-label="New post">
+        <div className="fixed inset-0 z-[80] flex flex-col bg-white max-w-app mx-auto" role="dialog" aria-label="New post">
           <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 border-b border-[#EFEFEF]">
             <button type="button" onClick={closeCompose} disabled={posting}
               className="text-[#111827] text-[15px] font-medium disabled:opacity-50">Cancel</button>

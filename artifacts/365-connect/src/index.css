@@ -152,6 +152,22 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* ── App column width ────────────────────────────────────────────────────────
+   On phones the app fills the whole screen, whatever its width. On tablets and
+   desktops it becomes a centred phone-shaped column. Every fixed-position bar,
+   sheet and nav uses `max-w-app` so they always line up with the page. */
+:root {
+  --app-max-width: 100%;
+}
+@media (min-width: 640px) {
+  :root {
+    --app-max-width: 430px;
+  }
+}
+@utility max-w-app {
+  max-width: var(--app-max-width);
+}
+
 /* Leaflet stacks map panes/controls at z-index 400–1000. Contain that inside
    the map box so it never paints over fixed bars, sheets or the bottom nav. */
 .leaflet-container {

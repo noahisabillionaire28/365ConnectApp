@@ -53,7 +53,7 @@ export function CTABar({
   label?: string; onPress: () => void; disabled?: boolean; loading?: boolean;
 }) {
   return (
-    <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] px-5 pb-9 pt-4 bg-gradient-to-t from-white via-white/95 to-transparent z-10 border-t border-[#DBDBDB]">
+    <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-9 pt-4 bg-gradient-to-t from-white via-white/95 to-transparent z-10 border-t border-[#DBDBDB]">
       <motion.button type="button" whileTap={{ scale: disabled ? 1 : 0.97 }}
         onClick={onPress} disabled={disabled || loading}
         aria-label={label} aria-disabled={disabled || loading}

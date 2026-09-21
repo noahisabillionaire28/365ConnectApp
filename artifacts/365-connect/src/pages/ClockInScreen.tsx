@@ -267,7 +267,7 @@ function ConfirmEndOverlay({ companyName, onConfirm, onCancel }: {
       <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', stiffness: 360, damping: 36 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[390px] bg-white border-t border-[#DBDBDB] rounded-t-[24px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+40px)]">
+        className="w-full max-w-app bg-white border-t border-[#DBDBDB] rounded-t-[24px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+40px)]">
         <div aria-hidden className="w-10 h-1 rounded-full bg-[#DBDBDB] mx-auto mb-6" />
         <h2 className="text-black font-bold text-[22px] mb-2">End your shift?</h2>
         <p className="text-[#737373] text-[14px] mb-7 leading-relaxed">

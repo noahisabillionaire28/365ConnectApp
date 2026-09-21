@@ -115,7 +115,7 @@ export function PostScreen() {
       </div>
 
       {/* Composer */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white border-t border-[#EFEFEF] px-3 py-2.5 flex items-center gap-2">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app bg-white border-t border-[#EFEFEF] px-3 py-2.5 flex items-center gap-2">
         <input
           type="text"
           value={text}

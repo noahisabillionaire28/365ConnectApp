@@ -116,7 +116,7 @@ function ThreadActionSheet({ conv, onClose, onPref, onDelete }: {
   );
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40" role="dialog" aria-modal="true" aria-label="Conversation options" onClick={onClose}>
-      <div className="w-full max-w-[390px] bg-white rounded-t-[20px] px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+16px)]" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-app bg-white rounded-t-[20px] px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+16px)]" onClick={(e) => e.stopPropagation()}>
         <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-3" />
         <p className="text-[#111827] font-bold text-[16px] mb-3 truncate">{conv.displayName}</p>
         <Row icon={conv.is_pinned ? <PinOff size={17} /> : <Pin size={17} />} label={conv.is_pinned ? 'Unpin' : 'Pin to top'} onClick={() => onPref({ pinned: !conv.is_pinned })} />

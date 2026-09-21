@@ -90,7 +90,7 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
         <div className="fixed inset-0 z-[80] flex items-end justify-center" role="dialog" aria-modal="true">
           <button type="button" aria-label="Close" onClick={() => setMenuOpen(false)}
             className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-[390px] bg-white rounded-t-[18px] pb-6 pt-2 px-3">
+          <div className="relative w-full max-w-app bg-white rounded-t-[18px] pb-6 pt-2 px-3">
             <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto my-2" aria-hidden />
             <button type="button" onClick={handleDelete} disabled={deletePost.isPending}
               className="w-full flex items-center justify-center gap-2 h-[52px] rounded-[12px] text-[#EF4444] font-bold text-[15px] active:bg-[#FEF2F2] disabled:opacity-60">

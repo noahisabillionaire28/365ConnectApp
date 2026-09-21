@@ -107,7 +107,7 @@ function SuspendedGuard() {
   return null;
 }
 
-// ── Mobile router — 390 px centred column ─────────────────────────────────────
+// ── Mobile router — full-width on phones, centred column on larger screens ─────────────────────────────────────
 function MobileRouter() {
   const [location] = useLocation();
   return (
