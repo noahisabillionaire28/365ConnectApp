@@ -1,20 +1,23 @@
-import { lazy, Suspense, type ComponentType } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { lazyNamed, warmRoutes } from '@/lib/lazyRoutes';
 
 /**
- * Route-level code splitting: each screen is its own chunk, fetched the
- * first time it is opened. Splash/Login/Home stay in the main bundle so the
- * first paint needs nothing extra.
+ * Route-level code splitting: each screen is its own chunk. Splash/Login/Home
+ * stay in the main bundle so the first paint needs nothing extra; every other
+ * screen is warmed in the background right after launch (see lib/lazyRoutes),
+ * so tapping a tab swaps screens instantly instead of flashing a loader.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyComponent = ComponentType<any>;
-function lazyNamed<M extends Record<string, unknown>>(loader: () => Promise<M>, name: keyof M) {
-  return lazy<AnyComponent>(async () => ({ default: (await loader())[name] as AnyComponent }));
-}
-
 function RouteFallback() {
+  // Only show the spinner if a chunk is genuinely slow (cold cache on a weak
+  // connection). Brief loads stay a plain page so nothing flickers.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setSlow(true), 250);
+    return () => window.clearTimeout(t);
+  }, []);
   return (
     <div className="min-h-[100dvh] bg-white flex items-center justify-center" aria-busy="true" aria-label="Loading">
-      <div className="w-7 h-7 rounded-full border-2 border-[#DBDBDB] border-t-[#0A1628] animate-spin" />
+      {slow && <div className="w-7 h-7 rounded-full border-2 border-[#DBDBDB] border-t-[#0A1628] animate-spin" />}
     </div>
   );
 }
@@ -25,7 +28,6 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, Redirect, Router as WouterRouter, useLocation } from 'wouter';
-import { motion, AnimatePresence } from 'framer-motion';
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import { RoleProvider, useRole } from '@/contexts/RoleContext';
@@ -132,17 +134,17 @@ function SuspendedGuard() {
 // ── Mobile router — full-width on phones, centred column on larger screens ─────────────────────────────────────
 function MobileRouter() {
   const [location] = useLocation();
+
+  // Screens swap instantly, like a native tab bar — no fade-out to white and
+  // back in. Each new screen starts at the top.
+  useEffect(() => { window.scrollTo(0, 0); }, [location]);
+
+  // Fetch every screen's code in the background once the first screen is up.
+  useEffect(() => { warmRoutes(); }, []);
+
   return (
     <MobileContainer>
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={location}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.13, ease: 'easeInOut' }}
-          style={{ width: '100%' }}
-        >
+      <div style={{ width: '100%' }}>
           <Suspense fallback={<RouteFallback />}>
           <Switch>
             {/* ── Auth (Supabase) ───────────────────────────────── */}
@@ -211,8 +213,7 @@ function MobileRouter() {
             <Route component={NotFound} />
           </Switch>
           </Suspense>
-        </motion.div>
-      </AnimatePresence>
+      </div>
     </MobileContainer>
   );
 }
