@@ -403,7 +403,7 @@ function Sheet({ children, onClose, label, busy }: { children: React.ReactNode; 
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40" role="dialog" aria-modal="true" aria-label={label}
       onClick={() => { if (!busy) onClose(); }}>
-      <div className="w-full max-w-[390px] max-h-[85dvh] overflow-y-auto bg-white rounded-t-[20px] px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+16px)]"
+      <div className="w-full max-w-app max-h-[85dvh] overflow-y-auto bg-white rounded-t-[20px] px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+16px)]"
         onClick={(e) => e.stopPropagation()}>
         <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-4" />
         {children}

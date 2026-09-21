@@ -156,7 +156,7 @@ function ReviewSheet({ w, payRate, busy, onApprove, onClose }: {
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-[390px] max-h-[85dvh] overflow-y-auto bg-white rounded-t-[20px] px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+32px)]">
+      <div className="relative w-full max-w-app max-h-[85dvh] overflow-y-auto bg-white rounded-t-[20px] px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+32px)]">
         <div className="w-10 h-1 rounded-full bg-[#DBDBDB] mx-auto mb-4" />
         <p className="text-[#111827] font-bold text-[17px] mb-1">Review timesheet</p>
         <p className="text-[#6B7280] text-[13px] mb-4">

@@ -203,7 +203,7 @@ function MapPane({ shifts, selectedId, onPinClick, onOpenShift }: {
 /* ── View toggle (List / Map) ────────────────────────────────────────────── */
 function ViewToggle({ view, onChange }: { view: 'list' | 'map'; onChange: (v: 'list' | 'map') => void }) {
   return (
-    <div className="flex bg-[#F3F4F6] rounded-full p-[3px]" role="tablist" aria-label="Choose view">
+    <div className="flex flex-shrink-0 bg-[#F3F4F6] rounded-full p-[3px]" role="tablist" aria-label="Choose view">
       <button type="button" role="tab" aria-selected={view === 'list'} aria-label="List view"
         onClick={() => onChange('list')}
         className={`flex items-center gap-1 h-[32px] px-3 rounded-full text-[12px] font-semibold transition-all ${
@@ -271,7 +271,7 @@ export function JobsScreen() {
       {/* ── Header: search + filters + view toggle ───────────────────────── */}
       <div className="flex-shrink-0 bg-white border-b border-[#EAEAEA]">
         <div className="px-4 pt-4 pb-2 flex items-center gap-2">
-          <div className="flex-1 flex items-center gap-2 bg-[#F5F5F5] border border-[#E5E7EB] rounded-[12px] px-3.5 h-[44px]">
+          <div className="flex-1 min-w-0 flex items-center gap-2 bg-[#F5F5F5] border border-[#E5E7EB] rounded-[12px] px-3.5 h-[44px]">
             <Search size={16} aria-hidden className="text-[#737373] flex-shrink-0" />
             <input
               type="search"
@@ -279,7 +279,7 @@ export function JobsScreen() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Search shifts"
-              className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] outline-none font-medium"
+              className="flex-1 min-w-0 w-full bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] outline-none font-medium"
             />
             {query && (
               <button type="button" aria-label="Clear search" onClick={() => setQuery('')}

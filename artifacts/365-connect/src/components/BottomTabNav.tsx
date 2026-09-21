@@ -61,7 +61,7 @@ export function BottomTabNav() {
 
   return (
     <div
-      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] pb-safe z-50"
+      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app pb-safe z-50"
       style={{ background: '#FFFFFF', borderTop: '1px solid #E5E7EB' }}
     >
       <div className="flex justify-around items-center h-[56px]">

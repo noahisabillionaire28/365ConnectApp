@@ -85,8 +85,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           className="flex justify-center"
           style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 12px)' }}
         >
-          {/* Constrained to 390 px so it looks right on mobile */}
-          <div className="w-full max-w-[390px] px-4">
+          {/* Matches the app column width */}
+          <div className="w-full max-w-app px-4">
             <AnimatePresence mode="wait">
               {current && (
                 <motion.button

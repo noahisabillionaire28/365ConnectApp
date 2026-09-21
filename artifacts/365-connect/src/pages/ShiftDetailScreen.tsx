@@ -430,7 +430,7 @@ export function ShiftDetailScreen() {
     {showCancelConfirm && (
       <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 backdrop-blur-sm px-4 pb-8"
         role="dialog" aria-modal="true" aria-label="Confirm shift cancellation">
-        <div className="w-full max-w-[390px] bg-white rounded-[20px] p-5 shadow-xl">
+        <div className="w-full max-w-app bg-white rounded-[20px] p-5 shadow-xl">
           <h2 className="text-[#111827] font-bold text-[18px] mb-2">Cancel this shift?</h2>
           <p className="text-[#6B7280] text-[14px] leading-relaxed mb-5">
             Workers who applied will be notified. This cannot be undone.
@@ -698,7 +698,7 @@ export function ShiftDetailScreen() {
                   className="fixed inset-0 bg-black/40 z-[60]" />
                 <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
                   transition={{ type: 'spring', stiffness: 400, damping: 38 }}
-                  className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] z-[61] bg-white rounded-t-[20px] px-5 pt-4 pb-9 shadow-2xl">
+                  className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app z-[61] bg-white rounded-t-[20px] px-5 pt-4 pb-9 shadow-2xl">
                   <div className="flex items-center justify-between mb-1">
                     <p className="font-bold text-[16px] text-[#111827]">Get directions</p>
                     <button type="button" onClick={() => setDirectionsOpen(false)} aria-label="Close">
@@ -936,7 +936,7 @@ export function ShiftDetailScreen() {
       {/* Fixed CTA — worker actions only (apply/claim/clock-in). Clients and
           staffers never apply or clock in; owners manage via the inline block. */}
       {profile.role === 'worker' && !isOwner && (
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+14px)] bg-white z-30 border-t border-[#EFEFEF] shadow-[0_-8px_24px_rgba(0,0,0,0.08)]">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+14px)] bg-white z-30 border-t border-[#EFEFEF] shadow-[0_-8px_24px_rgba(0,0,0,0.08)]">
         <AnimatePresence>
           {ctaState === 'pending' && (
             <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -1059,7 +1059,7 @@ export function ShiftDetailScreen() {
         <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40"
           role="dialog" aria-modal="true" aria-label="Confirm dropping this shift"
           onClick={() => { if (!dropping) setConfirmDrop(false); }}>
-          <div className="w-full max-w-[390px] bg-white rounded-t-[20px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+20px)]"
+          <div className="w-full max-w-app bg-white rounded-t-[20px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+20px)]"
             onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-4" />
             <p className="text-[#111827] font-bold text-[17px]">
