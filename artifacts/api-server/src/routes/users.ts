@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
+import { invalidateRole } from '../lib/roleCache.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -66,6 +67,7 @@ router.post('/', requireAuth, async (req, res) => {
     .select()
     .single();
   if (error) return res.status(500).json({ error: error.message });
+  if (payload.role !== undefined) invalidateRole(req.userId!);
   return res.json(data);
 });
 

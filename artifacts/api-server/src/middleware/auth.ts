@@ -8,6 +8,8 @@
  */
 import { adminDb } from "../lib/supabaseAdmin.js";
 import { logger } from "../lib/logger.js";
+import { verifySupabaseToken } from "../lib/jwtVerify.js";
+import { getRoleInfo } from "../lib/roleCache.js";
 import type { Request, Response, NextFunction } from "express";
 
 declare global {
@@ -44,6 +46,21 @@ export async function attachUserId(
   }
 
   try {
+    // Fast path: verify the JWT signature in-process (no network hop).
+    const local = await verifySupabaseToken(token);
+    if (local.ok === true) {
+      req.userId = local.userId;
+      next();
+      return;
+    }
+    if (local.ok === false) {
+      req.userId = null;
+      req.authReason = `verify-failed: ${local.reason}`;
+      next();
+      return;
+    }
+
+    // Slow path: local verification isn't possible for this token/config.
     const { data, error } = await adminDb.auth.getUser(token);
     if (error || !data?.user) {
       req.userId = null;
@@ -80,12 +97,7 @@ export function requireAuth(
  * does not exist. Result is memoised on req.userRole for the request.
  */
 export async function getUserRole(userId: string): Promise<string | null> {
-  const { data } = await adminDb
-    .from("users")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle();
-  return (data?.role as string | undefined) ?? null;
+  return (await getRoleInfo(userId)).role;
 }
 
 /**
@@ -103,16 +115,11 @@ export function requireRole(...roles: string[]) {
       return;
     }
     try {
-      const { data } = await adminDb
-        .from("users")
-        .select("role, is_admin")
-        .eq("id", req.userId)
-        .maybeSingle();
-      const role = (data?.role as string | undefined) ?? null;
+      // Cached for 60s per user — see lib/roleCache.ts.
+      const { role, isAdmin } = await getRoleInfo(req.userId);
       req.userRole = role;
       // Admins are superusers: they can act in any role (this powers the
       // in-app "view as worker/client/staffer" switcher).
-      const isAdmin = role === "admin" || data?.is_admin === true;
       if (!isAdmin && (!role || !roles.includes(role))) {
         res.status(403).json({ error: "Forbidden — insufficient role" });
         return;
