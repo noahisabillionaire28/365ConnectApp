@@ -5,6 +5,7 @@
  */
 import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
+import { invalidateRole } from '../lib/roleCache.js';
 import { sendEmail, renderNotificationEmail, appUrl } from '../lib/email.js';
 import type { Request, Response, NextFunction } from 'express';
 
@@ -106,6 +107,7 @@ router.patch('/users/:id', async (req, res) => {
     if (!Object.keys(updates).length) { res.status(400).json({ error: 'No valid fields' }); return; }
     const { error } = await adminDb.from('users').update(updates).eq('id', id);
     if (error) throw error;
+    invalidateRole(String(id));
     res.json({ ok: true });
   } catch (err) {
     console.error('[admin/users PATCH]', err);
