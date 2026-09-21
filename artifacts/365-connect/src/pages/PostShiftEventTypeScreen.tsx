@@ -1,7 +1,7 @@
 /**
- * Step 1 of 6 — Event Type
- * The event frames the whole shift (Wedding, Corporate, …). This is the first
- * step; it starts a fresh draft for a new post and preserves it when editing.
+ * Step 2 of 7 — Event Type
+ * The event frames the whole shift (Wedding, Corporate, …). The draft was
+ * started on the Shift Name step; this step only adds the event type.
  */
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
@@ -10,7 +10,7 @@ import {
   ChevronLeft, Check, PartyPopper, Heart, UtensilsCrossed, Star, Building2, Sparkles,
 } from 'lucide-react';
 import { EVENT_TYPES } from '@/lib/eventTypes';
-import { getDraft, setDraft, resetDraft, getEditShiftId, setEditShiftId } from '@/store/postShiftStore';
+import { getDraft, setDraft } from '@/store/postShiftStore';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useRole } from '@/contexts/RoleContext';
 
@@ -47,11 +47,6 @@ export function PostShiftEventTypeScreen() {
     if (!roleLoading && role === 'worker') navigate('/home');
   }, [role, roleLoading, navigate]);
 
-  // Fresh start for a new post; preserve the draft when editing an existing shift.
-  useEffect(() => {
-    if (!getEditShiftId()) resetDraft();
-  }, []);
-
   const [eventType, setEventType] = useState(getDraft().event_type);
 
   function handleContinue() {
@@ -66,18 +61,14 @@ export function PostShiftEventTypeScreen() {
       <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
         <div className="flex items-center gap-3 mb-4">
           <button
-            type="button" aria-label="Cancel — go back to home"
-            onClick={() => {
-              const editId = getEditShiftId();
-              if (editId) { setEditShiftId(null); resetDraft(); navigate(`/shift/${editId}`); }
-              else navigate('/home');
-            }}
+            type="button" aria-label="Back to shift name"
+            onClick={() => navigate('/post-shift/name?keep=1')}
             className="w-9 h-9 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
-          <div className="flex-1"><StepBar current={1} total={6} /></div>
-          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">1 of 6</span>
+          <div className="flex-1"><StepBar current={2} total={7} /></div>
+          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">2 of 7</span>
         </div>
         <h1 className="text-[#111827] font-bold text-[22px] tracking-tight">What kind of event?</h1>
         <p className="text-[#6B7280] text-[13px] mt-0.5">Pick the type of event you're staffing</p>

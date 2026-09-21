@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -16,27 +17,20 @@ export type ReviewRow = {
   reviewer_photo?: string | null;
 };
 
+export const REVIEWS_KEY = 'reviews';
+
 export function useReviews(targetUserId?: string) {
   const { user } = useAuth();
-  const [reviews, setReviews]   = useState<ReviewRow[]>([]);
-  const [isLoading, setLoading] = useState(true);
-
+  const qc = useQueryClient();
   const userId = targetUserId ?? user?.id;
 
-  const load = useCallback(async () => {
-    if (!userId) { setReviews([]); setLoading(false); return; }
-    setLoading(true);
-    try {
-      const rows = await apiClient(user?.id ?? null).get<ReviewRow[]>(`/reviews/${userId}`);
-      setReviews(rows);
-    } catch (e) {
-      console.error('[useReviews] load failed:', e);
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, user?.id]);
-
-  useEffect(() => { void load(); }, [load]);
+  const q = useQuery<ReviewRow[], Error>({
+    queryKey: [REVIEWS_KEY, userId],
+    enabled: !!userId,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+    queryFn: () => apiClient(user?.id ?? null).get<ReviewRow[]>(`/reviews/${userId}`),
+  });
 
   const submitReviewFn = useCallback(async (review: {
     shift_id: string;
@@ -49,47 +43,35 @@ export function useReviews(targetUserId?: string) {
     if (!user?.id) return false;
     try {
       await apiClient(user.id).post('/reviews', review);
-      await load();
+      void qc.invalidateQueries({ queryKey: [REVIEWS_KEY, review.reviewee_id] });
       return true;
     } catch (e) {
       console.error('[useReviews] submitReview failed:', e);
       return false;
     }
-  }, [user?.id, load]);
+  }, [user?.id, qc]);
 
-  return { reviews, isLoading, submitReview: submitReviewFn, refetch: load };
+  return { reviews: q.data ?? [], isLoading: q.isLoading, submitReview: submitReviewFn, refetch: q.refetch };
 }
 
 /**
  * Hook to check whether a reviewer has already reviewed a reviewee for a shift.
- * Returns `{ existing: ReviewRow | null, isLoading }`.
+ * Returns `{ existing: ReviewRow | null, isLoading }`. Shares the reviews cache.
  */
 export function useExistingReview(
   shiftId: string | undefined,
   reviewerId: string | undefined,
   revieweeId: string | undefined,
 ) {
-  const [existingReview, setExisting] = useState<ReviewRow | null>(null);
-  const [isLoading, setLoading]       = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!shiftId || !reviewerId || !revieweeId) { setLoading(false); return; }
-    setLoading(true);
-    apiClient(reviewerId).get<ReviewRow[]>(`/reviews/${revieweeId}`)
-      .then((rows) => {
-        if (cancelled) return;
-        const found = rows.find(
-          (r) => r.shift_id === shiftId && r.reviewer_id === reviewerId,
-        ) ?? null;
-        setExisting(found);
-      })
-      .catch(() => { if (!cancelled) setExisting(null); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [shiftId, reviewerId, revieweeId]);
-
-  return { existing: existingReview, existingReview, isLoading };
+  const q = useQuery<ReviewRow[], Error, ReviewRow | null>({
+    queryKey: [REVIEWS_KEY, revieweeId],
+    enabled: !!shiftId && !!reviewerId && !!revieweeId,
+    staleTime: 60_000,
+    queryFn: () => apiClient(reviewerId!).get<ReviewRow[]>(`/reviews/${revieweeId}`),
+    select: (rows) => rows.find((r) => r.shift_id === shiftId && r.reviewer_id === reviewerId) ?? null,
+  });
+  const existing = q.data ?? null;
+  return { existing, existingReview: existing, isLoading: q.isLoading };
 }
 
 /**

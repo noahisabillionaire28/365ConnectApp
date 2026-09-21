@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -21,63 +22,63 @@ export type RosterWorker = {
   followed_at: string;
 };
 
+export const ROSTER_KEY = 'roster';
+
 export function useRoster() {
   const { user } = useAuth();
-  const [roster, setRoster]     = useState<RosterWorker[]>([]);
-  const [isLoading, setLoading] = useState(true);
-  const [error, setError]       = useState<string | null>(null);
+  const qc = useQueryClient();
+  const key = [ROSTER_KEY, user?.id];
 
-  const load = useCallback(async () => {
-    if (!user?.id) { setRoster([]); setLoading(false); return; }
-    setLoading(true);
-    setError(null);
-    try {
-      const rows = await apiClient(user.id).get<(RosterWorker & { is_pro: boolean; primary_job_type: string | null; photo_url: string | null })[]>('/follows/roster');
-      setRoster(rows.map((r) => ({
+  const q = useQuery<RosterWorker[], Error>({
+    queryKey: key,
+    enabled: !!user?.id,
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const rows = await apiClient(user!.id).get<(RosterWorker & { is_pro: boolean; primary_job_type: string | null; photo_url: string | null })[]>('/follows/roster');
+      return rows.map((r) => ({
         ...r,
         photoUrl:       r.photo_url,
         primaryJobType: r.primary_job_type,
         isPro:          r.is_pro,
-      })));
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
-
-  useEffect(() => { void load(); }, [load]);
+      }));
+    },
+  });
 
   const removeFromRoster = useCallback(async (workerId: string): Promise<void> => {
     if (!user?.id) return;
-    setRoster((prev) => prev.filter((w) => w.id !== workerId));
+    qc.setQueryData<RosterWorker[]>(key, (prev) => (prev ?? []).filter((w) => w.id !== workerId));
     try {
       await apiClient(user.id).delete(`/follows/${workerId}`);
+      void qc.invalidateQueries({ queryKey: ['follow', workerId] });
     } catch (e) {
       console.error('[useRoster] remove failed:', e);
-      await load();
+      void qc.invalidateQueries({ queryKey: key });
     }
-  }, [user?.id, load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const addToRoster = useCallback(async (workerId: string): Promise<void> => {
     if (!user?.id) return;
     try {
       await apiClient(user.id).post('/follows', { following_id: workerId });
-      await load();
+      void qc.invalidateQueries({ queryKey: key });
+      void qc.invalidateQueries({ queryKey: ['follow', workerId] });
     } catch (e) {
       console.error('[useRoster] add failed:', e);
     }
-  }, [user?.id, load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
+  const roster = q.data ?? [];
   return {
     roster,
     workers:          roster,           // alias for pages that use `workers`
-    isLoading,
-    error,
+    isLoading:        q.isLoading,
+    error:            q.error ? q.error.message : null,
     removeFromRoster,
     remove:           removeFromRoster, // alias for pages that use `remove`
     addToRoster,
-    refetch: load,
+    refetch: q.refetch,
   };
 }

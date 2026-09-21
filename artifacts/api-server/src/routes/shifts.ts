@@ -53,7 +53,20 @@ router.get('/my', requireAuth, async (req, res) => {
     .eq('client_id', req.userId)
     .order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
-  return res.json(data);
+
+  // Applicants waiting on a decision, counted in one query for every shift
+  // (the dashboard used to make one request per shift for this).
+  const ids = (data ?? []).map((s) => s.id);
+  const pending = new Map<string, number>();
+  if (ids.length) {
+    const { data: apps } = await adminDb
+      .from('applications')
+      .select('shift_id')
+      .in('shift_id', ids)
+      .eq('status', 'pending');
+    for (const a of apps ?? []) pending.set(a.shift_id, (pending.get(a.shift_id) ?? 0) + 1);
+  }
+  return res.json((data ?? []).map((s) => ({ ...s, pending_count: pending.get(s.id) ?? 0 })));
 });
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

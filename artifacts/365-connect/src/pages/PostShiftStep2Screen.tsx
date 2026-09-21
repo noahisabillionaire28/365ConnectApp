@@ -1,5 +1,5 @@
 /**
- * Step 2 of 5 — Location
+ * Step 4 of 7 — Location
  * Address autocomplete + Apple-light map preview + optional unit/suite.
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -227,8 +227,8 @@ export function PostShiftStep2Screen() {
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
-          <div className="flex-1"><StepBar current={3} total={6} /></div>
-          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">3 of 6</span>
+          <div className="flex-1"><StepBar current={4} total={7} /></div>
+          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">4 of 7</span>
         </div>
         <h1 className="text-[#111827] font-bold text-[22px] tracking-tight">Where is it?</h1>
         <p className="text-[#6B7280] text-[13px] mt-0.5">Enter the venue address</p>

@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { MY_APPLICATIONS_KEY } from './useMyApplications';
 
 export type ShiftRequestRow = {
   id: string;
@@ -87,37 +89,37 @@ function mapRow(r: ShiftRequestRow): ShiftRequestRow {
   };
 }
 
+export const SHIFT_REQUESTS_KEY = 'shift-requests';
+
 export function useShiftRequests(
   /** Optional userId override — if omitted, reads from AuthContext */
   _userId?: string,
 ) {
   const { user } = useAuth();
-  const [requests, setRequests] = useState<ShiftRequestRow[]>([]);
-  const [isLoading, setLoading] = useState(true);
-  const [error, setError]       = useState<string | null>(null);
+  const qc = useQueryClient();
+  const key = [SHIFT_REQUESTS_KEY, user?.id];
 
-  const load = useCallback(async () => {
-    if (!user?.id) { setRequests([]); setLoading(false); return; }
-    setLoading(true);
-    setError(null);
-    try {
-      const rows = await apiClient(user.id).get<ShiftRequestRow[]>('/shift-requests');
-      setRequests(rows.map(mapRow));
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
+  const q = useQuery<ShiftRequestRow[], Error>({
+    queryKey: key,
+    enabled: !!user?.id,
+    staleTime: 15_000,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const rows = await apiClient(user!.id).get<ShiftRequestRow[]>('/shift-requests');
+      return rows.map(mapRow);
+    },
+  });
 
-  useEffect(() => { void load(); }, [load]);
+  const patchLocal = useCallback((id: string, status: ShiftRequestRow['status']) => {
+    qc.setQueryData<ShiftRequestRow[]>(key, (prev) => (prev ?? []).map((x) => (x.id === id ? { ...x, status } : x)));
+  }, [qc, key]);
 
   const sendRequest = useCallback(async (shiftId: string, workerId: string, message?: string): Promise<boolean> => {
     if (!user?.id) return false;
     const result = await createShiftRequest(user.id, shiftId, workerId, message);
+    if (result.ok) void qc.invalidateQueries({ queryKey: [SHIFT_REQUESTS_KEY] });
     return result.ok;
-  }, [user?.id]);
+  }, [user?.id, qc]);
 
   /** Accept an offer. Resolves to the booking outcome: booked, or waitlisted (standby). */
   const accept = useCallback(async (id: string): Promise<{ ok: boolean; status?: 'accepted' | 'standby' }> => {
@@ -126,29 +128,39 @@ export function useShiftRequests(
       const r = await apiClient(user.id).patch<{ status?: 'accepted' | 'standby' }>(
         `/shift-requests/${id}`, { status: 'accepted' },
       );
-      setRequests((prev) => prev.map((x) => x.id === id ? { ...x, status: 'accepted' as const } : x));
+      patchLocal(id, 'accepted');
+      // The worker's schedule and applied-set changed too.
+      void qc.invalidateQueries({ queryKey: [MY_APPLICATIONS_KEY] });
+      void qc.invalidateQueries({ queryKey: ['my-shift-ids'] });
+      void qc.invalidateQueries({ queryKey: ['worker-home-shifts'] });
       return { ok: true, status: r?.status ?? 'accepted' };
     } catch (e) {
       console.error('[useShiftRequests] accept failed:', e);
       return { ok: false };
     }
-  }, [user?.id]);
+  }, [user?.id, patchLocal, qc]);
 
   const decline = useCallback(async (id: string): Promise<boolean> => {
     if (!user?.id) return false;
     try {
       await apiClient(user.id).patch(`/shift-requests/${id}`, { status: 'declined' });
-      setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status: 'declined' as const } : r));
+      patchLocal(id, 'declined');
       return true;
     } catch (e) {
       console.error('[useShiftRequests] decline failed:', e);
       return false;
     }
-  }, [user?.id]);
+  }, [user?.id, patchLocal]);
 
   const respondToRequest = useCallback(async (id: string, status: 'accepted' | 'declined'): Promise<boolean> => {
     return status === 'accepted' ? (await accept(id)).ok : decline(id);
   }, [accept, decline]);
 
-  return { requests, isLoading, error, sendRequest, accept, decline, respondToRequest, refetch: load };
+  return {
+    requests: q.data ?? [],
+    isLoading: q.isLoading,
+    error: q.error ? q.error.message : null,
+    sendRequest, accept, decline, respondToRequest,
+    refetch: q.refetch,
+  };
 }

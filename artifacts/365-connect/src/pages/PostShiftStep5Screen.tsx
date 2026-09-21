@@ -1,5 +1,5 @@
 /**
- * Step 5 of 5 — Review & Post
+ * Step 7 of 7 — Review & Post
  * Summary of all wizard data, platform fee breakdown, and the Post Shift button
  * that writes a real row to the shifts table and navigates to the new shift detail.
  */
@@ -198,8 +198,8 @@ export function PostShiftStep5Screen() {
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
-          <div className="flex-1"><StepBar current={6} total={6} /></div>
-          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">6 of 6</span>
+          <div className="flex-1"><StepBar current={7} total={7} /></div>
+          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">7 of 7</span>
         </div>
         <h1 className="text-[#111827] font-bold text-[22px] tracking-tight">
           {isEditing ? 'Review changes' : 'Review & post'}
