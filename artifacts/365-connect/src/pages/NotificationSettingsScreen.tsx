@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { usePush } from '@/hooks/usePush';
 import { BottomTabNav } from '@/components/BottomTabNav';
+import { InstallBanner } from '@/components/InstallBanner';
 
 type Prefs = { in_app_notifications: boolean; email_notifications: boolean };
 
@@ -128,6 +129,7 @@ export function NotificationSettingsScreen() {
 
         {prefs && (
           <>
+            <InstallBanner flush />
             <p className="text-[#9CA3AF] text-[11px] font-bold uppercase tracking-[0.12em] px-1 mb-2">
               Choose how you hear from us
             </p>
