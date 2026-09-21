@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatTime } from '@/lib/supabase';
@@ -21,6 +21,8 @@ type RawShift = {
   created_at: string;
   /** Set when this shift is one position of a multi-position event. */
   event_id?: string | null;
+  /** Applicants still waiting on a decision (computed by the API). */
+  pending_count?: number;
 };
 
 export type ClientShift = RawShift & {
@@ -40,7 +42,8 @@ export type ClientShift = RawShift & {
 /** @deprecated use ClientShift */
 export type DashboardShift = ClientShift;
 
-function toClientShift(s: RawShift, appCount: number): ClientShift {
+function toClientShift(s: RawShift): ClientShift {
+  const appCount = s.pending_count ?? 0;
   return {
     ...s,
     applicationCount: appCount,
@@ -55,39 +58,25 @@ function toClientShift(s: RawShift, appCount: number): ClientShift {
   };
 }
 
+export const CLIENT_SHIFTS_KEY = 'client-shifts';
+
+/** The poster's own shifts with pending-applicant counts — cached, one request. */
 export function useClientShiftsDashboard() {
   const { user } = useAuth();
-  const [shifts, setShifts]     = useState<ClientShift[]>([]);
-  const [isLoading, setLoading] = useState(true);
-  const [error, setError]       = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!user?.id) { setShifts([]); setLoading(false); return; }
-    setLoading(true);
-    setError(null);
-    try {
-      const myShifts = await apiClient(user.id).get<RawShift[]>('/shifts/my');
-      const appCountMap = new Map<string, number>();
-      await Promise.all(myShifts.map(async (s) => {
-        try {
-          // Only applications still waiting on a decision count as "applicants"
-          // — booked, declined and withdrawn ones shouldn't inflate the badge.
-          const applicants = await apiClient(user.id).get<{ status?: string }[]>(`/applications?shift_id=${s.id}`);
-          appCountMap.set(s.id, applicants.filter((a) => a.status === 'pending').length);
-        } catch {
-          appCountMap.set(s.id, 0);
-        }
-      }));
-      setShifts(myShifts.map((s) => toClientShift(s, appCountMap.get(s.id) ?? 0)));
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  return { shifts, isLoading, error, refetch: load };
+  const q = useQuery<ClientShift[], Error>({
+    queryKey: [CLIENT_SHIFTS_KEY, user?.id],
+    enabled: !!user?.id,
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const rows = await apiClient(user!.id).get<RawShift[]>('/shifts/my');
+      return rows.map(toClientShift);
+    },
+  });
+  return {
+    shifts: q.data ?? [],
+    isLoading: q.isLoading,
+    error: q.error ? q.error.message : null,
+    refetch: q.refetch,
+  };
 }

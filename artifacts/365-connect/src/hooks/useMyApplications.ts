@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -57,28 +57,25 @@ function toMyApplication(r: RawApplication): MyApplication {
   };
 }
 
+export const MY_APPLICATIONS_KEY = 'my-applications';
+
+/** The worker's applications with their shifts — cached so Schedule opens instantly. */
 export function useMyApplications() {
   const { user } = useAuth();
-  const [applications, setApplications] = useState<MyApplication[]>([]);
-  const [isLoading, setLoading]         = useState(true);
-  const [error, setError]               = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!user?.id) { setApplications([]); setLoading(false); return; }
-    setLoading(true);
-    setError(null);
-    try {
-      const rows = await apiClient(user.id).get<RawApplication[]>('/applications');
-      setApplications(rows.map(toMyApplication));
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  return { applications, isLoading, error, refetch: load };
+  const q = useQuery<MyApplication[], Error>({
+    queryKey: [MY_APPLICATIONS_KEY, user?.id],
+    enabled: !!user?.id,
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const rows = await apiClient(user!.id).get<RawApplication[]>('/applications');
+      return rows.map(toMyApplication);
+    },
+  });
+  return {
+    applications: q.data ?? [],
+    isLoading: q.isLoading,
+    error: q.error ? q.error.message : null,
+    refetch: q.refetch,
+  };
 }

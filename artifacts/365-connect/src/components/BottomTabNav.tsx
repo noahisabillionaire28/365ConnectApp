@@ -29,7 +29,7 @@ const WORKER_TABS: Tab[] = [
 
 const CLIENT_TABS: Tab[] = [
   { name: 'Home',       path: '/home',             activeFor: '/home',        icon: Home          },
-  { name: 'Post Shift', path: '/post-shift/event', activeFor: '/post-shift',  icon: PlusCircle    },
+  { name: 'Post Shift', path: '/post-shift/name', activeFor: '/post-shift',  icon: PlusCircle    },
   { name: 'Explore',    path: '/explore',           activeFor: '/explore',     icon: Compass       },
   { name: 'Messages',   path: '/messages',          activeFor: '/messages',    icon: MessageSquare },
   { name: 'Profile',    path: '/profile',           activeFor: '/profile',     icon: User          },
@@ -37,7 +37,7 @@ const CLIENT_TABS: Tab[] = [
 
 const STAFFER_TABS: Tab[] = [
   { name: 'Home',       path: '/home',                activeFor: '/home',           icon: Home          },
-  { name: 'Post Shift', path: '/post-shift/event', activeFor: '/post-shift',  icon: PlusCircle    },
+  { name: 'Post Shift', path: '/post-shift/name', activeFor: '/post-shift',  icon: PlusCircle    },
   { name: 'Explore',    path: '/explore',              activeFor: '/explore',        icon: Compass       },
   { name: 'Messages',   path: '/messages',             activeFor: '/messages',       icon: MessageSquare },
   { name: 'Profile',    path: '/profile',              activeFor: '/profile',        icon: User          },

@@ -236,7 +236,7 @@ export function JobsScreen() {
   function handlePostShift() {
     if (role === 'staffer') resetStafferDraft();
     else resetDraft();
-    navigate('/post-shift/event');
+    navigate('/post-shift/name');
   }
 
   // Workers browse all open shifts; clients/staffers see only their own posted shifts.

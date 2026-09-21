@@ -1,6 +1,6 @@
 /**
- * Step 1 of 5 — Job Type + Title
- * Pick one primary job type from the canonical 14, then name the shift.
+ * Step 3 of 7 — Job Types
+ * Pick every worker type this shift needs.
  */
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
@@ -25,11 +25,6 @@ function StepBar({ current, total }: { current: number; total: number }) {
     </div>
   );
 }
-
-const INPUT_CLS =
-  'w-full bg-white border border-[#E5E7EB] rounded-[10px] px-3 h-[46px] ' +
-  'text-[#111827] text-[14px] font-medium placeholder:text-[#9CA3AF] ' +
-  'focus:outline-none focus:border-[#0A1628] transition-colors';
 
 // ─── Job-type tile ────────────────────────────────────────────────────────────
 function JobTile({
@@ -93,10 +88,7 @@ export function PostShiftStep1Screen() {
   const [jobTypes, setJobTypes] = useState<string[]>(
     initial.job_types.length ? initial.job_types : (initial.job_type ? [initial.job_type] : []),
   );
-  const [title,   setTitle]   = useState(initial.title);
-  const [titleErr, setTitleErr] = useState('');
-
-  const canContinue = jobTypes.length > 0 && title.trim().length >= 3;
+  const canContinue = jobTypes.length > 0;
 
   function toggleType(label: string) {
     setJobTypes((prev) => prev.includes(label) ? prev.filter((t) => t !== label) : [...prev, label]);
@@ -104,11 +96,8 @@ export function PostShiftStep1Screen() {
 
   function handleContinue() {
     if (jobTypes.length === 0) return;
-    const t = title.trim();
-    if (t.length < 3) { setTitleErr('Title must be at least 3 characters'); return; }
-    // Preserve the rest of the draft (event type, edit context) — the fresh
-    // start happens once, on the Event Type step.
-    setDraft({ job_type: jobTypes[0], job_types: jobTypes, title: t });
+    // Preserve the rest of the draft (name, event type, edit context).
+    setDraft({ job_type: jobTypes[0], job_types: jobTypes });
     navigate('/post-shift/step2');
   }
 
@@ -125,11 +114,11 @@ export function PostShiftStep1Screen() {
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
-          <div className="flex-1"><StepBar current={2} total={6} /></div>
-          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">2 of 6</span>
+          <div className="flex-1"><StepBar current={3} total={7} /></div>
+          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">3 of 7</span>
         </div>
         <h1 className="text-[#111827] font-bold text-[22px] tracking-tight">Who do you need?</h1>
-        <p className="text-[#6B7280] text-[13px] mt-0.5">Select one or more job types and name this shift</p>
+        <p className="text-[#6B7280] text-[13px] mt-0.5">Select one or more job types for this shift</p>
       </div>
 
       {/* Body */}
@@ -163,39 +152,12 @@ export function PostShiftStep1Screen() {
           ))}
         </div>
 
-        {/* Shift title */}
-        <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-4">
-          <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider mb-1.5">
-            Shift Title <span className="normal-case text-[#EF4444]">*</span>
-          </p>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => { setTitle(e.target.value); setTitleErr(''); }}
-            placeholder="e.g. Saturday Night Bar Service"
-            aria-label="Shift title"
-            aria-invalid={!!titleErr}
-            maxLength={80}
-            className={INPUT_CLS + (titleErr ? ' border-[#EF4444]' : '')}
-          />
-          {titleErr && <p className="text-[#EF4444] text-[11px] mt-1.5">{titleErr}</p>}
-          <p className="text-[#9CA3AF] text-[11px] mt-1.5">{title.length}/80</p>
-        </div>
-
       </div>
 
       {/* Fixed CTA */}
       <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-4 pt-4
         bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
-        {jobTypes.length > 0 && title.trim().length < 3 ? (
-          <motion.p
-            key="need-title"
-            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-            className="text-center text-[#6B7280] text-[12px] mb-2"
-          >
-            Add a <span className="text-[#0A1628] font-bold">shift title</span> above to continue
-          </motion.p>
-        ) : jobTypes.length > 0 ? (
+        {jobTypes.length > 0 ? (
           <motion.p
             key={jobTypes.length}
             initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}

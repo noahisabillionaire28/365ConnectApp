@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useState } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -7,62 +8,70 @@ type FollowOptions = {
   onUnfollowSuccess?: () => void;
 };
 
+type FollowState = { following: boolean; count: number };
+
+export const FOLLOW_KEY = 'follow';
+
 export function useFollow(
   targetUserId: string | undefined,
   options: FollowOptions = {},
 ) {
   const { user } = useAuth();
-  const [isFollowing, setIsFollowing]       = useState(false);
-  const [followerCount, setFollowerCount]   = useState(0);
-  const [isLoading, setLoading]             = useState(true);
+  const qc = useQueryClient();
   const [isFollowPending, setFollowPending] = useState(false);
+  const key = [FOLLOW_KEY, targetUserId, user?.id];
 
-  useEffect(() => {
-    if (!targetUserId || !user?.id) { setLoading(false); return; }
-    setLoading(true);
-    Promise.all([
-      apiClient(user.id).get<{ following: boolean }>(`/follows/status/${targetUserId}`),
-      apiClient(null).get<unknown[]>(`/follows/followers/${targetUserId}`),
-    ]).then(([status, followers]) => {
-      setIsFollowing(status.following);
-      setFollowerCount(followers.length);
-    }).catch((e) => console.error('[useFollow] load failed:', e))
-      .finally(() => setLoading(false));
+  const q = useQuery<FollowState, Error>({
+    queryKey: key,
+    enabled: !!targetUserId && !!user?.id,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const [status, followers] = await Promise.all([
+        apiClient(user!.id).get<{ following: boolean }>(`/follows/status/${targetUserId}`),
+        apiClient(null).get<unknown[]>(`/follows/followers/${targetUserId}`),
+      ]);
+      return { following: status.following, count: followers.length };
+    },
+  });
+  const state = q.data ?? { following: false, count: 0 };
+
+  const setLocal = useCallback((following: boolean, delta: number) => {
+    qc.setQueryData<FollowState>(key, (prev) => ({ following, count: Math.max(0, (prev?.count ?? 0) + delta) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetUserId, user?.id]);
 
   const follow = useCallback(async () => {
     if (!targetUserId || !user?.id || isFollowPending) return;
     setFollowPending(true);
-    setIsFollowing(true);
-    setFollowerCount((c) => c + 1);
+    setLocal(true, 1);
     try {
       await apiClient(user.id).post('/follows', { following_id: targetUserId });
+      void qc.invalidateQueries({ queryKey: ['roster'] });
       options.onFollowSuccess?.();
     } catch (e) {
-      setIsFollowing(false);
-      setFollowerCount((c) => c - 1);
+      setLocal(false, -1);
       console.error('[useFollow] follow failed:', e);
     } finally {
       setFollowPending(false);
     }
-  }, [targetUserId, user?.id, isFollowPending, options]);
+  }, [targetUserId, user?.id, isFollowPending, options, setLocal, qc]);
 
   const unfollow = useCallback(async () => {
     if (!targetUserId || !user?.id || isFollowPending) return;
     setFollowPending(true);
-    setIsFollowing(false);
-    setFollowerCount((c) => Math.max(0, c - 1));
+    setLocal(false, -1);
     try {
       await apiClient(user.id).delete(`/follows/${targetUserId}`);
+      void qc.invalidateQueries({ queryKey: ['roster'] });
       options.onUnfollowSuccess?.();
     } catch (e) {
-      setIsFollowing(true);
-      setFollowerCount((c) => c + 1);
+      setLocal(true, 1);
       console.error('[useFollow] unfollow failed:', e);
     } finally {
       setFollowPending(false);
     }
-  }, [targetUserId, user?.id, isFollowPending, options]);
+  }, [targetUserId, user?.id, isFollowPending, options, setLocal, qc]);
 
-  return { isFollowing, followerCount, isLoading, isFollowPending, follow, unfollow };
+  return { isFollowing: state.following, followerCount: state.count, isLoading: q.isLoading, isFollowPending, follow, unfollow };
 }

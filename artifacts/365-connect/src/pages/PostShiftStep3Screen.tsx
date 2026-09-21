@@ -1,5 +1,5 @@
 /**
- * Step 3 of 5 — Schedule & Headcount
+ * Step 5 of 7 — Schedule & Headcount
  * Date, start time, end time, duration preview, and spots_available stepper.
  */
 import { useState } from 'react';
@@ -130,8 +130,8 @@ export function PostShiftStep3Screen() {
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
-          <div className="flex-1"><StepBar current={4} total={6} /></div>
-          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">4 of 6</span>
+          <div className="flex-1"><StepBar current={5} total={7} /></div>
+          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">5 of 7</span>
         </div>
         <h1 className="text-[#111827] font-bold text-[22px] tracking-tight">When & how many?</h1>
         <p className="text-[#6B7280] text-[13px] mt-0.5">Set the date, times, and headcount</p>

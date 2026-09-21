@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -33,62 +34,66 @@ export type ApplicantCard = RawApplicant & {
 /** @deprecated use ApplicantCard */
 export type ApplicantRow = ApplicantCard;
 
+export const SHIFT_APPLICANTS_KEY = 'shift-applicants';
+
 export function useShiftApplicants(shiftId: string | undefined) {
   const { user } = useAuth();
-  const [applicants, setApplicants] = useState<ApplicantCard[]>([]);
-  const [isLoading, setLoading]     = useState(true);
+  const qc = useQueryClient();
+  const key = [SHIFT_APPLICANTS_KEY, shiftId, user?.id];
 
-  const load = useCallback(async () => {
-    if (!shiftId || !user?.id) { setApplicants([]); setLoading(false); return; }
-    setLoading(true);
-    try {
-      const rows = await apiClient(user.id).get<RawApplicant[]>(`/applications?shift_id=${shiftId}`);
-      setApplicants(rows.map((r) => ({
+  const q = useQuery<ApplicantCard[], Error>({
+    queryKey: key,
+    enabled: !!shiftId && !!user?.id,
+    staleTime: 15_000,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const rows = await apiClient(user!.id).get<RawApplicant[]>(`/applications?shift_id=${shiftId}`);
+      return rows.map((r) => ({
         ...r,
         applicationId: r.id,
         photoUrl:      r.photo_url,
         matchScore:    r.match_score ?? null,
         jobTypes:      r.job_types,
         primaryJobType: r.primary_job_type,
-      })));
-    } catch (e) {
-      console.error('[useShiftApplicants] load failed:', e);
-    } finally {
-      setLoading(false);
-    }
-  }, [shiftId, user?.id]);
-
-  useEffect(() => { void load(); }, [load]);
+      }));
+    },
+  });
 
   const updateStatus = useCallback(async (applicationId: string, status: string): Promise<void> => {
     try {
       await apiClient(user?.id).patch(`/applications/${applicationId}`, { status });
-      setApplicants((prev) => prev.map((a) =>
-        a.id === applicationId ? { ...a, status: status as ApplicantCard['status'] } : a,
-      ));
+      qc.setQueryData<ApplicantCard[]>(key, (prev) => (prev ?? []).map((a) =>
+        a.id === applicationId ? { ...a, status: status as ApplicantCard['status'] } : a));
+      // The confirmed roster and the shift's spots changed too.
+      void qc.invalidateQueries({ queryKey: ['accepted-workers', shiftId] });
+      void qc.invalidateQueries({ queryKey: ['shift', shiftId] });
+      void qc.invalidateQueries({ queryKey: ['client-shifts'] });
     } catch (e) {
       console.error('[useShiftApplicants] updateStatus failed:', e);
       throw e;
     }
-  }, [user?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, shiftId]);
 
   // Return null on success, or the server's error message on failure (e.g. a
   // double-booking conflict) so the screen can show it.
   const approve = useCallback(async (applicationId: string): Promise<string | null> => {
     try {
       await updateStatus(applicationId, 'accepted');
-      setApplicants((prev) => prev.filter((a) => a.id !== applicationId));
+      qc.setQueryData<ApplicantCard[]>(key, (prev) => (prev ?? []).filter((a) => a.id !== applicationId));
       return null;
     } catch (e) { return e instanceof Error ? e.message : 'Could not confirm this worker.'; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateStatus]);
 
   const decline = useCallback(async (applicationId: string): Promise<string | null> => {
     try {
       await updateStatus(applicationId, 'declined');
-      setApplicants((prev) => prev.filter((a) => a.id !== applicationId));
+      qc.setQueryData<ApplicantCard[]>(key, (prev) => (prev ?? []).filter((a) => a.id !== applicationId));
       return null;
     } catch (e) { return e instanceof Error ? e.message : 'Could not decline this applicant.'; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateStatus]);
 
-  return { applicants, isLoading, approve, decline, updateStatus, refetch: load };
+  return { applicants: q.data ?? [], isLoading: q.isLoading, approve, decline, updateStatus, refetch: q.refetch };
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -51,23 +51,24 @@ export type AcceptedWorker = RawAccepted & {
   breakMinutes: number | null;
 };
 
+export const ACCEPTED_WORKERS_KEY = 'accepted-workers';
+
 export function useAcceptedWorkers(
   shiftId: string | undefined,
   /** optional — kept for compat, ignored (comes from auth context) */
   _ownerId?: string,
 ) {
   const { user } = useAuth();
-  const [workers, setWorkers]   = useState<AcceptedWorker[]>([]);
-  const [isLoading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    if (!shiftId || !user?.id) { setWorkers([]); setLoading(false); return; }
-    setLoading(true);
-    try {
-      const rows = await apiClient(user.id).get<RawAccepted[]>(
+  const q = useQuery<AcceptedWorker[], Error>({
+    queryKey: [ACCEPTED_WORKERS_KEY, shiftId, user?.id],
+    enabled: !!shiftId && !!user?.id,
+    staleTime: 15_000,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const rows = await apiClient(user!.id).get<RawAccepted[]>(
         `/applications?shift_id=${shiftId}&status=accepted`,
       );
-      setWorkers(rows.map((r) => ({
+      return rows.map((r) => ({
         ...r,
         workerId:        r.worker_id,
         photoUrl:        r.photo_url,
@@ -81,15 +82,9 @@ export function useAcceptedWorkers(
         approvedPay:     (r.approved_pay as number | null) ?? null,
         overtimeHours:   (r.overtime_hours as number | null) ?? null,
         breakMinutes:    (r.break_minutes as number | null) ?? null,
-      })));
-    } catch (e) {
-      console.error('[useAcceptedWorkers] load failed:', e);
-    } finally {
-      setLoading(false);
-    }
-  }, [shiftId, user?.id]);
+      }));
+    },
+  });
 
-  useEffect(() => { void load(); }, [load]);
-
-  return { workers, isLoading, refetch: load };
+  return { workers: q.data ?? [], isLoading: q.isLoading, refetch: q.refetch };
 }

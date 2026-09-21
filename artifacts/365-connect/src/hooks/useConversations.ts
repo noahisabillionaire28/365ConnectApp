@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { onSSE } from '@/lib/sseEmitter';
@@ -83,48 +84,47 @@ export async function openShiftGroupChat(userId: string, shiftId: string): Promi
   }
 }
 
+export const CONVERSATIONS_KEY = 'conversations';
+
 export function useConversations(opts: { archived?: boolean } = {}) {
   const { user } = useAuth();
-  const [items, setItems]       = useState<ConversationWithOther[]>([]);
-  const [isLoading, setLoading] = useState(true);
+  const qc = useQueryClient();
   const archived = !!opts.archived;
+  const key = [CONVERSATIONS_KEY, user?.id, archived];
 
-  const load = useCallback(async () => {
-    if (!user?.id) { setItems([]); setLoading(false); return; }
-    try {
-      const rows = await apiClient(user.id).get<ApiConversation[]>(`/conversations${archived ? '?archived=1' : ''}`);
-      setItems(rows.map((c) => shapeConversation(c, user.id)));
-    } catch (e) {
-      console.error('[useConversations] fetch failed:', e);
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id, archived]);
-
-  useEffect(() => { setLoading(true); void load(); }, [load]);
+  const q = useQuery<ConversationWithOther[], Error>({
+    queryKey: key,
+    enabled: !!user?.id,
+    staleTime: 10_000,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const rows = await apiClient(user!.id).get<ApiConversation[]>(`/conversations${archived ? '?archived=1' : ''}`);
+      return rows.map((c) => shapeConversation(c, user!.id));
+    },
+  });
+  const load = q.refetch;
 
   // Live updates + a polling fallback for hosts where SSE drops.
   useEffect(() => {
-    const off = onSSE<{ conversationId: string }>('conversation_update', () => { void load(); });
-    const t = setInterval(() => { if (document.visibilityState === 'visible') void load(); }, 20_000);
+    const off = onSSE<{ conversationId: string }>('conversation_update', () => { void qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] }); });
+    const t = setInterval(() => { if (document.visibilityState === 'visible') void qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] }); }, 20_000);
     return () => { off(); clearInterval(t); };
-  }, [load]);
+  }, [qc]);
 
   const getOrCreate = useCallback(
     async (otherUserId: string, shiftId?: string): Promise<string | null> => {
       if (!user?.id) return null;
       const id = await getOrCreateDirectConversation(user.id, otherUserId, shiftId);
-      if (id) await load();
+      if (id) void qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
       return id;
     },
-    [user?.id, load],
+    [user?.id, qc],
   );
 
   /** Per-user thread settings: mute / pin / archive. */
   const setPrefs = useCallback(async (conversationId: string, prefs: { muted?: boolean; pinned?: boolean; archived?: boolean }): Promise<string | null> => {
     if (!user?.id) return 'Not signed in.';
-    setItems((prev) => prev.map((c) => (c.id === conversationId ? {
+    qc.setQueryData<ConversationWithOther[]>(key, (prev) => (prev ?? []).map((c) => (c.id === conversationId ? {
       ...c,
       is_muted: prefs.muted ?? c.is_muted,
       is_pinned: prefs.pinned ?? c.is_pinned,
@@ -132,26 +132,28 @@ export function useConversations(opts: { archived?: boolean } = {}) {
     } : c)));
     try {
       await apiClient(user.id).patch(`/conversations/${conversationId}/prefs`, prefs);
-      await load();
+      void qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
       return null;
     } catch (e) {
-      await load();
+      void qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
       return e instanceof Error ? e.message : 'Could not update this conversation.';
     }
-  }, [user?.id, load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, archived]);
 
   /** Remove a thread from my list (the other side keeps their copy). */
   const deleteConversation = useCallback(async (conversationId: string): Promise<string | null> => {
     if (!user?.id) return 'Not signed in.';
-    setItems((prev) => prev.filter((c) => c.id !== conversationId));
+    qc.setQueryData<ConversationWithOther[]>(key, (prev) => (prev ?? []).filter((c) => c.id !== conversationId));
     try {
       await apiClient(user.id).delete(`/conversations/${conversationId}`);
       return null;
     } catch (e) {
-      await load();
+      void qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
       return e instanceof Error ? e.message : 'Could not delete this conversation.';
     }
-  }, [user?.id, load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, archived]);
 
-  return { items, isLoading, refetch: load, getOrCreateConversation: getOrCreate, setPrefs, deleteConversation };
+  return { items: q.data ?? [], isLoading: q.isLoading, refetch: load, getOrCreateConversation: getOrCreate, setPrefs, deleteConversation };
 }

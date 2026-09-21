@@ -314,6 +314,8 @@ export function ShiftDetailScreen() {
     void qc.invalidateQueries({ queryKey: ['shifts'] });
     void qc.invalidateQueries({ queryKey: ['shift', shiftId] });
     void qc.invalidateQueries({ queryKey: ['application-status'] });
+    void qc.invalidateQueries({ queryKey: ['my-applications'] });
+    void qc.invalidateQueries({ queryKey: ['my-shift-ids'] });
   }
 
   /** Runs after the worker confirms in the drop sheet. */
@@ -400,7 +402,7 @@ export function ShiftDetailScreen() {
         requirements:    (raw.requirements    as string[] | null)  ?? [],
       });
       setEditShiftId(shiftId);
-      navigate('/post-shift/event');
+      navigate('/post-shift/name');
     } catch (e) {
       console.error('[ShiftDetail] edit prefill failed:', e);
     } finally {

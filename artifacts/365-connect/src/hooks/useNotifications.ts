@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { onSSE } from '@/lib/sseEmitter';
@@ -8,6 +9,8 @@ type NotificationWithSender = NotificationRow & {
   from_username?: string | null;
   from_photo_url?: string | null;
 };
+
+export const NOTIFICATIONS_KEY = 'notifications';
 
 /** ms → human-readable relative time */
 export function relativeTime(iso: string | null | undefined): string {
@@ -39,35 +42,37 @@ export function notificationDeepLink(
   return '/notifications';
 }
 
+/**
+ * The viewer's notifications, cached in react-query so the screen paints
+ * instantly from the last snapshot and refreshes in the background.
+ */
 export function useNotifications() {
   const { user } = useAuth();
-  const [items, setItems]         = useState<NotificationWithSender[]>([]);
-  const [isLoading, setLoading]   = useState(true);
-  // Map of user_id → username for sender display
-  const [usernames, setUsernames] = useState<Record<string, string>>({});
+  const qc = useQueryClient();
+  const key = [NOTIFICATIONS_KEY, user?.id];
 
-  const load = useCallback(async () => {
-    if (!user?.id) { setItems([]); setLoading(false); return; }
-    setLoading(true);
-    try {
-      const rows = await apiClient(user.id).get<NotificationWithSender[]>('/notifications');
-      setItems(rows);
-      // Build username map from sender info included in response
-      const map: Record<string, string> = {};
-      for (const r of rows) {
-        if (r.from_user_id && r.from_username) {
-          map[r.from_user_id] = r.from_username;
-        }
-      }
-      setUsernames(map);
-    } catch (e) {
-      console.error('[useNotifications] load failed:', e);
-    } finally {
-      setLoading(false);
-    }
+  const q = useQuery<NotificationWithSender[], Error>({
+    queryKey: key,
+    enabled: !!user?.id,
+    staleTime: 15_000,
+    placeholderData: keepPreviousData,
+    queryFn: () => apiClient(user!.id).get<NotificationWithSender[]>('/notifications'),
+  });
+  const items = useMemo(() => q.data ?? [], [q.data]);
+
+  const setItems = useCallback((fn: (prev: NotificationWithSender[]) => NotificationWithSender[]) => {
+    qc.setQueryData<NotificationWithSender[]>(key, (prev) => fn(prev ?? []));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  useEffect(() => { void load(); }, [load]);
+  // Map of user_id → username for sender display
+  const usernames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const r of items) {
+      if (r.from_user_id && r.from_username) map[r.from_user_id] = r.from_username;
+    }
+    return map;
+  }, [items]);
 
   // Live updates: prepend incoming notifications
   useEffect(() => {
@@ -77,29 +82,39 @@ export function useNotifications() {
         return [notification, ...prev];
       });
     });
-  }, []);
+  }, [setItems]);
 
   const unreadCount = items.filter((n) => !n.read_at).length;
 
   const markRead = useCallback(async (id: string) => {
+    setItems((prev) => prev.map((n) =>
+      n.id === id ? { ...n, read_at: n.read_at ?? new Date().toISOString(), read: true } : n,
+    ));
     try {
       await apiClient(user?.id).patch(`/notifications/${id}/read`, {});
-      setItems((prev) => prev.map((n) =>
-        n.id === id ? { ...n, read_at: new Date().toISOString(), read: true } : n,
-      ));
     } catch (e) {
       console.error('[useNotifications] markRead failed:', e);
     }
-  }, [user?.id]);
+  }, [user?.id, setItems]);
 
   const markAllRead = useCallback(async () => {
+    setItems((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? new Date().toISOString(), read: true })));
     try {
       await apiClient(user?.id).patch('/notifications/read-all', {});
-      setItems((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? new Date().toISOString(), read: true })));
     } catch (e) {
       console.error('[useNotifications] markAllRead failed:', e);
     }
-  }, [user?.id]);
+  }, [user?.id, setItems]);
 
-  return { items, isLoading, unreadCount, markRead, markAllRead, refetch: load, usernames };
+  const refetch = useCallback(async () => { await q.refetch(); }, [q.refetch]);
+
+  return {
+    items,
+    isLoading: !!user?.id && q.isLoading,
+    unreadCount,
+    markRead,
+    markAllRead,
+    refetch,
+    usernames,
+  };
 }

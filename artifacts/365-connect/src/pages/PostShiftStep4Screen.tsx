@@ -1,5 +1,5 @@
 /**
- * Step 4 of 5 — Pay Rate + Description & Requirements
+ * Step 6 of 7 — Pay Rate + Description & Requirements
  */
 import { useState } from 'react';
 import { useLocation } from 'wouter';
@@ -93,8 +93,8 @@ export function PostShiftStep4Screen() {
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
-          <div className="flex-1"><StepBar current={5} total={6} /></div>
-          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">5 of 6</span>
+          <div className="flex-1"><StepBar current={6} total={7} /></div>
+          <span className="text-[#6B7280] text-[12px] font-semibold flex-shrink-0">6 of 7</span>
         </div>
         <h1 className="text-[#111827] font-bold text-[22px] tracking-tight">Pay & details</h1>
         <p className="text-[#6B7280] text-[13px] mt-0.5">Set the rate and describe the role</p>

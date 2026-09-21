@@ -1,3 +1,24 @@
+import { lazy, Suspense, type ComponentType } from 'react';
+
+/**
+ * Route-level code splitting: each screen is its own chunk, fetched the
+ * first time it is opened. Splash/Login/Home stay in the main bundle so the
+ * first paint needs nothing extra.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyComponent = ComponentType<any>;
+function lazyNamed<M extends Record<string, unknown>>(loader: () => Promise<M>, name: keyof M) {
+  return lazy<AnyComponent>(async () => ({ default: (await loader())[name] as AnyComponent }));
+}
+
+function RouteFallback() {
+  return (
+    <div className="min-h-[100dvh] bg-white flex items-center justify-center" aria-busy="true" aria-label="Loading">
+      <div className="w-7 h-7 rounded-full border-2 border-[#DBDBDB] border-t-[#0A1628] animate-spin" />
+    </div>
+  );
+}
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { restoreQueryCache, startQueryCachePersistence } from '@/lib/queryPersist';
 import { Toaster } from '@/components/ui/toaster';
@@ -20,60 +41,61 @@ import { AdminNav } from '@/components/AdminNav';
 // Auth / onboarding
 import { SplashScreen }         from '@/pages/SplashScreen';
 import { LoginScreen }          from '@/pages/LoginScreen';
-import { SignUpScreen }         from '@/pages/SignUpScreen';
-import { PhoneAuthScreen }      from '@/pages/PhoneAuthScreen';
-import { ResetPasswordScreen }  from '@/pages/ResetPasswordScreen';
-import { AuthCallbackScreen }   from '@/pages/AuthCallbackScreen';
-import { RoleSelectScreen }      from '@/pages/RoleSelectScreen';
-import { OnboardingScreen }      from '@/pages/OnboardingScreen';
-import { WorkerSetupScreen }     from '@/pages/WorkerSetupScreen';
-import { ClientSetupScreen }     from '@/pages/ClientSetupScreen';
-import { StafferSetupScreen }    from '@/pages/StafferSetupScreen';
+const SignUpScreen = lazyNamed(() => import('@/pages/SignUpScreen'), 'SignUpScreen');
+const PhoneAuthScreen = lazyNamed(() => import('@/pages/PhoneAuthScreen'), 'PhoneAuthScreen');
+const ResetPasswordScreen = lazyNamed(() => import('@/pages/ResetPasswordScreen'), 'ResetPasswordScreen');
+const AuthCallbackScreen = lazyNamed(() => import('@/pages/AuthCallbackScreen'), 'AuthCallbackScreen');
+const RoleSelectScreen = lazyNamed(() => import('@/pages/RoleSelectScreen'), 'RoleSelectScreen');
+const OnboardingScreen = lazyNamed(() => import('@/pages/OnboardingScreen'), 'OnboardingScreen');
+const WorkerSetupScreen = lazyNamed(() => import('@/pages/WorkerSetupScreen'), 'WorkerSetupScreen');
+const ClientSetupScreen = lazyNamed(() => import('@/pages/ClientSetupScreen'), 'ClientSetupScreen');
+const StafferSetupScreen = lazyNamed(() => import('@/pages/StafferSetupScreen'), 'StafferSetupScreen');
 
 // Main app tabs
 import { HomeScreen }            from '@/pages/HomeScreen';
-import { JobsScreen }            from '@/pages/JobsScreen';
-import { ExploreScreen }         from '@/pages/ExploreScreen';
-import { MessagesScreen }        from '@/pages/MessagesScreen';
-import { ChatScreen }            from '@/pages/ChatScreen';
-import { NotificationsScreen }   from '@/pages/NotificationsScreen';
-import { NotificationSettingsScreen } from '@/pages/NotificationSettingsScreen';
-import { PostScreen }             from '@/pages/PostScreen';
-import { HashtagScreen }          from '@/pages/HashtagScreen';
-import { SavedWorkersScreen }     from '@/pages/SavedWorkersScreen';
-import { AvailabilityScreen }      from '@/pages/AvailabilityScreen';
-import { ProfileScreen }         from '@/pages/ProfileScreen';
+const JobsScreen = lazyNamed(() => import('@/pages/JobsScreen'), 'JobsScreen');
+const ExploreScreen = lazyNamed(() => import('@/pages/ExploreScreen'), 'ExploreScreen');
+const MessagesScreen = lazyNamed(() => import('@/pages/MessagesScreen'), 'MessagesScreen');
+const ChatScreen = lazyNamed(() => import('@/pages/ChatScreen'), 'ChatScreen');
+const NotificationsScreen = lazyNamed(() => import('@/pages/NotificationsScreen'), 'NotificationsScreen');
+const NotificationSettingsScreen = lazyNamed(() => import('@/pages/NotificationSettingsScreen'), 'NotificationSettingsScreen');
+const PostScreen = lazyNamed(() => import('@/pages/PostScreen'), 'PostScreen');
+const HashtagScreen = lazyNamed(() => import('@/pages/HashtagScreen'), 'HashtagScreen');
+const SavedWorkersScreen = lazyNamed(() => import('@/pages/SavedWorkersScreen'), 'SavedWorkersScreen');
+const AvailabilityScreen = lazyNamed(() => import('@/pages/AvailabilityScreen'), 'AvailabilityScreen');
+const ProfileScreen = lazyNamed(() => import('@/pages/ProfileScreen'), 'ProfileScreen');
 
 // Detail screens
-import { ShiftDetailScreen }     from '@/pages/ShiftDetailScreen';
-import { WorkerProfileScreen }   from '@/pages/WorkerProfileScreen';
-import { ClockInScreen }         from '@/pages/ClockInScreen';
-import { ApplicantsScreen }      from '@/pages/ApplicantsScreen';
-import { ShiftUpdatesScreen }     from '@/pages/ShiftUpdatesScreen';
-import { ReviewScreen }          from '@/pages/ReviewScreen';
-import { RosterScreen }          from '@/pages/RosterScreen';
-import { AssignWorkersScreen }   from '@/pages/AssignWorkersScreen';
+const ShiftDetailScreen = lazyNamed(() => import('@/pages/ShiftDetailScreen'), 'ShiftDetailScreen');
+const WorkerProfileScreen = lazyNamed(() => import('@/pages/WorkerProfileScreen'), 'WorkerProfileScreen');
+const ClockInScreen = lazyNamed(() => import('@/pages/ClockInScreen'), 'ClockInScreen');
+const ApplicantsScreen = lazyNamed(() => import('@/pages/ApplicantsScreen'), 'ApplicantsScreen');
+const ShiftUpdatesScreen = lazyNamed(() => import('@/pages/ShiftUpdatesScreen'), 'ShiftUpdatesScreen');
+const ReviewScreen = lazyNamed(() => import('@/pages/ReviewScreen'), 'ReviewScreen');
+const RosterScreen = lazyNamed(() => import('@/pages/RosterScreen'), 'RosterScreen');
+const AssignWorkersScreen = lazyNamed(() => import('@/pages/AssignWorkersScreen'), 'AssignWorkersScreen');
 
 // Wizards (post-shift builders)
-import { PostShiftEventTypeScreen } from '@/pages/PostShiftEventTypeScreen';
-import { PostEventScreen }         from '@/pages/PostEventScreen';
-import { PostShiftSuccessScreen } from '@/pages/PostShiftSuccessScreen';
-import { PostShiftStep1Screen }  from '@/pages/PostShiftStep1Screen';
-import { PostShiftStep2Screen }  from '@/pages/PostShiftStep2Screen';
-import { PostShiftStep3Screen }  from '@/pages/PostShiftStep3Screen';
-import { PostShiftStep4Screen }  from '@/pages/PostShiftStep4Screen';
-import { PostShiftStep5Screen }  from '@/pages/PostShiftStep5Screen';
-import { ProUpgradeScreen }       from '@/pages/ProUpgradeScreen';
-import { EarningsScreen }         from '@/pages/EarningsScreen';
+const PostShiftNameScreen = lazyNamed(() => import('@/pages/PostShiftNameScreen'), 'PostShiftNameScreen');
+const PostShiftEventTypeScreen = lazyNamed(() => import('@/pages/PostShiftEventTypeScreen'), 'PostShiftEventTypeScreen');
+const PostEventScreen = lazyNamed(() => import('@/pages/PostEventScreen'), 'PostEventScreen');
+const PostShiftSuccessScreen = lazyNamed(() => import('@/pages/PostShiftSuccessScreen'), 'PostShiftSuccessScreen');
+const PostShiftStep1Screen = lazyNamed(() => import('@/pages/PostShiftStep1Screen'), 'PostShiftStep1Screen');
+const PostShiftStep2Screen = lazyNamed(() => import('@/pages/PostShiftStep2Screen'), 'PostShiftStep2Screen');
+const PostShiftStep3Screen = lazyNamed(() => import('@/pages/PostShiftStep3Screen'), 'PostShiftStep3Screen');
+const PostShiftStep4Screen = lazyNamed(() => import('@/pages/PostShiftStep4Screen'), 'PostShiftStep4Screen');
+const PostShiftStep5Screen = lazyNamed(() => import('@/pages/PostShiftStep5Screen'), 'PostShiftStep5Screen');
+const ProUpgradeScreen = lazyNamed(() => import('@/pages/ProUpgradeScreen'), 'ProUpgradeScreen');
+const EarningsScreen = lazyNamed(() => import('@/pages/EarningsScreen'), 'EarningsScreen');
 
 // ── Admin screens ──────────────────────────────────────────────────────────────
-import { AdminLogin }     from '@/pages/admin/AdminLogin';
-import { AdminDashboard } from '@/pages/admin/AdminDashboard';
-import { AdminUsers }     from '@/pages/admin/AdminUsers';
-import { AdminShifts }    from '@/pages/admin/AdminShifts';
-import { AdminDisputes }  from '@/pages/admin/AdminDisputes';
-import { AdminRevenue }   from '@/pages/admin/AdminRevenue';
-import { AdminSettings }  from '@/pages/admin/AdminSettings';
+const AdminLogin = lazyNamed(() => import('@/pages/admin/AdminLogin'), 'AdminLogin');
+const AdminDashboard = lazyNamed(() => import('@/pages/admin/AdminDashboard'), 'AdminDashboard');
+const AdminUsers = lazyNamed(() => import('@/pages/admin/AdminUsers'), 'AdminUsers');
+const AdminShifts = lazyNamed(() => import('@/pages/admin/AdminShifts'), 'AdminShifts');
+const AdminDisputes = lazyNamed(() => import('@/pages/admin/AdminDisputes'), 'AdminDisputes');
+const AdminRevenue = lazyNamed(() => import('@/pages/admin/AdminRevenue'), 'AdminRevenue');
+const AdminSettings = lazyNamed(() => import('@/pages/admin/AdminSettings'), 'AdminSettings');
 
 // ── Query client ──────────────────────────────────────────────────────────────
 const queryClient = new QueryClient({
@@ -121,6 +143,7 @@ function MobileRouter() {
           transition={{ duration: 0.13, ease: 'easeInOut' }}
           style={{ width: '100%' }}
         >
+          <Suspense fallback={<RouteFallback />}>
           <Switch>
             {/* ── Auth (Supabase) ───────────────────────────────── */}
             <Route path="/login"          component={LoginScreen}         />
@@ -175,6 +198,7 @@ function MobileRouter() {
             <Route path="/shift/:id/assign" component={AssignWorkersScreen}  />
 
             {/* ── Client post-shift wizard ──────────────────────── */}
+            <Route path="/post-shift/name"  component={PostShiftNameScreen} />
             <Route path="/post-shift/event" component={PostShiftEventTypeScreen} />
             <Route path="/post-event"       component={PostEventScreen} />
             <Route path="/post-shift/step1" component={PostShiftStep1Screen} />
@@ -186,6 +210,7 @@ function MobileRouter() {
 
             <Route component={NotFound} />
           </Switch>
+          </Suspense>
         </motion.div>
       </AnimatePresence>
     </MobileContainer>
@@ -204,6 +229,7 @@ function AdminRouter() {
     >
       {showNav && <AdminNav />}
 
+      <Suspense fallback={<RouteFallback />}>
       <Switch>
         <Route path="/admin/login"     component={AdminLogin}     />
         <Route path="/admin/dashboard" component={AdminDashboard} />
@@ -221,6 +247,7 @@ function AdminRouter() {
           }}
         </Route>
       </Switch>
+      </Suspense>
     </div>
   );
 }
