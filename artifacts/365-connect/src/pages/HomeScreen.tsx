@@ -7,6 +7,7 @@ import {
   Users, ChevronRight,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
+import { InstallBanner } from '@/components/InstallBanner';
 import { ShiftListCard, ShiftListCardSkeleton } from '@/components/home/ShiftListCard';
 import { PeopleCard, PeopleCardSkeleton } from '@/components/home/PeopleCard';
 import { useWorkerHomeShifts } from '@/hooks/useWorkerHomeShifts';
@@ -386,6 +387,7 @@ function WorkerHomeFeed() {
           onChange={(v) => setTab(v as 'schedule' | 'requests' | 'available')}
         />
       </div>
+      <div className="pt-3"><InstallBanner compact /></div>
 
       {tab === 'schedule'  && <WorkerMyShiftsView />}
       {tab === 'requests'  && <WorkerRequestsView {...shiftRequests} />}
@@ -693,6 +695,7 @@ function ClientHomeFeed() {
           onChange={(v) => setTab(v as 'browse' | 'my-shifts')}
         />
       </div>
+      <div className="pt-3"><InstallBanner compact /></div>
       {tab === 'browse' ? <WorkerDiscoveryBody /> : <ClientMyShiftsView />}
       <BottomTabNav />
     </div>
@@ -722,6 +725,7 @@ function StafferHomeFeed() {
           onChange={(v) => setTab(v as 'browse' | 'my-shifts')}
         />
       </div>
+      <div className="pt-3"><InstallBanner compact /></div>
       {tab === 'browse' ? <WorkerDiscoveryBody /> : <ClientMyShiftsView />}
 
       <motion.button
