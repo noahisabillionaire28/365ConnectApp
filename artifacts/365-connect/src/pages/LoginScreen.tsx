@@ -131,7 +131,7 @@ export function LoginScreen() {
 
     const { data: profile, error: profileErr } = await supabase
       .from('users')
-      .select('username, role, availability')
+      .select('username, role, availability, bio, company_name')
       .eq('id', data.user.id)
       .maybeSingle();
 

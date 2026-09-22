@@ -8,6 +8,7 @@
     { "source": "/(.*)", "destination": "/api" }
   ],
   "crons": [
-    { "path": "/api/messages/flush-scheduled", "schedule": "0 12 * * *" }
+    { "path": "/api/messages/flush-scheduled", "schedule": "0 12 * * *" },
+    { "path": "/api/cron/tick", "schedule": "0 11 * * *" }
   ]
 }

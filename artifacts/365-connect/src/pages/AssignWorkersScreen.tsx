@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { useParams, useLocation } from 'wouter';
-import { ChevronLeft, Star, BadgeCheck, UserPlus, CheckCircle2, Users } from 'lucide-react';
+import { useParams, useLocation, useSearch } from 'wouter';
+import { ChevronLeft, Star, BadgeCheck, UserPlus, CheckCircle2, Users, Send } from 'lucide-react';
 import { useAssignWorkers, type AssignableWorker } from '@/hooks/useAssignWorkers';
 import { useShiftById } from '@/hooks/useShifts';
 import { useRole } from '@/contexts/RoleContext';
@@ -22,12 +22,21 @@ function AssignCardSkeleton() {
   );
 }
 
-function AssignCard({ worker, shiftFull, isAssigning, onAssign }: {
-  worker: AssignableWorker; shiftFull: boolean; isAssigning: boolean; onAssign: (id: string) => void;
+function AssignCard({ worker, shiftFull, shiftJobTypes, isAssigning, isOffering, onAssign, onOffer }: {
+  worker: AssignableWorker; shiftFull: boolean; shiftJobTypes: string[];
+  isAssigning: boolean; isOffering: boolean;
+  onAssign: (id: string) => void; onOffer: (id: string) => void;
 }) {
   const initials = (worker.username ?? 'W').replace('@', '').slice(0, 2).toUpperCase();
   const alreadyAssigned = worker.applicationStatus === 'accepted';
-  const disabled = alreadyAssigned || isAssigning || (shiftFull && !alreadyAssigned);
+  const onStandby = worker.applicationStatus === 'standby';
+  const offerPending = worker.requestStatus === 'pending';
+  const offerDeclined = worker.requestStatus === 'declined';
+  const busy = isAssigning || isOffering;
+  const disabled = alreadyAssigned || busy || (shiftFull && !alreadyAssigned);
+  const roles = [worker.primaryJobType, ...(worker.job_types ?? [])].filter((r): r is string => !!r);
+  const matches = shiftJobTypes.filter((t) => roles.includes(t));
+  const roleMismatch = shiftJobTypes.length > 0 && roles.length > 0 && matches.length === 0;
 
   return (
     <div className="rounded-[12px] border border-[#E5E7EB] bg-white p-4 flex items-center gap-3">
@@ -61,14 +70,42 @@ function AssignCard({ worker, shiftFull, isAssigning, onAssign }: {
         </div>
       </div>
 
-      <button type="button" disabled={disabled} aria-disabled={disabled}
-        onClick={() => onAssign(worker.id)}
-        className={`flex-shrink-0 h-[34px] px-3.5 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 transition-colors ${
-          alreadyAssigned ? 'bg-[#10B981]/10 text-[#10B981]' : 'text-white disabled:opacity-50'
-        }`}
-        style={alreadyAssigned ? undefined : { background: '#0A1628' }}>
-        {alreadyAssigned ? (<><CheckCircle2 size={14} /> Assigned</>) : isAssigning ? 'Assigning…' : (<><UserPlus size={14} /> Assign</>)}
-      </button>
+      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+        {alreadyAssigned ? (
+          <span className="h-[34px] px-3.5 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 bg-[#10B981]/10 text-[#10B981]">
+            <CheckCircle2 size={14} /> Assigned
+          </span>
+        ) : onStandby ? (
+          <span className="h-[34px] px-3.5 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200">
+            On standby
+          </span>
+        ) : (
+          <>
+            <button type="button" disabled={disabled} aria-disabled={disabled}
+              onClick={() => onAssign(worker.id)}
+              aria-label={`Assign ${worker.username ? `@${worker.username}` : 'worker'} — books them immediately`}
+              className="h-[34px] px-3.5 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 text-white disabled:opacity-50"
+              style={{ background: '#0A1628' }}>
+              {isAssigning ? 'Assigning…' : (<><UserPlus size={14} /> Assign</>)}
+            </button>
+            {offerPending ? (
+              <span className="text-[11px] font-semibold text-[#6B7280]">Offer sent · awaiting reply</span>
+            ) : (
+              <button type="button" disabled={busy || shiftFull} onClick={() => onOffer(worker.id)}
+                aria-label={`Send ${worker.username ? `@${worker.username}` : 'worker'} an offer they can accept or decline`}
+                className="h-[30px] px-3 rounded-[8px] text-[11px] font-bold flex items-center gap-1 border border-[#E5E7EB] text-[#0A1628] disabled:opacity-50">
+                <Send size={12} aria-hidden /> {isOffering ? 'Sending…' : offerDeclined ? 'Offer again' : 'Send offer'}
+              </button>
+            )}
+          </>
+        )}
+        {roleMismatch && (
+          <span className="text-[10px] font-semibold text-amber-600">No matching role</span>
+        )}
+        {matches.length > 0 && !alreadyAssigned && (
+          <span className="text-[10px] font-semibold text-emerald-600">Matches {matches[0]}</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -78,19 +115,33 @@ export function AssignWorkersScreen() {
   const [, navigate] = useLocation();
   const { role, roleLoading } = useRole();
   const { data: shift, isLoading: shiftLoading } = useShiftById(id);
-  const { workers, isLoading, error, assign, assigningId } = useAssignWorkers(id);
+  const { workers, isLoading, error, assign, offer, assigningId, offeringId } = useAssignWorkers(id);
   const { showToast } = useToast();
 
   function handleAssign(workerId: string) {
     void assign(workerId).then((err) => {
-      if (err) showToast(err);
+      if (err) showToast(err, 'error');
       else showToast('Worker assigned to this shift.');
+    });
+  }
+
+  function handleOffer(workerId: string) {
+    void offer(workerId).then((err) => {
+      if (err) showToast(err, 'error');
+      else showToast('Offer sent — they can accept from their Home tab.');
     });
   }
 
   useEffect(() => {
     if (!roleLoading && role !== 'staffer') navigate('/home');
   }, [roleLoading, role, navigate]);
+
+  // Arriving from the roster with ?worker=<id>: bring that person to the top
+  // so the assign button is the first thing under the thumb.
+  const preselect = new URLSearchParams(useSearch()).get('worker');
+  const ordered = preselect
+    ? [...workers].sort((a, b) => (a.id === preselect ? -1 : b.id === preselect ? 1 : 0))
+    : workers;
 
   if (roleLoading || role !== 'staffer') return null;
 
@@ -125,9 +176,13 @@ export function AssignWorkersScreen() {
               {shift.spotsAvailable} of {shift.spotsTotal} spot{shift.spotsTotal !== 1 ? 's' : ''} open
               {assignedCount > 0 && ` · ${assignedCount} assigned from roster`}
             </p>
-            {shiftFull && (
+            {shiftFull ? (
               <p className="text-[#EF4444] text-[12px] font-medium mt-1">
                 This shift is fully booked — remove a worker before assigning another.
+              </p>
+            ) : (
+              <p className="text-[#6B7280] text-[12px] mt-1">
+                <b>Assign</b> books someone right away. <b>Send offer</b> lets them accept or decline first.
               </p>
             )}
           </div>
@@ -154,8 +209,10 @@ export function AssignWorkersScreen() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {workers.map((w) => (
-              <AssignCard key={w.id} worker={w} shiftFull={shiftFull} isAssigning={assigningId === w.id} onAssign={handleAssign} />
+            {ordered.map((w) => (
+              <AssignCard key={w.id} worker={w} shiftFull={shiftFull} shiftJobTypes={shift?.jobTypes ?? []}
+                isAssigning={assigningId === w.id} isOffering={offeringId === w.id}
+                onAssign={handleAssign} onOffer={handleOffer} />
             ))}
           </div>
         )}

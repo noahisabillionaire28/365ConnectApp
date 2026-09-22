@@ -6,7 +6,7 @@
  * Admin    → null (admin uses the left sidebar instead)
  */
 import { Link, useLocation } from 'wouter';
-import { Home, Briefcase, Compass, MessageSquare, User, PlusCircle } from 'lucide-react';
+import { Home, Briefcase, Compass, MessageSquare, User, PlusCircle, Users } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { useRole } from '@/contexts/RoleContext';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
@@ -19,6 +19,7 @@ const SCREEN_FOR_PATH: Record<string, string> = {
   '/messages':        'MessagesScreen',
   '/profile':         'ProfileScreen',
   '/post-shift/name': 'PostShiftNameScreen',
+  '/roster':          'RosterScreen',
 };
 
 type Tab = {
@@ -45,10 +46,12 @@ const CLIENT_TABS: Tab[] = [
   { name: 'Profile',    path: '/profile',           activeFor: '/profile',     icon: User          },
 ];
 
+// An agency runs on its roster, so it gets a Roster tab; worker discovery
+// lives on Home → Browse Workers (and /explore stays reachable from there).
 const STAFFER_TABS: Tab[] = [
   { name: 'Home',       path: '/home',                activeFor: '/home',           icon: Home          },
   { name: 'Post Shift', path: '/post-shift/name', activeFor: '/post-shift',  icon: PlusCircle    },
-  { name: 'Explore',    path: '/explore',              activeFor: '/explore',        icon: Compass       },
+  { name: 'Roster',     path: '/roster',               activeFor: '/roster',         icon: Users         },
   { name: 'Messages',   path: '/messages',             activeFor: '/messages',       icon: MessageSquare },
   { name: 'Profile',    path: '/profile',              activeFor: '/profile',        icon: User          },
 ];

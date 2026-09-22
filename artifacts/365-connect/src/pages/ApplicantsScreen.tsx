@@ -5,6 +5,7 @@ import {
   ChevronLeft, Check, X, Star, Send, UserPlus, Users, AlarmClock,
   CheckCircle2, Flag, DollarSign, Clock3, MessageCircle, MessagesSquare,
 } from 'lucide-react';
+import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { getOrCreateDirectConversation, openShiftGroupChat } from '@/hooks/useConversations';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
 import { useAcceptedWorkers, type AcceptedWorker, type Attendance } from '@/hooks/useAcceptedWorkers';
@@ -52,12 +53,15 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
 }
 
 /* ── Confirmed worker row (attendance + pay / no-show / remove) ───────────── */
-function ConfirmedRow({ w, late, onApprove, onPay, onNoShow, onRemove, onReview, onMessage, busy }: {
+function ConfirmedRow({ w, late, closed, onApprove, onPay, onNoShow, onRemove, onReview, onMessage, busy }: {
   w: AcceptedWorker; late: boolean;
+  /** The shift has ended — a worker still "on site" forgot to clock out. */
+  closed: boolean;
   onApprove: () => void; onPay: () => void; onNoShow: () => void; onRemove: () => void; onReview: () => void;
   onMessage: () => void;
   busy: boolean;
 }) {
+  const forgotClockOut = w.attendance === 'on_site' && closed;
   return (
     <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 flex flex-col gap-2.5">
       <div className="flex items-center gap-3">
@@ -97,11 +101,11 @@ function ConfirmedRow({ w, late, onApprove, onPay, onNoShow, onRemove, onReview,
       </div>
 
       <div className="flex gap-2">
-        {w.attendance === 'done' && !w.approved && (
+        {(w.attendance === 'done' || forgotClockOut) && !w.approved && (
           <button type="button" disabled={busy} onClick={onApprove}
             className="flex-1 h-9 rounded-[8px] bg-[#0A1628] text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
             <Clock3 size={13} aria-hidden />
-            Review &amp; Approve
+            {forgotClockOut ? 'Set clock-out & approve' : 'Review & Approve'}
           </button>
         )}
         {w.attendance === 'done' && w.approved && !w.paid && (
@@ -140,12 +144,23 @@ function ConfirmedRow({ w, late, onApprove, onPay, onNoShow, onRemove, onReview,
 }
 
 /* ── Timesheet review sheet (approve hours + overtime) ───────────────────── */
-function ReviewSheet({ w, payRate, busy, onApprove, onClose }: {
-  w: AcceptedWorker; payRate: number; busy: boolean;
-  onApprove: (breakMinutes: number) => void; onClose: () => void;
+function ReviewSheet({ w, payRate, shiftEndISO, busy, onApprove, onClose }: {
+  w: AcceptedWorker; payRate: number; shiftEndISO: string | null; busy: boolean;
+  onApprove: (breakMinutes: number, clockOutISO?: string) => void; onClose: () => void;
 }) {
-  const grossH = w.clock_in && w.clock_out
-    ? (Date.parse(w.clock_out) - Date.parse(w.clock_in)) / 3_600_000 : 0;
+  // Forgot to clock out: the manager sets the clock-out (defaults to the
+  // scheduled end) and the server records it before approving.
+  const needsClockOut = !!w.clock_in && !w.clock_out;
+  const toLocalInput = (iso: string) => {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const [clockOutLocal, setClockOutLocal] = useState<string>(() =>
+    needsClockOut ? toLocalInput(shiftEndISO && Date.parse(shiftEndISO) > Date.parse(w.clock_in!) ? shiftEndISO : new Date().toISOString()) : '');
+  const clockOutISO = needsClockOut && clockOutLocal ? new Date(clockOutLocal).toISOString() : (w.clock_out ?? null);
+  const grossH = w.clock_in && clockOutISO
+    ? Math.max(0, (Date.parse(clockOutISO) - Date.parse(w.clock_in)) / 3_600_000) : 0;
   const [breakMin, setBreakMin] = useState<number>(Math.round(w.breakMinutes ?? 0));
   const billable = Math.max(0, grossH - breakMin / 60);
   const regular = Math.min(billable, 8);
@@ -164,6 +179,14 @@ function ReviewSheet({ w, payRate, busy, onApprove, onClose }: {
         </p>
 
         <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-4 py-3 mb-4 flex flex-col gap-2.5">
+          {needsClockOut && (
+            <div className="flex flex-col gap-1 pb-1 border-b border-[#E5E7EB]">
+              <p className="text-[12px] text-amber-700 font-semibold">This worker never clocked out. Set when they finished:</p>
+              <input type="datetime-local" value={clockOutLocal} min={w.clock_in ? toLocalInput(w.clock_in) : undefined}
+                onChange={(e) => setClockOutLocal(e.target.value)} aria-label="Clock-out time"
+                className="h-10 rounded-[8px] border border-[#E5E7EB] bg-white px-2.5 text-[14px] text-[#111827] outline-none focus:border-[#0A1628]" />
+            </div>
+          )}
           <div className="flex justify-between text-[14px]"><span className="text-[#6B7280]">Clocked time</span><span className="text-[#111827] font-semibold">{fmt(grossH)}</span></div>
           <div className="flex items-center justify-between">
             <span className="text-[#6B7280] text-[14px]">Unpaid break (min)</span>
@@ -182,7 +205,8 @@ function ReviewSheet({ w, payRate, busy, onApprove, onClose }: {
           <div className="flex justify-between text-[15px] pt-1"><span className="text-[#111827] font-bold">Approved pay</span><span className="text-[#111827] font-bold">${pay.toFixed(2)}</span></div>
         </div>
 
-        <button type="button" disabled={busy} onClick={() => onApprove(breakMin)}
+        <button type="button" disabled={busy || (needsClockOut && grossH <= 0)}
+          onClick={() => onApprove(breakMin, needsClockOut && clockOutISO ? clockOutISO : undefined)}
           className="w-full h-[50px] rounded-[10px] bg-[#0A1628] text-white font-bold text-[15px] disabled:opacity-60">
           {busy ? 'Approving…' : 'Approve timesheet'}
         </button>
@@ -228,6 +252,7 @@ export function ApplicantsScreen() {
     else showToast('Could not open a chat with this worker.', 'error');
   }
   const [reviewing, setReviewing] = useState<AcceptedWorker | null>(null);
+  const [confirmBroadcast, setConfirmBroadcast] = useState(false);
 
   const loading = shiftLoading || appsLoading || confLoading;
   const pending = applicants.filter((a) => a.status === 'pending');
@@ -300,12 +325,14 @@ export function ApplicantsScreen() {
     finally { setBusyId(null); }
   }
 
-  async function handleApprove(w: AcceptedWorker, breakMinutes: number) {
+  async function handleApprove(w: AcceptedWorker, breakMinutes: number, clockOutISO?: string) {
     if (!user?.id || !id) return;
     setBusyId(w.id);
     try {
       await apiClient(user.id).post('/time-entries/approve', {
         shift_id: id, worker_id: w.workerId, break_minutes: breakMinutes,
+        // Manager override for a worker who forgot to clock out.
+        ...(clockOutISO ? { clock_out: clockOutISO } : {}),
       });
       showToast('Timesheet approved. You can pay this worker now.');
       setReviewing(null);
@@ -371,11 +398,20 @@ export function ApplicantsScreen() {
         </button>
         {!closed && (
         <div className="flex gap-2 mb-2">
-          <button type="button" onClick={() => void handleBroadcast()} disabled={inviting}
+          <button type="button" onClick={() => setConfirmBroadcast(true)} disabled={inviting}
             className="flex-1 h-[46px] rounded-[8px] bg-[#0095F6] text-white font-bold text-[13px] flex items-center justify-center gap-2 disabled:opacity-60">
             <Send size={15} aria-hidden />
             {inviting ? 'Sending…' : 'Request All Workers'}
           </button>
+          <ConfirmSheet
+            open={confirmBroadcast}
+            title="Invite matching workers?"
+            body={<>Every available worker whose roles match <b>{shift?.jobTypes?.join(', ') || shift?.jobType || 'this shift'}</b> gets a notification and an offer to accept a spot. Workers who already applied or were invited are skipped.</>}
+            confirmLabel="Send invites"
+            busy={inviting}
+            onConfirm={() => { setConfirmBroadcast(false); void handleBroadcast(); }}
+            onCancel={() => setConfirmBroadcast(false)}
+          />
           {role === 'staffer' && (
             <button type="button" onClick={() => navigate(`/shift/${id}/assign`)}
               className="flex-1 h-[46px] rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[13px] flex items-center justify-center gap-2">
@@ -408,7 +444,7 @@ export function ApplicantsScreen() {
             ) : (
               <div className="flex flex-col gap-2">
                 {confirmed.map((w) => (
-                  <ConfirmedRow key={w.id} w={w} late={isLate(w)} busy={busyId === w.id}
+                  <ConfirmedRow key={w.id} w={w} late={isLate(w)} closed={closed} busy={busyId === w.id}
                     onApprove={() => setReviewing(w)}
                     onPay={() => void handlePay(w)}
                     onNoShow={() => void handleNoShow(w)}
@@ -493,8 +529,13 @@ export function ApplicantsScreen() {
                         <X size={16} aria-hidden className="text-[#6B7280]" />
                       </button>
                       <button type="button"
-                        onClick={() => void approve(a.applicationId).then((err) => { showToast(err ?? 'Worker confirmed!', err ? 'error' : 'success'); refetchAll(); })}
-                        className="h-9 px-3 rounded-full bg-[#10B981] text-white text-[12px] font-bold flex items-center gap-1">
+                        disabled={isFull}
+                        aria-label={isFull ? 'Shift is full — remove someone to confirm a standby worker' : `Confirm ${a.username ? `@${a.username}` : 'worker'}`}
+                        onClick={() => {
+                          if (isFull) { showToast('Shift is full — remove someone first.', 'error'); return; }
+                          void approve(a.applicationId).then((err) => { showToast(err ?? 'Worker confirmed!', err ? 'error' : 'success'); refetchAll(); });
+                        }}
+                        className="h-9 px-3 rounded-full bg-[#10B981] text-white text-[12px] font-bold flex items-center gap-1 disabled:opacity-40">
                         <Check size={14} aria-hidden /> Confirm
                       </button>
                     </div>
@@ -553,8 +594,8 @@ export function ApplicantsScreen() {
       </div>
 
       {reviewing && (
-        <ReviewSheet w={reviewing} payRate={shift?.payRate ?? 0} busy={busyId === reviewing.id}
-          onApprove={(brk) => void handleApprove(reviewing, brk)}
+        <ReviewSheet w={reviewing} payRate={shift?.payRate ?? 0} shiftEndISO={shift?.endTimeISO ?? null} busy={busyId === reviewing.id}
+          onApprove={(brk, clockOut) => void handleApprove(reviewing, brk, clockOut)}
           onClose={() => setReviewing(null)} />
       )}
     </div>

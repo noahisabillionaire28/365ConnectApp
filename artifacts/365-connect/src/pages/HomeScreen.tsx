@@ -360,7 +360,11 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
 
 /* ─── (A) Worker Home Feed — Nowsta-style Schedule / Requests / Available ─────── */
 function WorkerHomeFeed() {
-  const [tab, setTab] = useState<'schedule' | 'requests' | 'available'>('schedule');
+  // Deep links (e.g. an offer notification) can open a specific tab.
+  const initialTab = new URLSearchParams(useSearch()).get('tab');
+  const [tab, setTab] = useState<'schedule' | 'requests' | 'available'>(
+    initialTab === 'requests' || initialTab === 'available' ? initialTab : 'schedule',
+  );
   const { user } = useAuth();
   const shiftRequests = useShiftRequests();
   const { requests } = shiftRequests;
@@ -413,7 +417,8 @@ function WorkerDiscoveryBody() {
   const maxDistance  = distance === '< 5 mi' ? 5 : distance === '< 15 mi' ? 15 : distance === '< 25 mi' ? 25 : Infinity;
 
   const filtered = people.filter((p) => {
-    if (jobType && p.primaryJobType !== jobType) return false;
+    // A worker matches a job type if it's their primary OR one of their others.
+    if (jobType && p.primaryJobType !== jobType && !(p.job_types ?? []).includes(jobType) && !(p.secondary_job_types ?? []).includes(jobType)) return false;
     if (p.rating < minRating)        return false;
     if (p.distanceMiles > maxDistance) return false;
     if (availableOnly && !p.availableToday) return false;
@@ -482,7 +487,7 @@ function ClientShiftCard({
   showCount?: boolean;
 }) {
   const dateStr = shift.startTimeISO
-    ? new Date(shift.startTimeISO).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    ? new Date(shift.startTimeISO).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: shift.timezone || undefined })
     : null;
 
   return (
@@ -527,12 +532,31 @@ function ClientShiftCard({
               </p>
             )}
           </div>
-          {showCount && (
-            <div className="flex flex-col items-center bg-[#F3F4F6] rounded-[8px] px-2.5 py-1.5 flex-shrink-0 min-w-[44px] text-center">
-              <span className="text-[#111827] font-bold text-[16px] leading-tight">{shift.applicantCount}</span>
-              <span className="text-[#6B7280] text-[9px] font-semibold uppercase tracking-wide">Applied</span>
-            </div>
-          )}
+          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+            {/* Fill status at a glance: confirmed / needed */}
+            {(() => {
+              const total = Math.max(1, Number(shift.spots_available ?? 1) || 1);
+              const filled = Math.min(total, Math.max(0, Number(shift.spots_filled ?? 0) || 0));
+              const full = filled >= total;
+              const none = filled === 0;
+              const cls = full
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : none ? 'bg-red-50 border-red-200 text-red-600'
+                : 'bg-amber-50 border-amber-200 text-amber-700';
+              return (
+                <span className={`inline-flex items-center gap-1 border rounded-full px-2 py-0.5 text-[11px] font-bold ${cls}`}
+                  aria-label={`${filled} of ${total} spots confirmed`}>
+                  <Users size={11} aria-hidden />{filled}/{total} confirmed
+                </span>
+              );
+            })()}
+            {showCount && (
+              <div className="flex flex-col items-center bg-[#F3F4F6] rounded-[8px] px-2.5 py-1.5 min-w-[44px] text-center">
+                <span className="text-[#111827] font-bold text-[16px] leading-tight">{shift.applicantCount}</span>
+                <span className="text-[#6B7280] text-[9px] font-semibold uppercase tracking-wide">Applied</span>
+              </div>
+            )}
+          </div>
         </div>
       </motion.button>
       {onApplicants && (
@@ -596,15 +620,20 @@ function ClientShiftGroup({
 function ClientMyShiftsView() {
   const [, navigate] = useLocation();
   const { shifts, isLoading, error } = useClientShiftsDashboard();
-  const now = new Date();
+  const now = Date.now();
 
-  const open      = shifts.filter((s) => s.status === 'open');
-  const filled    = shifts.filter((s) => s.status === 'filled');
-  const completed = shifts.filter(
-    (s) => s.status === 'completed' ||
-      (s.status !== 'cancelled' && s.status !== 'open' && s.status !== 'filled' &&
-       s.startTimeISO && new Date(s.startTimeISO) < now),
-  );
+  // A shift is "over" once it has ended, whatever its stored status — the
+  // server sweeps statuses lazily, so never trust status alone for grouping.
+  const isOver = (s: ClientShift) => {
+    const ref = s.end_time || s.startTimeISO;
+    const t = ref ? Date.parse(ref) : NaN;
+    return Number.isFinite(t) && t < now;
+  };
+  const byStart = (a: ClientShift, b: ClientShift) => Date.parse(a.startTimeISO || '') - Date.parse(b.startTimeISO || '');
+
+  const open      = shifts.filter((s) => s.status === 'open'   && !isOver(s)).sort(byStart);
+  const filled    = shifts.filter((s) => s.status === 'filled' && !isOver(s)).sort(byStart);
+  const completed = shifts.filter((s) => s.status === 'completed' || (s.status !== 'cancelled' && isOver(s))).sort(byStart).reverse();
   const cancelled = shifts.filter((s) => s.status === 'cancelled');
 
   if (isLoading) {

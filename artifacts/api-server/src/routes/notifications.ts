@@ -3,6 +3,7 @@ import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { broadcastToUser } from '../lib/sseManager.js';
 import { sendEmail, renderNotificationEmail, appUrl } from '../lib/email.js';
+import { pushToUser } from '../lib/push.js';
 
 /** Notification types that should NOT trigger an email (too high-frequency). */
 const EMAIL_SKIP_TYPES = new Set(['post_like', 'post_comment', 'follow']);
@@ -128,8 +129,13 @@ export async function createNotification(params: {
         .select()
         .maybeSingle();
       if (error) throw error;
-      // Push live to the recipient if they're online.
+      // Push live to the recipient if they're online…
       if (data) broadcastToUser(userId, 'new_notification', data);
+      // …and to their phone if they've enabled push (no-op when unconfigured).
+      const cta = emailCta(type, shiftId, postId);
+      const path = cta.href.startsWith(appUrl()) ? cta.href.slice(appUrl().length) : cta.href;
+      void pushToUser(userId, { title, body, url: path || '/notifications', tag: shiftId ? `shift-${shiftId}` : undefined })
+        .catch((e) => console.warn('[createNotification] push failed:', e));
     }
 
     // Email notification — best-effort, gated by the email preference and type.

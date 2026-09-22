@@ -4,6 +4,8 @@
  * State persists across step navigations; call resetDraft() on wizard entry.
  */
 
+import { browserTimeZone, zonedTimeToUtc } from '@/lib/timezone';
+
 export type PostShiftDraft = {
   // ── Step 1: Event type ───────────────────────────────────────────────────
   event_type: string; // Wedding, Corporate, Cocktail Party, …
@@ -158,19 +160,20 @@ export function durationLabel(start: string, end: string): string {
  * Build an ISO datetime string from a date and HH:MM time.
  * If refTime is provided and time ≤ refTime, adds one day (handles midnight crossings).
  */
-export function buildIso(date: string, time: string, refTime?: string): string {
+export function buildIso(date: string, time: string, refTime?: string, tz: string = browserTimeZone()): string {
   if (!date || !time) return '';
   let d = date;
   if (refTime) {
     const [rh, rm] = refTime.split(':').map(Number);
     const [th, tm] = time.split(':').map(Number);
     if (th * 60 + tm <= rh * 60 + rm) {
-      const dt = new Date(`${date}T00:00:00`);
-      dt.setDate(dt.getDate() + 1);
-      d = dt.toISOString().split('T')[0];
+      const [y, m, day] = date.split('-').map(Number);
+      const next = new Date(Date.UTC(y, m - 1, day + 1));
+      d = next.toISOString().split('T')[0];
     }
   }
-  return `${d}T${time}:00`;
+  // A real instant: the venue's wall-clock time converted with its zone.
+  return zonedTimeToUtc(d, time, tz);
 }
 
 /** Format HH:MM to 12-hour "7:00 PM" display. */

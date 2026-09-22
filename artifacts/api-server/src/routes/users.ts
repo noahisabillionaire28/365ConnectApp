@@ -47,13 +47,18 @@ router.post('/', requireAuth, async (req, res) => {
     if (body[f] !== undefined && body[f] !== null) payload[f] = body[f];
   }
 
+  const { data: existing } = await adminDb
+    .from('users').select('role, username').eq('id', req.userId).maybeSingle();
+
+  // An auto-generated username (sent at role select) must never replace one
+  // the user chose during setup.
+  if (payload.username !== undefined && existing?.username) delete payload.username;
+
   if (safeRole) {
     // Guard: a self-assigned 'worker' must never DOWNGRADE an already-chosen
     // role (staffer/client/admin). Bootstrap sign-in writes used to send
     // role:'worker' and would reset a real staffer back to worker on conflict.
     if (safeRole === 'worker') {
-      const { data: existing } = await adminDb
-        .from('users').select('role').eq('id', req.userId).maybeSingle();
       if (!existing?.role || existing.role === 'worker') payload.role = 'worker';
       // else: keep their existing non-worker role — do not overwrite.
     } else {

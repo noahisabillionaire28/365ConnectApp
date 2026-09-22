@@ -6,6 +6,12 @@ import { useAuth } from '@/contexts/AuthContext';
 type FollowOptions = {
   onFollowSuccess?:   () => void;
   onUnfollowSuccess?: () => void;
+  /**
+   * When the list that rendered this card already knows the follow state
+   * (the workers directory returns is_followed), pass it here and the hook
+   * skips its own two requests — 50 cards no longer mean 100 calls.
+   */
+  initialFollowing?:  boolean;
 };
 
 type FollowState = { following: boolean; count: number };
@@ -21,9 +27,10 @@ export function useFollow(
   const [isFollowPending, setFollowPending] = useState(false);
   const key = [FOLLOW_KEY, targetUserId, user?.id];
 
+  const known = options.initialFollowing;
   const q = useQuery<FollowState, Error>({
     queryKey: key,
-    enabled: !!targetUserId && !!user?.id,
+    enabled: !!targetUserId && !!user?.id && known === undefined,
     staleTime: 30_000,
     placeholderData: keepPreviousData,
     queryFn: async () => {
@@ -34,7 +41,7 @@ export function useFollow(
       return { following: status.following, count: followers.length };
     },
   });
-  const state = q.data ?? { following: false, count: 0 };
+  const state = q.data ?? { following: known ?? false, count: 0 };
 
   const setLocal = useCallback((following: boolean, delta: number) => {
     qc.setQueryData<FollowState>(key, (prev) => ({ following, count: Math.max(0, (prev?.count ?? 0) + delta) }));
@@ -48,6 +55,7 @@ export function useFollow(
     try {
       await apiClient(user.id).post('/follows', { following_id: targetUserId });
       void qc.invalidateQueries({ queryKey: ['roster'] });
+      void qc.invalidateQueries({ queryKey: ['people-feed'] });
       options.onFollowSuccess?.();
     } catch (e) {
       setLocal(false, -1);
@@ -64,6 +72,7 @@ export function useFollow(
     try {
       await apiClient(user.id).delete(`/follows/${targetUserId}`);
       void qc.invalidateQueries({ queryKey: ['roster'] });
+      void qc.invalidateQueries({ queryKey: ['people-feed'] });
       options.onUnfollowSuccess?.();
     } catch (e) {
       setLocal(true, 1);

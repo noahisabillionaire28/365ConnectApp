@@ -20,7 +20,10 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
   const { isFollowing, follow, unfollow, isFollowPending } = useFollow(person.id, {
     onFollowSuccess:   () => showToast(`@${person.username} added to your roster`),
     onUnfollowSuccess: () => showToast(`@${person.username} removed from your roster`),
+    // The directory already tells us — no extra request per card.
+    initialFollowing:  person.isFollowed,
   });
+  const hasDistance = Number.isFinite(person.distanceMiles);
 
   return (
     <div className="mx-4 rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-4 flex items-center gap-4">
@@ -48,8 +51,18 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
           <span className="text-[#6B7280] text-[12px] font-medium">
             {Number(person.rating) > 0 ? Number(person.rating).toFixed(1) : 'New'}
           </span>
-          <span className="text-[#D1D5DB]">·</span>
-          <span className="text-[#6B7280] text-[12px]">{person.distanceMiles} mi</span>
+          {hasDistance && (
+            <>
+              <span className="text-[#D1D5DB]">·</span>
+              <span className="text-[#6B7280] text-[12px]">{person.distanceMiles} mi</span>
+            </>
+          )}
+          {!person.isAvailable && (
+            <>
+              <span className="text-[#D1D5DB]">·</span>
+              <span className="text-[#9CA3AF] text-[12px]">Not taking shifts</span>
+            </>
+          )}
         </div>
       </div>
 
