@@ -6,6 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useToast } from '@/contexts/ToastContext';
 import { geocodeAddress } from '@/lib/geocode';
+import { browserTimeZone } from '@/lib/timezone';
+import { buildIso } from '@/store/postShiftStore';
 import { JOB_TYPES } from '@/lib/jobTypes';
 import { BottomTabNav } from '@/components/BottomTabNav';
 
@@ -61,14 +63,17 @@ export function PostEventScreen() {
     setSaving(true);
     try {
       const coords = await geocodeAddress(location.trim());
-      const start_time = new Date(`${date}T${startTime}`).toISOString();
-      const end_time = new Date(`${date}T${endTime}`).toISOString();
+      // Venue wall-clock → real instants in the poster's zone (an end time at
+      // or before the start rolls to the next day).
+      const timezone = browserTimeZone();
+      const start_time = buildIso(date, startTime, undefined, timezone);
+      const end_time = buildIso(date, endTime, startTime, timezone);
       const created = await apiClient(user.id).post<{ event_id: string; positions: Array<{ id: string }> }>('/shifts/event', {
         title: name.trim(),
         location: location.trim(),
         event_type: eventType,
         company_name: profile.displayName ?? null,
-        start_time, end_time,
+        start_time, end_time, timezone,
         lat: coords?.lat ?? null,
         lng: coords?.lng ?? null,
         special_instructions: notes.trim() || null,

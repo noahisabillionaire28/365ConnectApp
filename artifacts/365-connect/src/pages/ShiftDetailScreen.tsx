@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, UserPlus,
-  Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText, MessagesSquare,
+  Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText, MessagesSquare, Repeat2,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -20,6 +20,8 @@ import { computeMatchScore } from '@/lib/matchScore';
 import { haversineMiles } from '@/lib/supabase';
 import { apiClient } from '@/lib/api';
 import { resetDraft, setDraft, setEditShiftId } from '@/store/postShiftStore';
+import { utcToZonedParts, DEFAULT_SHIFT_TZ } from '@/lib/timezone';
+import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasCompletedTimeEntry } from '@/hooks/useTimeEntry';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
@@ -173,6 +175,7 @@ export function ShiftDetailScreen() {
   const [venueCoords, setVenueCoords] = useState<Coords | null>(null);
   const [dropping, setDropping] = useState(false);
   const [confirmDrop, setConfirmDrop] = useState(false);
+  const [confirmBroadcast, setConfirmBroadcast] = useState(false);
   const [openingChat, setOpeningChat] = useState(false);
   const qc = useQueryClient();
   // ── No more hooks below this line ────────────────────────────────────────────
@@ -266,7 +269,10 @@ export function ShiftDetailScreen() {
   const clockOpensLabel = Number.isFinite(clockOpensMs)
     ? new Date(clockOpensMs).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
     : '';
-  const canClockIn   = withinClockInRange && clockOpen;
+  // The button is gated by TIME only. Distance is checked with live GPS on the
+  // clock-in screen itself — the stored profile location used here can be
+  // miles away from the venue and would otherwise lock the button forever.
+  const canClockIn   = clockOpen;
   // Lifecycle: Upcoming → In progress → Ended (uses start/end timestamps).
   const endMs = shift.endTimeISO ? Date.parse(shift.endTimeISO) : NaN;
   const lifecycle: 'upcoming' | 'in_progress' | 'ended' =
@@ -298,8 +304,10 @@ export function ShiftDetailScreen() {
       ? (lifecycle === 'ended' ? 'past' : 'pending')
       : applicationStatus === 'declined' || applicationStatus === 'rejected'
       ? 'declined'
+      // A dropped application isn't final: while the shift is still open the
+      // worker may apply again (the server flips the row back to pending).
       : applicationStatus === 'withdrawn'
-      ? 'withdrawn'
+      ? (lifecycle === 'ended' ? 'past' : shift.spotsAvailable <= 0 ? 'withdrawn' : canClaim ? 'claim' : 'apply')
       : lifecycle === 'ended'
       ? 'past'
       : shift.spotsAvailable <= 0
@@ -326,6 +334,12 @@ export function ShiftDetailScreen() {
       await apiClient(user.id).post('/applications/withdraw', { shift_id: shiftId });
       invalidateShiftCaches();
       setConfirmDrop(false);
+      if (applicationStatus === 'pending') {
+        // Stay on the shift — they may change their mind and apply again.
+        showToast('Application withdrawn.');
+        void refetchApplicationStatus();
+        return;
+      }
       showToast(applicationStatus === 'standby' ? 'You left the waitlist.' : 'You dropped this shift.');
       navigate('/home');
     } catch (e) {
@@ -354,7 +368,7 @@ export function ShiftDetailScreen() {
         shiftId,
         matchScore ?? undefined,
         () => { showToast('Applied! The client will review your application.'); void refetchApplicationStatus(); },
-        (msg) => showToast(msg),
+        (msg) => showToast(msg, 'error'),
       );
     }
     if (ctaState === 'claim') void handleClaim();
@@ -374,26 +388,38 @@ export function ShiftDetailScreen() {
     }
   }
 
-  async function handleEditShift() {
+  /**
+   * Load this shift into the post-shift draft. `edit` updates the shift in
+   * place; `clone` ("Post again") starts a new shift with the same details
+   * and a blank date.
+   */
+  async function handleEditShift(mode: 'edit' | 'clone' = 'edit') {
     if (!user?.id || editLoading) return;
     setEditLoading(true);
     try {
       const raw = await apiClient(user.id).get<Record<string, unknown>>(`/shifts/${shiftId}`);
       if (!raw || raw.client_id !== user.id) return;
-      const startISO   = raw.start_time as string;
-      const endISO     = raw.end_time   as string;
-      const date       = startISO.split('T')[0] ?? '';
-      const start_time = startISO.split('T')[1]?.slice(0, 5) ?? '18:00';
-      const end_time   = endISO.split('T')[1]?.slice(0, 5)   ?? '23:00';
+      // Times are instants; edit them as the venue's wall clock.
+      const tz    = (raw.timezone as string | null) || DEFAULT_SHIFT_TZ;
+      const start = utcToZonedParts(raw.start_time as string, tz);
+      const end   = utcToZonedParts(raw.end_time as string, tz);
+      const date       = start.date;
+      const start_time = start.time || '18:00';
+      const end_time   = end.time   || '23:00';
+      const jobTypes   = Array.isArray(raw.job_types) ? (raw.job_types as string[]) : [];
       resetDraft();
       setDraft({
+        event_type:      (raw.event_type      as string | null)    ?? '',
         job_type:        (raw.job_type        as string)           ?? '',
+        job_types:       jobTypes.length ? jobTypes : ((raw.job_type as string) ? [raw.job_type as string] : []),
+        instant_claim:   !!raw.instant_claim,
         title:           (raw.title           as string)           ?? '',
         location:        (raw.location        as string | null)    ?? '',
         lat:             (raw.lat             as number | null)    ?? 25.7825,
         lng:             (raw.lng             as number | null)    ?? -80.1298,
         unit_info:       (raw.unit_info       as string | null)    ?? '',
-        date,
+        // A re-post keeps everything but needs a fresh date.
+        date:            mode === 'edit' ? date : '',
         start_time,
         end_time,
         spots_available: (raw.spots_available as number)           ?? 1,
@@ -401,8 +427,9 @@ export function ShiftDetailScreen() {
         description:     (raw.description     as string | null)    ?? '',
         requirements:    (raw.requirements    as string[] | null)  ?? [],
       });
-      setEditShiftId(shiftId);
-      navigate('/post-shift/name');
+      setEditShiftId(mode === 'edit' ? shiftId : null);
+      // keep=1 stops the name step from wiping the draft we just built.
+      navigate('/post-shift/name?keep=1');
     } catch (e) {
       console.error('[ShiftDetail] edit prefill failed:', e);
     } finally {
@@ -415,6 +442,9 @@ export function ShiftDetailScreen() {
     setCancelling(true);
     try {
       await apiClient(user.id).patch(`/shifts/${shiftId}`, { status: 'cancelled' });
+      invalidateShiftCaches();
+      void qc.invalidateQueries({ queryKey: ['client-shifts'] });
+      void qc.invalidateQueries({ queryKey: ['my-posted-shifts'] });
       setShowCancelConfirm(false);
       showToast('Shift cancelled.');
       navigate('/home');
@@ -428,6 +458,15 @@ export function ShiftDetailScreen() {
 
   return (
     <>
+    <ConfirmSheet
+      open={confirmBroadcast}
+      title="Invite matching workers?"
+      body={<>Every available worker whose roles match <b>{shift.jobTypes.join(', ')}</b> gets a notification and an offer to accept a spot. Workers who already applied or were invited are skipped.</>}
+      confirmLabel="Send invites"
+      busy={inviting}
+      onConfirm={() => { setConfirmBroadcast(false); void handleBroadcast(); }}
+      onCancel={() => setConfirmBroadcast(false)}
+    />
     {/* Cancel confirm overlay */}
     {showCancelConfirm && (
       <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 backdrop-blur-sm px-4 pb-8"
@@ -891,7 +930,7 @@ export function ShiftDetailScreen() {
             )}
             {(shift.status === 'open' || shift.status === 'filled') && lifecycle !== 'ended' && (
               <motion.button type="button" whileTap={{ scale: 0.97 }}
-                onClick={() => void handleBroadcast()} disabled={inviting}
+                onClick={() => setConfirmBroadcast(true)} disabled={inviting}
                 aria-label="Request all workers for this shift"
                 className="w-full h-[46px] rounded-[8px] bg-[#0095F6] text-white font-bold text-[14px] tracking-wide flex items-center justify-center gap-2 disabled:opacity-60">
                 <Send size={16} aria-hidden />
@@ -930,6 +969,17 @@ export function ShiftDetailScreen() {
                   Cancel
                 </motion.button>
               </div>
+            )}
+            {/* Over or cancelled: the fastest way to rebook is a copy with a new date */}
+            {(lifecycle === 'ended' || shift.status === 'cancelled' || shift.status === 'completed') && (
+              <motion.button type="button" whileTap={{ scale: 0.97 }}
+                onClick={() => void handleEditShift('clone')}
+                disabled={editLoading}
+                aria-label="Post this shift again with a new date"
+                className="w-full h-[46px] rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-60">
+                <Repeat2 size={16} aria-hidden />
+                {editLoading ? 'Loading…' : 'Post again'}
+              </motion.button>
             )}
           </div>
         )}
@@ -976,7 +1026,11 @@ export function ShiftDetailScreen() {
               className="w-full h-[52px] rounded-[8px] bg-[#F0F0F0] border border-[#DBDBDB] flex items-center justify-center gap-2 cursor-not-allowed"
             >
               <CheckCircle2 size={18} aria-hidden className="text-emerald-500" />
-              <span className="text-[#737373] font-semibold text-[15px]">Applied</span>
+              <span className="text-[#737373] font-semibold text-[15px]">Applied · awaiting approval</span>
+            </button>
+            <button type="button" onClick={() => setConfirmDrop(true)} disabled={dropping}
+              className="w-full h-9 text-[#6B7280] font-semibold text-[13px] disabled:opacity-50">
+              {dropping ? 'Withdrawing…' : 'Withdraw application'}
             </button>
           </div>
         )}
@@ -989,7 +1043,7 @@ export function ShiftDetailScreen() {
 
         {ctaState === 'withdrawn' && (
           <div className="w-full h-[52px] rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center gap-2.5">
-            <span className="text-[#737373] font-semibold text-[15px]">You dropped this shift</span>
+            <span className="text-[#737373] font-semibold text-[15px]">You dropped this shift · now full</span>
           </div>
         )}
 
@@ -1065,17 +1119,24 @@ export function ShiftDetailScreen() {
             onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-4" />
             <p className="text-[#111827] font-bold text-[17px]">
-              {applicationStatus === 'standby' ? 'Leave the waitlist?' : 'Drop this shift?'}
+              {applicationStatus === 'standby' ? 'Leave the waitlist?'
+                : applicationStatus === 'pending' ? 'Withdraw your application?'
+                : 'Drop this shift?'}
             </p>
             <p className="text-[#6B7280] text-[13px] mt-1 leading-relaxed">
               {applicationStatus === 'standby'
                 ? "You'll stop being considered if a spot opens up. You can apply again later."
+                : applicationStatus === 'pending'
+                ? "The client won't see your application anymore. You can apply again while the shift is open."
                 : 'Your spot will reopen for someone else. Dropping close to the start time can affect your reliability.'}
             </p>
             <div className="flex flex-col gap-2 mt-5">
               <button type="button" onClick={() => void handleDrop()} disabled={dropping}
                 className="w-full h-[50px] rounded-[10px] bg-[#EF4444] text-white font-bold text-[15px] disabled:opacity-60">
-                {dropping ? 'Working…' : applicationStatus === 'standby' ? 'Leave waitlist' : 'Yes, drop shift'}
+                {dropping ? 'Working…'
+                  : applicationStatus === 'standby' ? 'Leave waitlist'
+                  : applicationStatus === 'pending' ? 'Withdraw application'
+                  : 'Yes, drop shift'}
               </button>
               <button type="button" onClick={() => setConfirmDrop(false)} disabled={dropping}
                 className="w-full h-[50px] rounded-[10px] bg-white border border-[#DBDBDB] text-[#111827] font-semibold text-[15px] disabled:opacity-60">

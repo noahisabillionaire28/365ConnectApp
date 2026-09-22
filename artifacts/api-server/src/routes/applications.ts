@@ -3,6 +3,9 @@ import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
 import { addWorkerToShiftChat, removeWorkerFromShiftChat } from '../lib/chat.js';
+import { HttpError, sendError } from '../lib/httpError.js';
+import { assertShiftOwner, loadShift } from '../lib/shiftAccess.js';
+import { bookWorker, syncShiftCapacity } from '../lib/booking.js';
 
 const router = Router();
 
@@ -50,25 +53,18 @@ export async function findTimeConflict(
   return null;
 }
 
-/** Returns true if userId is the client that owns the given shift. */
-async function ownsShift(userId: string, shiftId: string): Promise<boolean> {
-  const { count } = await adminDb
-    .from('shifts')
-    .select('*', { count: 'exact', head: true })
-    .eq('id', shiftId)
-    .eq('client_id', userId);
-  return (count ?? 0) > 0;
-}
+/** Statuses that count as "still in play" for a worker on a shift. */
+const LIVE_STATUSES = new Set(['pending', 'accepted', 'standby']);
+/** Statuses a worker may re-apply from. */
+const REAPPLY_STATUSES = new Set(['withdrawn', 'declined', 'rejected']);
 
 /** GET /api/applications?shift_id=&worker_id= */
 router.get('/', requireAuth, async (req, res) => {
   const { shift_id, worker_id, status } = req.query as Record<string, string>;
   try {
     if (shift_id) {
-      // Only the shift owner may see the applicants for their shift.
-      if (!(await ownsShift(req.userId!, shift_id))) {
-        return res.status(403).json({ error: 'Forbidden' });
-      }
+      // Only the shift owner (or an admin) may see the applicants for a shift.
+      await assertShiftOwner(shift_id, req.userId!);
       let q = adminDb.from('applications').select('*').eq('shift_id', shift_id);
       if (status) q = q.eq('status', status);
       const { data: apps, error } = await q.order('created_at', { ascending: false });
@@ -218,7 +214,7 @@ router.get('/', requireAuth, async (req, res) => {
     });
     return res.json(merged);
   } catch (e) {
-    return res.status(500).json({ error: String(e) });
+    return sendError(res, e);
   }
 });
 
@@ -252,42 +248,109 @@ router.get('/my-shift-ids', requireAuth, async (req, res) => {
   }
 });
 
-/** POST /api/applications - a worker applies to a shift (always as themselves, pending) */
+/**
+ * POST /api/applications - a worker applies to a shift (always as themselves, pending).
+ * 409 when the shift is not open / has ended, or when the worker already has a
+ * live (pending/accepted/standby) application. A withdrawn/declined row is
+ * flipped back to pending so the worker can re-apply.
+ */
 router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
   const { shift_id, match_score, message } = req.body as Record<string, unknown>;
+  if (!shift_id || typeof shift_id !== 'string') {
+    return res.status(400).json({ error: 'shift_id is required' });
+  }
   try {
-    const conflict = await findTimeConflict(req.userId!, shift_id as string);
+    const shift = await loadShift(shift_id);
+    if (!shift) return res.status(404).json({ error: 'Shift not found' });
+    if (shift.status !== 'open') return res.status(409).json({ error: 'This shift is no longer accepting applications.' });
+    const endMs = shift.end_time ? Date.parse(shift.end_time) : NaN;
+    if (Number.isFinite(endMs) && endMs < Date.now()) {
+      return res.status(409).json({ error: 'This shift has already ended.' });
+    }
+    if (shift.client_id === req.userId) {
+      return res.status(409).json({ error: "You can't apply to your own shift." });
+    }
+
+    const conflict = await findTimeConflict(req.userId!, shift_id);
     if (conflict) {
       return res.status(409).json({
         error: `This overlaps a shift you're already booked for${conflict.title ? ` ("${conflict.title}")` : ''}.`,
       });
     }
-    const { data, error } = await adminDb
+
+    const { data: existing, error: exErr } = await adminDb
       .from('applications')
-      .upsert(
-        {
+      .select('id, status')
+      .eq('shift_id', shift_id)
+      .eq('worker_id', req.userId)
+      .maybeSingle();
+    if (exErr) return res.status(500).json({ error: exErr.message });
+
+    let row: Record<string, unknown> | null = null;
+    if (existing) {
+      if (LIVE_STATUSES.has(existing.status)) {
+        return res.status(409).json({ error: 'Already applied' });
+      }
+      if (!REAPPLY_STATUSES.has(existing.status)) {
+        return res.status(409).json({ error: 'Already applied' });
+      }
+      // Re-apply: flip the old row back to pending.
+      const { data, error } = await adminDb
+        .from('applications')
+        .update({
+          status: 'pending',
+          match_score: typeof match_score === 'number' ? match_score : null,
+          message: typeof message === 'string' ? message : null,
+        })
+        .eq('id', existing.id)
+        .select()
+        .maybeSingle();
+      if (error) return res.status(500).json({ error: error.message });
+      row = data;
+    } else {
+      const { data, error } = await adminDb
+        .from('applications')
+        .insert({
           shift_id,
           worker_id: req.userId,
           status: 'pending',
-          match_score: match_score ?? null,
-          message: message ?? null,
-        },
-        { onConflict: 'shift_id,worker_id', ignoreDuplicates: true },
-      )
-      .select()
-      .maybeSingle();
-    if (error) return res.status(500).json({ error: error.message });
-    if (!data) return res.status(409).json({ error: 'Already applied' });
-    return res.status(201).json(data);
+          match_score: typeof match_score === 'number' ? match_score : null,
+          message: typeof message === 'string' ? message : null,
+        })
+        .select()
+        .maybeSingle();
+      if (error) {
+        // Unique-violation race: someone double-clicked.
+        if (error.code === '23505') return res.status(409).json({ error: 'Already applied' });
+        return res.status(500).json({ error: error.message });
+      }
+      row = data;
+    }
+    if (!row) return res.status(409).json({ error: 'Already applied' });
+
+    // Tell the shift owner a new applicant arrived (in-app + SSE + email via createNotification).
+    if (shift.client_id) {
+      const label = shift.title ? `"${shift.title}"` : 'your shift';
+      await createNotification({
+        userId: shift.client_id,
+        fromUserId: req.userId,
+        type: 'application_received',
+        title: 'New applicant',
+        body: `${await workerName(req.userId!)} applied to ${label}.`,
+        shiftId: shift_id,
+      });
+    }
+    return res.status(201).json(row);
   } catch (e) {
-    return res.status(500).json({ error: String(e) });
+    return sendError(res, e);
   }
 });
 
 /**
  * PATCH /api/applications/:id - update an application's status.
  * The applicant (worker) may only 'withdraw' their own application.
- * The shift's owning client may accept/reject/decline or reset to pending.
+ * The shift's owning client (or an admin) may accept/reject/decline or reset to pending.
+ * Accepting goes through the capacity-safe booking helper (409 when full/closed).
  */
 router.patch('/:id', requireAuth, async (req, res) => {
   const { status } = req.body as { status: string };
@@ -298,53 +361,57 @@ router.patch('/:id', requireAuth, async (req, res) => {
   try {
     const { data: appRow, error: aErr } = await adminDb
       .from('applications')
-      .select('worker_id, shift_id')
+      .select('id, worker_id, shift_id, status')
       .eq('id', req.params.id)
       .maybeSingle();
     if (aErr) return res.status(500).json({ error: aErr.message });
     if (!appRow) return res.status(404).json({ error: 'Not found' });
 
-    const { data: shiftRow, error: sErr } = await adminDb
-      .from('shifts')
-      .select('client_id')
-      .eq('id', appRow.shift_id)
-      .maybeSingle();
-    if (sErr) return res.status(500).json({ error: sErr.message });
-
-    const app = { worker_id: appRow.worker_id, client_id: shiftRow?.client_id };
-
-    const isApplicant = app.worker_id === req.userId;
-    const isShiftOwner = app.client_id === req.userId;
-
-    if (isApplicant && !isShiftOwner) {
-      // Workers may only withdraw their own application, never self-accept.
-      if (status !== 'withdrawn') {
-        return res.status(403).json({ error: 'Workers may only withdraw an application' });
+    const isApplicant = appRow.worker_id === req.userId;
+    let isShiftOwner = false;
+    if (!(isApplicant && status === 'withdrawn')) {
+      // Anything other than a self-withdraw requires shift ownership (or admin).
+      try {
+        await assertShiftOwner(appRow.shift_id, req.userId!);
+      } catch (e) {
+        if (isApplicant && e instanceof HttpError && e.status === 403) {
+          return res.status(403).json({ error: 'Workers may only withdraw an application' });
+        }
+        throw e;
       }
-    } else if (!isShiftOwner) {
-      // Neither the applicant nor the shift owner.
-      return res.status(403).json({ error: 'Forbidden' });
+      isShiftOwner = true;
     }
 
-    // Double-booking guard: don't confirm a worker who's already booked for an
-    // overlapping shift.
+    let data: Record<string, unknown> | null = null;
+
     if (status === 'accepted') {
+      // Double-booking guard: don't confirm a worker who's already booked for an
+      // overlapping shift.
       const conflict = await findTimeConflict(appRow.worker_id, appRow.shift_id);
       if (conflict) {
         return res.status(409).json({
           error: `This worker is already booked for an overlapping shift${conflict.title ? ` ("${conflict.title}")` : ''}.`,
         });
       }
+      // Capacity + status guard, spots_filled derivation, 'filled'/'open' flip.
+      const booking = await bookWorker(appRow.shift_id, appRow.worker_id, 'accept');
+      data = booking.application as unknown as Record<string, unknown>;
+    } else {
+      const { data: updated, error } = await adminDb
+        .from('applications')
+        .update({ status })
+        .eq('id', req.params.id)
+        .select()
+        .maybeSingle();
+      if (error) return res.status(500).json({ error: error.message });
+      if (!updated) return res.status(404).json({ error: 'Not found' });
+      data = updated;
+      // Leaving 'accepted' frees a spot. The live trigger
+      // (trg_handle_application_released) decrements spots_filled for
+      // withdrawn/declined/rejected; deriving from the accepted count keeps it
+      // exact for every transition (incl. accepted → pending) without double-counting.
+      if (appRow.status === 'accepted') await syncShiftCapacity(appRow.shift_id);
     }
-
-    const { data, error } = await adminDb
-      .from('applications')
-      .update({ status })
-      .eq('id', req.params.id)
-      .select()
-      .maybeSingle();
-    if (error) return res.status(500).json({ error: error.message });
-    if (!data) return res.status(404).json({ error: 'Not found' });
 
     // Keep the shift group chat in step with the roster.
     if (status === 'accepted') await addWorkerToShiftChat(appRow.shift_id, appRow.worker_id);
@@ -372,7 +439,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
         shiftId: appRow.shift_id,
       });
     }
-    // Receipt to the owner/staffer when they remove (decline/reject) a worker.
+    // Receipt to the owner when they remove (decline/reject) a worker.
     if ((status === 'declined' || status === 'rejected') && isShiftOwner) {
       const label = await shiftLabel(appRow.shift_id);
       await createNotification({
@@ -386,13 +453,13 @@ router.patch('/:id', requireAuth, async (req, res) => {
     }
     return res.json(data);
   } catch (e) {
-    return res.status(500).json({ error: String(e) });
+    return sendError(res, e);
   }
 });
 
 /**
  * POST /api/applications/assign - directly assign a worker to a shift.
- * Only the shift's owning client (or a staffer acting for them) may do this.
+ * Only the shift's owning client (or an admin) may do this.
  */
 router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const { shift_id, worker_id } = req.body as Record<string, string>;
@@ -400,10 +467,7 @@ router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req
     return res.status(400).json({ error: 'shift_id and worker_id are required' });
   }
   try {
-    // Clients may only assign on shifts they own. Staffers may assign on any shift.
-    if (req.userRole === 'client' && !(await ownsShift(req.userId!, shift_id))) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
+    await assertShiftOwner(shift_id, req.userId!);
     // Double-booking guard.
     const assignConflict = await findTimeConflict(worker_id, shift_id);
     if (assignConflict) {
@@ -411,15 +475,7 @@ router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req
         error: `This worker is already booked for an overlapping shift${assignConflict.title ? ` ("${assignConflict.title}")` : ''}.`,
       });
     }
-    const { data, error } = await adminDb
-      .from('applications')
-      .upsert(
-        { shift_id, worker_id, status: 'accepted' },
-        { onConflict: 'shift_id,worker_id' },
-      )
-      .select()
-      .single();
-    if (error) return res.status(500).json({ error: error.message });
+    const booking = await bookWorker(shift_id, worker_id, 'assign');
     await addWorkerToShiftChat(shift_id, worker_id);
 
     const label = await shiftLabel(shift_id);
@@ -431,7 +487,7 @@ router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req
       body: `You've been assigned to ${label}.`,
       shiftId: shift_id,
     });
-    // Receipt to the owner/staffer who made the booking.
+    // Receipt to the owner who made the booking.
     await createNotification({
       userId: req.userId!,
       fromUserId: worker_id,
@@ -440,16 +496,16 @@ router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req
       body: `You booked ${await workerName(worker_id)} for ${label}.`,
       shiftId: shift_id,
     });
-    return res.status(201).json(data);
+    return res.status(201).json(booking.application);
   } catch (e) {
-    return res.status(500).json({ error: String(e) });
+    return sendError(res, e);
   }
 });
 
 /**
  * POST /api/applications/withdraw { shift_id } - a worker drops a shift they're
- * booked for. Sets their application to 'withdrawn'; a DB trigger frees the spot
- * (decrements spots_filled and reopens a 'filled' shift).
+ * booked for (or pulls a pending/standby application). Sets their application to
+ * 'withdrawn' and recomputes the shift's spots_filled/status.
  */
 router.post('/withdraw', requireAuth, requireRole('worker'), async (req, res) => {
   const { shift_id } = req.body as Record<string, string>;
@@ -466,6 +522,8 @@ router.post('/withdraw', requireAuth, requireRole('worker'), async (req, res) =>
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'You are not booked for this shift.' });
     await removeWorkerFromShiftChat(shift_id, req.userId!);
+    // Spot freed (the DB trigger decrements; this derives the exact count).
+    await syncShiftCapacity(shift_id);
 
     // Let the owner know a spot opened up.
     const { data: shift } = await adminDb
@@ -482,7 +540,7 @@ router.post('/withdraw', requireAuth, requireRole('worker'), async (req, res) =>
     }
     return res.json({ ok: true });
   } catch (e) {
-    return res.status(500).json({ error: String(e) });
+    return sendError(res, e);
   }
 });
 
@@ -495,17 +553,11 @@ router.post('/claim', requireAuth, requireRole('worker'), async (req, res) => {
   const { shift_id } = req.body as Record<string, string>;
   if (!shift_id) return res.status(400).json({ error: 'shift_id is required' });
   try {
-    const { data: shift, error: sErr } = await adminDb
-      .from('shifts')
-      .select('id, title, client_id, status, spots_available, spots_filled, instant_claim')
-      .eq('id', shift_id)
-      .maybeSingle();
-    if (sErr) return res.status(500).json({ error: sErr.message });
+    const shift = await loadShift(shift_id);
     if (!shift) return res.status(404).json({ error: 'Shift not found' });
     if (!shift.instant_claim) return res.status(403).json({ error: 'This shift is not open for instant claim.' });
     if (shift.status !== 'open') return res.status(409).json({ error: 'This shift is no longer open.' });
-    const spotsLeft = (shift.spots_available ?? 1) - (shift.spots_filled ?? 0);
-    if (spotsLeft <= 0) return res.status(409).json({ error: 'This shift is already full.' });
+    if (shift.client_id === req.userId) return res.status(409).json({ error: "You can't claim your own shift." });
 
     // Double-booking guard: can't claim a shift overlapping one you're booked for.
     const claimConflict = await findTimeConflict(req.userId!, shift_id);
@@ -515,17 +567,8 @@ router.post('/claim', requireAuth, requireRole('worker'), async (req, res) => {
       });
     }
 
-    // Confirm the worker directly. The DB trigger on an accepted insert
-    // increments spots_filled and notifies the worker.
-    const { data, error } = await adminDb
-      .from('applications')
-      .upsert(
-        { shift_id, worker_id: req.userId, status: 'accepted' },
-        { onConflict: 'shift_id,worker_id' },
-      )
-      .select()
-      .single();
-    if (error) return res.status(500).json({ error: error.message });
+    // Confirm the worker directly (capacity-checked; bumps spots_filled).
+    const booking = await bookWorker(shift_id, req.userId!, 'claim');
     await addWorkerToShiftChat(shift_id, req.userId!);
 
     const label = await shiftLabel(shift_id);
@@ -549,17 +592,18 @@ router.post('/claim', requireAuth, requireRole('worker'), async (req, res) => {
         shiftId: shift_id,
       });
     }
-    return res.status(201).json(data);
+    return res.status(201).json(booking.application);
   } catch (e) {
-    return res.status(500).json({ error: String(e) });
+    return sendError(res, e);
   }
 });
 
 /**
  * POST /api/applications/no-show - the shift owner reports a booked worker who
  * never clocked in. Files a 'no-show' dispute (feeds the admin queue) and
- * notifies the worker. Guards: caller owns the shift, worker was accepted, the
- * shift has started, the worker has no clock-in, and no prior no-show on file.
+ * notifies the worker. Guards: caller owns the shift (or is admin), worker was
+ * accepted, the shift has started, the worker has no clock-in, and no prior
+ * no-show on file.
  */
 router.post('/no-show', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const { shift_id, worker_id } = req.body as Record<string, string>;
@@ -567,13 +611,7 @@ router.post('/no-show', requireAuth, requireRole('client', 'staffer'), async (re
     return res.status(400).json({ error: 'shift_id and worker_id are required' });
   }
   try {
-    const { data: shift } = await adminDb
-      .from('shifts').select('id, title, client_id, start_time').eq('id', shift_id).maybeSingle();
-    if (!shift) return res.status(404).json({ error: 'Shift not found' });
-    // Clients may only report on their own shifts; staffers on any shift.
-    if (req.userRole === 'client' && shift.client_id !== req.userId) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
+    const shift = await assertShiftOwner(shift_id, req.userId!);
     // The worker must be booked (accepted) for this shift.
     const { count: acceptedCount } = await adminDb
       .from('applications').select('*', { count: 'exact', head: true })
@@ -616,7 +654,7 @@ router.post('/no-show', requireAuth, requireRole('client', 'staffer'), async (re
     });
     return res.status(201).json({ ok: true });
   } catch (e) {
-    return res.status(500).json({ error: String(e) });
+    return sendError(res, e);
   }
 });
 

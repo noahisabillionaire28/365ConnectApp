@@ -74,9 +74,20 @@ router.get('/counts/:userId', async (req, res) => {
   return res.json({ followers: followers.count ?? 0, following: following.count ?? 0 });
 });
 
-/** POST /api/follows — follow a user */
+/** POST /api/follows — follow a worker (self-follow and non-workers are rejected) */
 router.post('/', requireAuth, async (req, res) => {
-  const { following_id } = req.body as { following_id: string };
+  const { following_id } = req.body as { following_id?: string };
+  if (!following_id || typeof following_id !== 'string') {
+    return res.status(400).json({ error: 'following_id is required' });
+  }
+  if (following_id === req.userId) return res.status(409).json({ error: "You can't follow yourself." });
+
+  const { data: target, error: tErr } = await adminDb
+    .from('users').select('id, role').eq('id', following_id).maybeSingle();
+  if (tErr) return res.status(500).json({ error: tErr.message });
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  if (target.role !== 'worker') return res.status(409).json({ error: 'You can only follow workers.' });
+
   const { error } = await adminDb
     .from('follows')
     .upsert(

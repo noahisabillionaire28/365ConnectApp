@@ -15,6 +15,7 @@ import { useLocation }          from 'wouter';
 import { ChevronLeft, AlertCircle, CreditCard, Lock, CheckCircle2, Camera } from 'lucide-react';
 import { uploadAvatar } from '@/lib/storage';
 import { apiClient } from '@/lib/api';
+import { posterSetupDone } from '@/lib/setupRoute';
 import { useAuth }  from '@/contexts/AuthContext';
 import { ImageCropper } from '@/components/ImageCropper';
 
@@ -237,10 +238,13 @@ export function ClientSetupScreen() {
   // ── Load & resume ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) { navigate('/'); return; }
-    apiClient(user.id).get<{ username?: string | null; bio?: string | null; secondary_job_types?: string[] }>('/users/me')
+    apiClient(user.id).get<{ username?: string | null; bio?: string | null; company_name?: string | null; secondary_job_types?: string[] }>('/users/me')
       .then((data) => {
-        if (data?.username && !isEdit) { navigate('/home'); return; }
+        // Setup is done once the client has a name; the username is
+        // auto-generated at role select so it cannot be the marker.
+        if (posterSetupDone(data) && !isEdit) { navigate('/home'); return; }
         if (data?.bio)                setFullName(data.bio);
+        if (data?.company_name)       setCompanyName(data.company_name);
         if (Array.isArray(data?.secondary_job_types)) setEventTypes(data.secondary_job_types);
 
         let inferred = 1;

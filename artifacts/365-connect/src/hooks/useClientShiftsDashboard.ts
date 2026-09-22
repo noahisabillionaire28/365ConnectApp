@@ -13,6 +13,8 @@ type RawShift = {
   status: string;
   start_time: string;
   end_time: string;
+  /** IANA zone of the venue (display times in it). */
+  timezone?: string | null;
   pay_rate: number | null;
   pay_period: string | null;
   spots_available: number;
@@ -51,7 +53,7 @@ function toClientShift(s: RawShift): ClientShift {
     eventType:        s.event_type  ?? null,
     jobType:          s.job_type    ?? null,
     companyName:      s.company_name ?? null,
-    startTime:        formatTime(s.start_time),
+    startTime:        formatTime(s.start_time, s.timezone),
     startTimeISO:     s.start_time,
     payRate:          s.pay_rate    ?? null,
     payPeriod:        s.pay_period  ?? null,

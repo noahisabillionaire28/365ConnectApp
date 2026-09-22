@@ -49,7 +49,7 @@ export function AuthCallbackScreen() {
         console.warn('[AuthCallback] upsert warning:', e);
       }
 
-      let profile: { username: string | null; role: string | null; availability: unknown } | null = null;
+      let profile: { username: string | null; role: string | null; availability: unknown; bio?: string | null; company_name?: string | null } | null = null;
       try {
         profile = await apiClient(session.user.id).get('/users/me');
       } catch (e) {

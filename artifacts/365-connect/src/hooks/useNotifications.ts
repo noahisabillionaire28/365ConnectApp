@@ -35,8 +35,12 @@ export function notificationDeepLink(
   if (n.type === 'booking') return '/home';
   // A shift offer is accepted/declined on the Home → Requests tab, not on the
   // shift page (which would only show "Apply").
-  if (n.type === 'shift_invite' || n.type === 'direct_shift_request') return '/home';
+  if (n.type === 'shift_invite' || n.type === 'direct_shift_request') return '/home?tab=requests';
   if (n.post_id) return `/post/${n.post_id}`;
+  // A new applicant is handled on the applicants list, not the shift page.
+  if (n.shift_id && (n.type === 'application_received' || n.type === 'new_application' || n.type === 'application')) {
+    return `/shift/${n.shift_id}/applicants`;
+  }
   if (n.shift_id) return `/shift/${n.shift_id}`;
   if (n.type === 'new_message') return '/messages';
   return '/notifications';

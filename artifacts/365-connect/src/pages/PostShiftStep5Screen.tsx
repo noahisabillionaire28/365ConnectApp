@@ -14,6 +14,7 @@ import {
   getDraft, resetDraft, getEditShiftId,
   durationHours, durationLabel, fmt12h, fmtDate, buildIso,
 } from '@/store/postShiftStore';
+import { browserTimeZone } from '@/lib/timezone';
 import { usePostShift } from '@/hooks/usePostShift';
 import { useUpdateShift } from '@/hooks/useUpdateShift';
 import { useAuth } from '@/contexts/AuthContext';
@@ -125,8 +126,10 @@ export function PostShiftStep5Screen() {
       return;
     }
 
-    const start_time = buildIso(draft.date, draft.start_time);
-    const end_time   = buildIso(draft.date, draft.end_time, draft.start_time);
+    // The venue's zone: the poster's device zone (venues are posted locally).
+    const timezone   = browserTimeZone();
+    const start_time = buildIso(draft.date, draft.start_time, undefined, timezone);
+    const end_time   = buildIso(draft.date, draft.end_time, draft.start_time, timezone);
 
     if (!start_time || !end_time) {
       setPostError('Invalid date or time — please go back and fix Step 3.');
@@ -147,6 +150,7 @@ export function PostShiftStep5Screen() {
           unit_info:       draft.unit_info || undefined,
           start_time,
           end_time,
+          timezone,
           spots_available: draft.spots_available,
           pay_rate:        draft.pay_rate,
           description:     draft.description || undefined,
@@ -169,6 +173,7 @@ export function PostShiftStep5Screen() {
           unit_info:       draft.unit_info || undefined,
           start_time,
           end_time,
+          timezone,
           spots_available: draft.spots_available,
           pay_rate:        draft.pay_rate,
           description:     draft.description || undefined,

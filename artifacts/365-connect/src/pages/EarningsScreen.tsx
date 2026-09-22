@@ -11,8 +11,7 @@ import {
   ChevronLeft, DollarSign, CheckCircle2, Clock3,
   AlertCircle, Zap, CreditCard, TrendingUp,
 } from 'lucide-react';
-import { usePayments } from '@/hooks/usePayments';
-import type { PaymentRow } from '@/lib/supabase';
+import { usePayments, type PaymentRow } from '@/hooks/usePayments';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useAuth } from '@/contexts/AuthContext';
 import { confirmShiftPayment } from '@/lib/checkout';
@@ -34,6 +33,8 @@ function StatusChip({ status }: { status: string }) {
     completed:  { label: 'Completed',  cls: 'bg-[#ECFDF5] text-[#065F46] border-[#10B981]/30', icon: <CheckCircle2 size={11} aria-hidden className="text-[#10B981]" /> },
     simulated:  { label: 'Simulated',  cls: 'bg-[#FFF7ED] text-[#92400E] border-[#FED7AA]',    icon: <Zap size={11} aria-hidden className="text-[#F59E0B]" /> },
     pending:    { label: 'Pending',    cls: 'bg-[#F3F4F6] text-[#6B7280] border-[#E5E7EB]',    icon: <Clock3 size={11} aria-hidden className="text-[#9CA3AF]" /> },
+    awaiting_approval: { label: 'Awaiting approval', cls: 'bg-[#F3F4F6] text-[#6B7280] border-[#E5E7EB]', icon: <Clock3 size={11} aria-hidden className="text-[#9CA3AF]" /> },
+    approved:   { label: 'Approved · payment on its way', cls: 'bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]', icon: <CheckCircle2 size={11} aria-hidden className="text-[#3B82F6]" /> },
     failed:     { label: 'Failed',     cls: 'bg-red-50 text-[#DC2626] border-red-200',          icon: <AlertCircle size={11} aria-hidden className="text-[#EF4444]" /> },
   };
   const cfg = map[status] ?? map.pending;
@@ -49,7 +50,10 @@ function StatusChip({ status }: { status: string }) {
 function typeLabel(row: PaymentRow): string {
   if (row.payment_type === 'pro_subscription') return 'Pro subscription';
   if (row.direction === 'out') return 'Shift payment sent';
-  return 'Shift earnings';
+  const title = row.shift_title || row.company_name;
+  const hours = typeof row.hours === 'number' && row.hours > 0 ? ` · ${row.hours.toFixed(1)}h` : '';
+  if (row.payment_type === 'timesheet') return `${title ?? 'Shift'}${hours}`;
+  return title ? `Shift earnings · ${title}` : 'Shift earnings';
 }
 
 function typeIcon(row: PaymentRow) {
@@ -83,7 +87,10 @@ function SummaryCard({ payments }: { payments: PaymentRow[] }) {
   const totalEarned   = shiftPayments
     .filter((p) => p.status === 'completed')
     .reduce((acc, p) => acc + p.net_amount, 0);
-  const pending       = payments.filter((p) => p.status === 'pending' && p.direction !== 'out').reduce((acc, p) => acc + p.amount, 0);
+  // Pending = finished shifts not yet paid out (awaiting approval, approved, or a pending payment).
+  const pending       = payments
+    .filter((p) => p.direction !== 'out' && (p.status === 'pending' || p.status === 'approved' || p.status === 'awaiting_approval'))
+    .reduce((acc, p) => acc + p.amount, 0);
   const completed     = shiftPayments.filter((p) => p.status === 'completed').length;
 
   return (

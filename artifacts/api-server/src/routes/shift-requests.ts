@@ -4,25 +4,25 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
 import { findTimeConflict } from './applications.js';
 import { addWorkerToShiftChat } from '../lib/chat.js';
+import { HttpError, sendError } from '../lib/httpError.js';
+import { assertShiftOwner } from '../lib/shiftAccess.js';
+import { bookWorker, isAcceptingWorkers, MSG_CLOSED, MSG_FULL } from '../lib/booking.js';
 
 const router = Router();
 
-/** Returns true if userId is the client that owns the given shift. */
-async function ownsShift(userId: string, shiftId: string): Promise<boolean> {
-  const { count } = await adminDb
-    .from('shifts').select('*', { count: 'exact', head: true })
-    .eq('id', shiftId).eq('client_id', userId);
-  return (count ?? 0) > 0;
-}
+/** Max workers invited by one broadcast call. */
+const BROADCAST_CAP = 200;
 
-/** GET /api/shift-requests — my shift requests (worker or client) */
+/** GET /api/shift-requests?shift_id= — my shift requests (worker or client) */
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const { data: requests, error } = await adminDb
+    const { shift_id } = req.query as Record<string, string | undefined>;
+    let q = adminDb
       .from('shift_requests')
       .select('*')
-      .or(`worker_id.eq.${req.userId},client_id.eq.${req.userId}`)
-      .order('created_at', { ascending: false });
+      .or(`worker_id.eq.${req.userId},client_id.eq.${req.userId}`);
+    if (shift_id) q = q.eq('shift_id', shift_id);
+    const { data: requests, error } = await q.order('created_at', { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
 
     const rows = requests ?? [];
@@ -33,7 +33,7 @@ router.get('/', requireAuth, async (req, res) => {
     if (shiftIds.length) {
       const { data: shifts, error: shiftsError } = await adminDb
         .from('shifts')
-        .select('id, title, job_type, start_time, end_time, location, pay_rate, company_name')
+        .select('id, title, job_type, start_time, end_time, location, pay_rate, pay_period, company_name')
         .in('id', shiftIds);
       if (shiftsError) return res.status(500).json({ error: shiftsError.message });
       shiftsById = new Map((shifts ?? []).map((s: any) => [s.id, s]));
@@ -60,6 +60,7 @@ router.get('/', requireAuth, async (req, res) => {
         end_time: s?.end_time ?? null,
         location: s?.location ?? null,
         pay_rate: s?.pay_rate ?? null,
+        pay_period: s?.pay_period ?? null,
         company_name: s?.company_name ?? null,
         worker_username: w?.username ?? null,
         worker_photo: w?.photo_url ?? null,
@@ -67,14 +68,21 @@ router.get('/', requireAuth, async (req, res) => {
     });
     return res.json(merged);
   } catch (e) {
-    return res.status(500).json({ error: String(e) });
+    return sendError(res, e);
   }
 });
 
-/** POST /api/shift-requests — create a shift request (client invites one worker) */
+/** POST /api/shift-requests — create a shift request (owner invites one worker) */
 router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const { shift_id, worker_id, message } = req.body as Record<string, string>;
+  if (!shift_id || !worker_id) {
+    return res.status(400).json({ error: 'shift_id and worker_id are required' });
+  }
   try {
+    const shift = await assertShiftOwner(shift_id, req.userId!);
+    if (!isAcceptingWorkers(shift)) return res.status(409).json({ error: MSG_CLOSED });
+    if (worker_id === req.userId) return res.status(409).json({ error: "You can't request yourself." });
+
     const { data, error } = await adminDb
       .from('shift_requests')
       .upsert(
@@ -86,17 +94,15 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(409).json({ error: 'Request already exists' });
 
-    const [{ data: w }, { data: sh }] = await Promise.all([
-      adminDb.from('users').select('username').eq('id', worker_id).maybeSingle(),
-      adminDb.from('shifts').select('title').eq('id', shift_id).maybeSingle(),
-    ]);
+    const { data: w } = await adminDb.from('users').select('username').eq('id', worker_id).maybeSingle();
+    const label = shift.title ? `"${shift.title}"` : 'a shift';
     // Notify the invited worker.
     await createNotification({
       userId: worker_id,
       fromUserId: req.userId,
       type: 'shift_invite',
       title: 'Shift request',
-      body: `You've been requested for ${sh?.title ? `"${sh.title}"` : 'a shift'}. Accept to claim your spot.`,
+      body: `You've been requested for ${label}. Accept to claim your spot.`,
       shiftId: shift_id,
     });
     // Receipt to the requester.
@@ -105,51 +111,87 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
       fromUserId: worker_id,
       type: 'receipt',
       title: 'Request sent',
-      body: `You requested ${w?.username ? `@${w.username}` : 'a worker'} for ${sh?.title ? `"${sh.title}"` : 'a shift'}.`,
+      body: `You requested ${w?.username ? `@${w.username}` : 'a worker'} for ${label}.`,
       shiftId: shift_id,
     });
     return res.status(201).json(data);
   } catch (e) {
-    return res.status(500).json({ error: String(e) });
+    return sendError(res, e);
   }
 });
 
+/** Case-insensitive job-type overlap between a worker and a shift. */
+function matchesJobTypes(
+  worker: { job_types: string[] | null; primary_job_type: string | null },
+  wanted: Set<string>,
+): boolean {
+  if (!wanted.size) return true;
+  const mine = new Set<string>();
+  for (const t of worker.job_types ?? []) if (typeof t === 'string') mine.add(t.trim().toLowerCase());
+  if (worker.primary_job_type) mine.add(worker.primary_job_type.trim().toLowerCase());
+  for (const t of mine) if (wanted.has(t)) return true;
+  return false;
+}
+
 /**
- * POST /api/shift-requests/broadcast — invite ALL workers to a shift at once.
- * Nowsta-style blast: every worker gets a request + notification, and whoever
- * accepts claims a spot (first-come, up to the shift's headcount). Owner/staffer.
+ * POST /api/shift-requests/broadcast — invite matching workers to a shift at once.
+ * Owner (or admin) only. Targets available workers whose job types overlap the
+ * shift's (all available workers when the shift has none), skips anyone who
+ * already has a request or application for the shift, caps at 200 per call,
+ * and only notifies the workers whose request rows were newly created.
  */
 router.post('/broadcast', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const { shift_id, message } = req.body as Record<string, string>;
   if (!shift_id) return res.status(400).json({ error: 'shift_id is required' });
   try {
-    // Clients may only broadcast their own shifts; staffers/admins any shift.
-    if (req.userRole === 'client' && !(await ownsShift(req.userId!, shift_id))) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-    const { data: shift } = await adminDb
-      .from('shifts').select('id, title').eq('id', shift_id).maybeSingle();
-    if (!shift) return res.status(404).json({ error: 'Shift not found' });
+    const shift = await assertShiftOwner(shift_id, req.userId!);
+    if (!isAcceptingWorkers(shift)) return res.status(409).json({ error: MSG_CLOSED });
 
-    // Every worker on the platform (excluding the requester).
+    // Job types the shift accepts (job_types[], falling back to job_type).
+    const wanted = new Set<string>();
+    for (const t of shift.job_types ?? []) if (typeof t === 'string' && t.trim()) wanted.add(t.trim().toLowerCase());
+    if (!wanted.size && shift.job_type?.trim()) wanted.add(shift.job_type.trim().toLowerCase());
+
+    // Available workers (is_available null counts as available).
     const { data: workers, error: wErr } = await adminDb
-      .from('users').select('id').eq('role', 'worker');
+      .from('users')
+      .select('id, job_types, primary_job_type, is_available')
+      .eq('role', 'worker')
+      .or('is_available.is.null,is_available.eq.true');
     if (wErr) return res.status(500).json({ error: wErr.message });
-    const workerIds = (workers ?? []).map((w) => w.id).filter((id) => id !== req.userId);
-    if (!workerIds.length) return res.json({ invited: 0 });
 
-    // Create a request row for each (ignore ones that already exist).
-    const rows = workerIds.map((worker_id) => ({
+    // Anyone already invited to / applied for this shift.
+    const [{ data: existingReqs }, { data: existingApps }] = await Promise.all([
+      adminDb.from('shift_requests').select('worker_id').eq('shift_id', shift_id),
+      adminDb.from('applications').select('worker_id').eq('shift_id', shift_id),
+    ]);
+    const skip = new Set<string>([req.userId!]);
+    for (const r of existingReqs ?? []) skip.add(r.worker_id);
+    for (const a of existingApps ?? []) skip.add(a.worker_id);
+    if (shift.client_id) skip.add(shift.client_id);
+
+    const targets = (workers ?? [])
+      .filter((w) => w.is_available !== false)
+      .filter((w) => !skip.has(w.id))
+      .filter((w) => matchesJobTypes(w, wanted))
+      .slice(0, BROADCAST_CAP)
+      .map((w) => w.id);
+    if (!targets.length) return res.json({ invited: 0, matched: 0 });
+
+    // Insert a request row for each; RETURNING only yields the newly created rows.
+    const rows = targets.map((worker_id) => ({
       shift_id, client_id: req.userId, worker_id, message: message ?? null,
     }));
-    const { error: insErr } = await adminDb
+    const { data: inserted, error: insErr } = await adminDb
       .from('shift_requests')
-      .upsert(rows, { onConflict: 'shift_id,worker_id', ignoreDuplicates: true });
+      .upsert(rows, { onConflict: 'shift_id,worker_id', ignoreDuplicates: true })
+      .select('worker_id');
     if (insErr) return res.status(500).json({ error: insErr.message });
+    const invitedIds = [...new Set((inserted ?? []).map((r) => r.worker_id as string))];
 
-    // Notify every invited worker (best-effort).
+    // Notify (in-app + SSE + email via createNotification) only the newly invited.
     const label = shift.title ? `"${shift.title}"` : 'a shift';
-    await Promise.all(workerIds.map((worker_id) =>
+    await Promise.all(invitedIds.map((worker_id) =>
       createNotification({
         userId: worker_id,
         fromUserId: req.userId,
@@ -160,23 +202,27 @@ router.post('/broadcast', requireAuth, requireRole('client', 'staffer'), async (
       }),
     ));
     // Receipt to the requester.
-    await createNotification({
-      userId: req.userId!,
-      type: 'receipt',
-      title: 'Workers invited',
-      body: `You invited ${workerIds.length} worker${workerIds.length === 1 ? '' : 's'} to ${label}.`,
-      shiftId: shift_id,
-    });
-    return res.json({ invited: workerIds.length });
+    if (invitedIds.length) {
+      await createNotification({
+        userId: req.userId!,
+        type: 'receipt',
+        title: 'Workers invited',
+        body: `You invited ${invitedIds.length} worker${invitedIds.length === 1 ? '' : 's'} to ${label}.`,
+        shiftId: shift_id,
+      });
+    }
+    return res.json({ invited: invitedIds.length, matched: targets.length });
   } catch (e) {
-    return res.status(500).json({ error: String(e) });
+    return sendError(res, e);
   }
 });
 
 /**
  * PATCH /api/shift-requests/:id — worker accepts or declines an invite.
  * Accepting BOOKS the worker (creates an accepted application) so they can clock
- * in — first-come up to the shift's headcount.
+ * in — first-come up to the shift's headcount. When the shift is full the
+ * worker is placed on standby (application + request both 'standby') and the
+ * response is { status: 'standby' } so the UI can say "You're on standby".
  */
 router.patch('/:id', requireAuth, async (req, res) => {
   const { status } = req.body as { status: 'accepted' | 'declined' };
@@ -204,13 +250,11 @@ router.patch('/:id', requireAuth, async (req, res) => {
       return res.json(data);
     }
 
-    // Accept → book the worker, or waitlist them if the shift is full.
     const { data: shift } = await adminDb
       .from('shifts')
-      .select('id, title, client_id, spots_available, spots_filled')
+      .select('id, title, client_id, status, end_time')
       .eq('id', reqRow.shift_id).maybeSingle();
     if (!shift) return res.status(404).json({ error: 'Shift not found' });
-    const spotsLeft = (shift.spots_available ?? 1) - (shift.spots_filled ?? 0);
     const label = shift.title ? `"${shift.title}"` : 'a shift';
 
     // Don't book into a time-overlapping shift.
@@ -221,11 +265,14 @@ router.patch('/:id', requireAuth, async (req, res) => {
       });
     }
 
-    // Mark the request accepted.
-    await adminDb.from('shift_requests').update({ status: 'accepted' }).eq('id', reqRow.id);
-
-    // Full → put them on standby (waitlist); a spot opening promotes them.
-    if (spotsLeft <= 0) {
+    // Try to book; a full shift → standby, a closed/ended shift → 409.
+    let booking: Record<string, unknown> | null = null;
+    try {
+      const r = await bookWorker(reqRow.shift_id, req.userId!, 'offer');
+      booking = r.application as unknown as Record<string, unknown>;
+    } catch (e) {
+      if (!(e instanceof HttpError) || e.status !== 409 || e.message !== MSG_FULL) throw e;
+      // Full → waitlist: application AND request go to 'standby'.
       const { data: standby, error: stErr } = await adminDb
         .from('applications')
         .upsert(
@@ -234,6 +281,9 @@ router.patch('/:id', requireAuth, async (req, res) => {
         )
         .select().single();
       if (stErr) return res.status(500).json({ error: stErr.message });
+      const { error: rqErr } = await adminDb
+        .from('shift_requests').update({ status: 'standby' }).eq('id', reqRow.id);
+      if (rqErr) return res.status(500).json({ error: rqErr.message });
       await createNotification({
         userId: req.userId!, fromUserId: shift.client_id, type: 'booking',
         title: "You're on standby",
@@ -243,16 +293,8 @@ router.patch('/:id', requireAuth, async (req, res) => {
       return res.json({ status: 'standby', booking: standby });
     }
 
-    // Book them: an accepted application (the DB trigger bumps spots_filled).
-    const { data: booking, error: bErr } = await adminDb
-      .from('applications')
-      .upsert(
-        { shift_id: reqRow.shift_id, worker_id: req.userId, status: 'accepted' },
-        { onConflict: 'shift_id,worker_id' },
-      )
-      .select()
-      .single();
-    if (bErr) return res.status(500).json({ error: bErr.message });
+    // Booked → mark the request accepted.
+    await adminDb.from('shift_requests').update({ status: 'accepted' }).eq('id', reqRow.id);
     await addWorkerToShiftChat(reqRow.shift_id, req.userId!);
 
     // Confirm to the worker.
@@ -279,7 +321,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
     }
     return res.json({ status: 'accepted', booking });
   } catch (e) {
-    return res.status(500).json({ error: String(e) });
+    return sendError(res, e);
   }
 });
 

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { DEFAULT_SHIFT_TZ } from './timezone';
 
 // ─── Feed UI types (no mock data — all data comes from Supabase) ──────────────
 
@@ -28,6 +29,8 @@ export type MockShift = {
   startTimeISO: string;
   /** Raw ISO timestamptz for the shift end — used for lifecycle state. */
   endTimeISO: string;
+  /** IANA zone of the venue; times are displayed in this zone. */
+  timezone: string;
   /** When set, this shift is one position of a multi-position event. */
   eventId: string | null;
   distanceMiles: number;
@@ -130,8 +133,9 @@ export type ShiftRow = {
   job_types: string[];
   pay_rate: number | null;
   pay_period: string;
-  start_time: string;       // ISO timestamptz from DB
-  end_time: string;         // ISO timestamptz from DB
+  start_time: string;       // ISO timestamptz from DB (a real instant)
+  end_time: string;         // ISO timestamptz from DB (a real instant)
+  timezone?: string | null; // IANA zone of the venue (null on legacy rows → America/New_York)
   date: string | null;      // optional display-date override; usually null — derive from start_time
   spots_available: number;  // total slots posted (despite the name, this is the total, not the remainder — remainder = spots_available - spots_filled)
   spots_filled: number;
@@ -341,34 +345,39 @@ export type ShiftRequestRow = {
 
 // ─── Date / time helpers ──────────────────────────────────────────────────────
 
-// Shift times are entered as a venue "wall clock" and stored labelled UTC
-// (e.g. 6:00 PM → 2026-08-20T18:00:00+00:00). We therefore render them in UTC
-// so every viewer sees the time exactly as it was entered, regardless of their
-// own timezone — otherwise a Pacific viewer would see a 6 PM shift as 11 AM.
+// Shift times are real instants tagged with the venue's IANA zone (see
+// lib/timezone.ts). We render them in the venue zone so every viewer sees the
+// time as it was entered ("6:00 PM"), while lifecycle logic compares instants.
 
-/** "9:00 PM" format from an ISO timestamptz string (rendered as entered) */
-export function formatTime(iso: string): string {
+function safeZone(tz?: string | null): string {
+  const zone = tz || DEFAULT_SHIFT_TZ;
+  try { new Intl.DateTimeFormat('en-US', { timeZone: zone }); return zone; } catch { return DEFAULT_SHIFT_TZ; }
+}
+
+/** "9:00 PM" format from an ISO timestamptz string, in the venue zone */
+export function formatTime(iso: string, tz?: string | null): string {
   return new Date(iso).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-    timeZone: 'UTC',
+    timeZone: safeZone(tz),
   });
 }
 
-/** "Today" / "Tonight" / "Tomorrow" / "Mon Jul 8" from an ISO timestamptz string */
-export function friendlyDate(iso: string): string {
+/** "Today" / "Tonight" / "Tomorrow" / "Mon Jul 8" from an ISO timestamptz string, in the venue zone */
+export function friendlyDate(iso: string, tz?: string | null): string {
+  const zone     = safeZone(tz);
   const d        = new Date(iso);
   const now      = new Date();
   const tomorrow = new Date(now.getTime() + 86_400_000);
-  // Compare on the UTC calendar day to stay consistent with formatTime above.
-  const key = (x: Date) => `${x.getUTCFullYear()}-${x.getUTCMonth()}-${x.getUTCDate()}`;
+  const dayKey   = (x: Date) => x.toLocaleDateString('en-CA', { timeZone: zone }); // YYYY-MM-DD
+  const hourIn   = Number(d.toLocaleTimeString('en-US', { timeZone: zone, hour12: false, hour: '2-digit' })) % 24;
 
   // A 9am shift is "Today", not "Tonight" — only evening starts get that label.
-  if (key(d) === key(now))      return d.getUTCHours() >= 17 ? 'Tonight' : 'Today';
-  if (key(d) === key(tomorrow)) return 'Tomorrow';
+  if (dayKey(d) === dayKey(now))      return hourIn >= 17 ? 'Tonight' : 'Today';
+  if (dayKey(d) === dayKey(tomorrow)) return 'Tomorrow';
   return d.toLocaleDateString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC',
+    weekday: 'short', month: 'short', day: 'numeric', timeZone: zone,
   });
 }
 
@@ -426,11 +435,12 @@ export function shiftRowToMockShift(
     coverImage:     row.cover_image     ?? COVER_FALLBACKS[primaryType] ?? COVER_FALLBACKS.default,
     payRate:        Number(row.pay_rate ?? 0),
     payPeriod:      (row.pay_period as 'hr' | 'day' | 'event') ?? 'hr',
-    date:           row.date ?? friendlyDate(row.start_time),
-    startTime:      formatTime(row.start_time),
-    endTime:        formatTime(row.end_time),
+    date:           friendlyDate(row.start_time, row.timezone),
+    startTime:      formatTime(row.start_time, row.timezone),
+    endTime:        formatTime(row.end_time, row.timezone),
     startTimeISO:   row.start_time,
     endTimeISO:     row.end_time,
+    timezone:       row.timezone || DEFAULT_SHIFT_TZ,
     eventId:        (row as { event_id?: string | null }).event_id ?? null,
     distanceMiles:  Math.round(haversineMiles(refCoords.lat, refCoords.lng, lat, lng) * 10) / 10,
     spotsAvailable,
@@ -476,6 +486,7 @@ export function hardenShift(s: MockShift): MockShift {
     endTime:        raw.endTime ?? '',
     startTimeISO:   raw.startTimeISO ?? '',
     endTimeISO:     raw.endTimeISO ?? '',
+    timezone:       raw.timezone || DEFAULT_SHIFT_TZ,
     eventId:        raw.eventId ?? null,
     distanceMiles:  Number.isFinite(raw.distanceMiles) ? (raw.distanceMiles as number) : 0,
     spotsAvailable: Number(raw.spotsAvailable ?? 0) || 0,
