@@ -6,6 +6,7 @@ import {
   CheckCircle2, Flag, DollarSign, Clock3, MessageCircle, MessagesSquare,
 } from 'lucide-react';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
+import { useShiftRanking } from '@/hooks/useMatch';
 import { getOrCreateDirectConversation, openShiftGroupChat } from '@/hooks/useConversations';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
 import { useAcceptedWorkers, type AcceptedWorker, type Attendance } from '@/hooks/useAcceptedWorkers';
@@ -256,6 +257,10 @@ export function ApplicantsScreen() {
 
   const loading = shiftLoading || appsLoading || confLoading;
   const pending = applicants.filter((a) => a.status === 'pending');
+  // Best candidates first, using the server's insight (history + AI) when available.
+  const ranking = useShiftRanking(id, pending.length > 0 || applicants.some((a) => a.status === 'standby'));
+  const rankedPending = [...pending].sort((x, y) =>
+    (ranking.byWorker.get(y.worker_id)?.score ?? y.matchScore ?? 0) - (ranking.byWorker.get(x.worker_id)?.score ?? x.matchScore ?? 0));
   const standby = applicants.filter((a) => a.status === 'standby');
   const invitedPending = invites.filter(
     (i) => i.status === 'pending' && !confirmed.some((c) => c.workerId === i.worker_id),
@@ -460,7 +465,10 @@ export function ApplicantsScreen() {
               <>
                 <SectionHeader label="Applied — needs review" count={pending.length} />
                 <div className="flex flex-col gap-2">
-                  {pending.map((a) => (
+                  {rankedPending.map((a) => {
+                    const m = ranking.byWorker.get(a.worker_id);
+                    const score = m?.score ?? a.matchScore;
+                    return (
                     <div key={a.applicationId} className="bg-white border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 flex items-center gap-3">
                       <Avatar url={a.photoUrl} name={a.username} />
                       <button type="button" aria-label={`Message ${a.username ? `@${a.username}` : 'applicant'}`}
@@ -471,9 +479,14 @@ export function ApplicantsScreen() {
                       <div className="flex-1 min-w-0">
                         <p className="text-[#111827] font-semibold text-[14px] truncate">
                           {a.username ? `@${a.username}` : 'Applicant'}
+                          {score != null && (
+                            <span className={`ml-2 text-[11px] font-bold ${score >= 75 ? 'text-emerald-600' : score >= 50 ? 'text-[#0095F6]' : 'text-amber-600'}`}>
+                              {score} match
+                            </span>
+                          )}
                         </p>
-                        {a.matchScore !== null && (
-                          <p className="text-[#0095F6] text-[11px] font-bold">{a.matchScore}% match</p>
+                        {m?.reason && (
+                          <p className="text-[#6B7280] text-[12px] leading-snug mt-0.5 line-clamp-2">{m.reason}</p>
                         )}
                       </div>
                       <button type="button" aria-label="Decline"
@@ -490,7 +503,7 @@ export function ApplicantsScreen() {
                         <Check size={17} aria-hidden className="text-white" />
                       </button>
                     </div>
-                  ))}
+                  );})}
                 </div>
               </>
             )}

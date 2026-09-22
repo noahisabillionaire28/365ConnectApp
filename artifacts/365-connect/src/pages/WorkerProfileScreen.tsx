@@ -5,6 +5,8 @@ import { apiClient } from '@/lib/api';
 import { friendlyDate } from '@/lib/supabase';
 import { useFollow } from '@/hooks/useFollow';
 import { usePosts } from '@/hooks/usePosts';
+import { useToggleLike } from '@/hooks/useFeed';
+import { PostCard } from '@/components/PostCard';
 import { ProfileBadges } from '@/components/ProfileBadges';
 import { useSavedWorker } from '@/hooks/useSavedWorkers';
 import { useAuth } from '@/contexts/AuthContext';
@@ -338,6 +340,7 @@ export function WorkerProfileScreen() {
 
   const { followerCount } = useFollow(profile?.id ?? '');
   const { data: workerPosts = [] } = usePosts(profile?.id);
+  const toggleLike = useToggleLike();
   const canRequestShift =
     !!authUser && !!profile && authUser.id !== profile.id &&
     (role === 'client' || role === 'staffer') && profile.role === 'worker';
@@ -559,20 +562,18 @@ export function WorkerProfileScreen() {
         )}
         {!canRequestShift && <div className="mb-8" />}
 
-        {/* Posts grid */}
-        {workerPosts.filter((p) => p.photo_url).length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-[13px] font-semibold text-[#737373] uppercase tracking-widest mb-3">
+        {/* Posts — the worker's feed, post by post (not a thumbnail grid), so a
+            client or agency can see their work the way it was shared. */}
+        {workerPosts.length > 0 && (
+          <div className="mb-8 -mx-5">
+            <h2 className="text-[13px] font-semibold text-[#737373] uppercase tracking-widest mb-3 px-5">
               Posts
             </h2>
-            <div className="grid grid-cols-3 gap-[3px]">
-              {workerPosts.filter((p) => p.photo_url).map((p) => (
-                <button type="button" key={p.id} onClick={() => navigate(`/post/${p.id}`)}
-                  aria-label="Open post"
-                  className="relative aspect-square overflow-hidden bg-[#EFEFEF] rounded-[4px]">
-                  <img src={p.photo_url as string} alt={p.caption ?? 'Post'}
-                    loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                </button>
+            <div className="flex flex-col gap-6">
+              {workerPosts.map((p) => (
+                <PostCard key={p.id} post={p}
+                  onLike={(id) => toggleLike.mutate(id)}
+                  onOpenComments={(id) => navigate(`/post/${id}`)} />
               ))}
             </div>
           </div>

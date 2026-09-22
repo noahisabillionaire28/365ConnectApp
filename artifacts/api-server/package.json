@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
     "@google-cloud/storage": "^7.21.0",
     "@supabase/supabase-js": "^2.110.0",
     "@workspace/api-zod": "workspace:*",

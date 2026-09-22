@@ -213,10 +213,12 @@ router.get('/:userId', async (req, res) => {
   const { data, error } = await adminDb
     .from('posts')
     .select('*')
-    .eq('user_id', req.params.userId)
+    .eq('user_id', String(req.params.userId))
     .order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
-  return res.json(data ?? []);
+  // Same shape as the feed (author, like/comment counts, liked_by_me) so a
+  // profile can show posts as a scrolling feed with working likes.
+  return res.json(await enrichPosts((data ?? []) as Array<Record<string, unknown>>, req.userId ?? undefined));
 });
 
 /** POST /api/posts — create post */
