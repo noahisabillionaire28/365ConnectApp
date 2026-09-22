@@ -11,7 +11,7 @@ import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
 import { useToast } from '@/contexts/ToastContext';
 import { useApplicationStatus } from '@/hooks/useApplicationStatus';
-import { LeafletMap } from '@/components/LeafletMap';
+import { VenueMap } from '@/components/VenueMap';
 import { geocodeAddress, type Coords } from '@/lib/geocode';
 import { useShiftById } from '@/hooks/useShifts';
 import { useProfile } from '@/hooks/useProfile';
@@ -154,6 +154,9 @@ export function ShiftDetailScreen() {
     isOwnerForHooks ? user?.id : undefined,
   );
   const { positions: eventPositions } = useEventPositions(shift?.eventId ?? undefined);
+  // Server-side insight (real history + Claude when configured). Declared here,
+  // before the loading/error returns, so the hook order never changes.
+  const myMatch = useMyMatch(shift?.id, profile.role === 'worker');
   const { showToast } = useToast();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -248,8 +251,6 @@ export function ShiftDetailScreen() {
   const canManage   = isOwner && (profile.role === 'client' || profile.role === 'staffer');
   const isWorker    = profile.role === 'worker';
 
-  // Server-side insight (real history + Claude when configured).
-  const myMatch = useMyMatch(shiftId, isWorker);
   const matchScore = isWorker
     ? computeMatchScore(shift, {
         primaryJobType: profile.primaryJobType,
@@ -698,28 +699,17 @@ export function ShiftDetailScreen() {
           </div>
         )}
 
-        {/* Map */}
+        {/* Map — Apple Maps style block: address bar, dark map, Hide Map, distance footer */}
         <div className="px-5 pb-6">
           <SectionHeading>Location</SectionHeading>
-          <button type="button" onClick={() => setDirectionsOpen(true)}
-            aria-label="Get directions to this shift" className="block w-full text-left">
-            <div className="rounded-[12px] overflow-hidden border border-[#DBDBDB] relative" style={{ height: 180 }}>
-              <LeafletMap
-                center={shiftCoords}
-                zoom={15}
-                interactive={false}
-                recenter
-                ariaLabel="Shift location map"
-                markers={[{ id: shift.id, lat: shiftCoords.lat, lng: shiftCoords.lng, selected: true }]}
-              />
-              {/* Transparent tap layer so a tap anywhere on the map opens directions */}
-              <div aria-hidden className="absolute inset-0" />
-            </div>
-            <div className="flex items-center gap-2 mt-2.5">
-              <MapPin size={13} aria-hidden className="text-[#737373] flex-shrink-0" />
-              <p className="text-[#737373] text-[13px]">{shift.location} · {distanceMilesLabel} mi from your location</p>
-            </div>
-          </button>
+          <VenueMap
+            address={shift.location}
+            coords={shiftCoords}
+            markerId={shift.id}
+            distanceMiles={distanceFromShift}
+            footerLeft={`${shift.date} • ${shift.startTime}`}
+            onOpenDirections={() => setDirectionsOpen(true)}
+          />
           <button type="button" onClick={() => setDirectionsOpen(true)}
             className="mt-3 w-full h-[44px] rounded-[10px] bg-[#0A1628] text-white font-semibold text-[14px] flex items-center justify-center gap-2 active:scale-[0.99] transition-transform">
             <Navigation size={15} aria-hidden />

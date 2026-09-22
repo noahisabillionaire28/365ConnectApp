@@ -55,6 +55,9 @@ pnpm exec cap open ios     # opens Xcode → Product → Archive → Distribute
 
 ## Notes
 
+- While you are in the Apple Developer portal, also create the Maps key from
+  `docs/apple-maps.md`; it switches every map in the app to real Apple Maps.
+
 - `APNS_SANDBOX=1` on the API switches to Apple's sandbox gateway, which is
   only for builds installed directly from Xcode. TestFlight and App Store
   builds use production (the default).
