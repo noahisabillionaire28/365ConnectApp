@@ -22,6 +22,7 @@ import { apiClient } from '@/lib/api';
 import { resetDraft, setDraft, setEditShiftId } from '@/store/postShiftStore';
 import { utcToZonedParts, DEFAULT_SHIFT_TZ } from '@/lib/timezone';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
+import { useMyMatch } from '@/hooks/useMatch';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasCompletedTimeEntry } from '@/hooks/useTimeEntry';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
@@ -247,6 +248,8 @@ export function ShiftDetailScreen() {
   const canManage   = isOwner && (profile.role === 'client' || profile.role === 'staffer');
   const isWorker    = profile.role === 'worker';
 
+  // Server-side insight (real history + Claude when configured).
+  const myMatch = useMyMatch(shiftId, isWorker);
   const matchScore = isWorker
     ? computeMatchScore(shift, {
         primaryJobType: profile.primaryJobType,
@@ -782,33 +785,39 @@ export function ShiftDetailScreen() {
           );
         })()}
 
-        {/* AI match score — worker-only, computed 40 job-type + 30 availability + 20 rating + 10 distance */}
-        {isWorker && matchScore !== null && (
-          <div className="px-5 pb-6">
-            <div className="bg-[#F0F7FF] border border-[#DBDBDB] rounded-[12px] px-5 py-4 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-[#0095F6]/10 border border-[#0095F6]/20 flex items-center justify-center flex-shrink-0">
-                <Sparkles size={20} aria-hidden className="text-[#0095F6]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-[#0095F6] font-bold text-[22px]">{matchScore}%</span>
-                  <span className="bg-[#0095F6]/10 text-[#0095F6] text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide border border-[#0095F6]/20">
-                    AI Match
-                  </span>
+        {/* Match — server-computed from real history (role, reliability, past
+            shifts with this poster, distance) and, when configured, explained
+            by Claude. The local formula only fills the gap while it loads. */}
+        {isWorker && matchScore !== null && (() => {
+          const score = myMatch.insight?.score ?? matchScore;
+          const reason = myMatch.insight?.reason
+            ?? (matchScore >= 80 ? 'Strong fit for this role and day.'
+              : matchScore >= 60 ? 'Good fit — check the role and your availability.'
+              : 'Partial fit — the role or day may not line up.');
+          const tone = score >= 75 ? '#059669' : score >= 50 ? '#0095F6' : '#B45309';
+          return (
+            <div className="px-5 pb-6">
+              <div className="bg-[#F0F7FF] border border-[#DBDBDB] rounded-[12px] px-5 py-4 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-white border flex items-center justify-center flex-shrink-0" style={{ borderColor: tone }}>
+                  <span className="font-bold text-[15px]" style={{ color: tone }}>{score}</span>
                 </div>
-                <p className="text-[#737373] text-[13px] leading-snug">
-                  {matchScore >= 90
-                    ? 'Your skills align perfectly with this shift'
-                    : matchScore >= 80
-                    ? 'Strong match — you meet most requirements'
-                    : matchScore >= 60
-                    ? 'Good match — a few areas to strengthen'
-                    : 'Partial match — check job type and availability'}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-[#111827] font-bold text-[14px]">
+                      {score >= 75 ? 'Strong match' : score >= 50 ? 'Good match' : 'Partial match'}
+                    </span>
+                    {myMatch.insight?.source === 'claude' && (
+                      <span className="inline-flex items-center gap-1 bg-[#0095F6]/10 text-[#0095F6] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border border-[#0095F6]/20">
+                        <Sparkles size={10} aria-hidden /> AI
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[#737373] text-[13px] leading-snug">{reason}</p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Spots remaining */}
         <div className="px-5 pb-6">

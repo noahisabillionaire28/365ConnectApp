@@ -25,6 +25,7 @@ import disputesRouter    from './disputes.js';
 import pushRouter        from './push.js';
 import linkPreviewRouter from './link-preview.js';
 import cronRouter        from './cron.js';
+import matchRouter       from './match.js';
 
 const router: IRouter = Router();
 
@@ -65,5 +66,6 @@ router.use('/push',           pushRouter);
 router.use('/link-preview',   linkPreviewRouter);
 router.use('/disputes',       disputesRouter);
 router.use('/cron',           cronRouter);
+router.use('/match',          matchRouter);
 
 export default router;
