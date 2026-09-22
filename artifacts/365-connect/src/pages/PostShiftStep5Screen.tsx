@@ -156,6 +156,7 @@ export function PostShiftStep5Screen() {
           description:     draft.description || undefined,
           requirements:    draft.requirements.length ? draft.requirements : undefined,
           instant_claim:   draft.instant_claim,
+          visibility:      draft.visibility,
         });
         resetDraft();
         showToast('Shift updated!');
@@ -179,6 +180,7 @@ export function PostShiftStep5Screen() {
           description:     draft.description || undefined,
           requirements:    draft.requirements.length ? draft.requirements : undefined,
           instant_claim:   draft.instant_claim,
+          visibility:      draft.visibility,
         });
         resetDraft();
         if (data) navigate(`/post-shift/success?id=${data.id}`);

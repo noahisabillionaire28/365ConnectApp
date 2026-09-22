@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, UserPlus,
-  Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText, MessagesSquare, Repeat2,
+  Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText, MessagesSquare, Repeat2, DollarSign,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -413,6 +413,7 @@ export function ShiftDetailScreen() {
         job_type:        (raw.job_type        as string)           ?? '',
         job_types:       jobTypes.length ? jobTypes : ((raw.job_type as string) ? [raw.job_type as string] : []),
         instant_claim:   !!raw.instant_claim,
+        visibility:      raw.visibility === 'roster' ? 'roster' : 'public',
         title:           (raw.title           as string)           ?? '',
         location:        (raw.location        as string | null)    ?? '',
         lat:             (raw.lat             as number | null)    ?? 25.7825,
@@ -760,6 +761,26 @@ export function ShiftDetailScreen() {
             );
           })()}
         </AnimatePresence>
+
+        {/* What this shift pays in total — the number a worker actually decides on */}
+        {isWorker && shift.payRate > 0 && (() => {
+          const hrs = calcDurationHours(shift.startTime, shift.endTime);
+          const total = shift.payPeriod === 'hr' ? shift.payRate * hrs : shift.payRate;
+          if (!(total > 0)) return null;
+          return (
+            <div className="px-5 pb-4">
+              <div className="rounded-[12px] border border-emerald-200 bg-emerald-50 px-4 py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-emerald-800 font-bold text-[15px]">≈ ${total.toFixed(0)} for this shift</p>
+                  <p className="text-emerald-700 text-[12px] mt-0.5">
+                    {shift.payPeriod === 'hr' ? `$${shift.payRate}/hr × ${duration}` : 'Flat rate for the whole shift'} · before any breaks
+                  </p>
+                </div>
+                <DollarSign size={20} aria-hidden className="text-emerald-600 flex-shrink-0" />
+              </div>
+            </div>
+          );
+        })()}
 
         {/* AI match score — worker-only, computed 40 job-type + 30 availability + 20 rating + 10 distance */}
         {isWorker && matchScore !== null && (

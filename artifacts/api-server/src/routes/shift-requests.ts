@@ -170,9 +170,17 @@ router.post('/broadcast', requireAuth, requireRole('client', 'staffer'), async (
     for (const a of existingApps ?? []) skip.add(a.worker_id);
     if (shift.client_id) skip.add(shift.client_id);
 
+    // A roster-only shift is only ever offered to the poster's own roster.
+    let rosterOnly: Set<string> | null = null;
+    if ((shift as { visibility?: string | null }).visibility === 'roster') {
+      const { data: roster } = await adminDb.from('follows').select('following_id').eq('follower_id', shift.client_id);
+      rosterOnly = new Set((roster ?? []).map((r) => r.following_id as string));
+    }
+
     const targets = (workers ?? [])
       .filter((w) => w.is_available !== false)
       .filter((w) => !skip.has(w.id))
+      .filter((w) => !rosterOnly || rosterOnly.has(w.id))
       .filter((w) => matchesJobTypes(w, wanted))
       .slice(0, BROADCAST_CAP)
       .map((w) => w.id);

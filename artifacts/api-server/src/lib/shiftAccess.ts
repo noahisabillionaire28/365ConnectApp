@@ -25,10 +25,12 @@ export type ShiftRow = {
   job_type: string | null;
   job_types: string[] | null;
   instant_claim: boolean | null;
+  visibility?: 'public' | 'roster' | null;
+  timezone?: string | null;
 };
 
 export const SHIFT_COLUMNS =
-  'id, client_id, title, status, start_time, end_time, spots_available, spots_filled, pay_rate, pay_period, job_type, job_types, instant_claim';
+  'id, client_id, title, status, start_time, end_time, spots_available, spots_filled, pay_rate, pay_period, job_type, job_types, instant_claim, visibility, timezone';
 
 /** Load a shift by id, or null. */
 export async function loadShift(shiftId: string): Promise<ShiftRow | null> {
@@ -53,4 +55,24 @@ export async function assertShiftOwner(shiftId: string, userId: string): Promise
   const { isAdmin } = await getRoleInfo(userId);
   if (isAdmin) return shift;
   throw new HttpError(403, 'Forbidden');
+}
+
+/**
+ * Roster-only shifts: only workers on the poster's roster (the poster follows
+ * them) may see, apply to, or claim the shift. Public shifts always pass.
+ */
+export async function rosterAllows(
+  shift: { client_id: string | null; visibility?: string | null },
+  workerId: string,
+): Promise<boolean> {
+  if ((shift.visibility ?? 'public') !== 'roster') return true;
+  if (!shift.client_id) return false;
+  if (shift.client_id === workerId) return true;
+  const { data } = await adminDb
+    .from('follows')
+    .select('follower_id')
+    .eq('follower_id', shift.client_id)
+    .eq('following_id', workerId)
+    .maybeSingle();
+  return !!data;
 }

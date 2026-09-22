@@ -44,7 +44,15 @@ const shiftFields = z.object({
   repeat_type:     z.string().max(30).optional(),
   instant_claim:   z.coerce.boolean().optional(),
   status:          z.enum(STATUSES).optional(),
+  /** 'roster' = only workers on the poster's roster can see/apply/claim. */
+  visibility:      z.enum(['public', 'roster']).optional(),
 });
+
+/** Ids of posters who have the viewer on their roster (follower = poster). */
+async function rosterPostersFor(viewerId: string): Promise<string[]> {
+  const { data } = await adminDb.from('follows').select('follower_id').eq('following_id', viewerId);
+  return (data ?? []).map((f) => f.follower_id as string);
+}
 
 /** Cross-field rules shared by create and update. */
 function timeProblems(start?: string, end?: string, requireFuture = false): string | null {
@@ -92,6 +100,11 @@ router.get('/', async (req, res) => {
   if (!event_id && status === 'open') {
     // The feed shows what a worker can still take: not ended, soonest first.
     q = q.gt('end_time', new Date().toISOString()).order('start_time', { ascending: true });
+    // Roster-only shifts are visible to the poster and to workers on their roster.
+    const allowed = req.userId ? [req.userId, ...await rosterPostersFor(req.userId)] : [];
+    q = allowed.length
+      ? q.or(`visibility.eq.public,client_id.in.(${allowed.join(',')})`)
+      : q.eq('visibility', 'public');
   } else {
     q = q.order('created_at', { ascending: false });
   }
@@ -240,6 +253,7 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
     special_instructions: b.special_instructions ?? null,
     repeat_type: b.repeat_type ?? 'once',
     instant_claim: b.instant_claim ?? false,
+    visibility: b.visibility ?? 'public',
   };
   const { data, error } = await adminDb
     .from('shifts')
@@ -292,6 +306,7 @@ router.post('/event', requireAuth, requireRole('client', 'staffer'), async (req,
     dress_code: b.dress_code ?? null,
     special_instructions: b.special_instructions ?? null,
     instant_claim: b.instant_claim ?? false,
+    visibility: b.visibility ?? 'public',
     event_id,
   };
   const rows = b.positions.map((p) => ({

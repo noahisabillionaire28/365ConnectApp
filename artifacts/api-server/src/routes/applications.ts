@@ -4,7 +4,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
 import { addWorkerToShiftChat, removeWorkerFromShiftChat } from '../lib/chat.js';
 import { HttpError, sendError } from '../lib/httpError.js';
-import { assertShiftOwner, loadShift } from '../lib/shiftAccess.js';
+import { assertShiftOwner, loadShift, rosterAllows } from '../lib/shiftAccess.js';
 import { bookWorker, syncShiftCapacity } from '../lib/booking.js';
 
 const router = Router();
@@ -269,6 +269,9 @@ router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
     }
     if (shift.client_id === req.userId) {
       return res.status(409).json({ error: "You can't apply to your own shift." });
+    }
+    if (!(await rosterAllows(shift, req.userId!))) {
+      return res.status(403).json({ error: "This shift is only open to the agency's roster." });
     }
 
     const conflict = await findTimeConflict(req.userId!, shift_id);
@@ -558,6 +561,9 @@ router.post('/claim', requireAuth, requireRole('worker'), async (req, res) => {
     if (!shift.instant_claim) return res.status(403).json({ error: 'This shift is not open for instant claim.' });
     if (shift.status !== 'open') return res.status(409).json({ error: 'This shift is no longer open.' });
     if (shift.client_id === req.userId) return res.status(409).json({ error: "You can't claim your own shift." });
+    if (!(await rosterAllows(shift, req.userId!))) {
+      return res.status(403).json({ error: "This shift is only open to the agency's roster." });
+    }
 
     // Double-booking guard: can't claim a shift overlapping one you're booked for.
     const claimConflict = await findTimeConflict(req.userId!, shift_id);

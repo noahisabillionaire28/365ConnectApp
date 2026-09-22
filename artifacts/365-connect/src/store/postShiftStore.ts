@@ -34,6 +34,8 @@ export type PostShiftDraft = {
 
   // ── Booking mode ─────────────────────────────────────────────────────────
   instant_claim: boolean; // true = any qualified worker can grab it, no approval
+  /** 'roster' = only workers on the agency's roster can see and take it. */
+  visibility: 'public' | 'roster';
 };
 
 // ─── Default location (updated by initDraftLocation; survives resetDraft) ────
@@ -59,6 +61,7 @@ function empty(): PostShiftDraft {
     description:     '',
     requirements:    [],
     instant_claim:   false,
+    visibility:      'public',
   };
 }
 
