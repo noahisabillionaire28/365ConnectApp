@@ -1,13 +1,13 @@
 /**
  * Step 4 of 7 — Location
- * Address autocomplete + Apple-light map preview + optional unit/suite.
+ * Address autocomplete + Apple Maps preview + optional unit/suite.
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { ChevronLeft, MapPin, Building2 } from 'lucide-react';
 import { getDraft, setDraft } from '@/store/postShiftStore';
-import { LeafletMap } from '@/components/LeafletMap';
+import { AppMap } from '@/components/AppMap';
 import { BottomTabNav } from '@/components/BottomTabNav';
 
 // ─── Wizard primitives ────────────────────────────────────────────────────────
@@ -265,7 +265,7 @@ export function PostShiftStep2Screen() {
                 aria-label="Map showing shift location"
                 role="img"
               >
-                <LeafletMap
+                <AppMap
                   center={displayCoords}
                   zoom={15}
                   interactive={false}

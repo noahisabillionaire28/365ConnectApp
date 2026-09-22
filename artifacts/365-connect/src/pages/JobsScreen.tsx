@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
-  Search, MapPin, Plus,
+  Search, MapPin, Plus, X,
   List as ListIcon, Map as MapIcon, CalendarDays, Clock, DollarSign, Users, CheckCircle2, Zap,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
-import { LeafletMap } from '@/components/LeafletMap';
+import { AppMap } from '@/components/AppMap';
+import { geocodeAddress, type Coords } from '@/lib/geocode';
 import { type MockShift } from '@/lib/supabase';
 import { useShifts } from '@/hooks/useShifts';
 import { useMyLocation } from '@/hooks/useMyLocation';
@@ -112,7 +113,7 @@ function ShiftRowSkeleton() {
   );
 }
 
-/* ── MapPane — Leaflet map with price pins + a card carousel (Airbnb-style) ── */
+/* ── MapPane — Apple Maps style: address bar, dark map, price pins, card carousel ── */
 function MapPane({ shifts, selectedId, onPinClick, onOpenShift }: {
   shifts: MockShift[];
   selectedId: string | null;
@@ -123,22 +124,72 @@ function MapPane({ shifts, selectedId, onPinClick, onOpenShift }: {
   const selectedShift = shifts.find((s) => s.id === selectedId) ?? shifts[0] ?? null;
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
+  // Address bar: type a place or address and the map jumps there.
+  const [addressQuery, setAddressQuery] = useState('');
+  const [searched, setSearched] = useState<Coords | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+
+  async function submitAddress() {
+    const q = addressQuery.trim();
+    if (!q) return;
+    setSearching(true); setNotFound(false);
+    const c = await geocodeAddress(q);
+    setSearching(false);
+    if (c) setSearched(c); else setNotFound(true);
+  }
+  function clearAddress() { setAddressQuery(''); setSearched(null); setNotFound(false); }
+
   // Keep the carousel in sync with the selected pin.
   useEffect(() => {
     if (!selectedId) return;
     cardRefs.current[selectedId]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
   }, [selectedId]);
 
-  const center = selectedShift
-    ? { lat: selectedShift.lat, lng: selectedShift.lng }
-    : { lat: 25.7913, lng: -80.145 };
+  // A picked pin wins over a searched address once the user taps one.
+  useEffect(() => { if (selectedId) setSearched(null); }, [selectedId]);
+
+  const center = searched
+    ? searched
+    : selectedShift
+      ? { lat: selectedShift.lat, lng: selectedShift.lng }
+      : { lat: 25.7913, lng: -80.145 };
 
   return (
-    <div className="flex-1 relative bg-[#eef1f4]">
-      <LeafletMap
+    <div className="flex-1 relative bg-[#1c1c1e]">
+      {/* Address bar */}
+      <form
+        onSubmit={(e) => { e.preventDefault(); void submitAddress(); }}
+        className="absolute left-4 right-4 top-3 z-20 flex items-center gap-2 h-[46px] px-4 rounded-[14px] bg-white shadow-[0_4px_16px_rgba(0,0,0,0.35)]"
+      >
+        <input
+          type="search"
+          enterKeyHint="search"
+          value={addressQuery}
+          onChange={(e) => { setAddressQuery(e.target.value); setNotFound(false); }}
+          placeholder="Search an address or area"
+          aria-label="Search an address or area"
+          className="flex-1 min-w-0 bg-transparent text-[#111827] text-[14px] font-medium placeholder:text-[#9CA3AF] outline-none"
+        />
+        {searching ? (
+          <span className="w-4 h-4 rounded-full border-2 border-[#E5E7EB] border-t-[#0A1628] animate-spin" aria-label="Searching" />
+        ) : addressQuery ? (
+          <button type="button" onClick={clearAddress} aria-label="Clear address"
+            className="w-7 h-7 -mr-1 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#F3F4F6]">
+            <X size={16} aria-hidden />
+          </button>
+        ) : null}
+      </form>
+      {notFound && (
+        <p role="status" className="absolute left-4 right-4 top-[54px] z-20 text-center text-[12px] text-white/85 bg-black/60 rounded-full py-1">
+          Couldn't find that address
+        </p>
+      )}
+
+      <AppMap
         center={center}
-        zoom={12}
-        recenter={!!selectedShift}
+        zoom={searched ? 14 : 12}
+        recenter={!!selectedShift || !!searched}
         ariaLabel="Map of available shifts"
         markers={shifts.map((s) => ({
           id: s.id, lat: s.lat, lng: s.lng,
@@ -149,10 +200,10 @@ function MapPane({ shifts, selectedId, onPinClick, onOpenShift }: {
       />
 
       {shifts.length === 0 && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-[#FAFAFA]/80 pointer-events-none">
-          <MapPin size={28} aria-hidden className="text-[#DBDBDB]" />
-          <p className="text-[#737373] text-[14px] font-medium">No shifts to map</p>
-          <p className="text-[#AAAAAA] text-[12px]">Try a different filter</p>
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/55 pointer-events-none">
+          <MapPin size={28} aria-hidden className="text-white/50" />
+          <p className="text-white text-[14px] font-medium">No shifts to map</p>
+          <p className="text-white/70 text-[12px]">Try a different filter</p>
         </div>
       )}
 

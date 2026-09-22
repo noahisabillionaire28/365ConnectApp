@@ -1,34 +1,33 @@
 /**
- * Reusable Leaflet map — free basemap, no API key, no billing.
+ * Fallback map engine — free dark basemap, no API key, no billing.
  *
- * Replaces Google Maps for tile rendering. Uses CARTO's free "Positron" light
- * basemap (OpenStreetMap data) which looks clean/minimal like Apple Maps. Pins
- * reuse the app's existing navy teardrop SVG so nothing visually changes but the
- * tiles now actually draw.
+ * Styled to match Apple Maps in dark mode (charcoal land, near-black water,
+ * soft grey roads and labels) so the app looks the same before and after the
+ * real Apple Maps key is added. Pins are the app's own logo badge or a price
+ * pill, identical to the ones drawn on the Apple engine.
  */
 import 'leaflet/dist/leaflet.css';
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { navyPinUrl } from '@/lib/mapStyles';
+import { logoPinUrl, logoPinSize } from '@/lib/mapStyles';
 
-// Free, key-less street basemap (Esri "World Street Map") — richer than the
-// blank light-gray canvas (roads, places, labels), no API key, no watermark.
-const TILE_URL =
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
-const TILE_ATTR = 'Tiles &copy; Esri';
-const TILE_MAX_ZOOM = 18;
+// CARTO "Dark Matter" (OpenStreetMap data) — the closest free match to Apple's
+// dark map. Attribution is shown in the corner as their terms require.
+const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const TILE_SUBDOMAINS = 'abcd';
+const TILE_ATTR = '&copy; OpenStreetMap &copy; CARTO';
+const TILE_MAX_ZOOM = 20;
 
 export type MapMarker = { id: string; lat: number; lng: number; selected?: boolean; label?: string };
 
 function pinIcon(selected: boolean): L.Icon {
-  const size = selected ? 38 : 30;
-  const height = Math.round(size * 1.28);
+  const [w, h] = logoPinSize(selected);
   return L.icon({
-    iconUrl: navyPinUrl(selected),
-    iconSize: [size, height],
-    iconAnchor: [size / 2, height], // tip of the teardrop
-    className: 'leaflet-navy-pin',
+    iconUrl: logoPinUrl(selected),
+    iconSize: [w, h],
+    iconAnchor: [w / 2, h], // tip of the pointer
+    className: 'leaflet-logo-pin',
   });
 }
 
@@ -37,7 +36,7 @@ function pinIcon(selected: boolean): L.Icon {
 function priceIcon(label: string, selected: boolean): L.DivIcon {
   const bg = selected ? '#0A1628' : '#FFFFFF';
   const fg = selected ? '#FFFFFF' : '#0A1628';
-  const bd = selected ? '#0A1628' : '#D1D5DB';
+  const bd = selected ? '#FFFFFF' : '#D1D5DB';
   const w = Math.max(44, Math.round(18 + label.length * 8.5));
   const h = 28;
   return L.divIcon({
@@ -45,7 +44,7 @@ function priceIcon(label: string, selected: boolean): L.DivIcon {
     html:
       `<div style="width:${w}px;height:${h}px;display:flex;align-items:center;justify-content:center;` +
       `background:${bg};color:${fg};border:1.5px solid ${bd};border-radius:9999px;font-weight:800;` +
-      `font-size:12px;line-height:1;box-shadow:0 2px 6px rgba(16,24,40,0.22);cursor:pointer;">${label}</div>`,
+      `font-size:12px;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,0.35);cursor:pointer;">${label}</div>`,
     iconSize: [w, h],
     iconAnchor: [w / 2, h / 2],
   });
@@ -96,11 +95,11 @@ export function LeafletMap({
   // otherwise float above the app's fixed bars, sheets and bottom nav while
   // scrolling. An isolated stacking context keeps all of that inside the map box.
   return (
-    <div style={{ position: 'relative', zIndex: 0, isolation: 'isolate', width: '100%', height: '100%', ...(style ?? {}) }}>
+    <div style={{ position: 'relative', zIndex: 0, isolation: 'isolate', width: '100%', height: '100%', background: '#1c1c1e', ...(style ?? {}) }}>
     <MapContainer
       center={[center.lat, center.lng]}
       zoom={zoom}
-      style={{ width: '100%', height: '100%' }}
+      style={{ width: '100%', height: '100%', background: '#1c1c1e' }}
       zoomControl={false}
       attributionControl={false}
       dragging={interactive}
@@ -111,7 +110,7 @@ export function LeafletMap({
       keyboard={interactive}
       aria-label={ariaLabel}
     >
-      <TileLayer url={TILE_URL} attribution={TILE_ATTR} maxZoom={TILE_MAX_ZOOM} />
+      <TileLayer url={TILE_URL} subdomains={TILE_SUBDOMAINS} attribution={TILE_ATTR} maxZoom={TILE_MAX_ZOOM} />
       <InvalidateSize />
       {recenter && <Recenter lat={center.lat} lng={center.lng} zoom={zoom} />}
       {markers.map((m) => (
@@ -124,6 +123,10 @@ export function LeafletMap({
         />
       ))}
     </MapContainer>
+    {/* Data credit (required by the tile provider). Apple's engine draws its own. */}
+    <span aria-hidden className="absolute left-2 bottom-1.5 z-[1] text-[9px] text-white/45 pointer-events-none select-none">
+      © OpenStreetMap © CARTO
+    </span>
     </div>
   );
 }

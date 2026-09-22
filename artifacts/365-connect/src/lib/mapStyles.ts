@@ -38,6 +38,36 @@ export function blackPinUrl(selected: boolean): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+/** Pixel size of the logo pin (width, height) for a given selection state. */
+export function logoPinSize(selected: boolean): [number, number] {
+  return selected ? [50, 60] : [42, 50];
+}
+
+/**
+ * Branded venue pin: the 365 app icon (navy rounded square with a white "3")
+ * inside a white badge with a short pointer — the look of a custom Apple Maps
+ * place marker. Rendered as an SVG data-URI so it works in every map engine.
+ */
+export function logoPinUrl(selected: boolean): string {
+  const [w, h] = logoPinSize(selected);
+  const r      = w / 2 - 2;          // white badge radius
+  const cx     = w / 2;
+  const cy     = r + 2;
+  const box    = Math.round(r * 1.18); // navy square side
+  const bx     = cx - box / 2;
+  const by     = cy - box / 2;
+  const tipY   = h - 1;
+  const svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg"
+    style="filter:drop-shadow(0 3px 6px rgba(0,0,0,0.45))">
+    <path d="M${cx - 7} ${cy + r - 3} L${cx} ${tipY} L${cx + 7} ${cy + r - 3}z" fill="#FFFFFF"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="#FFFFFF"/>
+    <rect x="${bx}" y="${by}" width="${box}" height="${box}" rx="${Math.round(box * 0.26)}" fill="#0A1628"/>
+    <text x="${cx}" y="${cy + box * 0.24}" font-family="system-ui,-apple-system,sans-serif" font-size="${Math.round(box * 0.62)}"
+      font-weight="800" fill="#FFFFFF" text-anchor="middle">3</text>
+  </svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
 /** Build a navy teardrop pin SVG data-URI for the Jobs map (open shifts / posted shifts) */
 export function navyPinUrl(selected: boolean): string {
   const size   = selected ? 38 : 30;

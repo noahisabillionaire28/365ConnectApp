@@ -174,4 +174,8 @@
   position: relative;
   z-index: 0;
   isolation: isolate;
+  background: #1c1c1e; /* dark map: no white flash while tiles load */
 }
+/* Apple MapKit JS draws its own chrome; keep it inside the map box too. */
+.apple-map .mk-map-view { position: absolute; inset: 0; }
+.apple-map { overflow: hidden; }
