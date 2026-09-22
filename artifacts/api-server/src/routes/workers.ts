@@ -46,24 +46,26 @@ router.get('/', async (req, res) => {
       );
     }
 
-    const { data, error } = await q
+    const { data: raw, error } = await q
       .order('rating', { ascending: false })
       .order('created_at', { ascending: false })
       .range(off, off + lim - 1);
     if (error) return res.status(500).json({ error: error.message });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = (raw ?? []) as Array<Record<string, any>>;
 
     // Who the viewer already follows (roster) — one query, not one per card.
     const followed = new Set<string>();
-    if (req.userId && data?.length) {
+    if (req.userId && data.length) {
       const { data: f } = await adminDb
         .from('follows')
         .select('following_id')
         .eq('follower_id', req.userId)
-        .in('following_id', data.map((u) => u.id));
+        .in('following_id', data.map((u) => u.id as string));
       for (const row of f ?? []) followed.add(row.following_id);
     }
 
-    const rows = (data ?? [])
+    const rows = data
       .filter((u) => u.status !== 'banned' && u.status !== 'suspended')
       .map((u) => {
         const { status: _status, ...pub } = u;

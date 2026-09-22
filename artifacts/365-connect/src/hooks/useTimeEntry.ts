@@ -9,6 +9,8 @@ export type TimeEntryRow = {
   clock_in: string;
   clock_out: string | null;
   break_minutes: number;
+  /** When the current (open) break started; null when not on break. Server-tracked. */
+  break_started_at?: string | null;
   total_hours: number | null;
   total_pay: number | null;
   fee: number | null;
@@ -28,7 +30,7 @@ function toEntry(r: RawEntry, flags?: { alreadyCompleted?: boolean; resumed?: bo
   return {
     ...r,
     clockInISO:      r.clock_in,
-    breakMinutes:    r.break_minutes,
+    breakMinutes:    r.break_minutes ?? 0,
     totalPay:        r.total_pay,
     alreadyCompleted: flags?.alreadyCompleted ?? false,
     resumed:          flags?.resumed          ?? false,
@@ -113,17 +115,38 @@ export function useTimeEntry(shiftId: string | undefined) {
     return e;
   }, [shiftId, user?.id]);
 
-  const clockOut = useCallback(async (updates: {
-    clock_out: string;
-    break_minutes?: number;
-    total_hours?: number;
-    total_pay?: number;
-    fee?: number;
-  }): Promise<TimeEntryRow | null> => {
-    if (!entry?.id || !user?.id) return null;
+  /** Start a server-tracked break on an entry (defaults to the loaded one). */
+  const startBreak = useCallback(async (entryId?: string): Promise<TimeEntryRow | null> => {
+    const id = entryId ?? entry?.id;
+    if (!id || !user?.id) return null;
+    const row = await apiClient(user.id).post<RawEntry>(`/time-entries/${id}/break/start`, {});
+    const e = toEntry(row);
+    setEntry(e);
+    return e;
+  }, [entry?.id, user?.id]);
+
+  /** End the open break; the server adds the elapsed minutes to break_minutes. */
+  const stopBreak = useCallback(async (entryId?: string): Promise<TimeEntryRow | null> => {
+    const id = entryId ?? entry?.id;
+    if (!id || !user?.id) return null;
+    const row = await apiClient(user.id).post<RawEntry>(`/time-entries/${id}/break/stop`, {});
+    const e = toEntry(row);
+    setEntry(e);
+    return e;
+  }, [entry?.id, user?.id]);
+
+  /**
+   * Clock out. The server sets the clock-out time, closes any open break and
+   * computes total_hours / total_pay itself — nothing pay-related is sent.
+   */
+  const clockOut = useCallback(async (entryId?: string): Promise<TimeEntryRow | null> => {
+    const id = entryId ?? entry?.id;
+    if (!id || !user?.id) return null;
     try {
-      const row = await apiClient(user.id).patch<RawEntry>(`/time-entries/${entry.id}`, updates);
-      const e = toEntry(row);
+      const row = await apiClient(user.id).patch<RawEntry>(`/time-entries/${id}`, {
+        clock_out: new Date().toISOString(),
+      });
+      const e = toEntry(row, { alreadyCompleted: true, resumed: false });
       setEntry(e);
       return e;
     } catch (e) {
@@ -136,39 +159,23 @@ export function useTimeEntry(shiftId: string | undefined) {
 
   /**
    * Alias used by ClockInScreen.
-   * Accepts either `(entryId, camelCaseUpdates)` or `(camelCaseUpdates)`.
-   * Returns `{ error: null }` on success or `{ error: string }` on failure.
+   * Accepts either `(entryId, updates)` or `(updates)`; any hours/pay in
+   * `updates` are ignored — the server computes them. Resolves to
+   * `{ error: null, entry }` on success or `{ error: string, entry: null }`.
    */
   const completeEntry = useCallback(async (
-    entryIdOrUpdates: string | {
-      clockOutISO?: string; clock_out?: string;
-      breakMinutes?: number; break_minutes?: number;
-      totalHours?: number; total_hours?: number;
-      totalPay?: number; total_pay?: number;
-      fee?: number;
-    },
-    updates?: {
-      clockOutISO?: string; clock_out?: string;
-      breakMinutes?: number; break_minutes?: number;
-      totalHours?: number; total_hours?: number;
-      totalPay?: number; total_pay?: number;
-      fee?: number;
-    },
-  ): Promise<{ error: string | null }> => {
-    const u = (typeof entryIdOrUpdates === 'string' ? updates : entryIdOrUpdates) ?? {};
+    entryIdOrUpdates?: string | Record<string, unknown>,
+    _updates?: Record<string, unknown>,
+  ): Promise<{ error: string | null; entry: TimeEntryRow | null }> => {
+    const id = typeof entryIdOrUpdates === 'string' ? entryIdOrUpdates : undefined;
     try {
-      await clockOut({
-        clock_out:     u.clockOutISO  ?? u.clock_out     ?? new Date().toISOString(),
-        break_minutes: u.breakMinutes ?? u.break_minutes,
-        total_hours:   u.totalHours   ?? u.total_hours,
-        total_pay:     u.totalPay     ?? u.total_pay,
-        fee:           u.fee,
-      });
-      return { error: null };
+      const e = await clockOut(id);
+      if (!e) return { error: 'Missing shift or session data', entry: null };
+      return { error: null, entry: e };
     } catch (e) {
-      return { error: e instanceof Error ? e.message : String(e) };
+      return { error: e instanceof Error ? e.message : String(e), entry: null };
     }
   }, [clockOut]);
 
-  return { entry, isLoading, clockIn, startOrResume, clockOut, completeEntry, refetch: load };
+  return { entry, isLoading, clockIn, startOrResume, startBreak, stopBreak, clockOut, completeEntry, refetch: load };
 }

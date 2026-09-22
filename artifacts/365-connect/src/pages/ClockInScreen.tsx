@@ -450,7 +450,7 @@ export function ClockInScreen() {
   const [, navigate]       = useLocation();
   const { user }            = useAuth();
   const { data: shift, isLoading, error } = useShiftById(id);
-  const { startOrResume, completeEntry } = useTimeEntry(id);
+  const { startOrResume, completeEntry, startBreak, stopBreak } = useTimeEntry(id);
   const { showToast } = useToast();
 
   const [phase,      setPhase]      = useState<Phase>('geo-check');
@@ -463,9 +463,13 @@ export function ClockInScreen() {
   const [priorEntry, setPriorEntry] = useState<{ netPay: number | null } | null>(null);
   const [endShiftError, setEndShiftError] = useState<string | null>(null);
   const [contacting, setContacting] = useState(false);
+  /** Hours / pay as computed by the server at clock-out (the only source for the summary). */
+  const [serverResult, setServerResult] = useState<{ totalHours: number; totalPay: number; breakMinutes: number } | null>(null);
   const shiftRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const breakRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedRef = useRef(false);
+  /** Set when we resumed an entry that has a server-side break still open. */
+  const resumeOnBreakRef = useRef(false);
 
   /** Opens (or creates) a direct chat with whoever posted the shift. */
   async function handleContactManager() {
@@ -508,8 +512,13 @@ export function ClockInScreen() {
           setEntryId(entry.id);
           if (entry.resumed) {
             const elapsedSinceClockIn = Math.max(0, Math.floor((Date.now() - new Date(entry.clockInISO).getTime()) / 1000));
-            setShiftSecs(elapsedSinceClockIn);
-            setBreakSecs(entry.breakMinutes * 60);
+            // Open server-side break: count its elapsed time and resume on-break.
+            const openBreakStart = entry.break_started_at ? new Date(entry.break_started_at).getTime() : NaN;
+            const openBreakSecs = Number.isFinite(openBreakStart) ? Math.max(0, Math.floor((Date.now() - openBreakStart) / 1000)) : 0;
+            const totalBreakSecs = entry.breakMinutes * 60 + openBreakSecs;
+            setShiftSecs(Math.max(0, elapsedSinceClockIn - totalBreakSecs));
+            setBreakSecs(totalBreakSecs);
+            resumeOnBreakRef.current = Number.isFinite(openBreakStart);
           }
           setPhase('geo-success');
         } catch (e) {
@@ -548,6 +557,14 @@ export function ClockInScreen() {
   useEffect(() => {
     if (phase !== 'geo-success') return;
     const t = setTimeout(() => {
+      if (resumeOnBreakRef.current) {
+        // Resumed mid-break: keep the break clock running until they end it.
+        resumeOnBreakRef.current = false;
+        setPhase('on-break');
+        breakRef.current = setInterval(() => setBreakSecs((s) => s + 1), 1000);
+        showToast("You're still on break.");
+        return;
+      }
       setPhase('active');
       shiftRef.current = setInterval(() => setShiftSecs((s) => s + 1), 1000);
       showToast('Clocked in. Your timer has started.');
@@ -564,21 +581,42 @@ export function ClockInScreen() {
     };
   }, []);
 
-  function handleTakeBreak() {
+  async function handleTakeBreak() {
+    if (!entryId) return;
+    try {
+      await startBreak(entryId);
+    } catch (e) {
+      console.error('[ClockIn] failed to start break:', e);
+      showToast("Couldn't start your break. Please try again.", 'error');
+      return;
+    }
     if (shiftRef.current) { clearInterval(shiftRef.current); shiftRef.current = null; }
     breakRef.current = setInterval(() => setBreakSecs((s) => s + 1), 1000);
     setPhase('on-break');
   }
 
-  function handleEndBreak() {
+  async function handleEndBreak() {
+    if (!entryId) return;
+    try {
+      const updated = await stopBreak(entryId);
+      // Sync the displayed break to the server's accumulated minutes.
+      if (updated) setBreakSecs(updated.breakMinutes * 60);
+    } catch (e) {
+      console.error('[ClockIn] failed to end break:', e);
+      showToast("Couldn't end your break. Please try again.", 'error');
+      return;
+    }
     if (breakRef.current) { clearInterval(breakRef.current); breakRef.current = null; }
     shiftRef.current = setInterval(() => setShiftSecs((s) => s + 1), 1000);
     setPhase('active');
   }
 
-  const billedSecs  = Math.max(0, shiftSecs - breakSecs);
-  const billedHours = billedSecs / 3600;
-  const grossPay    = billedHours * (shift?.payRate ?? 0);
+  // Billed time and pay come from the server's clock-out response (computed
+  // once there as clocked − break); the local timers are display-only.
+  const summaryBreakSecs = serverResult ? serverResult.breakMinutes * 60 : breakSecs;
+  const billedSecs  = serverResult ? Math.round(serverResult.totalHours * 3600) : 0;
+  const summaryShiftSecs = serverResult ? billedSecs + summaryBreakSecs : shiftSecs;
+  const grossPay    = serverResult ? serverResult.totalPay : 0;
   const serviceFee  = 0; // platform fee removed for now
   const netPay      = grossPay - serviceFee;
 
@@ -593,13 +631,16 @@ export function ClockInScreen() {
       return;
     }
 
-    const { error: completeError } = await completeEntry(entryId, {
-      clockOutISO: new Date().toISOString(),
-      breakMinutes: breakSecs / 60,
-      totalHours: billedHours,
-      totalPay: grossPay,
-      fee: serviceFee,
-    });
+    // The server closes any open break and computes hours + pay itself.
+    const { error: completeError, entry: completed } = await completeEntry(entryId);
+    if (!completeError && completed) {
+      setServerResult({
+        totalHours:   completed.total_hours ?? 0,
+        totalPay:     completed.total_pay ?? 0,
+        breakMinutes: completed.breakMinutes ?? 0,
+      });
+      setBreakSecs((completed.breakMinutes ?? 0) * 60);
+    }
     if (completeError) {
       console.error('[ClockIn] failed to complete time entry:', completeError);
       setEndShiftError("We couldn't save your timesheet. Please try ending your shift again.");
@@ -667,7 +708,7 @@ export function ClockInScreen() {
         )}
         {phase === 'transfer' && <TransferScreen key="transfer" netPay={netPay} onDone={() => setPhase('summary')} />}
         {phase === 'summary' && (
-          <SummaryScreen key="summary" shift={shift} shiftSecs={shiftSecs} breakSecs={breakSecs}
+          <SummaryScreen key="summary" shift={shift} shiftSecs={summaryShiftSecs} breakSecs={summaryBreakSecs}
             billedSecs={billedSecs} grossPay={grossPay} serviceFee={serviceFee} netPay={netPay}
             onRate={() => navigate(`/review/${shift.id}/${shift.clientId}`)}
             onDone={() => navigate('/home')} />

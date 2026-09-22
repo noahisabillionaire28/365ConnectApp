@@ -38,18 +38,31 @@ router.get('/', requireAuth, async (req, res) => {
   return res.json(rows);
 });
 
-/** POST /api/payments — record a payment */
+// ── Pro upgrade (simulated subscription) ────────────────────────────────────
+// The only caller of POST /payments is ProUpgradeScreen (payment_type
+// 'pro_subscription'). Shift payments are recorded exclusively by /confirm
+// after Stripe verifies the checkout session, so this route never accepts a
+// client-chosen amount/status — a caller cannot mint 'completed' rows.
+const PRO_SUBSCRIPTION_PRICE = 17.0;
+
+/** POST /api/payments — record the (simulated) Pro subscription payment */
 router.post('/', requireAuth, async (req, res) => {
-  const { shift_id, amount, fee, net_amount, status, payment_type } = req.body as Record<string, unknown>;
+  const { payment_type } = req.body as Record<string, unknown>;
+  if (payment_type !== 'pro_subscription') {
+    return res.status(400).json({
+      error: 'Only pro_subscription payments can be recorded here. Shift payments go through /payments/checkout.',
+    });
+  }
   const payload = {
-    shift_id: shift_id ?? null,
+    shift_id: null,
+    client_id: req.userId,
     worker_id: req.userId,
-    amount,
-    fee: fee ?? 0,
-    total: amount ?? net_amount ?? 0,
-    net_amount,
-    status: status ?? 'completed',
-    payment_type: payment_type ?? 'shift_payment',
+    amount: PRO_SUBSCRIPTION_PRICE,
+    fee: 0,
+    total: PRO_SUBSCRIPTION_PRICE,
+    net_amount: PRO_SUBSCRIPTION_PRICE,
+    status: 'simulated',
+    payment_type: 'pro_subscription',
   };
   const { data, error } = await adminDb.from('payments').insert(payload).select().single();
   if (error) return res.status(500).json({ error: error.message });
