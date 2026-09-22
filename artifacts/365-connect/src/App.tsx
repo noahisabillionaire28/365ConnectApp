@@ -38,6 +38,7 @@ import { ToastProvider } from '@/contexts/ToastContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { MobileContainer } from '@/components/MobileContainer';
 import { NativeBridge } from '@/components/NativeBridge';
+import { PullToRefresh } from '@/components/PullToRefresh';
 import { AdminNav } from '@/components/AdminNav';
 
 // ── Mobile screens ─────────────────────────────────────────────────────────────
@@ -143,8 +144,13 @@ function MobileRouter() {
   // Fetch every screen's code in the background once the first screen is up.
   useEffect(() => { warmRoutes(); }, []);
 
+  // Chat and clock-in manage their own gestures; every other screen gets
+  // pull-to-refresh for free.
+  const noPull = /^\/messages\/[^/]+|^\/clock\//.test(location);
+
   return (
     <MobileContainer>
+      <PullToRefresh disabled={noPull}>
       <div style={{ width: '100%' }}>
           <Suspense fallback={<RouteFallback />}>
           <Switch>
@@ -215,6 +221,7 @@ function MobileRouter() {
           </Switch>
           </Suspense>
       </div>
+      </PullToRefresh>
     </MobileContainer>
   );
 }
