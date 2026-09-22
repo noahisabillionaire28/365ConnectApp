@@ -27,7 +27,7 @@ const MUTED  = '#6B7280';
 const GREEN  = '#10B981';
 const RED    = '#EF4444';
 
-const TOTAL = 4;
+const TOTAL = 3; // billing card step removed — payments are set up when a shift is paid
 
 // ── Event types ───────────────────────────────────────────────────────────────
 const EVENT_TYPES = [
@@ -254,7 +254,7 @@ export function ClientSetupScreen() {
         if (Array.isArray(data?.secondary_job_types)) inferred = Math.max(inferred, 4);
 
         const stored = loadStep(user.id);
-        setStep(isEdit ? 1 : Math.max(inferred, stored));
+        setStep(isEdit ? 1 : Math.min(3, Math.max(inferred, stored)));
         setInitialized(true);
       });
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -327,7 +327,17 @@ export function ClientSetupScreen() {
       } finally { setSaving(false); }
       return;
     }
-    await saveAndAdvance({ secondary_job_types: eventTypes }, 4);
+    // Last step — no billing card at signup (payments are set up when a
+    // shift is actually paid). Save and go straight into the app.
+    if (!user) return;
+    setSaving(true); setError(null);
+    try {
+      await apiClient(user.id).patch('/users/me', { secondary_job_types: eventTypes });
+      localStorage.removeItem(stepKey(user.id));
+      navigate('/home');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save. Please try again.');
+    } finally { setSaving(false); }
   }
 
   async function handleCardConfirm(ref: string) {

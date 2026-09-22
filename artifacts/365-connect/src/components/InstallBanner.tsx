@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Download, Share, X, Smartphone } from 'lucide-react';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
+import { isNative } from '@/lib/native';
 
 const DISMISS_KEY = '365connect:install-banner-dismissed';
 
@@ -18,7 +19,8 @@ export function InstallBanner({ compact = false, flush = false }: { compact?: bo
   const [dismissed, setDismissed] = useState(readDismissed);
   const [showIosSteps, setShowIosSteps] = useState(false);
 
-  if (installed || dismissed || (!canPrompt && !ios)) return null;
+  // Inside the native app there is nothing to install.
+  if (isNative() || installed || dismissed || (!canPrompt && !ios)) return null;
 
   function dismiss() {
     setDismissed(true);

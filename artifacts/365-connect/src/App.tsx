@@ -37,6 +37,7 @@ import { useSSE } from '@/hooks/useSSE';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { MobileContainer } from '@/components/MobileContainer';
+import { NativeBridge } from '@/components/NativeBridge';
 import { AdminNav } from '@/components/AdminNav';
 
 // ── Mobile screens ─────────────────────────────────────────────────────────────
@@ -265,6 +266,7 @@ function AppShell() {
   return (
     <AuthProvider>
       <SSEMount />
+      <NativeBridge />
       <RoleProvider>
         <ToastProvider>
           <TooltipProvider>
