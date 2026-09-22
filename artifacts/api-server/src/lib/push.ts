@@ -11,6 +11,7 @@
  */
 import webPush from 'web-push';
 import { adminDb } from './supabaseAdmin.js';
+import { apnsConfigured, sendApns } from './apns.js';
 
 const PUBLIC_KEY  = process.env['VAPID_PUBLIC_KEY']  ?? '';
 const PRIVATE_KEY = process.env['VAPID_PRIVATE_KEY'] ?? '';
@@ -41,15 +42,30 @@ export type PushPayload = {
 
 /** Send a push to every device a user has subscribed. Dead endpoints are pruned. */
 export async function pushToUser(userId: string, payload: PushPayload): Promise<void> {
-  if (!configured) return;
+  const nativeOk = apnsConfigured();
+  if (!configured && !nativeOk) return;
   const { data: subs } = await adminDb
     .from('push_subscriptions')
-    .select('id, endpoint, keys')
+    .select('id, endpoint, keys, platform')
     .eq('user_id', userId);
   if (!subs?.length) return;
 
   const body = JSON.stringify({ icon: '/favicon.png', ...payload });
   await Promise.all(subs.map(async (s) => {
+    const platform = (s as { platform?: string }).platform ?? 'web';
+
+    // Native iOS device → APNs.
+    if (platform === 'ios') {
+      if (!nativeOk) return;
+      const r = await sendApns(s.endpoint, { title: payload.title, body: payload.body, url: payload.url, tag: payload.tag });
+      // 410 / BadDeviceToken / Unregistered = the app was removed → forget it.
+      if (!r.ok && (r.status === 410 || r.reason === 'BadDeviceToken' || r.reason === 'Unregistered')) {
+        await adminDb.from('push_subscriptions').delete().eq('id', s.id);
+      }
+      return;
+    }
+
+    if (!configured || !s.keys) return;
     try {
       await webPush.sendNotification(
         { endpoint: s.endpoint, keys: s.keys as { p256dh: string; auth: string } },

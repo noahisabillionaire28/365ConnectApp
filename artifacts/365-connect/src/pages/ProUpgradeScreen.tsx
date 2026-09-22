@@ -3,8 +3,9 @@
  * Shows the $17/mo Pro plan, lists benefits, and simulates a subscription
  * by writing a row to the payments table and setting users.is_pro = true.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
+import { isIOS } from '@/lib/native';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Zap, CheckCircle2, BadgeCheck,
@@ -142,6 +143,10 @@ export function ProUpgradeScreen() {
   const { user }        = useAuth();
   const profile         = useProfile();
   const queryClient     = useQueryClient();
+
+  // Apple requires digital subscriptions to use in-app purchase. Until that
+  // is wired up, the native iOS app never shows this screen.
+  useEffect(() => { if (isIOS()) navigate('/profile'); }, [navigate]);
 
   const [loading,  setLoading]  = useState(false);
   const [success,  setSuccess]  = useState(false);

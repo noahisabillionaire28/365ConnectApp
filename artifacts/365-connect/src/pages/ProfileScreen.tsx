@@ -19,6 +19,7 @@ import { ProfileBadges } from '@/components/ProfileBadges';
 import { useQueryClient } from '@tanstack/react-query';
 import { uploadPostPhoto } from '@/lib/storage';
 import { apiClient } from '@/lib/api';
+import { isIOS } from '@/lib/native';
 
 /* ── Sub-components ──────────────────────────────────────────────────────── */
 function StarRow({ rating, size = 12 }: { rating: number; size?: number }) {
@@ -545,7 +546,9 @@ export function ProfileScreen() {
       </div>
 
       {/* Go Pro CTA — shown when not yet Pro */}
-      {!profile.isPro && (
+      {/* Pro is a digital subscription: on iOS it must go through Apple's in-app
+          purchase, so it's hidden in the native app until that's wired up. */}
+      {!profile.isPro && !isIOS() && (
         <div className="px-4 mb-5">
           <motion.button
             type="button" whileTap={{ scale: 0.98 }}
@@ -615,7 +618,7 @@ export function ProfileScreen() {
                   </>
                 )}
 
-                {!profile.isPro && (
+                {!profile.isPro && !isIOS() && (
                   <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-4">
                     <SettingRow icon={Zap} label="Upgrade to Pro" onTap={() => go('/pro-upgrade')} />
                   </div>
