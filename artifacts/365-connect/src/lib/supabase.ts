@@ -38,6 +38,8 @@ export type MockShift = {
   spotsTotal: number;
   /** true when workers can grab this shift instantly with no approval. */
   instantClaim: boolean;
+  /** true when only the agency's roster can see and take this shift. */
+  rosterOnly: boolean;
   location: string;
   aiMatchPct: number;
   description: string;
@@ -140,6 +142,7 @@ export type ShiftRow = {
   spots_available: number;  // total slots posted (despite the name, this is the total, not the remainder — remainder = spots_available - spots_filled)
   spots_filled: number;
   instant_claim?: boolean | null;
+  visibility?: 'public' | 'roster' | null;
   status: 'open' | 'filled' | 'cancelled' | 'completed';
   created_at: string;
   // Phase 2 extended columns
@@ -446,6 +449,7 @@ export function shiftRowToMockShift(
     spotsAvailable,
     spotsTotal:     row.spots_available ?? 1,
     instantClaim:   !!row.instant_claim,
+    rosterOnly:     row.visibility === 'roster',
     location:       row.location        ?? 'Miami, FL',
     aiMatchPct:     row.ai_match_pct    ?? 85,
     description:    row.description     ?? '',
@@ -492,6 +496,7 @@ export function hardenShift(s: MockShift): MockShift {
     spotsAvailable: Number(raw.spotsAvailable ?? 0) || 0,
     spotsTotal:     Number(raw.spotsTotal ?? 1) || 1,
     instantClaim:   !!raw.instantClaim,
+    rosterOnly:     !!raw.rosterOnly,
     location:       raw.location ?? '',
     aiMatchPct:     Number(raw.aiMatchPct ?? 85) || 85,
     description:    raw.description ?? '',

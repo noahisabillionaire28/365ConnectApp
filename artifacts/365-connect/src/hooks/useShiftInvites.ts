@@ -24,7 +24,8 @@ export function useShiftInvites(shiftId: string | undefined) {
     enabled: !!shiftId && !!user?.id,
     staleTime: 15_000,
     queryFn: async () => {
-      const rows = await apiClient(user!.id).get<ShiftInvite[]>('/shift-requests');
+      // Server-side filter — the old call downloaded every request ever sent.
+      const rows = await apiClient(user!.id).get<ShiftInvite[]>(`/shift-requests?shift_id=${encodeURIComponent(shiftId!)}`);
       return (rows ?? []).filter((r) => r.shift_id === shiftId);
     },
   });

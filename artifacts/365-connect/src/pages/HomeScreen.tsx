@@ -16,6 +16,7 @@ import { useApplications } from '@/hooks/useApplications';
 import { useMyApplications, type MyApplication } from '@/hooks/useMyApplications';
 import { useClientShiftsDashboard, type ClientShift } from '@/hooks/useClientShiftsDashboard';
 import { useShiftRequests } from '@/hooks/useShiftRequests';
+import { useProfile } from '@/hooks/useProfile';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useRole } from '@/contexts/RoleContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -99,11 +100,14 @@ function groupApplications(apps: MyApplication[]) {
     const ref = a.endTime ?? a.startTime;
     return !!ref && Date.parse(ref) <= now;
   };
+  // Soonest first for anything ahead; most recent first for what's done.
+  const soonest = (a: MyApplication, b: MyApplication) => Date.parse(a.startTime ?? '') - Date.parse(b.startTime ?? '');
+  const latest  = (a: MyApplication, b: MyApplication) => -soonest(a, b);
   return {
-    upcoming:  apps.filter((a) => a.status === 'accepted' && !isOver(a)),
-    applied:   apps.filter((a) => a.status === 'pending' && !isOver(a)),
-    standby:   apps.filter((a) => a.status === 'standby' && !isOver(a)),
-    completed: apps.filter((a) => a.status === 'accepted' && isOver(a)),
+    upcoming:  apps.filter((a) => a.status === 'accepted' && !isOver(a)).sort(soonest),
+    applied:   apps.filter((a) => a.status === 'pending' && !isOver(a)).sort(soonest),
+    standby:   apps.filter((a) => a.status === 'standby' && !isOver(a)).sort(soonest),
+    completed: apps.filter((a) => a.status === 'accepted' && isOver(a)).sort(latest),
     // Applications that were never answered before the shift ended.
     expired:   apps.filter((a) => (a.status === 'pending' || a.status === 'standby') && isOver(a)),
     dropped:   apps.filter((a) => a.status === 'withdrawn'),
@@ -115,6 +119,15 @@ function MyShiftRow({ app, onTap }: { app: MyApplication; onTap: () => void }) {
   const dateStr = app.startTime
     ? new Date(app.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
     : null;
+  const timeStr = app.startTime
+    ? new Date(app.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    : null;
+  // Clock-in window: opens an hour before the start, closes at the end.
+  const now = Date.now();
+  const startMs = app.startTime ? Date.parse(app.startTime) : NaN;
+  const endMs = app.endTime ? Date.parse(app.endTime) : NaN;
+  const clockInNow = app.status === 'accepted' && Number.isFinite(startMs) &&
+    now >= startMs - 3_600_000 && (!Number.isFinite(endMs) || now <= endMs);
 
   return (
     <motion.button type="button" whileTap={{ scale: 0.98 }} onClick={onTap}
@@ -131,7 +144,7 @@ function MyShiftRow({ app, onTap }: { app: MyApplication; onTap: () => void }) {
           {dateStr && (
             <span className="text-[#6B7280] text-[12px] flex items-center gap-0.5 flex-shrink-0">
               <CalendarDays size={10} aria-hidden />
-              {dateStr}
+              {dateStr}{timeStr ? ` · ${timeStr}` : ''}
             </span>
           )}
           {app.payRate != null && (
@@ -141,7 +154,13 @@ function MyShiftRow({ app, onTap }: { app: MyApplication; onTap: () => void }) {
           )}
         </div>
       </div>
-      <ChevronRight size={15} aria-hidden className="text-[#D1D5DB] flex-shrink-0" />
+      {clockInNow ? (
+        <span className="flex-shrink-0 bg-[#FFD700] text-black text-[11px] font-bold px-2.5 py-1 rounded-full">
+          Clock in
+        </span>
+      ) : (
+        <ChevronRight size={15} aria-hidden className="text-[#D1D5DB] flex-shrink-0" />
+      )}
     </motion.button>
   );
 }
@@ -358,6 +377,25 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
   );
 }
 
+/* ─── Nudge: a worker with no roles never matches a shift ─────────────────── */
+function WorkerRolesNudge() {
+  const [, navigate] = useLocation();
+  const profile = useProfile();
+  if (profile.isLoading || profile.primaryJobType) return null;
+  return (
+    <div className="mx-4 mb-3 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-3">
+      <div className="flex-1 min-w-0">
+        <p className="text-amber-800 font-bold text-[14px]">Add your roles to get matched</p>
+        <p className="text-amber-700 text-[12px] mt-0.5">Shifts, offers and reminders are matched on the roles you can work.</p>
+      </div>
+      <button type="button" onClick={() => navigate('/worker-setup?edit=1')}
+        className="h-9 px-3.5 rounded-[8px] bg-[#0A1628] text-white text-[12px] font-bold flex-shrink-0">
+        Add roles
+      </button>
+    </div>
+  );
+}
+
 /* ─── (A) Worker Home Feed — Nowsta-style Schedule / Requests / Available ─────── */
 function WorkerHomeFeed() {
   // Deep links (e.g. an offer notification) can open a specific tab.
@@ -392,6 +430,7 @@ function WorkerHomeFeed() {
         />
       </div>
       <div className="pt-3"><InstallBanner compact /></div>
+      <WorkerRolesNudge />
 
       {tab === 'schedule'  && <WorkerMyShiftsView />}
       {tab === 'requests'  && <WorkerRequestsView {...shiftRequests} />}

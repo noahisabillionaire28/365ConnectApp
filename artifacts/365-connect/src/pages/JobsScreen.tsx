@@ -344,6 +344,14 @@ export function JobsScreen() {
                 <p className="text-[#AAAAAA] text-[12px] mt-1">Try a different category or clear the search.</p>
               </div>
             )}
+
+            {/* Paging: the feed loads 50 at a time; fetch the next page on demand */}
+            {!isLoading && isWorkerRole && openShifts.hasMore && (
+              <button type="button" onClick={openShifts.loadMore} disabled={openShifts.isFetchingMore}
+                className="mt-1 h-[46px] rounded-[10px] border border-[#E5E7EB] bg-white text-[#0A1628] text-[14px] font-bold disabled:opacity-60">
+                {openShifts.isFetchingMore ? 'Loading more…' : 'Load more shifts'}
+              </button>
+            )}
           </div>
         </main>
       ) : (

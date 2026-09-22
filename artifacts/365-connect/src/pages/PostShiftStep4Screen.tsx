@@ -6,6 +6,7 @@ import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { ChevronLeft, DollarSign, FileText, ListChecks } from 'lucide-react';
 import { getDraft, setDraft } from '@/store/postShiftStore';
+import { useRole } from '@/contexts/RoleContext';
 import { BottomTabNav } from '@/components/BottomTabNav';
 
 // ─── Wizard primitives ────────────────────────────────────────────────────────
@@ -51,6 +52,9 @@ export function PostShiftStep4Screen() {
   // requirements stored as newline-separated string in the textarea
   const [reqText,      setReqText]      = useState(initial.requirements.join('\n'));
   const [instantClaim, setInstantClaim] = useState(initial.instant_claim);
+  const [rosterOnly, setRosterOnly]     = useState(initial.visibility === 'roster');
+  const { role } = useRole();
+  const isStaffer = role === 'staffer';
   const [errors,       setErrors]       = useState<Record<string, string>>({});
 
   const payNum = Number(payRateStr);
@@ -76,6 +80,7 @@ export function PostShiftStep4Screen() {
       description:  description.trim(),
       requirements,
       instant_claim: instantClaim,
+      visibility:    isStaffer && rosterOnly ? 'roster' : 'public',
     });
     navigate('/post-shift/step5');
   }
@@ -214,6 +219,35 @@ export function PostShiftStep4Screen() {
             </button>
           </div>
         </div>
+
+        {/* Roster-only — agencies only */}
+        {isStaffer && (
+          <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-4 mt-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="text-[#111827] font-bold text-[15px]">Roster only</h2>
+                <p className="text-[#6B7280] text-[12px] leading-snug mt-1">
+                  Only workers on your roster can see, apply to or claim this shift.
+                  Off = it's listed publicly on Jobs as well.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={rosterOnly}
+                aria-label="Show this shift to my roster only"
+                onClick={() => setRosterOnly((v) => !v)}
+                className={`inline-flex items-center w-[50px] h-[30px] rounded-full p-[3px] flex-shrink-0 transition-colors duration-200 ${
+                  rosterOnly ? 'bg-[#0A1628]' : 'bg-[#D1D5DB]'
+                }`}
+              >
+                <span className={`inline-block w-[24px] h-[24px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.3)] transition-transform duration-200 ${
+                  rosterOnly ? 'translate-x-[20px]' : 'translate-x-0'
+                }`} />
+              </button>
+            </div>
+          </div>
+        )}
 
       </div>
 
