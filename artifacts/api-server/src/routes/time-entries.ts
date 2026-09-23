@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
 import { HttpError, sendError } from '../lib/httpError.js';
 import { assertShiftOwner } from '../lib/shiftAccess.js';
+import { setArrivalStatus } from './applications.js';
 
 const router = Router();
 
@@ -253,13 +254,14 @@ router.post('/', requireAuth, async (req, res) => {
   }
 
   // Only a worker booked (accepted) onto this shift may clock in.
-  const { count } = await adminDb
+  const { data: booked } = await adminDb
     .from('applications')
-    .select('*', { count: 'exact', head: true })
+    .select('id, shift_id, worker_id, arrival_status')
     .eq('shift_id', shift_id)
     .eq('worker_id', req.userId)
-    .eq('status', 'accepted');
-  if (!count) {
+    .eq('status', 'accepted')
+    .maybeSingle();
+  if (!booked) {
     return res.status(403).json({ error: 'You are not booked for this shift.' });
   }
 
@@ -279,6 +281,9 @@ router.post('/', requireAuth, async (req, res) => {
     .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(409).json({ error: 'Already clocked in' });
+  // Clocking in means they're here: mark the application 'arrived' (the owner
+  // sees "Clocked in", so no extra notification is sent).
+  await setArrivalStatus(booked, 'arrived', { notify: false });
   return res.status(201).json(data);
 });
 

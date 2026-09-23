@@ -1,10 +1,13 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
-import { addWorkerToShiftChat, removeWorkerFromShiftChat } from '../lib/chat.js';
+import {
+  addWorkerToShiftChat, removeWorkerFromShiftChat, ensureShiftGroupChat, insertSystemMessage,
+} from '../lib/chat.js';
 import { HttpError, sendError } from '../lib/httpError.js';
-import { assertShiftOwner, loadShift, rosterAllows } from '../lib/shiftAccess.js';
+import { assertShiftOwner, loadShift, rosterAllows, type ShiftRow } from '../lib/shiftAccess.js';
 import { bookWorker, syncShiftCapacity } from '../lib/booking.js';
 
 const router = Router();
@@ -13,6 +16,76 @@ const router = Router();
 async function workerName(id: string): Promise<string> {
   const { data } = await adminDb.from('users').select('username').eq('id', id).maybeSingle();
   return data?.username ? `@${data.username}` : 'the worker';
+}
+
+/**
+ * "Saturday's shift" — the shift's weekday in its own time zone, for day-of
+ * copy. Falls back to the quoted title, then to "the shift".
+ */
+function shiftDayLabel(shift: Pick<ShiftRow, 'title' | 'start_time' | 'timezone'>): string {
+  const ms = shift.start_time ? Date.parse(shift.start_time) : NaN;
+  if (Number.isFinite(ms)) {
+    try {
+      const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: shift.timezone || undefined }).format(new Date(ms));
+      return `${weekday}'s shift${shift.title ? ` ("${shift.title}")` : ''}`;
+    } catch { /* bad time zone: fall through */ }
+  }
+  return shift.title ? `"${shift.title}"` : 'the shift';
+}
+
+/** The day-of statuses a worker can set on their booked shift. */
+export const ARRIVAL_STATUSES = ['on_my_way', 'running_late', 'arrived'] as const;
+export type ArrivalStatus = (typeof ARRIVAL_STATUSES)[number];
+
+const arrivalBody = z.object({ status: z.enum(ARRIVAL_STATUSES) });
+
+const callOutBody = z.object({
+  reason: z.string().trim().min(1, 'Pick a reason').max(300, 'Reason is too long'),
+});
+
+const ARRIVAL_COPY: Record<ArrivalStatus, string> = {
+  on_my_way:    'is on the way',
+  running_late: 'is running late',
+  arrived:      'has arrived',
+};
+
+/**
+ * Stamp a worker's day-of status on their accepted application and tell the
+ * shift owner. Shared by the arrival route and the clock-in path (which sets
+ * 'arrived' automatically). Never throws — a failed status update must not
+ * break a clock-in.
+ */
+export async function setArrivalStatus(
+  app: { id: string; shift_id: string; worker_id: string; arrival_status?: string | null },
+  status: ArrivalStatus,
+  opts: { notify?: boolean } = {},
+): Promise<{ arrival_status: ArrivalStatus; arrival_status_at: string } | null> {
+  const at = new Date().toISOString();
+  const { error } = await adminDb
+    .from('applications')
+    .update({ arrival_status: status, arrival_status_at: at })
+    .eq('id', app.id);
+  if (error) {
+    console.error('[applications] setArrivalStatus failed:', error.message);
+    return null;
+  }
+  // Re-tapping the same pill is harmless: no duplicate notification.
+  if (opts.notify !== false && app.arrival_status !== status) {
+    const shift = await loadShift(app.shift_id);
+    if (shift?.client_id) {
+      const name = await workerName(app.worker_id);
+      await createNotification({
+        userId: shift.client_id,
+        fromUserId: app.worker_id,
+        type: 'arrival_status',
+        title: status === 'running_late' ? 'Worker running late' : status === 'arrived' ? 'Worker arrived' : 'Worker on the way',
+        body: `${name} ${ARRIVAL_COPY[status]} for ${shift.title ? `"${shift.title}"` : 'your shift'}.`,
+        shiftId: app.shift_id,
+        url: `/shift/${app.shift_id}/applicants`,
+      });
+    }
+  }
+  return { arrival_status: status, arrival_status_at: at };
 }
 
 /** A shift's title wrapped in quotes for notification copy, or a neutral fallback. */
@@ -170,6 +243,9 @@ router.get('/', requireAuth, async (req, res) => {
           approved_pay: e?.approved_pay ?? null,
           overtime_hours: e?.overtime_hours ?? null,
           attendance,
+          // Worker's self-reported day-of status (null until they tap a pill).
+          arrival_status: a.arrival_status ?? null,
+          arrival_status_at: a.arrival_status_at ?? null,
           already_reviewed: reviewedSet.has(a.worker_id),
           paid: paidSet.has(a.worker_id),
         };
@@ -210,6 +286,8 @@ router.get('/', requireAuth, async (req, res) => {
         pay_rate: s?.pay_rate ?? null,
         pay_period: s?.pay_period ?? null,
         company_name: s?.company_name ?? null,
+        arrival_status: a.arrival_status ?? null,
+        arrival_status_at: a.arrival_status_at ?? null,
       };
     });
     return res.json(merged);
@@ -223,12 +301,17 @@ router.get('/status/:shiftId', requireAuth, async (req, res) => {
   try {
     const { data, error } = await adminDb
       .from('applications')
-      .select('status')
+      .select('id, status, arrival_status, arrival_status_at')
       .eq('shift_id', req.params.shiftId)
       .eq('worker_id', req.userId)
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
-    return res.json({ status: data?.status ?? null });
+    return res.json({
+      status: data?.status ?? null,
+      id: data?.id ?? null,
+      arrival_status: data?.arrival_status ?? null,
+      arrival_status_at: data?.arrival_status_at ?? null,
+    });
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }
@@ -659,6 +742,155 @@ router.post('/no-show', requireAuth, requireRole('client', 'staffer'), async (re
       shiftId: shift_id,
     });
     return res.status(201).json({ ok: true });
+  } catch (e) {
+    return sendError(res, e);
+  }
+});
+
+/** Load an application the caller owns as the worker, or throw 404. */
+async function loadOwnApplication(id: string, workerId: string) {
+  const { data, error } = await adminDb
+    .from('applications')
+    .select('id, shift_id, worker_id, status, arrival_status, arrival_status_at')
+    .eq('id', id)
+    .eq('worker_id', workerId)
+    .maybeSingle();
+  if (error) throw new HttpError(500, error.message);
+  if (!data) throw new HttpError(404, 'Application not found');
+  return data as {
+    id: string; shift_id: string; worker_id: string; status: string;
+    arrival_status: string | null; arrival_status_at: string | null;
+  };
+}
+
+/**
+ * POST /api/applications/:id/arrival { status } — a booked worker reports their
+ * day-of status ('on_my_way' | 'running_late' | 'arrived'). The shift owner is
+ * notified (once per distinct status). Rejected once the shift has ended.
+ */
+router.post('/:id/arrival', requireAuth, requireRole('worker'), async (req, res) => {
+  const parsed = arrivalBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'status must be on_my_way, running_late or arrived' });
+  try {
+    const app = await loadOwnApplication(String(req.params.id), req.userId!);
+    if (app.status !== 'accepted') return res.status(409).json({ error: "You're not booked for this shift." });
+    const shift = await loadShift(app.shift_id);
+    if (!shift) return res.status(404).json({ error: 'Shift not found' });
+    if (shift.status === 'cancelled') return res.status(409).json({ error: 'This shift was cancelled.' });
+    const endMs = shift.end_time ? Date.parse(shift.end_time) : NaN;
+    if (Number.isFinite(endMs) && Date.now() > endMs) {
+      return res.status(409).json({ error: 'This shift has already ended.' });
+    }
+    const result = await setArrivalStatus(app, parsed.data.status);
+    if (!result) return res.status(500).json({ error: 'Could not update your status.' });
+    return res.json({ id: app.id, shift_id: app.shift_id, ...result });
+  } catch (e) {
+    return sendError(res, e);
+  }
+});
+
+/**
+ * POST /api/applications/:id/call-out { reason } — a booked worker calls out
+ * of a shift that has not started yet. Their application becomes 'withdrawn'
+ * (the reason is kept in callout_reason), the spot is freed, and the earliest
+ * standby worker (skipping anyone with a time conflict) is promoted to
+ * 'accepted'. The poster, the promoted worker and the shift chat are told.
+ * Once the shift has started the worker is asked to message the poster instead.
+ */
+router.post('/:id/call-out', requireAuth, requireRole('worker'), async (req, res) => {
+  const parsed = callOutBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid reason' });
+  const reason = parsed.data.reason;
+  try {
+    const app = await loadOwnApplication(String(req.params.id), req.userId!);
+    if (app.status !== 'accepted') return res.status(409).json({ error: "You're not booked for this shift." });
+    const shift = await loadShift(app.shift_id);
+    if (!shift) return res.status(404).json({ error: 'Shift not found' });
+    if (shift.status === 'cancelled') return res.status(409).json({ error: 'This shift was cancelled.' });
+    const startMs = shift.start_time ? Date.parse(shift.start_time) : NaN;
+    if (Number.isFinite(startMs) && Date.now() >= startMs) {
+      return res.status(409).json({ error: 'This shift has already started. Please message the poster directly.' });
+    }
+
+    // 1. Release the spot (same semantics as /withdraw, plus the reason).
+    const { data: released, error: wErr } = await adminDb
+      .from('applications')
+      .update({ status: 'withdrawn', callout_reason: reason, arrival_status: null, arrival_status_at: null })
+      .eq('id', app.id)
+      .eq('status', 'accepted')
+      .select('id')
+      .maybeSingle();
+    if (wErr) return res.status(500).json({ error: wErr.message });
+    if (!released) return res.status(409).json({ error: "You're not booked for this shift." });
+    await removeWorkerFromShiftChat(app.shift_id, req.userId!);
+    await syncShiftCapacity(app.shift_id);
+
+    // 2. Auto-fill from standby: earliest first, skipping time conflicts.
+    const { data: standbys } = await adminDb
+      .from('applications')
+      .select('id, worker_id, created_at')
+      .eq('shift_id', app.shift_id)
+      .eq('status', 'standby')
+      .order('created_at', { ascending: true });
+    let promotedId: string | null = null;
+    for (const s of standbys ?? []) {
+      if (await findTimeConflict(s.worker_id, app.shift_id)) continue;
+      try {
+        await bookWorker(app.shift_id, s.worker_id, 'accept');
+        promotedId = s.worker_id;
+        break;
+      } catch (e) {
+        // Full or closed: nothing more to fill. Anything else is a real failure.
+        if (e instanceof HttpError && e.status === 409) break;
+        throw e;
+      }
+    }
+    // Keep the standby worker's request row (if any) in step with the booking.
+    if (promotedId) {
+      await adminDb.from('shift_requests').update({ status: 'accepted' })
+        .eq('shift_id', app.shift_id).eq('worker_id', promotedId).eq('status', 'standby');
+      await addWorkerToShiftChat(app.shift_id, promotedId);
+    }
+
+    // 3. Tell everyone.
+    const me = await workerName(req.userId!);
+    const promotedName = promotedId ? await workerName(promotedId) : null;
+    const dayLabel = shiftDayLabel(shift);
+    if (shift.client_id) {
+      await createNotification({
+        userId: shift.client_id,
+        fromUserId: req.userId,
+        type: 'call_out',
+        title: promotedId ? 'Worker called out — spot refilled' : 'Worker called out',
+        body: `${me} can't make ${dayLabel}. Reason: ${reason}. ${
+          promotedId ? `${promotedName} from standby was moved in.` : 'No one on standby — the spot is open again.'}`,
+        shiftId: app.shift_id,
+        url: `/shift/${app.shift_id}/applicants`,
+      });
+    }
+    if (promotedId) {
+      await createNotification({
+        userId: promotedId,
+        fromUserId: shift.client_id,
+        type: 'booking',
+        title: "You're in!",
+        body: `A spot opened on ${dayLabel} and you've been moved from standby to confirmed.`,
+        shiftId: app.shift_id,
+      });
+    }
+    try {
+      const conv = await ensureShiftGroupChat(app.shift_id);
+      if (conv) {
+        await insertSystemMessage(conv,
+          promotedId
+            ? `${me} called out. ${promotedName} moved in from standby.`
+            : `${me} called out. The spot is open again.`,
+          conv.created_by);
+      }
+    } catch (e) {
+      console.error('[applications] call-out system message failed:', e);
+    }
+    return res.json({ ok: true, promoted_worker_id: promotedId });
   } catch (e) {
     return sendError(res, e);
   }

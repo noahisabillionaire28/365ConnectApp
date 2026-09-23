@@ -1,6 +1,7 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import type { ArrivalStatus } from './useArrivalStatus';
 
 type RawAccepted = {
   id: string;
@@ -19,12 +20,20 @@ type RawAccepted = {
   total_hours?: number | null;
   total_pay?: number | null;
   attendance?: 'applied' | 'booked' | 'on_site' | 'done' | 'no_show';
+  arrival_status?: ArrivalStatus | null;
+  arrival_status_at?: string | null;
   already_reviewed?: boolean;
   paid?: boolean;
   [key: string]: unknown;
 };
 
 export type Attendance = 'applied' | 'booked' | 'on_site' | 'done' | 'no_show';
+
+/**
+ * What the poster sees for a booked worker on the day: the worker's own
+ * report, or 'clocked_in' once a time entry exists (which wins).
+ */
+export type DayOfStatus = ArrivalStatus | 'clocked_in' | null;
 
 export type AcceptedWorker = RawAccepted & {
   /** camelCase aliases */
@@ -49,6 +58,11 @@ export type AcceptedWorker = RawAccepted & {
   overtimeHours: number | null;
   /** break minutes recorded on the timesheet */
   breakMinutes: number | null;
+  /** worker's self-reported day-of status (null until they report one) */
+  arrivalStatus: ArrivalStatus | null;
+  arrivalStatusAt: string | null;
+  /** day-of status for the roster chip: clocked in beats the self-report */
+  dayOfStatus: DayOfStatus;
 };
 
 export const ACCEPTED_WORKERS_KEY = 'accepted-workers';
@@ -82,6 +96,9 @@ export function useAcceptedWorkers(
         approvedPay:     (r.approved_pay as number | null) ?? null,
         overtimeHours:   (r.overtime_hours as number | null) ?? null,
         breakMinutes:    (r.break_minutes as number | null) ?? null,
+        arrivalStatus:   r.arrival_status ?? null,
+        arrivalStatusAt: r.arrival_status_at ?? null,
+        dayOfStatus:     r.clock_in ? 'clocked_in' : (r.arrival_status ?? null),
       }));
     },
   });

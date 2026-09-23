@@ -25,6 +25,8 @@ import { friendlyDate, formatTime } from '@/lib/supabase';
 import { Check, X, Inbox } from 'lucide-react';
 import { JOB_TYPES } from '@/lib/jobTypes';
 import { resetStafferDraft } from '@/store/stafferPostShiftStore';
+import { ArrivalPills } from '@/components/ArrivalPills';
+import { isToday } from '@/hooks/useArrivalStatus';
 
 /* ─── Shared header ──────────────────────────────────────────────────────────── */
 function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => void }) {
@@ -128,10 +130,13 @@ function MyShiftRow({ app, onTap }: { app: MyApplication; onTap: () => void }) {
   const endMs = app.endTime ? Date.parse(app.endTime) : NaN;
   const clockInNow = app.status === 'accepted' && Number.isFinite(startMs) &&
     now >= startMs - 3_600_000 && (!Number.isFinite(endMs) || now <= endMs);
+  // Day-of pills ("On my way" / "Running late") for today's booked shift.
+  const dayOf = app.status === 'accepted' && isToday(app.startTime) && (!Number.isFinite(endMs) || now <= endMs);
 
   return (
+    <div className="border-b border-[#E5E7EB] last:border-none">
     <motion.button type="button" whileTap={{ scale: 0.98 }} onClick={onTap}
-      className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-[#E5E7EB] text-left last:border-none">
+      className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
       <div className="w-10 h-10 rounded-[10px] bg-[#F3F4F6] flex items-center justify-center flex-shrink-0">
         <Briefcase size={16} aria-hidden className="text-[#6B7280]" />
       </div>
@@ -162,6 +167,13 @@ function MyShiftRow({ app, onTap }: { app: MyApplication; onTap: () => void }) {
         <ChevronRight size={15} aria-hidden className="text-[#D1D5DB] flex-shrink-0" />
       )}
     </motion.button>
+    {dayOf && (
+      <div className="px-4 pb-3 -mt-1 flex items-center gap-2">
+        <span className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider flex-shrink-0">Today</span>
+        <ArrivalPills applicationId={app.applicationId} status={app.arrivalStatus} statusAt={app.arrivalStatusAt} compact />
+      </div>
+    )}
+    </div>
   );
 }
 

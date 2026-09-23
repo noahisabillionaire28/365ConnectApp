@@ -30,6 +30,9 @@ import { useAcceptedWorkers } from '@/hooks/useAcceptedWorkers';
 import { useEventPositions } from '@/hooks/useEventPositions';
 import { broadcastShiftRequest } from '@/hooks/useShiftRequests';
 import { openShiftGroupChat } from '@/hooks/useConversations';
+import { ArrivalPills } from '@/components/ArrivalPills';
+import { CallOutSheet } from '@/components/CallOutSheet';
+import { useArrivalStatus, isDayOfWindow } from '@/hooks/useArrivalStatus';
 
 /** Deep links to open a destination in each navigation app. */
 function directionsLinks(lat: number, lng: number, label: string) {
@@ -138,7 +141,11 @@ export function ShiftDetailScreen() {
   const store        = useFeedStore();
   // useApplications: 7 stable hooks (see hook/useApplications.ts inventory comment)
   const { submitApplication }             = useApplications();
-  const { status: applicationStatus, refetch: refetchApplicationStatus } = useApplicationStatus(id);
+  const {
+    status: applicationStatus, applicationId, arrivalStatus, arrivalStatusAt,
+    refetch: refetchApplicationStatus,
+  } = useApplicationStatus(id);
+  const { callOut, busy: callingOut } = useArrivalStatus();
   const profile                           = useProfile();
   const { coords: myCoords, isDefault: myLocationIsDefault } = useMyLocation();
   // Distance (and therefore the AI Match Score's distance component) is
@@ -179,6 +186,7 @@ export function ShiftDetailScreen() {
   const [venueCoords, setVenueCoords] = useState<Coords | null>(null);
   const [dropping, setDropping] = useState(false);
   const [confirmDrop, setConfirmDrop] = useState(false);
+  const [confirmCallOut, setConfirmCallOut] = useState(false);
   const [confirmBroadcast, setConfirmBroadcast] = useState(false);
   const [openingChat, setOpeningChat] = useState(false);
   const qc = useQueryClient();
@@ -320,6 +328,11 @@ export function ShiftDetailScreen() {
       ? 'claim'
       : 'apply';
 
+  // Day-of pills ("On my way" / "Running late") for a booked worker once the
+  // shift is within 12 hours or in progress.
+  const showArrivalPills = ctaState === 'clock-in' && !!applicationId
+    && isDayOfWindow(shift.startTimeISO, shift.endTimeISO);
+
   /** Refresh every cache that reflects this shift's booking state. */
   function invalidateShiftCaches() {
     void qc.invalidateQueries({ queryKey: ['worker-home-shifts'] });
@@ -349,6 +362,17 @@ export function ShiftDetailScreen() {
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Could not drop the shift.', 'error');
     } finally { setDropping(false); }
+  }
+
+  /** Runs after the worker picks a reason in the call-out sheet. */
+  async function handleCallOut(reason: string) {
+    if (!applicationId) return;
+    const err = await callOut(applicationId, reason);
+    if (err) { showToast(err, 'error'); return; }
+    invalidateShiftCaches();
+    setConfirmCallOut(false);
+    showToast('The poster has been told. Your spot was released.');
+    navigate('/home');
   }
 
   async function handleClaim() {
@@ -499,7 +523,7 @@ export function ShiftDetailScreen() {
 
       {/* Reserve room for the fixed worker CTA bar only when it renders (it can be
           up to ~160px tall in the clock-in / standby states); owners get none. */}
-      <div className={`flex-1 overflow-y-auto ${profile.role === 'worker' && !isOwner ? 'pb-[150px]' : 'pb-8'}`}>
+      <div className={`flex-1 overflow-y-auto ${profile.role === 'worker' && !isOwner ? (showArrivalPills ? 'pb-[200px]' : 'pb-[150px]') : 'pb-8'}`}>
 
         {/* Hero photo */}
         <div className="relative w-full h-[300px] flex-shrink-0 overflow-hidden">
@@ -1087,6 +1111,11 @@ export function ShiftDetailScreen() {
           </div>
         )}
 
+        {showArrivalPills && applicationId && (
+          <ArrivalPills applicationId={applicationId} status={arrivalStatus} statusAt={arrivalStatusAt}
+            className="mb-2.5 justify-center" />
+        )}
+
         {ctaState === 'clock-in' && (
           <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleCta}
             disabled={!canClockIn}
@@ -1103,11 +1132,18 @@ export function ShiftDetailScreen() {
           </motion.button>
         )}
 
-        {ctaState === 'clock-in' && (
-          <button type="button" onClick={() => setConfirmDrop(true)} disabled={dropping}
-            className="w-full h-9 mt-2 text-[#EF4444] font-semibold text-[13px] disabled:opacity-50">
-            {dropping ? 'Dropping…' : 'Drop this shift'}
+        {/* Before the start a booked worker calls out (spot released + standby
+            auto-filled); once it's underway they talk to the poster instead. */}
+        {ctaState === 'clock-in' && lifecycle === 'upcoming' && applicationId && (
+          <button type="button" onClick={() => setConfirmCallOut(true)} disabled={callingOut}
+            className="w-full h-9 mt-2 text-[#6B7280] font-semibold text-[13px] disabled:opacity-50">
+            {callingOut ? 'Releasing your spot…' : "Can't make it?"}
           </button>
+        )}
+        {ctaState === 'clock-in' && lifecycle === 'in_progress' && (
+          <p className="text-center text-[#9CA3AF] text-[12px] mt-2">
+            Running into a problem? Message the poster in the shift chat.
+          </p>
         )}
 
         {ctaState === 'standby' && (
@@ -1132,7 +1168,16 @@ export function ShiftDetailScreen() {
       </div>
       )}
 
-      {/* Drop / leave-waitlist confirmation sheet (replaces the browser confirm) */}
+      {/* Call-out sheet — booked worker, before the shift starts */}
+      <CallOutSheet
+        open={confirmCallOut}
+        shiftLabel={`${shift.date} · ${shift.startTime}`}
+        busy={callingOut}
+        onConfirm={(reason) => void handleCallOut(reason)}
+        onCancel={() => setConfirmCallOut(false)}
+      />
+
+      {/* Withdraw / leave-waitlist confirmation sheet (pending + standby) */}
       {confirmDrop && (
         <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40"
           role="dialog" aria-modal="true" aria-label="Confirm dropping this shift"
