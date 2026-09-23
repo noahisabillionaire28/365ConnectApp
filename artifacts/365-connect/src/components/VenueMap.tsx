@@ -2,8 +2,8 @@
  * Venue map block, Apple Maps style (matches the reference screenshot):
  *
  *   ┌ 11200 Corbin Ave, Porter Ranch, CA 91326            ⓧ ┐   outlined address bar
- *   ├───────────────── edge-to-edge dark map ────────────────┤
- *   │   white balloon pin with the logo · blue "you" dot      │
+ *   ├───────────────── edge-to-edge light map ───────────────┤
+ *   │   navy balloon pin with the logo · blue "you" dot       │
  *   │ [ Hide Map ]                                            │
  *   │  Maps  Legal  (drawn by Apple's engine)                │
  *   └─────────────────────────────────────────────────────────┘
@@ -81,7 +81,7 @@ export function VenueMap({
 
       {/* Map — edge to edge */}
       {!hidden ? (
-        <div className="relative -mx-5 mt-4 bg-[#1c1c1e]" style={{ height }}>
+        <div className="relative -mx-5 mt-4 bg-[#F2EFE9]" style={{ height }}>
           <button
             type="button"
             onClick={onOpenDirections}

@@ -33,7 +33,7 @@ export async function initNative(handlers: {
     import('@capacitor/keyboard'),
   ]);
 
-  try { await StatusBar.setStyle({ style: Style.Dark }); } catch { /* not on this platform */ }
+  try { await StatusBar.setStyle({ style: Style.Light }); } catch { /* not on this platform */ }
   try { await Keyboard.setAccessoryBarVisible({ isVisible: false }); } catch { /* ignore */ }
 
   // connect365://shift/abc  or  https://365-connect-app.vercel.app/shift/abc

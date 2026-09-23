@@ -49,7 +49,7 @@ export function AppMap(props: AppMapProps) {
     <div
       role="img"
       aria-label={props.ariaLabel ?? 'Map loading'}
-      style={{ width: '100%', height: '100%', background: '#1c1c1e', ...(props.style ?? {}) }}
+      style={{ width: '100%', height: '100%', background: '#F2EFE9', ...(props.style ?? {}) }}
     />
   );
 }

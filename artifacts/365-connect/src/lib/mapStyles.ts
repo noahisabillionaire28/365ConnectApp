@@ -44,8 +44,8 @@ export function logoPinSize(selected: boolean): [number, number] {
 }
 
 /**
- * Branded venue pin, Apple Maps style: a white teardrop (balloon) with the
- * 365 logo mark drawn in the middle. Rendered as an SVG data-URI so the same
+ * Branded venue pin, Apple Maps style: a navy teardrop (balloon) with the
+ * 365 logo mark drawn in white, so it reads on the light map. Rendered as an SVG data-URI so the same
  * pin works in every map engine.
  */
 export function logoPinUrl(selected: boolean): string {
@@ -64,10 +64,10 @@ export function logoPinUrl(selected: boolean): string {
     `C${cx + r} ${cy + r * 0.2} ${cx + r * 0.55} ${cy + r * 0.55} ${cx} ${tip} Z`;
   const fs = Math.round(r * 1.25);
   const svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg"
-    style="filter:drop-shadow(0 3px 6px rgba(0,0,0,0.45))">
-    <path d="${balloon}" fill="#FFFFFF"/>
+    style="filter:drop-shadow(0 3px 6px rgba(0,0,0,0.35))">
+    <path d="${balloon}" fill="#0A1628" stroke="#FFFFFF" stroke-width="2"/>
     <text x="${cx}" y="${cy + fs * 0.36}" font-family="Georgia,'Times New Roman',serif" font-size="${fs}"
-      font-weight="900" fill="#0A1628" text-anchor="middle">3</text>
+      font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
   </svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }

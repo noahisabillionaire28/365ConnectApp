@@ -13,7 +13,7 @@ and drive-time footer) is the same either way.
 - `GET /api/maps/token` hands a token to signed-in users, or `404 {configured:false}`.
 - `artifacts/365-connect/src/lib/mapkit.ts` asks that endpoint once per tab, loads
   MapKit JS from Apple's CDN when configured, and refreshes tokens automatically.
-- `components/AppleMap.tsx` draws the Apple map in dark mode with the app's own
+- `components/AppleMap.tsx` draws the Apple map in light mode with the app's own
   pins; `components/LeafletMap.tsx` is the fallback with the same pins.
 - `/api/healthz` reports `"maps": "apple"` or `"maps": "fallback"`.
 
@@ -47,7 +47,7 @@ within an hour or on the next new tab.
 
 - Apple gives MapKit JS a free daily allowance (250,000 map views and 25,000
   service calls per day at the time of writing), far above the app's traffic.
-- The fallback map uses CARTO's free dark basemap on OpenStreetMap data; its
+- The fallback map uses CARTO's free light (Voyager) basemap on OpenStreetMap data; its
   credit line is drawn in the map corner as their terms require. Apple's engine
   draws its own legal link.
 - Tokens never expose the private key; the browser only ever sees a 30-minute
