@@ -10,7 +10,7 @@ import 'leaflet/dist/leaflet.css';
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { logoPinUrl, logoPinSize } from '@/lib/mapStyles';
+import { logoPinUrl, logoPinSize, userDotHtml, USER_DOT_SIZE } from '@/lib/mapStyles';
 
 // CARTO "Dark Matter" (OpenStreetMap data) — the closest free match to Apple's
 // dark map. Attribution is shown in the corner as their terms require.
@@ -19,7 +19,30 @@ const TILE_SUBDOMAINS = 'abcd';
 const TILE_ATTR = '&copy; OpenStreetMap &copy; CARTO';
 const TILE_MAX_ZOOM = 20;
 
-export type MapMarker = { id: string; lat: number; lng: number; selected?: boolean; label?: string };
+export type MapMarker = {
+  id: string;
+  lat: number;
+  lng: number;
+  selected?: boolean;
+  /** Price pill text; when set, the pin is a pill instead of the logo balloon. */
+  label?: string;
+  /** 'me' draws the blue "you are here" dot instead of a pin. */
+  kind?: 'pin' | 'me';
+};
+
+function userDotIcon(): L.DivIcon {
+  return L.divIcon({
+    className: 'leaflet-user-dot',
+    html: userDotHtml(),
+    iconSize: [USER_DOT_SIZE, USER_DOT_SIZE],
+    iconAnchor: [USER_DOT_SIZE / 2, USER_DOT_SIZE / 2],
+  });
+}
+
+function iconFor(m: MapMarker): L.Icon | L.DivIcon {
+  if (m.kind === 'me') return userDotIcon();
+  return m.label ? priceIcon(m.label, !!m.selected) : pinIcon(!!m.selected);
+}
 
 function pinIcon(selected: boolean): L.Icon {
   const [w, h] = logoPinSize(selected);
@@ -117,9 +140,10 @@ export function LeafletMap({
         <Marker
           key={m.id}
           position={[m.lat, m.lng]}
-          icon={m.label ? priceIcon(m.label, !!m.selected) : pinIcon(!!m.selected)}
-          zIndexOffset={m.selected ? 1000 : 0}
-          eventHandlers={onMarkerClick ? { click: () => onMarkerClick(m.id) } : undefined}
+          icon={iconFor(m)}
+          zIndexOffset={m.selected ? 1000 : m.kind === 'me' ? -100 : 0}
+          interactive={m.kind !== 'me'}
+          eventHandlers={onMarkerClick && m.kind !== 'me' ? { click: () => onMarkerClick(m.id) } : undefined}
         />
       ))}
     </MapContainer>

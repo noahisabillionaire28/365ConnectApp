@@ -114,9 +114,11 @@ function ShiftRowSkeleton() {
 }
 
 /* ── MapPane — Apple Maps style: address bar, dark map, price pins, card carousel ── */
-function MapPane({ shifts, selectedId, onPinClick, onOpenShift }: {
+function MapPane({ shifts, selectedId, userCoords, onPinClick, onOpenShift }: {
   shifts: MockShift[];
   selectedId: string | null;
+  /** The viewer's real location (blue dot); null when unknown. */
+  userCoords: { lat: number; lng: number } | null;
   onPinClick: (s: MockShift) => void;
   onOpenShift: (s: MockShift) => void;
 }) {
@@ -191,11 +193,14 @@ function MapPane({ shifts, selectedId, onPinClick, onOpenShift }: {
         zoom={searched ? 14 : 12}
         recenter={!!selectedShift || !!searched}
         ariaLabel="Map of available shifts"
-        markers={shifts.map((s) => ({
-          id: s.id, lat: s.lat, lng: s.lng,
-          selected: s.id === (selectedId ?? selectedShift?.id),
-          label: `$${s.payRate}`,
-        }))}
+        markers={[
+          ...shifts.map((s) => ({
+            id: s.id, lat: s.lat, lng: s.lng,
+            selected: s.id === (selectedId ?? selectedShift?.id),
+            label: `$${s.payRate}`,
+          })),
+          ...(userCoords ? [{ id: 'me', lat: userCoords.lat, lng: userCoords.lng, kind: 'me' as const }] : []),
+        ]}
         onMarkerClick={(id) => { const s = byId.get(id); if (s) { onPinClick(s); onOpenShift(s); } }}
       />
 
@@ -292,7 +297,7 @@ export function JobsScreen() {
 
   // Workers browse all open shifts; clients/staffers see only their own posted shifts.
   // Distances are measured from the viewer's real location, not a fixed fallback.
-  const { coords: myCoords } = useMyLocation();
+  const { coords: myCoords, isDefault: myLocationIsDefault } = useMyLocation();
   const openShifts   = useShifts(myCoords);
   const postedShifts = useMyPostedShifts();
   const isWorkerRole = role === 'worker' || role === null;
@@ -407,6 +412,7 @@ export function JobsScreen() {
         </main>
       ) : (
         <MapPane shifts={visibleShifts} selectedId={selectedId}
+          userCoords={myLocationIsDefault ? null : myCoords}
           onPinClick={handlePinClick} onOpenShift={handleSelectShift} />
       )}
 

@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef } from 'react';
 import type { MapMarker } from '@/components/LeafletMap';
-import { logoPinUrl, logoPinSize } from '@/lib/mapStyles';
+import { logoPinUrl, logoPinSize, userDotHtml } from '@/lib/mapStyles';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -18,6 +18,12 @@ function pinElement(selected: boolean): HTMLElement {
   img.draggable = false;
   img.style.display = 'block';
   return img;
+}
+
+function userDotElement(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = userDotHtml();
+  return el;
 }
 
 function priceElement(label: string, selected: boolean): HTMLElement {
@@ -120,19 +126,21 @@ export function AppleMap({
     if (annotationsRef.current.length) map.removeAnnotations(annotationsRef.current);
     const next = markers.map((m) => {
       const selected = !!m.selected;
+      const isMe = m.kind === 'me';
       const [, h] = logoPinSize(selected);
       const ann = new mk.Annotation(
         new mk.Coordinate(m.lat, m.lng),
-        () => (m.label ? priceElement(m.label, selected) : pinElement(selected)),
+        () => (isMe ? userDotElement() : m.label ? priceElement(m.label, selected) : pinElement(selected)),
         {
-          // A teardrop's tip sits on the coordinate; a pill is centered on it.
-          anchorOffset: m.label ? new DOMPoint(0, 0) : new DOMPoint(0, -h / 2),
-          displayPriority: selected ? 1000 : 750,
+          // A balloon's tip sits on the coordinate; a pill or dot is centered on it.
+          anchorOffset: m.label || isMe ? new DOMPoint(0, 0) : new DOMPoint(0, -h / 2),
+          displayPriority: selected ? 1000 : isMe ? 500 : 750,
           animates: false,
+          enabled: !isMe,
           data: { id: m.id },
         },
       );
-      ann.addEventListener('select', () => {
+      if (!isMe) ann.addEventListener('select', () => {
         clickRef.current?.(m.id);
         // Keep MapKit from drawing its own selection state; our pin styles handle it.
         try { ann.selected = false; } catch { /* noop */ }

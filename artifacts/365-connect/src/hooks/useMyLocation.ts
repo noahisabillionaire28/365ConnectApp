@@ -48,6 +48,8 @@ export function useMyLocation() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, !!saved, user?.id]);
 
-  const coords = saved ?? browserCoords ?? { lat: DEFAULT_LAT, lng: DEFAULT_LNG };
-  return { coords, loading: !!user?.id && isLoading };
+  const real = saved ?? browserCoords;
+  const coords = real ?? { lat: DEFAULT_LAT, lng: DEFAULT_LNG };
+  /** `isDefault` is true when neither the profile nor the browser gave a location. */
+  return { coords, loading: !!user?.id && isLoading, isDefault: !real };
 }
