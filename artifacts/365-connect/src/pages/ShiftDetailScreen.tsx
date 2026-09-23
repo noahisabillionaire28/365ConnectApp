@@ -140,7 +140,7 @@ export function ShiftDetailScreen() {
   const { submitApplication }             = useApplications();
   const { status: applicationStatus, refetch: refetchApplicationStatus } = useApplicationStatus(id);
   const profile                           = useProfile();
-  const { coords: myCoords }              = useMyLocation();
+  const { coords: myCoords, isDefault: myLocationIsDefault } = useMyLocation();
   // Distance (and therefore the AI Match Score's distance component) is
   // computed against the real viewer location, not a hardcoded fallback.
   const { data: shift, isLoading, error } = useShiftById(id, myCoords);
@@ -705,9 +705,11 @@ export function ShiftDetailScreen() {
           <VenueMap
             address={shift.location}
             coords={shiftCoords}
+            userCoords={myLocationIsDefault ? null : myCoords}
             markerId={shift.id}
-            distanceMiles={distanceFromShift}
-            footerLeft={`${shift.date} • ${shift.startTime}`}
+            distanceMiles={myLocationIsDefault ? null : distanceFromShift}
+            status={lifecycle === 'in_progress' ? 'Happening now' : lifecycle === 'ended' ? 'Ended' : shift.date}
+            detail={shift.startTime}
             onOpenDirections={() => setDirectionsOpen(true)}
           />
           <button type="button" onClick={() => setDirectionsOpen(true)}
