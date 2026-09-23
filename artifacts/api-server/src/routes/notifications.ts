@@ -102,8 +102,10 @@ export async function createNotification(params: {
   body:        string;
   shiftId?:    string | null;
   postId?:     string | null;
+  /** In-app path the push/email should open; defaults to the shift or post. */
+  url?:        string | null;
 }): Promise<void> {
-  const { userId, fromUserId, type, title, body, shiftId, postId } = params;
+  const { userId, fromUserId, type, title, body, shiftId, postId, url } = params;
   try {
     // Respect the recipient's preferences + grab their email in one read.
     // (A DB-level gate trigger enforces the in-app rule for SQL-trigger rows.)
@@ -133,7 +135,7 @@ export async function createNotification(params: {
       if (data) broadcastToUser(userId, 'new_notification', data);
       // …and to their phone if they've enabled push (no-op when unconfigured).
       const cta = emailCta(type, shiftId, postId);
-      const path = cta.href.startsWith(appUrl()) ? cta.href.slice(appUrl().length) : cta.href;
+      const path = url || (cta.href.startsWith(appUrl()) ? cta.href.slice(appUrl().length) : cta.href);
       void pushToUser(userId, { title, body, url: path || '/notifications', tag: shiftId ? `shift-${shiftId}` : undefined })
         .catch((e) => console.warn('[createNotification] push failed:', e));
     }
@@ -146,7 +148,7 @@ export async function createNotification(params: {
     ) {
       const cta = emailCta(type, shiftId, postId);
       const { html, text } = renderNotificationEmail({
-        title, body, ctaLabel: cta.label, ctaHref: cta.href, preheader: body,
+        title, body, ctaLabel: cta.label, ctaHref: url ? `${appUrl()}${url}` : cta.href, preheader: body,
       });
       await sendEmail({ to: pref.email as string, subject: title, html, text });
     }

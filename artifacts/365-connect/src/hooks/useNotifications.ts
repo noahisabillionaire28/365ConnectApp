@@ -37,8 +37,14 @@ export function notificationDeepLink(
   // shift page (which would only show "Apply").
   if (n.type === 'shift_invite' || n.type === 'direct_shift_request') return '/home?tab=requests';
   if (n.post_id) return `/post/${n.post_id}`;
+  // "Rate them" opens the review flow for the poster who sent the prompt.
+  if (n.shift_id && n.from_user_id && (n.type === 'rate_client' || n.type === 'rate_client_reminder')) {
+    return `/review/${n.shift_id}/${n.from_user_id}`;
+  }
   // A new applicant is handled on the applicants list, not the shift page.
-  if (n.shift_id && (n.type === 'application_received' || n.type === 'new_application' || n.type === 'application')) {
+  if (n.shift_id && (n.type === 'application_received' || n.type === 'new_application' || n.type === 'application'
+    || n.type === 'arrival_status' || n.type === 'call_out'
+    || n.type === 'rate_crew' || n.type === 'rate_crew_reminder' || n.type === 'hours_disputed')) {
     return `/shift/${n.shift_id}/applicants`;
   }
   if (n.shift_id) return `/shift/${n.shift_id}`;

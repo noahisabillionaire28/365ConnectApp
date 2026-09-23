@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'wouter';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Star, CheckCircle2 } from 'lucide-react';
 import { useShiftById } from '@/hooks/useShifts';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
-import { useExistingReview, submitReview } from '@/hooks/useReviews';
+import { useExistingReview, submitReview, REVIEWS_KEY } from '@/hooks/useReviews';
+import { ACCEPTED_WORKERS_KEY } from '@/hooks/useAcceptedWorkers';
 import { apiClient } from '@/lib/api';
 
 const POSITIVE_TAGS = [
@@ -38,6 +40,7 @@ function useTargetName(userId: string | undefined) {
 export function ReviewScreen() {
   const { shiftId, toUserId } = useParams<{ shiftId: string; toUserId: string }>();
   const [, navigate] = useLocation();
+  const qc = useQueryClient();
   const { user } = useAuth();
   const profile = useProfile();
   const { data: shift, isLoading: shiftLoading } = useShiftById(shiftId);
@@ -80,6 +83,10 @@ export function ReviewScreen() {
     setSubmitting(false);
     if (error) { setSubmitError('Could not submit your review — please try again.'); return; }
     setSubmitted(true);
+    // Every "have I rated this yet?" surface (home card, roster chips, the
+    // shift page button) reads from these caches.
+    void qc.invalidateQueries({ queryKey: [REVIEWS_KEY] });
+    void qc.invalidateQueries({ queryKey: [ACCEPTED_WORKERS_KEY] });
     if (duplicate) { setTimeout(goBack, 900); return; }
     setTimeout(goBack, 1400);
   }

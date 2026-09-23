@@ -6,11 +6,13 @@
  */
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { ChevronLeft, Bell, Mail, Smartphone } from 'lucide-react';
+import { ChevronLeft, Bell, Mail, Smartphone, BellRing, X } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { usePush } from '@/hooks/usePush';
+import { useProfile } from '@/hooks/useProfile';
+import { useSavedSearches, savedSearchLabel } from '@/hooks/useSavedSearches';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { InstallBanner } from '@/components/InstallBanner';
 
@@ -68,6 +70,9 @@ export function NotificationSettingsScreen() {
   const [loadErr, setLoadErr] = useState(false);
   const { showToast } = useToast();
   const push = usePush();
+  const { role } = useProfile();
+  const isWorker = role === 'worker';
+  const savedSearches = useSavedSearches(isWorker);
 
   async function togglePush() {
     if (push.subscribed) { await push.unsubscribe(); showToast('Push notifications off.'); return; }
@@ -175,6 +180,39 @@ export function NotificationSettingsScreen() {
               Turning a channel off stops new alerts on that channel. You can turn it
               back on anytime.
             </p>
+
+            {isWorker && (
+              <div className="mt-6">
+                <p className="text-[#9CA3AF] text-[11px] font-bold uppercase tracking-[0.12em] px-1 mb-2">
+                  Saved search alerts
+                </p>
+                <div className="bg-white border border-[#EDEEF0] rounded-[18px] shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
+                  <div className="flex items-center gap-3.5 px-4 py-4">
+                    <div className="w-10 h-10 rounded-full bg-[#F3F4F6] flex items-center justify-center flex-shrink-0">
+                      <BellRing size={17} aria-hidden className="text-[#0A1628]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[#111827] font-bold text-[15px] leading-tight">New shifts that match</p>
+                      <p className="text-[#6B7280] text-[12px] leading-snug mt-1">
+                        {savedSearches.searches.length
+                          ? 'You get one alert per new matching shift. Remove a search to stop.'
+                          : 'Save a search on the Jobs tab and we will tell you when a new shift matches.'}
+                      </p>
+                    </div>
+                  </div>
+                  {savedSearches.searches.map((s) => (
+                    <div key={s.id} className="flex items-center gap-3 px-4 py-3 border-t border-[#F0F1F3]">
+                      <p className="flex-1 min-w-0 text-[#111827] text-[14px] font-medium truncate">{savedSearchLabel(s)}</p>
+                      <button type="button" onClick={() => savedSearches.remove(s.id)}
+                        aria-label={`Remove saved search: ${savedSearchLabel(s)}`}
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-[#9CA3AF] active:bg-[#F3F4F6] flex-shrink-0">
+                        <X size={15} aria-hidden />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

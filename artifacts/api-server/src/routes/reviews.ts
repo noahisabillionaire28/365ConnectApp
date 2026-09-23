@@ -5,6 +5,114 @@ import { sendError } from '../lib/httpError.js';
 
 const router = Router();
 
+const PENDING_WINDOW_MS = 7 * 24 * 3600_000;
+const PENDING_LIMIT = 5;
+
+export type PendingReview = {
+  shift_id: string;
+  title: string | null;
+  /** The shift's start instant (ISO). */
+  date: string | null;
+  counterpart_id: string;
+  counterpart_name: string | null;
+  role: 'worker' | 'poster';
+};
+
+/**
+ * GET /api/reviews/pending — shifts from the last 7 days the caller has not
+ * rated yet: as a worker, the poster of each completed shift they were booked
+ * on; as a poster, each completed shift with a booked worker they have not
+ * reviewed (the first unrated worker is the counterpart). Newest first, at
+ * most 5. Drives the "Rate your last shift" / "Rate your crew" home cards.
+ */
+router.get('/pending', requireAuth, async (req, res) => {
+  try {
+    const me = req.userId!;
+    const now = Date.now();
+    const sinceISO = new Date(now - PENDING_WINDOW_MS).toISOString();
+    const nowISO = new Date(now).toISOString();
+    const items: PendingReview[] = [];
+
+    // ── As a worker ─────────────────────────────────────────────────────────
+    const { data: myApps, error: aErr } = await adminDb
+      .from('applications').select('shift_id').eq('worker_id', me).eq('status', 'accepted');
+    if (aErr) return res.status(500).json({ error: aErr.message });
+    const workedIds = [...new Set((myApps ?? []).map((a) => a.shift_id).filter(Boolean))];
+    if (workedIds.length) {
+      const { data: shifts } = await adminDb
+        .from('shifts')
+        .select('id, title, client_id, start_time, end_time, company_name, status')
+        .in('id', workedIds)
+        .neq('status', 'cancelled')
+        .gte('end_time', sinceISO)
+        .lte('end_time', nowISO);
+      const list = shifts ?? [];
+      if (list.length) {
+        const { data: mine } = await adminDb
+          .from('reviews').select('shift_id').eq('reviewer_id', me).in('shift_id', list.map((s) => s.id));
+        const rated = new Set((mine ?? []).map((r) => r.shift_id));
+        const posterIds = [...new Set(list.map((s) => s.client_id).filter(Boolean))];
+        const { data: posters } = posterIds.length
+          ? await adminDb.from('users').select('id, username, company_name').in('id', posterIds)
+          : { data: [] as { id: string; username: string | null; company_name: string | null }[] };
+        const posterMap = new Map((posters ?? []).map((u) => [u.id, u]));
+        for (const s of list) {
+          if (!s.client_id || s.client_id === me || rated.has(s.id)) continue;
+          const p = posterMap.get(s.client_id);
+          items.push({
+            shift_id: s.id, title: s.title ?? null, date: s.start_time ?? null,
+            counterpart_id: s.client_id,
+            counterpart_name: s.company_name || p?.company_name || (p?.username ? `@${p.username}` : null),
+            role: 'worker',
+          });
+        }
+      }
+    }
+
+    // ── As a poster ─────────────────────────────────────────────────────────
+    const { data: posted } = await adminDb
+      .from('shifts')
+      .select('id, title, start_time, end_time, status')
+      .eq('client_id', me)
+      .neq('status', 'cancelled')
+      .gte('end_time', sinceISO)
+      .lte('end_time', nowISO);
+    const postedList = posted ?? [];
+    if (postedList.length) {
+      const ids = postedList.map((s) => s.id);
+      const [{ data: crew }, { data: given }] = await Promise.all([
+        adminDb.from('applications').select('shift_id, worker_id').in('shift_id', ids).eq('status', 'accepted'),
+        adminDb.from('reviews').select('shift_id, reviewee_id').eq('reviewer_id', me).in('shift_id', ids),
+      ]);
+      const ratedPairs = new Set((given ?? []).map((r) => `${r.shift_id}:${r.reviewee_id}`));
+      const unrated = new Map<string, string>(); // shift → first unrated worker
+      for (const c of crew ?? []) {
+        if (ratedPairs.has(`${c.shift_id}:${c.worker_id}`) || unrated.has(c.shift_id)) continue;
+        unrated.set(c.shift_id, c.worker_id);
+      }
+      const workerIds = [...new Set(unrated.values())];
+      const { data: workers } = workerIds.length
+        ? await adminDb.from('users').select('id, username').in('id', workerIds)
+        : { data: [] as { id: string; username: string | null }[] };
+      const nameMap = new Map((workers ?? []).map((u) => [u.id, u.username]));
+      for (const s of postedList) {
+        const w = unrated.get(s.id);
+        if (!w) continue;
+        const username = nameMap.get(w);
+        items.push({
+          shift_id: s.id, title: s.title ?? null, date: s.start_time ?? null,
+          counterpart_id: w, counterpart_name: username ? `@${username}` : null, role: 'poster',
+        });
+      }
+    }
+
+    items.sort((a, b) => Date.parse(b.date ?? '') - Date.parse(a.date ?? ''));
+    return res.json(items.slice(0, PENDING_LIMIT));
+  } catch (e) {
+    return sendError(res, e);
+  }
+});
+
 /** GET /api/reviews/:userId — reviews for a user */
 router.get('/:userId', async (req, res) => {
   let viewerRole: string | null = null;

@@ -1,6 +1,7 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import type { ArrivalStatus } from './useArrivalStatus';
 
 type RawApplication = {
   id: string;
@@ -10,17 +11,23 @@ type RawApplication = {
   match_score: number | null;
   applied_at: string;
   created_at: string;
+  /** Day-of status the worker reported (null until they tap a pill). */
+  arrival_status?: ArrivalStatus | null;
+  arrival_status_at?: string | null;
   // Joined shift fields
   title?: string | null;
   job_type?: string | null;
   start_time?: string | null;
   end_time?: string | null;
+  timezone?: string | null;
   location?: string | null;
   pay_rate?: number | null;
   pay_period?: string | null;
   company_name?: string | null;
   client_id?: string | null;
   cover_image?: string | null;
+  point_of_contact?: string | null;
+  contact_phone?: string | null;
 };
 
 export type MyApplication = RawApplication & {
@@ -36,6 +43,12 @@ export type MyApplication = RawApplication & {
   payPeriod: string | null;
   jobType: string | null;
   coverImage: string | null;
+  arrivalStatus: ArrivalStatus | null;
+  arrivalStatusAt: string | null;
+  timezone: string | null;
+  location: string | null;
+  pointOfContact: string | null;
+  contactPhone: string | null;
 };
 
 /** @deprecated use MyApplication */
@@ -54,6 +67,12 @@ function toMyApplication(r: RawApplication): MyApplication {
     payPeriod:     r.pay_period  ?? null,
     jobType:       r.job_type    ?? null,
     coverImage:    r.cover_image ?? null,
+    arrivalStatus:   r.arrival_status ?? null,
+    arrivalStatusAt: r.arrival_status_at ?? null,
+    timezone:        r.timezone ?? null,
+    location:        r.location ?? null,
+    pointOfContact:  r.point_of_contact ?? null,
+    contactPhone:    r.contact_phone ?? null,
   };
 }
 

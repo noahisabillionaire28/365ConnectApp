@@ -6,7 +6,7 @@
 import type { ReactNode } from 'react';
 
 export function ConfirmSheet({
-  open, title, body, confirmLabel, cancelLabel = 'Cancel', tone = 'primary', busy = false, onConfirm, onCancel,
+  open, title, body, confirmLabel, cancelLabel = 'Cancel', tone = 'primary', busy = false, confirmDisabled = false, onConfirm, onCancel,
 }: {
   open: boolean;
   title: string;
@@ -15,6 +15,8 @@ export function ConfirmSheet({
   cancelLabel?: string;
   tone?: 'primary' | 'danger';
   busy?: boolean;
+  /** Disable the primary action until the body's input is complete. */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -30,7 +32,7 @@ export function ConfirmSheet({
         <p className="text-[#111827] font-bold text-[17px]">{title}</p>
         {body && <div className="text-[#6B7280] text-[13px] mt-1 leading-relaxed">{body}</div>}
         <div className="flex flex-col gap-2 mt-5">
-          <button type="button" onClick={onConfirm} disabled={busy}
+          <button type="button" onClick={onConfirm} disabled={busy || confirmDisabled}
             className={`w-full h-[50px] rounded-[10px] font-bold text-[15px] disabled:opacity-60 ${confirmCls}`}>
             {busy ? 'Working…' : confirmLabel}
           </button>

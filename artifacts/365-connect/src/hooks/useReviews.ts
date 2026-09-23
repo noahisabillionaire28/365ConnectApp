@@ -54,6 +54,33 @@ export function useReviews(targetUserId?: string) {
   return { reviews: q.data ?? [], isLoading: q.isLoading, submitReview: submitReviewFn, refetch: q.refetch };
 }
 
+export type PendingReview = {
+  shift_id: string;
+  title: string | null;
+  /** The shift's start instant (ISO). */
+  date: string | null;
+  counterpart_id: string;
+  counterpart_name: string | null;
+  role: 'worker' | 'poster';
+};
+
+/**
+ * Completed shifts from the last 7 days the viewer has not rated yet (at most
+ * 5, newest first). Shares the 'reviews' cache prefix so a submitted review
+ * refreshes it.
+ */
+export function usePendingReviews() {
+  const { user } = useAuth();
+  const q = useQuery<PendingReview[], Error>({
+    queryKey: [REVIEWS_KEY, 'pending', user?.id],
+    enabled: !!user?.id,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+    queryFn: () => apiClient(user!.id).get<PendingReview[]>('/reviews/pending'),
+  });
+  return { pending: q.data ?? [], isLoading: q.isLoading };
+}
+
 /**
  * Hook to check whether a reviewer has already reviewed a reviewee for a shift.
  * Returns `{ existing: ReviewRow | null, isLoading }`. Shares the reviews cache.

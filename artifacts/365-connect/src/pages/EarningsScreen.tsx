@@ -35,6 +35,8 @@ function StatusChip({ status }: { status: string }) {
     pending:    { label: 'Pending',    cls: 'bg-[#F3F4F6] text-[#6B7280] border-[#E5E7EB]',    icon: <Clock3 size={11} aria-hidden className="text-[#9CA3AF]" /> },
     awaiting_approval: { label: 'Awaiting approval', cls: 'bg-[#F3F4F6] text-[#6B7280] border-[#E5E7EB]', icon: <Clock3 size={11} aria-hidden className="text-[#9CA3AF]" /> },
     approved:   { label: 'Approved · payment on its way', cls: 'bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]', icon: <CheckCircle2 size={11} aria-hidden className="text-[#3B82F6]" /> },
+    hours_updated: { label: 'Hours updated · review', cls: 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]', icon: <AlertCircle size={11} aria-hidden className="text-[#F59E0B]" /> },
+    disputed:   { label: 'Disputed',   cls: 'bg-red-50 text-[#DC2626] border-red-200',          icon: <AlertCircle size={11} aria-hidden className="text-[#EF4444]" /> },
     failed:     { label: 'Failed',     cls: 'bg-red-50 text-[#DC2626] border-red-200',          icon: <AlertCircle size={11} aria-hidden className="text-[#EF4444]" /> },
   };
   const cfg = map[status] ?? map.pending;
@@ -89,7 +91,7 @@ function SummaryCard({ payments }: { payments: PaymentRow[] }) {
     .reduce((acc, p) => acc + p.net_amount, 0);
   // Pending = finished shifts not yet paid out (awaiting approval, approved, or a pending payment).
   const pending       = payments
-    .filter((p) => p.direction !== 'out' && (p.status === 'pending' || p.status === 'approved' || p.status === 'awaiting_approval'))
+    .filter((p) => p.direction !== 'out' && ['pending', 'approved', 'awaiting_approval', 'hours_updated', 'disputed'].includes(p.status))
     .reduce((acc, p) => acc + p.amount, 0);
   const completed     = shiftPayments.filter((p) => p.status === 'completed').length;
 

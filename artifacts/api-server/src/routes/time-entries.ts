@@ -1,15 +1,20 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
 import { HttpError, sendError } from '../lib/httpError.js';
-import { assertShiftOwner } from '../lib/shiftAccess.js';
+import { assertShiftOwner, loadShift } from '../lib/shiftAccess.js';
+import { shiftDayLabel, formatHoursMinutes, formatUsd } from '../lib/shiftLabel.js';
+import { setArrivalStatus, workerName } from './applications.js';
 
 const router = Router();
 
 const OT_THRESHOLD = 8;    // hours per shift before overtime
 const OT_MULTIPLIER = 1.5; // overtime pay multiplier
 const MAX_LATE_CLOCK_OUT_MS = 24 * 60 * 60 * 1000; // manager-supplied clock_out ≤ 24h after clock_in
+/** Approved hours within this many hours of the clocked hours count as "unchanged". */
+const UNCHANGED_TOLERANCE_H = 5 / 60;
 
 type EntryRow = {
   id: string;
@@ -23,12 +28,52 @@ type EntryRow = {
   total_pay: number | null;
   fee: number | null;
   approved: boolean | null;
+  /** Billable hours as computed at clock-out (before any poster change). */
+  clocked_hours?: number | null;
+  worker_ack?: 'accepted' | 'disputed' | null;
+  worker_ack_at?: string | null;
+  dispute_note?: string | null;
   [k: string]: unknown;
 };
 
 type PayShift = { pay_rate: number | null; pay_period: string | null };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Regular / overtime split and pay for `billable` hours on a shift — the ONE
+ * place this is computed, so the clock-out estimate and the approved figure
+ * always agree: hourly shifts pay regular up to 8h then 1.5× beyond; anything
+ * else is a flat rate.
+ */
+function computePay(billable: number, shift: PayShift): { regular: number; overtime: number; pay: number } {
+  const hourly = isHourly(shift.pay_period);
+  const regular = hourly ? Math.min(billable, OT_THRESHOLD) : billable;
+  const overtime = hourly ? Math.max(0, billable - OT_THRESHOLD) : 0;
+  const rate = Number(shift.pay_rate ?? 0);
+  const pay = hourly
+    ? (Number.isFinite(rate) && rate > 0 ? round2(regular * rate + overtime * rate * OT_MULTIPLIER) : 0)
+    : payFor(billable, shift);
+  return { regular: round2(regular), overtime: round2(overtime), pay };
+}
+
+/** Did the poster's approval change the hours (beyond the tolerance)? */
+function hoursChanged(entry: Pick<EntryRow, 'approved' | 'total_hours' | 'clocked_hours'>): boolean {
+  if (!entry.approved || entry.total_hours == null || entry.clocked_hours == null) return false;
+  return Math.abs(Number(entry.total_hours) - Number(entry.clocked_hours)) > UNCHANGED_TOLERANCE_H;
+}
+
+/** Public JSON for a time entry: the row plus the derived hours_changed flag. */
+function entryJson(entry: EntryRow): Record<string, unknown> {
+  return {
+    ...entry,
+    clocked_hours: entry.clocked_hours ?? null,
+    worker_ack: entry.worker_ack ?? null,
+    worker_ack_at: entry.worker_ack_at ?? null,
+    dispute_note: entry.dispute_note ?? null,
+    hours_changed: hoursChanged(entry),
+  };
+}
 
 /** Hourly pay periods; anything else ('day', 'event', 'flat', 'shift') is a flat total. */
 function isHourly(payPeriod: string | null | undefined): boolean {
@@ -88,24 +133,24 @@ router.get('/mine', requireAuth, async (req, res) => {
   try {
     const { data: entries, error } = await adminDb
       .from('time_entries')
-      .select('id, shift_id, clock_in, clock_out, break_minutes, total_hours, total_pay, approved, approved_at, approved_pay')
+      .select('id, shift_id, clock_in, clock_out, break_minutes, total_hours, total_pay, approved, approved_at, approved_pay, regular_hours, overtime_hours, clocked_hours, worker_ack, worker_ack_at, dispute_note')
       .eq('worker_id', req.userId)
       .order('clock_in', { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
     const rows = entries ?? [];
     const shiftIds = [...new Set(rows.map((r) => r.shift_id).filter(Boolean))];
 
-    const shiftMap = new Map<string, { title: string | null; company_name: string | null }>();
+    const shiftMap = new Map<string, { title: string | null; company_name: string | null; start_time: string | null }>();
     const paidSet = new Set<string>();
     if (shiftIds.length) {
       const [{ data: shifts, error: sErr }, { data: pays, error: pErr }] = await Promise.all([
-        adminDb.from('shifts').select('id, title, company_name').in('id', shiftIds),
+        adminDb.from('shifts').select('id, title, company_name, start_time').in('id', shiftIds),
         adminDb.from('payments').select('shift_id')
           .eq('worker_id', req.userId).eq('status', 'completed').in('shift_id', shiftIds),
       ]);
       if (sErr) return res.status(500).json({ error: sErr.message });
       if (pErr) return res.status(500).json({ error: pErr.message });
-      for (const s of shifts ?? []) shiftMap.set(s.id, { title: s.title ?? null, company_name: s.company_name ?? null });
+      for (const s of shifts ?? []) shiftMap.set(s.id, { title: s.title ?? null, company_name: s.company_name ?? null, start_time: s.start_time ?? null });
       for (const p of pays ?? []) if (p.shift_id) paidSet.add(p.shift_id);
     }
 
@@ -122,8 +167,16 @@ router.get('/mine', requireAuth, async (req, res) => {
         approved: r.approved ?? false,
         approved_at: r.approved_at ?? null,
         approved_pay: r.approved_pay ?? null,
+        regular_hours: r.regular_hours ?? null,
+        overtime_hours: r.overtime_hours ?? null,
+        clocked_hours: r.clocked_hours ?? null,
+        worker_ack: r.worker_ack ?? null,
+        worker_ack_at: r.worker_ack_at ?? null,
+        dispute_note: r.dispute_note ?? null,
+        hours_changed: hoursChanged({ approved: r.approved, total_hours: r.total_hours, clocked_hours: r.clocked_hours }),
         shift_title: s?.title ?? null,
         company_name: s?.company_name ?? null,
+        shift_start_time: s?.start_time ?? null,
         paid: paidSet.has(r.shift_id),
       };
     }));
@@ -194,13 +247,18 @@ router.post('/approve', requireAuth, async (req, res) => {
       billable = billableHours(clockIn, clockOut, breakMin);
     }
 
-    const hourly = isHourly(shift.pay_period);
-    const regular = hourly ? Math.min(billable, OT_THRESHOLD) : billable;
-    const overtime = hourly ? Math.max(0, billable - OT_THRESHOLD) : 0;
-    const rate = Number(shift.pay_rate ?? 0);
-    const pay = hourly
-      ? round2(regular * rate + overtime * rate * OT_MULTIPLIER)
-      : payFor(billable, shift);
+    const { regular, overtime, pay } = computePay(billable, shift);
+
+    // What the worker clocked (before this approval), for the "changed" check
+    // and so the app can show "5h 12m → 4h 45m" later. A forgot-to-clock-out
+    // fix has no clocked figure of its own: the poster's clock-out and the
+    // worker's original break stand in for it.
+    const clocked = entry.clocked_hours != null
+      ? Number(entry.clocked_hours)
+      : entry.total_hours != null
+      ? Number(entry.total_hours)
+      : billableHours(clockIn, clockOut, entry.break_minutes ?? 0);
+    const changed = Math.abs(billable - clocked) > UNCHANGED_TOLERANCE_H;
 
     const { data: updated, error } = await adminDb
       .from('time_entries')
@@ -214,6 +272,11 @@ router.post('/approve', requireAuth, async (req, res) => {
         overtime_hours: overtime,
         total_pay: pay,
         approved_pay: pay,
+        clocked_hours: round2(clocked),
+        // A (re)approval asks the worker again.
+        worker_ack: null,
+        worker_ack_at: null,
+        dispute_note: null,
       })
       .eq('id', entry.id)
       .select().single();
@@ -222,12 +285,74 @@ router.post('/approve', requireAuth, async (req, res) => {
     await createNotification({
       userId: entry.worker_id,
       fromUserId: req.userId,
-      type: 'timesheet_approved',
-      title: 'Timesheet approved',
-      body: `Your hours for ${shift.title ? `"${shift.title}"` : 'the shift'} were approved (${billable}h${overtime > 0 ? `, ${overtime}h OT` : ''}). Payment is on its way.`,
+      type: changed ? 'hours_updated' : 'timesheet_approved',
+      title: changed ? 'Hours updated' : 'Hours approved',
+      body: changed
+        ? `Hours updated: ${formatHoursMinutes(clocked)} → ${formatHoursMinutes(billable)} · ${formatUsd(pay)}. Tap to accept or dispute`
+        : `Hours approved · ${formatHoursMinutes(billable)} · ${formatUsd(pay)}`,
       shiftId: entry.shift_id,
+      url: `/shift/${entry.shift_id}`,
     });
-    return res.json(updated);
+    return res.json(entryJson(updated as EntryRow));
+  } catch (e) {
+    return sendError(res, e);
+  }
+});
+
+const ackBody = z.object({
+  action: z.enum(['accept', 'dispute']),
+  note: z.string().trim().max(500, 'Note is too long').optional(),
+});
+
+/**
+ * POST /api/time-entries/:id/ack — the worker answers the approved hours.
+ * Body: { action: 'accept' | 'dispute', note? }. Only the entry's worker, and
+ * only once the poster approved. A dispute files a payment dispute and tells
+ * the poster; accepting records the answer and nothing else.
+ */
+router.post('/:id/ack', requireAuth, async (req, res) => {
+  try {
+    const parsed = ackBody.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' });
+    const { action, note } = parsed.data;
+
+    const entry = await loadOwnEntry(String(req.params.id), req.userId!);
+    if (!entry.approved) return res.status(409).json({ error: 'These hours have not been approved yet.' });
+    if (entry.worker_ack) return res.status(409).json({ error: 'You already answered these hours.' });
+
+    const ack = action === 'accept' ? 'accepted' : 'disputed';
+    const { data: updated, error } = await adminDb
+      .from('time_entries')
+      .update({ worker_ack: ack, worker_ack_at: new Date().toISOString(), dispute_note: action === 'dispute' ? (note || null) : null })
+      .eq('id', entry.id)
+      .select().single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    if (action === 'dispute') {
+      const shift = await loadShift(entry.shift_id);
+      if (shift?.client_id) {
+        const { error: dErr } = await adminDb.from('disputes').insert({
+          type: 'payment',
+          reason: note || 'Worker disputes approved hours',
+          reported_user_id: shift.client_id,
+          reported_by_user_id: req.userId,
+          shift_id: entry.shift_id,
+          status: 'open',
+        });
+        if (dErr) console.error('[time-entries] dispute insert failed:', dErr.message);
+        const name = await workerName(req.userId!);
+        await createNotification({
+          userId: shift.client_id,
+          fromUserId: req.userId,
+          type: 'hours_disputed',
+          title: 'Hours disputed',
+          body: `${name} disputed the approved hours for ${shiftDayLabel(shift)}.${note ? ` "${note}"` : ''}`,
+          shiftId: entry.shift_id,
+          url: `/shift/${entry.shift_id}/applicants`,
+        });
+      }
+    }
+    return res.json(entryJson(updated as EntryRow));
   } catch (e) {
     return sendError(res, e);
   }
@@ -242,7 +367,7 @@ router.get('/:shiftId', requireAuth, async (req, res) => {
     .eq('worker_id', req.userId)
     .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
-  return res.json(data ?? null);
+  return res.json(data ? entryJson(data as EntryRow) : null);
 });
 
 /** POST /api/time-entries — clock in */
@@ -253,13 +378,14 @@ router.post('/', requireAuth, async (req, res) => {
   }
 
   // Only a worker booked (accepted) onto this shift may clock in.
-  const { count } = await adminDb
+  const { data: booked } = await adminDb
     .from('applications')
-    .select('*', { count: 'exact', head: true })
+    .select('id, shift_id, worker_id, arrival_status')
     .eq('shift_id', shift_id)
     .eq('worker_id', req.userId)
-    .eq('status', 'accepted');
-  if (!count) {
+    .eq('status', 'accepted')
+    .maybeSingle();
+  if (!booked) {
     return res.status(403).json({ error: 'You are not booked for this shift.' });
   }
 
@@ -279,6 +405,9 @@ router.post('/', requireAuth, async (req, res) => {
     .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(409).json({ error: 'Already clocked in' });
+  // Clocking in means they're here: mark the application 'arrived' (the owner
+  // sees "Clocked in", so no extra notification is sent).
+  await setArrivalStatus(booked, 'arrived', { notify: false });
   return res.status(201).json(data);
 });
 
@@ -359,12 +488,16 @@ router.patch('/:id', requireAuth, async (req, res) => {
 
     const clockOut = now.toISOString();
     const hours = billableHours(entry.clock_in, clockOut, breakMinutes);
-    const pay = payFor(hours, payShift);
+    // Same formula the poster's approval uses, so the two numbers agree.
+    const { regular, overtime, pay } = computePay(hours, payShift);
 
     const updates: Record<string, unknown> = {
       clock_out: clockOut,
       break_minutes: breakMinutes,
       total_hours: hours,
+      clocked_hours: hours,
+      regular_hours: regular,
+      overtime_hours: overtime,
       total_pay: pay,
       fee: 0,
     };
@@ -379,7 +512,17 @@ router.patch('/:id', requireAuth, async (req, res) => {
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'Not found' });
-    return res.json(data);
+
+    // The trust moment: tell the worker exactly what was recorded.
+    await createNotification({
+      userId: entry.worker_id,
+      type: 'hours_recorded',
+      title: 'Shift complete',
+      body: `You worked ${formatHoursMinutes(hours)} · ${formatUsd(pay)} (pending approval)`,
+      shiftId: entry.shift_id,
+      url: `/shift/${entry.shift_id}`,
+    });
+    return res.json(entryJson(data as EntryRow));
   } catch (e) {
     return sendError(res, e);
   }

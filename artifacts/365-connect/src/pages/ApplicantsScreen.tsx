@@ -9,7 +9,8 @@ import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { useShiftRanking } from '@/hooks/useMatch';
 import { getOrCreateDirectConversation, openShiftGroupChat } from '@/hooks/useConversations';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
-import { useAcceptedWorkers, type AcceptedWorker, type Attendance } from '@/hooks/useAcceptedWorkers';
+import { useAcceptedWorkers, type AcceptedWorker, type Attendance, type DayOfStatus } from '@/hooks/useAcceptedWorkers';
+import { isToday } from '@/hooks/useArrivalStatus';
 import { useShiftInvites, type ShiftInvite } from '@/hooks/useShiftInvites';
 import { useShiftById } from '@/hooks/useShifts';
 import { broadcastShiftRequest } from '@/hooks/useShiftRequests';
@@ -42,6 +43,31 @@ const ATTENDANCE: Record<Attendance, { label: string; cls: string }> = {
 function AttendanceChip({ a }: { a: Attendance }) {
   const m = ATTENDANCE[a];
   return <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${m.cls}`}>{m.label}</span>;
+}
+
+/** The worker's own day-of report (or "Clocked in" once a time entry exists). */
+const DAY_OF: Record<NonNullable<DayOfStatus>, { label: string; cls: string }> = {
+  on_my_way:    { label: 'On the way',   cls: 'bg-blue-50 border-blue-200 text-blue-600' },
+  running_late: { label: 'Running late', cls: 'bg-amber-50 border-amber-200 text-amber-700' },
+  arrived:      { label: 'Arrived',      cls: 'bg-emerald-50 border-emerald-200 text-emerald-600' },
+  clocked_in:   { label: 'Clocked in',   cls: 'bg-emerald-50 border-emerald-200 text-emerald-600' },
+};
+
+function DayOfChip({ s }: { s: DayOfStatus }) {
+  if (!s) return null;
+  const m = DAY_OF[s];
+  return <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${m.cls}`}>{m.label}</span>;
+}
+
+/** "3 on the way · 1 late · 2 arrived" for the day of the shift. */
+function dayOfSummary(workers: AcceptedWorker[]): string {
+  const n = (s: DayOfStatus) => workers.filter((w) => w.dayOfStatus === s).length;
+  const parts: string[] = [];
+  if (n('on_my_way'))    parts.push(`${n('on_my_way')} on the way`);
+  if (n('running_late')) parts.push(`${n('running_late')} late`);
+  if (n('arrived'))      parts.push(`${n('arrived')} arrived`);
+  if (n('clocked_in'))   parts.push(`${n('clocked_in')} clocked in`);
+  return parts.length ? parts.join(' · ') : 'No day-of updates from workers yet.';
 }
 
 function SectionHeader({ label, count }: { label: string; count: number }) {
@@ -94,6 +120,18 @@ function ConfirmedRow({ w, late, closed, onApprove, onPay, onNoShow, onRemove, o
                 {w.overtimeHours}h OT
               </span>
             )}
+            {w.approved && w.workerAck === 'accepted' && (
+              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5">
+                Accepted by worker
+              </span>
+            )}
+            {w.approved && w.workerAck === 'disputed' && (
+              <span className="text-[10px] font-bold text-red-500 bg-red-50 border border-red-200 rounded-full px-1.5 py-0.5"
+                title={w.dispute_note ?? undefined}>
+                Disputed
+              </span>
+            )}
+            {!w.clock_out && <DayOfChip s={w.dayOfStatus} />}
           </div>
         </div>
         {late
@@ -121,11 +159,19 @@ function ConfirmedRow({ w, late, closed, onApprove, onPay, onNoShow, onRemove, o
             <CheckCircle2 size={13} aria-hidden /> Paid
           </span>
         )}
-        {w.attendance === 'done' && !w.alreadyReviewed && (
+        {/* Rating: once the worker is done (or the shift is over), one tap
+            opens the review flow; afterwards the stars they gave stay visible. */}
+        {(w.attendance === 'done' || closed) && w.attendance !== 'no_show' && !w.alreadyReviewed && (
           <button type="button" onClick={onReview}
             className="flex-1 h-9 rounded-[8px] border border-[#E5E7EB] text-[#111827] text-[12px] font-bold flex items-center justify-center gap-1.5">
             <Star size={13} aria-hidden /> Rate
           </button>
+        )}
+        {w.alreadyReviewed && (
+          <span className="flex-1 h-9 rounded-[8px] bg-[#FAFAFA] border border-[#E5E7EB] text-[#6B7280] text-[12px] font-bold flex items-center justify-center gap-1"
+            aria-label={`You rated this worker ${w.myReviewRating ?? ''} stars`}>
+            Rated <Star size={12} aria-hidden className="text-[#FFD700] fill-[#FFD700]" />{w.myReviewRating ?? ''}
+          </span>
         )}
         {(w.attendance === 'no_show' || late) && (
           <button type="button" disabled={busy} onClick={onNoShow}
@@ -280,6 +326,8 @@ export function ApplicantsScreen() {
   // Shift state gates: no booking actions once cancelled/over; no over-booking.
   const endMs  = shift?.endTimeISO ? Date.parse(shift.endTimeISO) : NaN;
   const closed = shift?.status === 'cancelled' || (Number.isFinite(endMs) && Date.now() > endMs);
+  // Day of the shift (or in progress): show the workers' own status roll-up.
+  const dayOf = !closed && confirmed.length > 0 && (started || isToday(shift?.startTimeISO));
   const isFull = !!shift && confirmed.length >= total;
 
   function refetchAll() { void refetchApps(); void refetchConfirmed(); void refetchInvites(); }
@@ -444,6 +492,11 @@ export function ApplicantsScreen() {
           <>
             {/* Confirmed */}
             <SectionHeader label="Confirmed" count={confirmed.length} />
+            {dayOf && (
+              <p className="text-[#374151] text-[12px] font-semibold mb-2 px-1" role="status">
+                Today · {dayOfSummary(confirmed)}
+              </p>
+            )}
             {confirmed.length === 0 ? (
               <p className="text-[#9CA3AF] text-[13px] px-1">No one confirmed yet.</p>
             ) : (

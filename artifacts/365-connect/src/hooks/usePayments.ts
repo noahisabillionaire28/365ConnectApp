@@ -27,7 +27,7 @@ export type PaymentRow = {
 };
 
 /** A worker's own time entry, as returned by GET /time-entries/mine. */
-type MyTimeEntry = {
+export type MyTimeEntry = {
   id: string;
   shift_id: string;
   clock_in: string | null;
@@ -37,10 +37,44 @@ type MyTimeEntry = {
   approved: boolean | null;
   approved_at: string | null;
   approved_pay: number | null;
+  /** The poster changed the hours at approval; the worker may accept or dispute. */
+  hours_changed?: boolean;
+  worker_ack?: 'accepted' | 'disputed' | null;
   shift_title?: string | null;
   company_name?: string | null;
+  /** When the shift itself started (an instant), for week grouping. */
+  shift_start_time?: string | null;
   paid?: boolean;
 };
+
+/** What a finished entry is worth right now: the approved figure once the poster signed off, else the clock-out estimate. */
+export function entryPay(e: MyTimeEntry): number {
+  return Number(e.approved ? (e.approved_pay ?? e.total_pay ?? 0) : (e.total_pay ?? 0)) || 0;
+}
+
+/**
+ * The worker's own timesheets (GET /time-entries/mine). Keyed under the
+ * payments prefix so every clock-out / approval invalidation refreshes it too.
+ */
+export function useMyTimeEntries() {
+  const { user } = useAuth();
+  const q = useQuery<MyTimeEntry[], Error>({
+    queryKey: [...PAYMENTS_QUERY_KEY, 'time-entries', user?.id],
+    enabled: !!user?.id,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+    queryFn: () => apiClient(user!.id).get<MyTimeEntry[]>('/time-entries/mine'),
+  });
+  return { entries: q.data ?? [], isLoading: !!user?.id && q.isLoading, isError: q.isError };
+}
+
+/** Pipeline state for a finished, unpaid timesheet as an Earnings row status. */
+function timesheetStatus(e: MyTimeEntry): string {
+  if (!e.approved) return 'awaiting_approval';
+  if (e.worker_ack === 'disputed') return 'disputed';
+  if (e.hours_changed && !e.worker_ack) return 'hours_updated';
+  return 'approved';
+}
 
 /**
  * Money in and out. Real payment rows come from /payments; on top of them a
@@ -77,7 +111,7 @@ export function usePayments() {
             amount,
             fee: 0,
             net_amount: amount,
-            status: e.approved ? 'approved' : 'awaiting_approval',
+            status: timesheetStatus(e),
             payment_type: 'timesheet',
             created_at: e.approved_at ?? e.clock_out ?? e.clock_in ?? new Date().toISOString(),
             shift_title: e.shift_title ?? null,

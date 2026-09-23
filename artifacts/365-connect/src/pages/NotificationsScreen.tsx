@@ -31,6 +31,8 @@ const ICON_META: Record<string, { icon: React.ComponentType<{ size?: number; cla
   no_show:               { icon: Ban,         color: 'red'   },
   no_show_alert:         { icon: AlarmClock,  color: 'red'   },
   late_clock_in:         { icon: AlarmClock,  color: 'red'   },
+  arrival_status:        { icon: MapPin,      color: 'blue'  },
+  call_out:              { icon: Ban,         color: 'gold'  },
   post_like:             { icon: Heart,          color: 'red'  },
   post_comment:          { icon: MessageCircle,  color: 'blue' },
 };
