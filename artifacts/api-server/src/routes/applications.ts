@@ -260,7 +260,7 @@ router.get('/', requireAuth, async (req, res) => {
     const { data: shifts, error: sErr } = await adminDb
       .from('shifts')
       .select(
-        'id, title, job_type, start_time, end_time, location, pay_rate, pay_period, company_name',
+        'id, title, job_type, start_time, end_time, timezone, location, pay_rate, pay_period, company_name, point_of_contact, contact_phone',
       )
       .in('id', shiftIds);
     if (sErr) return res.status(500).json({ error: sErr.message });
@@ -274,10 +274,13 @@ router.get('/', requireAuth, async (req, res) => {
         job_type: s?.job_type ?? null,
         start_time: s?.start_time ?? null,
         end_time: s?.end_time ?? null,
+        timezone: s?.timezone ?? null,
         location: s?.location ?? null,
         pay_rate: s?.pay_rate ?? null,
         pay_period: s?.pay_period ?? null,
         company_name: s?.company_name ?? null,
+        point_of_contact: s?.point_of_contact ?? null,
+        contact_phone: s?.contact_phone ?? null,
         arrival_status: a.arrival_status ?? null,
         arrival_status_at: a.arrival_status_at ?? null,
       };

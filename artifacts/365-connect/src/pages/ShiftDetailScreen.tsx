@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, UserPlus,
-  Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText, MessagesSquare, Repeat2, DollarSign, Star,
+  Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText, MessagesSquare, Repeat2, DollarSign, Star, CalendarPlus,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -33,6 +33,7 @@ import { broadcastShiftRequest } from '@/hooks/useShiftRequests';
 import { openShiftGroupChat } from '@/hooks/useConversations';
 import { ArrivalPills } from '@/components/ArrivalPills';
 import { CallOutSheet } from '@/components/CallOutSheet';
+import { AddToCalendarSheet } from '@/components/AddToCalendarSheet';
 import { useArrivalStatus, isDayOfWindow } from '@/hooks/useArrivalStatus';
 
 /** Deep links to open a destination in each navigation app. */
@@ -176,6 +177,7 @@ export function ShiftDetailScreen() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [directionsOpen, setDirectionsOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [inviting, setInviting] = useState(false);
@@ -1071,6 +1073,27 @@ export function ShiftDetailScreen() {
             </div>
           </div>
         )}
+
+        {/* Add to calendar — a booked worker, while the shift is still ahead */}
+        {isWorker && applicationStatus === 'accepted' && lifecycle !== 'ended' && shift.status !== 'cancelled' && (
+          <div className="px-5 pt-2">
+            <button type="button" onClick={() => setCalendarOpen(true)}
+              className="w-full h-[46px] rounded-[8px] border border-[#E5E7EB] text-[#0A1628] font-bold text-[14px] flex items-center justify-center gap-2">
+              <CalendarPlus size={16} aria-hidden />
+              Add to calendar
+            </button>
+          </div>
+        )}
+        <AddToCalendarSheet
+          open={calendarOpen}
+          onClose={() => setCalendarOpen(false)}
+          event={{
+            shiftId, jobType: shift.jobType, companyName: shift.companyName,
+            startTimeISO: shift.startTimeISO, endTimeISO: shift.endTimeISO, timezone: shift.timezone,
+            location: shift.location, payRate: shift.payRate, payPeriod: shift.payPeriod,
+            pointOfContact: shift.pointOfContact, contactPhone: shift.contactPhone,
+          }}
+        />
 
         {/* Shift chat + Updates — owner and booked workers */}
         {(canManage || applicationStatus === 'accepted') && (

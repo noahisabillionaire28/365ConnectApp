@@ -3,8 +3,10 @@ import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   Search, MapPin, Plus, X,
-  List as ListIcon, Map as MapIcon, CalendarDays, Clock, DollarSign, Users, CheckCircle2, Zap,
+  List as ListIcon, Map as MapIcon, CalendarDays, Clock, DollarSign, Users, CheckCircle2, Zap, BellPlus,
 } from 'lucide-react';
+import { useToast } from '@/contexts/ToastContext';
+import { useSavedSearches, savedSearchLabel, sameSearch, type SavedSearch, type SavedSearchInput } from '@/hooks/useSavedSearches';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { AppMap } from '@/components/AppMap';
 import { geocodeAddress, type Coords } from '@/lib/geocode';
@@ -38,6 +40,47 @@ function applyFilter(shifts: MockShift[], f: FilterKey): MockShift[] {
     case 'tonight': return shifts.filter((s) => s.date === 'Tonight');
     default:        return shifts;
   }
+}
+
+/* ── Saved searches — "Save this search" + the saved chips, alerts via cron ── */
+function SavedSearchRow({ current, searches, canSaveMore, saving, onSave, onApply, onRemove }: {
+  /** The structured filters currently applied; null when nothing worth saving is set. */
+  current: SavedSearchInput | null;
+  searches: SavedSearch[];
+  canSaveMore: boolean;
+  saving: boolean;
+  onSave: () => void;
+  onApply: (s: SavedSearch) => void;
+  onRemove: (s: SavedSearch) => void;
+}) {
+  const alreadySaved = !!current && searches.some((s) => sameSearch(current, s));
+  const showSave = !!current && !alreadySaved;
+  if (!showSave && searches.length === 0) return null;
+  return (
+    <div className="flex items-center gap-2 px-4 pb-3 overflow-x-auto scrollbar-none"
+      role="group" aria-label="Saved searches" style={{ WebkitOverflowScrolling: 'touch' }}>
+      {showSave && (
+        <button type="button" onClick={onSave} disabled={saving || !canSaveMore}
+          title={canSaveMore ? undefined : 'You can save up to 3 searches'}
+          className="flex-shrink-0 h-[30px] px-3 rounded-full text-[12px] font-bold flex items-center gap-1.5 bg-[#0A1628] text-white disabled:opacity-50">
+          <BellPlus size={13} aria-hidden />
+          {saving ? 'Saving…' : 'Save this search'}
+        </button>
+      )}
+      {searches.map((s) => (
+        <span key={s.id} className="flex-shrink-0 h-[30px] pl-3 pr-1 rounded-full border border-[#E5E7EB] bg-[#FAFAFA] flex items-center gap-1">
+          <button type="button" onClick={() => onApply(s)} className="text-[#111827] text-[12px] font-semibold max-w-[200px] truncate"
+            aria-label={`Apply saved search: ${savedSearchLabel(s)}`}>
+            {savedSearchLabel(s)}
+          </button>
+          <button type="button" onClick={() => onRemove(s)} aria-label={`Remove saved search: ${savedSearchLabel(s)}`}
+            className="w-6 h-6 rounded-full flex items-center justify-center text-[#9CA3AF] active:bg-[#E5E7EB]">
+            <X size={13} aria-hidden />
+          </button>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 /* ── List card — clean Nowsta-style vertical row ─────────────────────────── */
@@ -318,6 +361,37 @@ export function JobsScreen() {
     : jobTypeFiltered;
   const visibleShifts = applyFilter(eventTypeFiltered, activeFilter);
 
+  // Saved searches (workers only): the active pills/selects as a filter set
+  // the cron can match new shifts against. A search query counts when it
+  // names a job type ("bartender"); free text on its own has nothing to save.
+  const { showToast } = useToast();
+  const savedSearches = useSavedSearches(isWorkerRole);
+  const queriedJobType = JOB_TYPES.find((t) => t.toLowerCase() === query.trim().toLowerCase()) ?? null;
+  const currentSearch: SavedSearchInput = {
+    jobTypes: jobTypeFilter ? [jobTypeFilter] : queriedJobType ? [queriedJobType] : [],
+    eventType: eventTypeFilter,
+    minPay: activeFilter === 'pay30' ? 30 : null,
+    maxDistanceMiles: activeFilter === 'near3' ? 3 : null,
+  };
+  const searchIsSaveable = (currentSearch.jobTypes?.length ?? 0) > 0 || !!currentSearch.eventType
+    || currentSearch.minPay != null || currentSearch.maxDistanceMiles != null;
+
+  async function handleSaveSearch() {
+    try {
+      await savedSearches.save(currentSearch);
+      showToast("Saved. We'll tell you when a new shift matches.");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not save this search.', 'error');
+    }
+  }
+  function applySavedSearch(s: SavedSearch) {
+    setQuery('');
+    setJobTypeFilter(s.jobTypes[0] ?? null);
+    setEventTypeFilter(s.eventType);
+    setActiveFilter(s.minPay != null ? 'pay30' : s.maxDistanceMiles != null ? 'near3' : 'all');
+    setSelectedId(null);
+  }
+
   function handleSelectShift(shift: MockShift) { setSelectedId(shift.id); navigate(`/shift/${shift.id}`); }
   function handlePinClick(shift: MockShift)    { setSelectedId(shift.id); }
 
@@ -377,6 +451,17 @@ export function JobsScreen() {
             );
           })}
         </div>
+        {isWorkerRole && (
+          <SavedSearchRow
+            current={searchIsSaveable ? currentSearch : null}
+            searches={savedSearches.searches}
+            canSaveMore={savedSearches.canSaveMore}
+            saving={savedSearches.saving}
+            onSave={() => void handleSaveSearch()}
+            onApply={applySavedSearch}
+            onRemove={(s) => savedSearches.remove(s.id)}
+          />
+        )}
       </div>
 
       {/* ── Body ─────────────────────────────────────────────────────────── */}

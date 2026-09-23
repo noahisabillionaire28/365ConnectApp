@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Bell, Search, PlusCircle, SlidersHorizontal,
   Briefcase, CalendarDays, Clock3, DollarSign, MapPin,
-  Users, ChevronRight,
+  Users, ChevronRight, CalendarPlus,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { InstallBanner } from '@/components/InstallBanner';
@@ -27,6 +27,9 @@ import { JOB_TYPES } from '@/lib/jobTypes';
 import { resetStafferDraft } from '@/store/stafferPostShiftStore';
 import { ArrivalPills } from '@/components/ArrivalPills';
 import { RatePromptCard } from '@/components/home/RatePromptCard';
+import { WeekEarningsCard } from '@/components/home/WeekEarningsCard';
+import { AddToCalendarSheet } from '@/components/AddToCalendarSheet';
+import type { CalendarEvent } from '@/lib/calendar';
 import { isToday } from '@/hooks/useArrivalStatus';
 
 /* ─── Shared header ──────────────────────────────────────────────────────────── */
@@ -118,7 +121,29 @@ function groupApplications(apps: MyApplication[]) {
   };
 }
 
-function MyShiftRow({ app, onTap }: { app: MyApplication; onTap: () => void }) {
+/** What a booked application looks like on a calendar. */
+function calendarEventFor(app: MyApplication): CalendarEvent | null {
+  if (!app.startTime || !app.endTime) return null;
+  return {
+    shiftId: app.shiftId,
+    jobType: app.jobType || app.shiftTitle || 'Shift',
+    companyName: app.companyName ?? '',
+    startTimeISO: app.startTime,
+    endTimeISO: app.endTime,
+    timezone: app.timezone,
+    location: app.location,
+    payRate: app.payRate,
+    payPeriod: app.payPeriod,
+    pointOfContact: app.pointOfContact,
+    contactPhone: app.contactPhone,
+  };
+}
+
+function MyShiftRow({ app, onTap, onCalendar }: {
+  app: MyApplication; onTap: () => void;
+  /** Upcoming rows only: opens the add-to-calendar sheet. */
+  onCalendar?: () => void;
+}) {
   const dateStr = app.startTime
     ? new Date(app.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
     : null;
@@ -136,8 +161,9 @@ function MyShiftRow({ app, onTap }: { app: MyApplication; onTap: () => void }) {
 
   return (
     <div className="border-b border-[#E5E7EB] last:border-none">
+    <div className="flex items-center">
     <motion.button type="button" whileTap={{ scale: 0.98 }} onClick={onTap}
-      className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
+      className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3.5 text-left">
       <div className="w-10 h-10 rounded-[10px] bg-[#F3F4F6] flex items-center justify-center flex-shrink-0">
         <Briefcase size={16} aria-hidden className="text-[#6B7280]" />
       </div>
@@ -168,6 +194,13 @@ function MyShiftRow({ app, onTap }: { app: MyApplication; onTap: () => void }) {
         <ChevronRight size={15} aria-hidden className="text-[#D1D5DB] flex-shrink-0" />
       )}
     </motion.button>
+    {onCalendar && (
+      <button type="button" onClick={onCalendar} aria-label={`Add ${app.shiftTitle ?? 'this shift'} to your calendar`}
+        className="w-11 h-11 mr-2 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#F3F4F6] flex-shrink-0">
+        <CalendarPlus size={17} aria-hidden />
+      </button>
+    )}
+    </div>
     {dayOf && (
       <div className="px-4 pb-3 -mt-1 flex items-center gap-2">
         <span className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider flex-shrink-0">Today</span>
@@ -179,11 +212,12 @@ function MyShiftRow({ app, onTap }: { app: MyApplication; onTap: () => void }) {
 }
 
 function MyShiftSection({
-  label, items, onTap, dotColor, emptyText,
+  label, items, onTap, onCalendar, dotColor, emptyText,
 }: {
   label: string;
   items: MyApplication[];
   onTap: (a: MyApplication) => void;
+  onCalendar?: (a: MyApplication) => void;
   dotColor: string;
   emptyText?: string;
 }) {
@@ -201,7 +235,10 @@ function MyShiftSection({
       </div>
       <div className="mx-4 bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden">
         {items.length > 0
-          ? items.map((a) => <MyShiftRow key={a.applicationId} app={a} onTap={() => onTap(a)} />)
+          ? items.map((a) => (
+            <MyShiftRow key={a.applicationId} app={a} onTap={() => onTap(a)}
+              onCalendar={onCalendar && calendarEventFor(a) ? () => onCalendar(a) : undefined} />
+          ))
           : (
             <p className="px-4 py-4 text-center text-[#9CA3AF] text-[13px]">{emptyText}</p>
           )}
@@ -215,6 +252,7 @@ function WorkerMyShiftsView() {
   const { applications, isLoading, error } = useMyApplications();
   const { upcoming, applied, standby, completed, expired, dropped, notSelected } = groupApplications(applications);
   const goToShift = (a: MyApplication) => navigate(`/shift/${a.shiftId}`);
+  const [calendarEvent, setCalendarEvent] = useState<CalendarEvent | null>(null);
 
   if (isLoading) {
     return (
@@ -249,7 +287,10 @@ function WorkerMyShiftsView() {
   return (
     <div className="flex-1 overflow-y-auto pt-4 pb-4">
       <RatePromptCard role="worker" />
-      <MyShiftSection label="Upcoming"     items={upcoming}     onTap={goToShift} dotColor="#10B981" emptyText="No confirmed upcoming shifts." />
+      <WeekEarningsCard />
+      <AddToCalendarSheet open={!!calendarEvent} event={calendarEvent} onClose={() => setCalendarEvent(null)} />
+      <MyShiftSection label="Upcoming"     items={upcoming}     onTap={goToShift} dotColor="#10B981" emptyText="No confirmed upcoming shifts."
+        onCalendar={(a) => setCalendarEvent(calendarEventFor(a))} />
       <MyShiftSection label="Standby"      items={standby}      onTap={goToShift} dotColor="#F59E0B" />
       <MyShiftSection label="Applied"      items={applied}      onTap={goToShift} dotColor="#F59E0B" emptyText="No pending applications. Browse Jobs to apply." />
       <MyShiftSection label="Completed"    items={completed}    onTap={goToShift} dotColor="#6B7280" />

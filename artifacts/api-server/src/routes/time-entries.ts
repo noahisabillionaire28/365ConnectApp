@@ -140,17 +140,17 @@ router.get('/mine', requireAuth, async (req, res) => {
     const rows = entries ?? [];
     const shiftIds = [...new Set(rows.map((r) => r.shift_id).filter(Boolean))];
 
-    const shiftMap = new Map<string, { title: string | null; company_name: string | null }>();
+    const shiftMap = new Map<string, { title: string | null; company_name: string | null; start_time: string | null }>();
     const paidSet = new Set<string>();
     if (shiftIds.length) {
       const [{ data: shifts, error: sErr }, { data: pays, error: pErr }] = await Promise.all([
-        adminDb.from('shifts').select('id, title, company_name').in('id', shiftIds),
+        adminDb.from('shifts').select('id, title, company_name, start_time').in('id', shiftIds),
         adminDb.from('payments').select('shift_id')
           .eq('worker_id', req.userId).eq('status', 'completed').in('shift_id', shiftIds),
       ]);
       if (sErr) return res.status(500).json({ error: sErr.message });
       if (pErr) return res.status(500).json({ error: pErr.message });
-      for (const s of shifts ?? []) shiftMap.set(s.id, { title: s.title ?? null, company_name: s.company_name ?? null });
+      for (const s of shifts ?? []) shiftMap.set(s.id, { title: s.title ?? null, company_name: s.company_name ?? null, start_time: s.start_time ?? null });
       for (const p of pays ?? []) if (p.shift_id) paidSet.add(p.shift_id);
     }
 
@@ -176,6 +176,7 @@ router.get('/mine', requireAuth, async (req, res) => {
         hours_changed: hoursChanged({ approved: r.approved, total_hours: r.total_hours, clocked_hours: r.clocked_hours }),
         shift_title: s?.title ?? null,
         company_name: s?.company_name ?? null,
+        shift_start_time: s?.start_time ?? null,
         paid: paidSet.has(r.shift_id),
       };
     }));
