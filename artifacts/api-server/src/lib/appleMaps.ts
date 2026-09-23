@@ -15,7 +15,7 @@
  *
  * When the key is missing the app falls back to the built-in map style.
  */
-import { SignJWT, importPKCS8, type KeyLike } from 'jose';
+import { SignJWT, importPKCS8 } from 'jose';
 
 const KEY_ID  = process.env['APPLE_MAPS_KEY_ID'] ?? '';
 const KEY_PEM = (process.env['APPLE_MAPS_KEY'] ?? '').replace(/\\n/g, '\n');
@@ -36,7 +36,7 @@ export function originAllowed(origin: string | undefined): boolean {
   return !!origin && ORIGINS.includes(origin);
 }
 
-let keyPromise: Promise<KeyLike | Uint8Array> | null = null;
+let keyPromise: Promise<CryptoKey> | null = null;
 
 /** Mint a MapKit JS token, optionally pinned to the requesting origin. */
 export async function mapsToken(origin?: string): Promise<{ token: string; expiresAt: number }> {
