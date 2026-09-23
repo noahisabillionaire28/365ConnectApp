@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { PAYMENTS_QUERY_KEY } from './usePayments';
+
+export type WorkerAck = 'accepted' | 'disputed' | null;
 
 export type TimeEntryRow = {
   id: string;
@@ -15,16 +19,33 @@ export type TimeEntryRow = {
   total_pay: number | null;
   fee: number | null;
   created_at: string;
+  /** Poster approval (migration 0017). */
+  approved?: boolean | null;
+  approved_at?: string | null;
+  approved_pay?: number | null;
+  regular_hours?: number | null;
+  overtime_hours?: number | null;
+  /** Hours as clocked, before any poster change (migration 0027). */
+  clocked_hours?: number | null;
+  /** Server-derived: the poster's approval changed the hours beyond 5 minutes. */
+  hours_changed?: boolean;
+  worker_ack?: WorkerAck;
+  worker_ack_at?: string | null;
+  dispute_note?: string | null;
   /** camelCase aliases */
   clockInISO: string;
   breakMinutes: number;
   totalPay: number | null;
+  approvedPay: number | null;
+  hoursChanged: boolean;
+  workerAck: WorkerAck;
   /** enriched flags added by startOrResume */
   alreadyCompleted?: boolean;
   resumed?: boolean;
 };
 
-type RawEntry = Omit<TimeEntryRow, 'clockInISO' | 'breakMinutes' | 'totalPay' | 'alreadyCompleted' | 'resumed'>;
+type RawEntry = Omit<TimeEntryRow,
+  'clockInISO' | 'breakMinutes' | 'totalPay' | 'approvedPay' | 'hoursChanged' | 'workerAck' | 'alreadyCompleted' | 'resumed'>;
 
 function toEntry(r: RawEntry, flags?: { alreadyCompleted?: boolean; resumed?: boolean }): TimeEntryRow {
   return {
@@ -32,26 +53,70 @@ function toEntry(r: RawEntry, flags?: { alreadyCompleted?: boolean; resumed?: bo
     clockInISO:      r.clock_in,
     breakMinutes:    r.break_minutes ?? 0,
     totalPay:        r.total_pay,
+    approvedPay:     r.approved_pay ?? null,
+    hoursChanged:    !!r.hours_changed,
+    workerAck:       r.worker_ack ?? null,
     alreadyCompleted: flags?.alreadyCompleted ?? false,
     resumed:          flags?.resumed          ?? false,
   };
 }
 
+/** 5.2 → "5h 12m"; 8 → "8h"; 0.5 → "30m". Mirrors the server's copy. */
+export function formatHoursMinutes(hours: number | null | undefined): string {
+  const total = Math.max(0, Math.round((Number(hours) || 0) * 60));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return `${m}m`;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+export const TIME_ENTRY_KEY = 'time-entry';
+
 /**
- * Static async helper — checks whether the worker has a completed (clocked-out)
- * time entry for the given shift.
+ * The worker's own time entry for a shift, cached in react-query (null when
+ * they have not clocked in). Used by the shift page's "Your hours" card.
  */
-export async function hasCompletedTimeEntry(shiftId: string, workerId: string): Promise<boolean> {
-  try {
-    const row = await apiClient(workerId).get<RawEntry | null>(`/time-entries/${shiftId}`);
-    return !!(row?.clock_out);
-  } catch {
-    return false;
-  }
+export function useMyTimeEntry(shiftId: string | undefined) {
+  const { user } = useAuth();
+  const q = useQuery<TimeEntryRow | null, Error>({
+    queryKey: [TIME_ENTRY_KEY, shiftId, user?.id],
+    enabled: !!shiftId && !!user?.id,
+    staleTime: 15_000,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const row = await apiClient(user!.id).get<RawEntry | null>(`/time-entries/${shiftId}`);
+      return row ? toEntry(row) : null;
+    },
+  });
+  return { entry: q.data ?? null, isLoading: q.isLoading, refetch: q.refetch };
+}
+
+/**
+ * Worker's answer to approved hours: "Looks right" or "Dispute" (with an
+ * optional note). Resolves to null on success, else the server's message.
+ */
+export function useAckHours() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const ack = useCallback(async (entryId: string, action: 'accept' | 'dispute', note?: string): Promise<string | null> => {
+    if (!user?.id || busy) return null;
+    setBusy(true);
+    try {
+      await apiClient(user.id).post(`/time-entries/${entryId}/ack`, { action, ...(note?.trim() ? { note: note.trim() } : {}) });
+      void qc.invalidateQueries({ queryKey: [TIME_ENTRY_KEY] });
+      void qc.invalidateQueries({ queryKey: PAYMENTS_QUERY_KEY });
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : 'Could not send your answer.';
+    } finally { setBusy(false); }
+  }, [user?.id, busy, qc]);
+  return { ack, busy };
 }
 
 export function useTimeEntry(shiftId: string | undefined) {
   const { user } = useAuth();
+  const qc = useQueryClient();
   const [entry, setEntry]       = useState<TimeEntryRow | null>(null);
   const [isLoading, setLoading] = useState(true);
 
@@ -148,6 +213,9 @@ export function useTimeEntry(shiftId: string | undefined) {
       });
       const e = toEntry(row, { alreadyCompleted: true, resumed: false });
       setEntry(e);
+      // The shift page's "Your hours" card and Earnings read these caches.
+      void qc.invalidateQueries({ queryKey: [TIME_ENTRY_KEY] });
+      void qc.invalidateQueries({ queryKey: PAYMENTS_QUERY_KEY });
       return e;
     } catch (e) {
       // Surface the failure — callers (completeEntry) must not report a
@@ -155,7 +223,7 @@ export function useTimeEntry(shiftId: string | undefined) {
       console.error('[useTimeEntry] clockOut failed:', e);
       throw e;
     }
-  }, [entry?.id, user?.id]);
+  }, [entry?.id, user?.id, qc]);
 
   /**
    * Alias used by ClockInScreen.

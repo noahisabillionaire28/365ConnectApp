@@ -26,6 +26,7 @@ import { Check, X, Inbox } from 'lucide-react';
 import { JOB_TYPES } from '@/lib/jobTypes';
 import { resetStafferDraft } from '@/store/stafferPostShiftStore';
 import { ArrivalPills } from '@/components/ArrivalPills';
+import { RatePromptCard } from '@/components/home/RatePromptCard';
 import { isToday } from '@/hooks/useArrivalStatus';
 
 /* ─── Shared header ──────────────────────────────────────────────────────────── */
@@ -247,6 +248,7 @@ function WorkerMyShiftsView() {
 
   return (
     <div className="flex-1 overflow-y-auto pt-4 pb-4">
+      <RatePromptCard role="worker" />
       <MyShiftSection label="Upcoming"     items={upcoming}     onTap={goToShift} dotColor="#10B981" emptyText="No confirmed upcoming shifts." />
       <MyShiftSection label="Standby"      items={standby}      onTap={goToShift} dotColor="#F59E0B" />
       <MyShiftSection label="Applied"      items={applied}      onTap={goToShift} dotColor="#F59E0B" emptyText="No pending applications. Browse Jobs to apply." />
@@ -729,6 +731,7 @@ function ClientMyShiftsView() {
 
   return (
     <div className="flex-1 overflow-y-auto pt-4 pb-4">
+      <RatePromptCard role="poster" />
       <ClientShiftGroup
         label="Open" shifts={open} dotColor="#10B981"
         onTap={(s) => navigate(`/shift/${s.id}`)}

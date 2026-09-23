@@ -23,6 +23,11 @@ type RawAccepted = {
   arrival_status?: ArrivalStatus | null;
   arrival_status_at?: string | null;
   already_reviewed?: boolean;
+  /** The star rating the viewer gave this worker for this shift (null until rated). */
+  my_review_rating?: number | null;
+  /** The worker's answer to the approved hours (null until they respond). */
+  worker_ack?: 'accepted' | 'disputed' | null;
+  dispute_note?: string | null;
   paid?: boolean;
   [key: string]: unknown;
 };
@@ -48,6 +53,10 @@ export type AcceptedWorker = RawAccepted & {
   totalPay: number | null;
   /** true when the shift owner has already rated this worker */
   alreadyReviewed: boolean;
+  /** the stars the owner gave (null until rated) */
+  myReviewRating: number | null;
+  /** worker's answer to the approved hours (null until they respond) */
+  workerAck: 'accepted' | 'disputed' | null;
   /** true when this worker has already been paid for the shift */
   paid: boolean;
   /** true when the timesheet has been approved by the manager */
@@ -91,6 +100,8 @@ export function useAcceptedWorkers(
         totalHours:      r.total_hours ?? null,
         totalPay:        r.total_pay ?? null,
         alreadyReviewed: !!(r.already_reviewed),
+        myReviewRating:  r.my_review_rating ?? null,
+        workerAck:       r.worker_ack ?? null,
         paid:            !!(r.paid),
         approved:        !!(r.approved),
         approvedPay:     (r.approved_pay as number | null) ?? null,

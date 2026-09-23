@@ -37,10 +37,21 @@ type MyTimeEntry = {
   approved: boolean | null;
   approved_at: string | null;
   approved_pay: number | null;
+  /** The poster changed the hours at approval; the worker may accept or dispute. */
+  hours_changed?: boolean;
+  worker_ack?: 'accepted' | 'disputed' | null;
   shift_title?: string | null;
   company_name?: string | null;
   paid?: boolean;
 };
+
+/** Pipeline state for a finished, unpaid timesheet as an Earnings row status. */
+function timesheetStatus(e: MyTimeEntry): string {
+  if (!e.approved) return 'awaiting_approval';
+  if (e.worker_ack === 'disputed') return 'disputed';
+  if (e.hours_changed && !e.worker_ack) return 'hours_updated';
+  return 'approved';
+}
 
 /**
  * Money in and out. Real payment rows come from /payments; on top of them a
@@ -77,7 +88,7 @@ export function usePayments() {
             amount,
             fee: 0,
             net_amount: amount,
-            status: e.approved ? 'approved' : 'awaiting_approval',
+            status: timesheetStatus(e),
             payment_type: 'timesheet',
             created_at: e.approved_at ?? e.clock_out ?? e.clock_in ?? new Date().toISOString(),
             shift_title: e.shift_title ?? null,

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, UserPlus,
-  Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText, MessagesSquare, Repeat2, DollarSign,
+  Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText, MessagesSquare, Repeat2, DollarSign, Star,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -17,14 +17,15 @@ import { useShiftById } from '@/hooks/useShifts';
 import { useProfile } from '@/hooks/useProfile';
 import { useMyLocation } from '@/hooks/useMyLocation';
 import { computeMatchScore } from '@/lib/matchScore';
-import { haversineMiles } from '@/lib/supabase';
+import { haversineMiles, formatTime } from '@/lib/supabase';
 import { apiClient } from '@/lib/api';
 import { resetDraft, setDraft, setEditShiftId } from '@/store/postShiftStore';
 import { utcToZonedParts, DEFAULT_SHIFT_TZ } from '@/lib/timezone';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { useMyMatch } from '@/hooks/useMatch';
 import { useAuth } from '@/contexts/AuthContext';
-import { hasCompletedTimeEntry } from '@/hooks/useTimeEntry';
+import { useMyTimeEntry, useAckHours, formatHoursMinutes } from '@/hooks/useTimeEntry';
+import { useExistingReview } from '@/hooks/useReviews';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
 import { useAcceptedWorkers } from '@/hooks/useAcceptedWorkers';
 import { useEventPositions } from '@/hooks/useEventPositions';
@@ -153,7 +154,14 @@ export function ShiftDetailScreen() {
   const { data: shift, isLoading, error } = useShiftById(id, myCoords);
   const [dressCodeDraft, setDressCodeDraft] = useState<string | null>(null);
   const [savingDressCode, setSavingDressCode] = useState(false);
-  const [hasCompleted, setHasCompleted] = useState(false);
+  // The worker's own timesheet for this shift (null until they clock in).
+  const { entry: myEntry } = useMyTimeEntry(id);
+  const { ack: ackHours, busy: acking } = useAckHours();
+  const [disputeOpen, setDisputeOpen] = useState(false);
+  const [disputeNote, setDisputeNote] = useState('');
+  // Has this worker already rated the poster for this shift?
+  const isWorkerForHooks = profile.role === 'worker';
+  const { existing: myReview } = useExistingReview(id, user?.id, isWorkerForHooks ? shift?.clientId : undefined);
   const isOwnerForHooks = !!user?.id && !!shift && user.id === shift.clientId;
   const { applicants: pendingApplicants } = useShiftApplicants(isOwnerForHooks ? id : undefined);
   const { workers: acceptedWorkers } = useAcceptedWorkers(
@@ -203,13 +211,6 @@ export function ShiftDetailScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!shift || !user?.id) return;
-    void hasCompletedTimeEntry(shift.id, user.id).then((done) => { if (!cancelled) setHasCompleted(done); });
-    return () => { cancelled = true; };
-  }, [shift?.id, user?.id]);
-
-  useEffect(() => {
-    let cancelled = false;
     setVenueCoords(null);
     const addr = shift?.location?.trim();
     if (!addr) return;
@@ -248,6 +249,8 @@ export function ShiftDetailScreen() {
   }
 
   const shiftId     = shift.id;
+  // Completion is tracked per-worker via time_entries.clock_out.
+  const hasCompleted = !!myEntry?.clock_out;
   const saved       = store.isSaved(shiftId);
   const spotsLow    = shift.spotsAvailable < 3;
   const duration    = calcDuration(shift.startTime, shift.endTime);
@@ -362,6 +365,16 @@ export function ShiftDetailScreen() {
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Could not drop the shift.', 'error');
     } finally { setDropping(false); }
+  }
+
+  /** "Looks right" / "Dispute" on approved hours the poster changed. */
+  async function handleAck(action: 'accept' | 'dispute') {
+    if (!myEntry) return;
+    const err = await ackHours(myEntry.id, action, action === 'dispute' ? disputeNote : undefined);
+    if (err) { showToast(err, 'error'); return; }
+    setDisputeOpen(false);
+    setDisputeNote('');
+    showToast(action === 'accept' ? 'Thanks — your hours are confirmed.' : 'The poster has been told. Our team will review it.');
   }
 
   /** Runs after the worker picks a reason in the call-out sheet. */
@@ -495,6 +508,28 @@ export function ShiftDetailScreen() {
       busy={inviting}
       onConfirm={() => { setConfirmBroadcast(false); void handleBroadcast(); }}
       onCancel={() => setConfirmBroadcast(false)}
+    />
+    {/* Dispute approved hours — optional note, then the poster is told */}
+    <ConfirmSheet
+      open={disputeOpen}
+      title="Dispute these hours?"
+      confirmLabel="Send dispute"
+      cancelLabel="Never mind"
+      tone="danger"
+      busy={acking}
+      onConfirm={() => void handleAck('dispute')}
+      onCancel={() => { if (!acking) { setDisputeOpen(false); setDisputeNote(''); } }}
+      body={
+        <div className="flex flex-col gap-3">
+          <p>
+            The poster approved <b>{formatHoursMinutes(myEntry?.total_hours)}</b> but you clocked{' '}
+            <b>{formatHoursMinutes(myEntry?.clocked_hours)}</b>. Tell them what happened and our team will take a look.
+          </p>
+          <textarea value={disputeNote} onChange={(e) => setDisputeNote(e.target.value.slice(0, 500))} rows={3} disabled={acking}
+            placeholder="What should the hours be, and why? (optional)" aria-label="Dispute note"
+            className="w-full border border-[#E5E7EB] rounded-[12px] px-3 py-2.5 text-[14px] text-[#111827] resize-none outline-none focus:border-[#0A1628] placeholder:text-[#9CA3AF]" />
+        </div>
+      }
     />
     {/* Cancel confirm overlay */}
     {showCancelConfirm && (
@@ -781,8 +816,103 @@ export function ShiftDetailScreen() {
           })()}
         </AnimatePresence>
 
+        {/* Your hours — the real timesheet once the worker has clocked out:
+            what was recorded, what the poster approved, and (if they changed
+            it) a chance to agree or dispute. Replaces the estimate below. */}
+        {isWorker && myEntry?.clock_out && (() => {
+          const e = myEntry;
+          const tz = shift.timezone;
+          const approved = !!e.approved;
+          const changed = approved && e.hoursChanged;
+          const hours = e.total_hours ?? 0;
+          const pay = approved ? (e.approvedPay ?? e.total_pay ?? 0) : (e.total_pay ?? 0);
+          const needsAnswer = changed && !e.workerAck;
+          const statusLabel = !approved ? 'Pending approval'
+            : e.workerAck === 'disputed' ? 'Disputed · under review'
+            : changed ? (e.workerAck === 'accepted' ? 'Updated by the poster · accepted' : 'Updated by the poster')
+            : 'Approved';
+          const statusCls = !approved ? 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]'
+            : e.workerAck === 'disputed' ? 'bg-red-50 border-red-200 text-red-600'
+            : needsAnswer ? 'bg-amber-50 border-amber-200 text-amber-700'
+            : 'bg-emerald-50 border-emerald-200 text-emerald-700';
+          return (
+            <div className="px-5 pb-4">
+              <div className="rounded-[12px] border border-[#DBDBDB] bg-white px-4 py-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <p className="text-[#111827] font-bold text-[15px]">Your hours</p>
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${statusCls}`}>{statusLabel}</span>
+                </div>
+                <div className="flex flex-col gap-2 text-[14px]">
+                  <div className="flex justify-between"><span className="text-[#6B7280]">Clocked in</span><span className="text-[#111827] font-semibold">{formatTime(e.clock_in, tz)}</span></div>
+                  <div className="flex justify-between"><span className="text-[#6B7280]">Clocked out</span><span className="text-[#111827] font-semibold">{formatTime(e.clock_out ?? e.clock_in, tz)}</span></div>
+                  {(e.breakMinutes ?? 0) > 0 && (
+                    <div className="flex justify-between"><span className="text-[#6B7280]">Unpaid break</span><span className="text-[#111827] font-semibold">{e.breakMinutes} min</span></div>
+                  )}
+                  <div className="border-t border-[#EFEFEF] my-0.5" />
+                  <div className="flex justify-between">
+                    <span className="text-[#6B7280]">Total hours</span>
+                    <span className="text-[#111827] font-semibold">
+                      {changed
+                        ? <><span className="line-through text-[#9CA3AF] font-normal mr-1.5">{formatHoursMinutes(e.clocked_hours)}</span>{formatHoursMinutes(hours)}</>
+                        : formatHoursMinutes(hours)}
+                      {(e.overtime_hours ?? 0) > 0 && <span className="ml-1.5 text-[11px] text-amber-600 font-bold">{formatHoursMinutes(e.overtime_hours)} OT</span>}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[15px]">
+                    <span className="text-[#111827] font-bold">{approved ? 'Approved pay' : 'Estimated pay'}</span>
+                    <span className="text-[#111827] font-bold">{usd(Number(pay) || 0)}</span>
+                  </div>
+                </div>
+                {!approved && (
+                  <p className="text-[#9CA3AF] text-[11px] mt-3 leading-relaxed">
+                    The poster reviews your timesheet before paying. You will be told if anything changes.
+                  </p>
+                )}
+                {needsAnswer && (
+                  <div className="mt-3.5 flex flex-col gap-2">
+                    <p className="text-amber-700 text-[12px] leading-relaxed">
+                      The poster changed your hours from {formatHoursMinutes(e.clocked_hours)} to {formatHoursMinutes(hours)}. Does that look right?
+                    </p>
+                    <div className="flex gap-2">
+                      <button type="button" disabled={acking} onClick={() => void handleAck('accept')}
+                        className="flex-1 h-10 rounded-[8px] bg-[#0A1628] text-white text-[13px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
+                        <CheckCircle2 size={14} aria-hidden /> Looks right
+                      </button>
+                      <button type="button" disabled={acking} onClick={() => setDisputeOpen(true)}
+                        className="flex-1 h-10 rounded-[8px] border border-red-200 bg-red-50 text-red-600 text-[13px] font-bold disabled:opacity-60">
+                        Dispute
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {e.workerAck === 'disputed' && e.dispute_note && (
+                  <p className="text-[#6B7280] text-[12px] mt-3 leading-relaxed">Your note: “{e.dispute_note}”</p>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Rate the client — once the shift is over, one tap to the review flow */}
+        {isWorker && applicationStatus === 'accepted' && lifecycle === 'ended' && shift.status !== 'cancelled' && (
+          <div className="px-5 pb-4">
+            {myReview ? (
+              <div className="w-full h-[44px] rounded-[10px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center gap-1.5 text-[#6B7280] font-semibold text-[14px]"
+                aria-label={`You rated this client ${myReview.rating} stars`}>
+                You rated <Star size={14} aria-hidden className="text-[#FFD700] fill-[#FFD700]" />{myReview.rating}
+              </div>
+            ) : (
+              <button type="button" onClick={() => navigate(`/review/${shiftId}/${shift.clientId}`)}
+                className="w-full h-[44px] rounded-[10px] border border-[#0A1628] text-[#0A1628] font-bold text-[14px] flex items-center justify-center gap-2 active:scale-[0.99] transition-transform">
+                <Star size={15} aria-hidden />
+                Rate this client
+              </button>
+            )}
+          </div>
+        )}
+
         {/* What this shift pays in total — the number a worker actually decides on */}
-        {isWorker && shift.payRate > 0 && (() => {
+        {isWorker && shift.payRate > 0 && !myEntry?.clock_out && (() => {
           const hrs = calcDurationHours(shift.startTime, shift.endTime);
           const total = shift.payPeriod === 'hr' ? shift.payRate * hrs : shift.payRate;
           if (!(total > 0)) return null;

@@ -14,6 +14,7 @@ import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { createNotification } from './notifications.js';
 import { logger } from '../lib/logger.js';
+import { shiftDayLabel } from '../lib/shiftLabel.js';
 
 const router = Router();
 
@@ -119,6 +120,66 @@ async function nudgeUnfilled() {
   return sent;
 }
 
+/**
+ * Post-shift rating prompts. For shifts that ended `fromH`–`toH` hours ago:
+ * each booked worker who clocked in is asked to rate the poster, and the
+ * poster is asked once to rate the crew — unless that person has already
+ * left a review for the shift. Deduped per (user, shift, type) so the
+ * 15-minute cadence never double-sends; the 24h reminder uses its own types.
+ */
+async function promptRatings(fromH: number, toH: number, types: { worker: string; poster: string }): Promise<number> {
+  const now = Date.now();
+  const H = 3600_000;
+  const { data: shifts } = await adminDb
+    .from('shifts')
+    .select('id, title, client_id, start_time, end_time, timezone, spots_available, status')
+    .in('status', ['completed', 'ended'])
+    .gte('end_time', new Date(now - toH * H).toISOString())
+    .lte('end_time', new Date(now - fromH * H).toISOString());
+  const list = (shifts ?? []) as ShiftLite[];
+  if (!list.length) return 0;
+  const ids = list.map((s) => s.id);
+
+  const [doneWorker, donePoster, accepted, { data: entries }, { data: reviews }, { data: posters }] = await Promise.all([
+    alreadyNotified(types.worker, ids),
+    alreadyNotified(types.poster, ids),
+    acceptedByShift(ids),
+    adminDb.from('time_entries').select('shift_id, worker_id').in('shift_id', ids).not('clock_in', 'is', null),
+    adminDb.from('reviews').select('shift_id, reviewer_id').in('shift_id', ids),
+    adminDb.from('users').select('id, username, company_name').in('id', [...new Set(list.map((s) => s.client_id))]),
+  ]);
+  const clockedIn = new Set((entries ?? []).map((e) => `${e.worker_id}:${e.shift_id}`));
+  const reviewed = new Set((reviews ?? []).map((r) => `${r.reviewer_id}:${r.shift_id}`));
+  const posterName = new Map((posters ?? []).map((u) => [u.id, u.company_name || (u.username ? `@${u.username}` : 'the poster')]));
+
+  let sent = 0;
+  for (const s of list) {
+    const day = shiftDayLabel(s, { withTitle: false });
+    const crew = (accepted.get(s.id) ?? []).filter((w) => w !== s.client_id);
+    for (const workerId of crew) {
+      if (!clockedIn.has(`${workerId}:${s.id}`)) continue;
+      if (reviewed.has(`${workerId}:${s.id}`) || doneWorker.has(`${workerId}:${s.id}`)) continue;
+      await createNotification({
+        userId: workerId, fromUserId: s.client_id, type: types.worker,
+        title: 'How did it go?',
+        body: `How was ${day} with ${posterName.get(s.client_id) ?? 'the poster'}? Rate them`,
+        shiftId: s.id, url: `/review/${s.id}/${s.client_id}`,
+      });
+      sent++;
+    }
+    if (crew.length && !reviewed.has(`${s.client_id}:${s.id}`) && !donePoster.has(`${s.client_id}:${s.id}`)) {
+      await createNotification({
+        userId: s.client_id, type: types.poster,
+        title: 'Rate your crew',
+        body: `Rate your crew from ${day}${s.title ? ` ("${s.title}")` : ''}.`,
+        shiftId: s.id, url: `/shift/${s.id}/applicants`,
+      });
+      sent++;
+    }
+  }
+  return sent;
+}
+
 async function sweepEnded(): Promise<number> {
   const { data } = await adminDb
     .from('shifts')
@@ -142,7 +203,10 @@ async function tick() {
     nudgeUnfilled(),
     sweepEnded(),
   ]);
-  return { startingSoon, tomorrow, unfilled, completed };
+  // After the sweep so a just-ended shift is already 'completed'.
+  const ratePrompts = await promptRatings(1, 3, { worker: 'rate_client', poster: 'rate_crew' });
+  const rateReminders = await promptRatings(25, 27, { worker: 'rate_client_reminder', poster: 'rate_crew_reminder' });
+  return { startingSoon, tomorrow, unfilled, completed, ratePrompts, rateReminders };
 }
 
 async function handle(req: import('express').Request, res: import('express').Response) {

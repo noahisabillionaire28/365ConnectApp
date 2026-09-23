@@ -7,30 +7,16 @@ import {
   addWorkerToShiftChat, removeWorkerFromShiftChat, ensureShiftGroupChat, insertSystemMessage,
 } from '../lib/chat.js';
 import { HttpError, sendError } from '../lib/httpError.js';
-import { assertShiftOwner, loadShift, rosterAllows, type ShiftRow } from '../lib/shiftAccess.js';
+import { assertShiftOwner, loadShift, rosterAllows } from '../lib/shiftAccess.js';
 import { bookWorker, syncShiftCapacity } from '../lib/booking.js';
+import { shiftDayLabel } from '../lib/shiftLabel.js';
 
 const router = Router();
 
 /** A worker's @handle for use in notification copy, or a neutral fallback. */
-async function workerName(id: string): Promise<string> {
+export async function workerName(id: string): Promise<string> {
   const { data } = await adminDb.from('users').select('username').eq('id', id).maybeSingle();
   return data?.username ? `@${data.username}` : 'the worker';
-}
-
-/**
- * "Saturday's shift" — the shift's weekday in its own time zone, for day-of
- * copy. Falls back to the quoted title, then to "the shift".
- */
-function shiftDayLabel(shift: Pick<ShiftRow, 'title' | 'start_time' | 'timezone'>): string {
-  const ms = shift.start_time ? Date.parse(shift.start_time) : NaN;
-  if (Number.isFinite(ms)) {
-    try {
-      const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: shift.timezone || undefined }).format(new Date(ms));
-      return `${weekday}'s shift${shift.title ? ` ("${shift.title}")` : ''}`;
-    } catch { /* bad time zone: fall through */ }
-  }
-  return shift.title ? `"${shift.title}"` : 'the shift';
 }
 
 /** The day-of statuses a worker can set on their booked shift. */
@@ -159,12 +145,12 @@ router.get('/', requireAuth, async (req, res) => {
         clock_in: string | null; clock_out: string | null;
         total_hours: number | null; total_pay: number | null;
         approved: boolean; approved_pay: number | null; overtime_hours: number | null;
-        break_minutes: number | null;
+        break_minutes: number | null; worker_ack: string | null; dispute_note: string | null;
       }>();
       if (workerIds.length) {
         const { data: entries } = await adminDb
           .from('time_entries')
-          .select('worker_id, clock_in, clock_out, total_hours, total_pay, approved, approved_pay, overtime_hours, break_minutes')
+          .select('worker_id, clock_in, clock_out, total_hours, total_pay, approved, approved_pay, overtime_hours, break_minutes, worker_ack, dispute_note')
           .eq('shift_id', shift_id)
           .in('worker_id', workerIds);
         for (const t of entries ?? []) {
@@ -177,6 +163,8 @@ router.get('/', requireAuth, async (req, res) => {
             approved_pay: t.approved_pay ?? null,
             overtime_hours: t.overtime_hours ?? null,
             break_minutes: t.break_minutes ?? null,
+            worker_ack: (t as { worker_ack?: string | null }).worker_ack ?? null,
+            dispute_note: (t as { dispute_note?: string | null }).dispute_note ?? null,
           });
         }
       }
@@ -187,16 +175,16 @@ router.get('/', requireAuth, async (req, res) => {
       const shiftEndMs = shiftTimes?.end_time ? Date.parse(shiftTimes.end_time) : NaN;
       const nowMs = Date.now();
 
-      // Whether the owner has already reviewed each worker for this shift.
-      const reviewedSet = new Set<string>();
+      // Whether (and how) the owner has already reviewed each worker for this shift.
+      const reviewedMap = new Map<string, number>();
       if (workerIds.length) {
         const { data: revs } = await adminDb
           .from('reviews')
-          .select('reviewee_id')
+          .select('reviewee_id, rating')
           .eq('shift_id', shift_id)
           .eq('reviewer_id', req.userId)
           .in('reviewee_id', workerIds);
-        for (const r of revs ?? []) reviewedSet.add(r.reviewee_id);
+        for (const r of revs ?? []) reviewedMap.set(r.reviewee_id, Number(r.rating) || 0);
       }
 
       // Whether each worker has already been paid for this shift (prevents
@@ -242,11 +230,15 @@ router.get('/', requireAuth, async (req, res) => {
           approved: e?.approved ?? false,
           approved_pay: e?.approved_pay ?? null,
           overtime_hours: e?.overtime_hours ?? null,
+          // The worker's answer to the approved hours (null until they respond).
+          worker_ack: e?.worker_ack ?? null,
+          dispute_note: e?.dispute_note ?? null,
           attendance,
           // Worker's self-reported day-of status (null until they tap a pill).
           arrival_status: a.arrival_status ?? null,
           arrival_status_at: a.arrival_status_at ?? null,
-          already_reviewed: reviewedSet.has(a.worker_id),
+          already_reviewed: reviewedMap.has(a.worker_id),
+          my_review_rating: reviewedMap.get(a.worker_id) ?? null,
           paid: paidSet.has(a.worker_id),
         };
       });

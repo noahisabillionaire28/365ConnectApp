@@ -120,6 +120,17 @@ function ConfirmedRow({ w, late, closed, onApprove, onPay, onNoShow, onRemove, o
                 {w.overtimeHours}h OT
               </span>
             )}
+            {w.approved && w.workerAck === 'accepted' && (
+              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5">
+                Accepted by worker
+              </span>
+            )}
+            {w.approved && w.workerAck === 'disputed' && (
+              <span className="text-[10px] font-bold text-red-500 bg-red-50 border border-red-200 rounded-full px-1.5 py-0.5"
+                title={w.dispute_note ?? undefined}>
+                Disputed
+              </span>
+            )}
             {!w.clock_out && <DayOfChip s={w.dayOfStatus} />}
           </div>
         </div>
@@ -148,11 +159,19 @@ function ConfirmedRow({ w, late, closed, onApprove, onPay, onNoShow, onRemove, o
             <CheckCircle2 size={13} aria-hidden /> Paid
           </span>
         )}
-        {w.attendance === 'done' && !w.alreadyReviewed && (
+        {/* Rating: once the worker is done (or the shift is over), one tap
+            opens the review flow; afterwards the stars they gave stay visible. */}
+        {(w.attendance === 'done' || closed) && w.attendance !== 'no_show' && !w.alreadyReviewed && (
           <button type="button" onClick={onReview}
             className="flex-1 h-9 rounded-[8px] border border-[#E5E7EB] text-[#111827] text-[12px] font-bold flex items-center justify-center gap-1.5">
             <Star size={13} aria-hidden /> Rate
           </button>
+        )}
+        {w.alreadyReviewed && (
+          <span className="flex-1 h-9 rounded-[8px] bg-[#FAFAFA] border border-[#E5E7EB] text-[#6B7280] text-[12px] font-bold flex items-center justify-center gap-1"
+            aria-label={`You rated this worker ${w.myReviewRating ?? ''} stars`}>
+            Rated <Star size={12} aria-hidden className="text-[#FFD700] fill-[#FFD700]" />{w.myReviewRating ?? ''}
+          </span>
         )}
         {(w.attendance === 'no_show' || late) && (
           <button type="button" disabled={busy} onClick={onNoShow}
