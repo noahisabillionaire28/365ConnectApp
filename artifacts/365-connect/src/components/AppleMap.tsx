@@ -1,5 +1,5 @@
 /**
- * The real Apple Maps (MapKit JS), dark scheme, with the app's own pins.
+ * The real Apple Maps (MapKit JS), light scheme, with the app's own pins.
  * Same props as LeafletMap so screens can swap engines without changes.
  * Only rendered once `ensureMapKit()` resolved true (see AppMap).
  */
@@ -32,7 +32,7 @@ function priceElement(label: string, selected: boolean): HTMLElement {
   el.style.cssText =
     `width:${w}px;height:28px;display:flex;align-items:center;justify-content:center;` +
     `background:${selected ? '#0A1628' : '#FFFFFF'};color:${selected ? '#FFFFFF' : '#0A1628'};` +
-    `border:1.5px solid ${selected ? '#FFFFFF' : '#D1D5DB'};border-radius:9999px;font-weight:800;` +
+    `border:1.5px solid ${selected ? '#0A1628' : '#D1D5DB'};border-radius:9999px;font-weight:800;` +
     `font-size:12px;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,0.35);cursor:pointer;font-family:inherit;`;
   el.textContent = label;
   return el;
@@ -78,7 +78,7 @@ export function AppleMap({
     const el = boxRef.current;
     if (!mk || !el) return;
     const map = new mk.Map(el, {
-      colorScheme: mk.Map.ColorSchemes.Dark,
+      colorScheme: mk.Map.ColorSchemes.Light,
       showsCompass: mk.FeatureVisibility.Hidden,
       showsMapTypeControl: false,
       showsZoomControl: false,
@@ -157,7 +157,7 @@ export function AppleMap({
       role={ariaLabel ? 'img' : undefined}
       aria-label={ariaLabel}
       className="apple-map"
-      style={{ position: 'relative', zIndex: 0, isolation: 'isolate', width: '100%', height: '100%', background: '#1c1c1e', ...(style ?? {}) }}
+      style={{ position: 'relative', zIndex: 0, isolation: 'isolate', width: '100%', height: '100%', background: '#F2EFE9', ...(style ?? {}) }}
     />
   );
 }

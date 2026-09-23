@@ -1,9 +1,9 @@
 /**
  * Fallback map engine — free dark basemap, no API key, no billing.
  *
- * Styled to match Apple Maps in dark mode (charcoal land, near-black water,
- * soft grey roads and labels) so the app looks the same before and after the
- * real Apple Maps key is added. Pins are the app's own logo badge or a price
+ * Styled to match Apple Maps in light mode (cream land, pale-blue water, soft
+ * grey roads and labels) so the app looks the same before and after the real
+ * Apple Maps key is added. Pins are the app's own logo badge or a price
  * pill, identical to the ones drawn on the Apple engine.
  */
 import 'leaflet/dist/leaflet.css';
@@ -12,9 +12,9 @@ import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { logoPinUrl, logoPinSize, userDotHtml, USER_DOT_SIZE } from '@/lib/mapStyles';
 
-// CARTO "Dark Matter" (OpenStreetMap data) — the closest free match to Apple's
-// dark map. Attribution is shown in the corner as their terms require.
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+// CARTO "Voyager" (OpenStreetMap data) — the closest free match to Apple's
+// light map. Attribution is shown in the corner as their terms require.
+const TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 const TILE_SUBDOMAINS = 'abcd';
 const TILE_ATTR = '&copy; OpenStreetMap &copy; CARTO';
 const TILE_MAX_ZOOM = 20;
@@ -59,7 +59,7 @@ function pinIcon(selected: boolean): L.Icon {
 function priceIcon(label: string, selected: boolean): L.DivIcon {
   const bg = selected ? '#0A1628' : '#FFFFFF';
   const fg = selected ? '#FFFFFF' : '#0A1628';
-  const bd = selected ? '#FFFFFF' : '#D1D5DB';
+  const bd = selected ? '#0A1628' : '#D1D5DB';
   const w = Math.max(44, Math.round(18 + label.length * 8.5));
   const h = 28;
   return L.divIcon({
@@ -118,11 +118,11 @@ export function LeafletMap({
   // otherwise float above the app's fixed bars, sheets and bottom nav while
   // scrolling. An isolated stacking context keeps all of that inside the map box.
   return (
-    <div style={{ position: 'relative', zIndex: 0, isolation: 'isolate', width: '100%', height: '100%', background: '#1c1c1e', ...(style ?? {}) }}>
+    <div style={{ position: 'relative', zIndex: 0, isolation: 'isolate', width: '100%', height: '100%', background: '#F2EFE9', ...(style ?? {}) }}>
     <MapContainer
       center={[center.lat, center.lng]}
       zoom={zoom}
-      style={{ width: '100%', height: '100%', background: '#1c1c1e' }}
+      style={{ width: '100%', height: '100%', background: '#F2EFE9' }}
       zoomControl={false}
       attributionControl={false}
       dragging={interactive}
@@ -148,7 +148,7 @@ export function LeafletMap({
       ))}
     </MapContainer>
     {/* Data credit (required by the tile provider). Apple's engine draws its own. */}
-    <span aria-hidden className="absolute left-2 bottom-1.5 z-[1] text-[9px] text-white/45 pointer-events-none select-none">
+    <span aria-hidden className="absolute left-2 bottom-1.5 z-[1] text-[9px] text-[#111827]/50 pointer-events-none select-none">
       © OpenStreetMap © CARTO
     </span>
     </div>

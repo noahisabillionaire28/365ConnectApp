@@ -113,7 +113,7 @@ function ShiftRowSkeleton() {
   );
 }
 
-/* ── MapPane — Apple Maps style: address bar, dark map, price pins, card carousel ── */
+/* ── MapPane — Apple Maps style: address bar, light map, price pins, card carousel ── */
 function MapPane({ shifts, selectedId, userCoords, onPinClick, onOpenShift }: {
   shifts: MockShift[];
   selectedId: string | null;
@@ -158,7 +158,7 @@ function MapPane({ shifts, selectedId, userCoords, onPinClick, onOpenShift }: {
       : { lat: 25.7913, lng: -80.145 };
 
   return (
-    <div className="flex-1 relative bg-[#1c1c1e]">
+    <div className="flex-1 relative bg-[#F2EFE9]">
       {/* Address bar */}
       <form
         onSubmit={(e) => { e.preventDefault(); void submitAddress(); }}
@@ -205,10 +205,10 @@ function MapPane({ shifts, selectedId, userCoords, onPinClick, onOpenShift }: {
       />
 
       {shifts.length === 0 && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/55 pointer-events-none">
-          <MapPin size={28} aria-hidden className="text-white/50" />
-          <p className="text-white text-[14px] font-medium">No shifts to map</p>
-          <p className="text-white/70 text-[12px]">Try a different filter</p>
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/70 pointer-events-none">
+          <MapPin size={28} aria-hidden className="text-[#9CA3AF]" />
+          <p className="text-[#111827] text-[14px] font-medium">No shifts to map</p>
+          <p className="text-[#6B7280] text-[12px]">Try a different filter</p>
         </div>
       )}
 
