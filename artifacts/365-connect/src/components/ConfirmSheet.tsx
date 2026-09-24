@@ -23,7 +23,7 @@ export function ConfirmSheet({
   if (!open) return null;
   const confirmCls = tone === 'danger' ? 'bg-[#EF4444] text-white' : 'bg-[#0A1628] text-white';
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40"
+    <div data-no-pull className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40"
       role="dialog" aria-modal="true" aria-label={title}
       onClick={() => { if (!busy) onCancel(); }}>
       <div className="w-full max-w-app bg-white rounded-t-[20px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+20px)]"

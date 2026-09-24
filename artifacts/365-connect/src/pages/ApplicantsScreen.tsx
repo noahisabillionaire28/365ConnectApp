@@ -15,6 +15,7 @@ import { useShiftInvites, type ShiftInvite } from '@/hooks/useShiftInvites';
 import { useShiftById } from '@/hooks/useShifts';
 import { broadcastShiftRequest } from '@/hooks/useShiftRequests';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRole } from '@/contexts/RoleContext';
 import { useToast } from '@/contexts/ToastContext';
 import { useProfile } from '@/hooks/useProfile';
 import { apiClient } from '@/lib/api';
@@ -150,11 +151,12 @@ function ConfirmedRow({ w, late, closed, timezone, onApprove, onPay, onNoShow, o
       </div>
 
       <div className="flex gap-2">
-        {(w.attendance === 'done' || forgotClockOut) && !w.approved && (
+        {/* Approve once; after a dispute the manager can adjust and approve again. */}
+        {(w.attendance === 'done' || forgotClockOut) && (!w.approved || w.workerAck === 'disputed') && (
           <button type="button" disabled={busy} onClick={onApprove}
             className="flex-1 h-9 rounded-[8px] bg-[#0A1628] text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
             <Clock3 size={13} aria-hidden />
-            {forgotClockOut ? 'Set clock-out & approve' : 'Review & Approve'}
+            {forgotClockOut ? 'Set clock-out & approve' : w.workerAck === 'disputed' ? 'Adjust & re-approve' : 'Review & Approve'}
           </button>
         )}
         {w.attendance === 'done' && w.approved && !w.paid && (
@@ -297,7 +299,11 @@ export function ApplicantsScreen() {
   const { user } = useAuth();
   const { showToast } = useToast();
   const { role } = useProfile();
+  const { isAdmin } = useRole();
   const { data: shift, isLoading: shiftLoading, error: shiftError, refetch: refetchShift } = useShiftById(id);
+  // Only the poster (or an admin) manages a roster; anyone else gets a plain
+  // "not yours" state instead of a management screen whose calls all 403.
+  const canManage = !shift || !user?.id || isAdmin || shift.clientId === user.id;
   const { applicants, isLoading: appsLoading, approve, decline, refetch: refetchApps } = useShiftApplicants(id);
   const { workers: confirmed, isLoading: confLoading, refetch: refetchConfirmed } = useAcceptedWorkers(id);
   const { invites, refetch: refetchInvites } = useShiftInvites(id);
@@ -432,6 +438,24 @@ export function ApplicantsScreen() {
     finally { setBusyId(null); }
   }
 
+  if (!canManage) {
+    return (
+      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-8 gap-3 text-center">
+        <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
+          <Users size={26} aria-hidden className="text-[#9CA3AF]" />
+        </div>
+        <p className="text-[#111827] font-bold text-[17px]">You don't manage this shift</p>
+        <p className="text-[#6B7280] text-[13px] max-w-[260px]">
+          Only the poster can see applicants and the roster for {[shift?.jobType, shift?.companyName].filter(Boolean).join(' at ') || 'this shift'}.
+        </p>
+        <button type="button" onClick={() => navigate(`/shift/${id ?? ''}`)}
+          className="mt-2 h-[40px] px-5 rounded-full bg-[#0A1628] text-white text-[13px] font-bold">
+          View the shift
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
       {/* Header */}
@@ -497,13 +521,13 @@ export function ApplicantsScreen() {
           <ConfirmSheet
             open={confirmBroadcast}
             title="Invite matching workers?"
-            body={<>Every available worker whose roles match <b>{shift?.jobTypes?.join(', ') || shift?.jobType || 'this shift'}</b> gets a notification and an offer to accept a spot. Workers who already applied or were invited are skipped.</>}
+            body={<>Every available worker{shift?.rosterOnly ? ' on your roster' : ''} whose roles match <b>{shift?.jobTypes?.join(', ') || shift?.jobType || 'this shift'}</b> gets a notification and an offer to accept a spot. Workers who already applied or were invited are skipped.</>}
             confirmLabel="Send invites"
             busy={inviting}
             onConfirm={() => { setConfirmBroadcast(false); void handleBroadcast(); }}
             onCancel={() => setConfirmBroadcast(false)}
           />
-          {role === 'staffer' && (
+          {(role === 'staffer' || role === 'client') && (
             <button type="button" onClick={() => navigate(`/shift/${id}/assign`)}
               className="flex-1 h-[46px] rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[13px] flex items-center justify-center gap-2">
               <UserPlus size={15} aria-hidden />

@@ -22,10 +22,18 @@ export function ShiftListCard({ shift, applied, onTap }: {
         transition-colors active:bg-[#FAFAFA] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A1628]">
 
       <div className="flex items-start justify-between gap-3">
-        <span className="text-white text-[11px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wide"
-          style={{ background: NAVY }}>
-          {shift.jobType}
-        </span>
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+          <span className="text-white text-[11px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wide"
+            style={{ background: NAVY }}>
+            {shift.jobType}
+          </span>
+          {shift.rosterOnly && (
+            <span className="text-[10px] font-bold text-[#0A1628] bg-[#F3F4F6] border border-[#E5E7EB] px-2 py-1 rounded-full truncate max-w-[160px]"
+              title="Only workers on this poster's roster can take this shift">
+              Roster only{shift.clientUsername ? ` · @${shift.clientUsername}` : ''}
+            </span>
+          )}
+        </div>
         {applied && (
           <div aria-label="Already applied" className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
             <CheckCircle2 size={15} aria-hidden className="text-white" strokeWidth={2.5} />

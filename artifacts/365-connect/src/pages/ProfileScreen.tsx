@@ -8,15 +8,18 @@ import {
   BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
+import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useMyApplications, type MyApplication } from '@/hooks/useMyApplications';
+import { useMyPostedShifts } from '@/hooks/useMyPostedShifts';
 import { usePayments } from '@/hooks/usePayments';
 import { useReviews } from '@/hooks/useReviews';
 import { usePosts } from '@/hooks/usePosts';
 import { useFollowCounts } from '@/hooks/useFollowCounts';
 import { ProfileBadges } from '@/components/ProfileBadges';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { uploadPostPhoto } from '@/lib/storage';
 import { apiClient } from '@/lib/api';
 import { isIOS } from '@/lib/native';
@@ -201,12 +204,107 @@ function MyApplicationsSection() {
   );
 }
 
+/* ── Rosters you're on (worker) ──────────────────────────────────────────── */
+type RosterOwner = {
+  id: string; username: string | null; photo_url: string | null;
+  role: 'client' | 'staffer' | 'worker' | 'admin' | null; company_name: string | null; followed_at?: string;
+};
+
+/**
+ * The clients and agencies that keep this worker on their roster (they
+ * follow the worker). Each row can be left, which removes the follow.
+ */
+function RostersOnSection() {
+  const { user } = useAuth();
+  const [, navigate] = useLocation();
+  const { showToast } = useToast();
+  const qc = useQueryClient();
+  const key = ['rosters-on', user?.id];
+  const q = useQuery<RosterOwner[], Error>({
+    queryKey: key,
+    enabled: !!user?.id,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const rows = await apiClient(user!.id).get<RosterOwner[]>(`/follows/followers/${user!.id}`);
+      return (rows ?? []).filter((r) => r.role === 'client' || r.role === 'staffer');
+    },
+  });
+  const [leaving, setLeaving] = useState<RosterOwner | null>(null);
+  const [busy, setBusy] = useState(false);
+  const owners = q.data ?? [];
+
+  async function leave(owner: RosterOwner) {
+    if (!user?.id || busy) return;
+    setBusy(true);
+    try {
+      await apiClient(user.id).delete(`/follows/followers/${owner.id}`);
+      qc.setQueryData<RosterOwner[]>(key, (prev) => (prev ?? []).filter((o) => o.id !== owner.id));
+      void qc.invalidateQueries({ queryKey: ['follow-counts'] });
+      showToast(`You left ${labelFor(owner)}'s roster.`);
+      setLeaving(null);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not leave this roster.', 'error');
+    } finally { setBusy(false); }
+  }
+
+  const labelFor = (o: RosterOwner) => o.company_name || (o.username ? `@${o.username}` : 'this poster');
+
+  if (q.isError || (!q.isLoading && owners.length === 0)) return null;
+
+  return (
+    <div className="px-5 mb-6">
+      <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-1">Rosters you're on</p>
+      <p className="text-[#AAAAAA] text-[12px] mb-2.5">These clients and agencies can offer you their shifts directly.</p>
+      <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden" role="list" aria-label="Rosters you are on">
+        {q.isLoading ? (
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <div className="w-10 h-10 rounded-full bg-[#EFEFEF] animate-pulse" />
+            <div className="w-1/2 h-3.5 rounded bg-[#EFEFEF] animate-pulse" />
+          </div>
+        ) : owners.map((o) => (
+          <div key={o.id} role="listitem" className="flex items-center gap-3 px-4 py-3 border-b border-[#DBDBDB] last:border-none">
+            <button type="button" onClick={() => { if (o.username) navigate(`/worker/${o.username}`); }}
+              aria-label={`View ${labelFor(o)}`}
+              className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] overflow-hidden flex items-center justify-center flex-shrink-0">
+              {o.photo_url
+                ? <img src={o.photo_url} alt="" className="w-full h-full object-cover" />
+                : <Users size={16} aria-hidden className="text-[#737373]" />}
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-black font-semibold text-[14px] truncate">{labelFor(o)}</p>
+              <p className="text-[#737373] text-[12px]">{o.role === 'staffer' ? 'Agency' : 'Client'}{o.company_name && o.username ? ` · @${o.username}` : ''}</p>
+            </div>
+            <button type="button" onClick={() => setLeaving(o)}
+              className="h-8 px-3 rounded-[8px] border border-[#DBDBDB] text-[#737373] text-[12px] font-semibold flex-shrink-0">
+              Leave roster
+            </button>
+          </div>
+        ))}
+      </div>
+      <ConfirmSheet
+        open={!!leaving}
+        title={`Leave ${leaving ? labelFor(leaving) : 'this'}'s roster?`}
+        body="They will no longer be able to assign you or send you roster-only shifts. Shifts you're already booked on are not affected, and they can add you again later."
+        confirmLabel="Leave roster"
+        tone="danger"
+        busy={busy}
+        onConfirm={() => { if (leaving) void leave(leaving); }}
+        onCancel={() => { if (!busy) setLeaving(null); }}
+      />
+    </div>
+  );
+}
+
 /* ── ProfileScreen ───────────────────────────────────────────────────────── */
 export function ProfileScreen() {
   const { signOut, user } = useAuth();
   const [, navigate] = useLocation();
   const profile      = useProfile();
   const { payments } = usePayments();
+  const isPoster = profile.role === 'client' || profile.role === 'staffer';
+  const isWorker = profile.role === 'worker';
+  // Posters: their own shifts (spots filled = workers booked) and money paid out.
+  const { shifts: postedShifts } = useMyPostedShifts();
   const { reviews }  = useReviews(); // defaults to the logged-in user's reviews
   const { data: posts = [] } = usePosts(user?.id);
   const { followers, following } = useFollowCounts(user?.id);
@@ -230,12 +328,18 @@ export function ProfileScreen() {
     }
   }
 
-  // Real lifetime stats derived from the worker's paid shifts.
-  const shiftsCompleted = payments.length;
-  const totalEarned = payments.reduce((sum, p) => sum + (Number(p.net_amount) || 0), 0);
-  const earnedDisplay = totalEarned >= 1000
-    ? `$${(totalEarned / 1000).toFixed(1)}k`
-    : `$${Math.round(totalEarned)}`;
+  // Real lifetime stats. Workers: shifts paid + money earned. Posters: shifts
+  // posted, workers booked across them, and money paid out.
+  const money = (n: number) => (n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${Math.round(n)}`);
+  const earnedRows = payments.filter((p) => p.direction !== 'out' && p.payment_type !== 'pro_subscription');
+  const shiftsCompleted = earnedRows.length;
+  const totalEarned = earnedRows.reduce((sum, p) => sum + (Number(p.net_amount) || 0), 0);
+  const livePosted = postedShifts.filter((s) => s.status !== 'cancelled');
+  const shiftsPosted = livePosted.length;
+  const workersBooked = livePosted.reduce((sum, s) => sum + Math.max(0, s.spotsTotal - s.spotsAvailable), 0);
+  const totalSpent = payments
+    .filter((p) => p.direction === 'out' && p.status === 'completed')
+    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
   const [available, setAvailable]     = useState(true);
   const [comingSoonLabel, setComingSoon] = useState<string | null>(null);
@@ -332,7 +436,8 @@ export function ProfileScreen() {
           <ProfileAvatar photoUrl={photoUrl} displayName={displayName} size={82} />
         </div>
 
-        {/* Available toggle */}
+        {/* Available toggle — workers only (it gates offers and broadcasts) */}
+        {isWorker && (
         <div className="flex justify-end px-5 pt-3">
           <button type="button" aria-pressed={available}
             aria-label={available ? 'Set yourself as unavailable' : 'Set yourself as available'}
@@ -344,6 +449,7 @@ export function ProfileScreen() {
             {available ? 'Available' : 'Unavailable'}
           </button>
         </div>
+        )}
       </div>
 
       {/* Name / meta */}
@@ -365,7 +471,7 @@ export function ProfileScreen() {
           </div>
         )}
 
-        <ProfileBadges isPro={profile.isPro} rating={rating} shifts={shiftsCompleted} reviews={reviews.length}
+        <ProfileBadges isPro={profile.isPro} rating={rating} shifts={isPoster ? shiftsPosted : shiftsCompleted} reviews={reviews.length}
           className="mb-3" />
 
         {bio ? (
@@ -399,11 +505,15 @@ export function ProfileScreen() {
       {/* Work stats */}
       <div className="mx-4 grid grid-cols-3 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] mb-5 overflow-hidden"
         role="list" aria-label="Profile statistics">
-        {[
+        {(isPoster ? [
+          { label: 'Shifts',  value: `${shiftsPosted}`,   sub: 'posted'       },
+          { label: 'Workers', value: `${workersBooked}`,  sub: 'booked'       },
+          { label: 'Spent',   value: money(totalSpent),   sub: 'lifetime'     },
+        ] : [
           { label: 'Shifts',  value: `${shiftsCompleted}`, sub: 'completed'   },
           { label: 'Rating',  value: `${ratingDisplay}★`,  sub: ratingSubLabel },
-          { label: 'Earned',  value: earnedDisplay,        sub: 'lifetime'    },
-        ].map(({ label, value, sub }, i) => (
+          { label: 'Earned',  value: money(totalEarned),   sub: 'lifetime'    },
+        ]).map(({ label, value, sub }, i) => (
           <div key={label} role="listitem" aria-label={`${label}: ${value}`}
             className={`flex flex-col items-center justify-center py-4 ${i < 2 ? 'border-r border-[#DBDBDB]' : ''}`}>
             <p className="text-black font-bold text-[22px] leading-tight">{value}</p>
@@ -422,7 +532,8 @@ export function ProfileScreen() {
         </button>
       </div>
 
-      {/* Specialties */}
+      {/* Specialties — worker only */}
+      {!isPoster && (
       <div className="px-5 mb-5">
         <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-2.5" id="job-types-label">
           Specialties
@@ -442,8 +553,10 @@ export function ProfileScreen() {
           </p>
         )}
       </div>
+      )}
 
-      {/* Certifications */}
+      {/* Certifications — worker only */}
+      {!isPoster && (
       <div className="px-5 mb-6">
         <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-2.5" id="certs-label">
           Certifications
@@ -463,6 +576,10 @@ export function ProfileScreen() {
           </p>
         )}
       </div>
+      )}
+
+      {/* Rosters this worker is on (clients / agencies who follow them) */}
+      {isWorker && <RostersOnSection />}
 
       {/* Posts grid */}
       <div className="px-5 mb-6">
@@ -565,7 +682,9 @@ export function ProfileScreen() {
             </div>
             <div className="flex-1 text-left">
               <p className="text-white font-bold text-[15px]">Upgrade to Pro</p>
-              <p className="text-white/60 text-[12px]">$17/mo · Priority applications + Pro badge</p>
+              <p className="text-white/60 text-[12px]">
+                {isPoster ? '$17/mo · Pro badge on your shifts + priority support' : '$17/mo · Priority applications + Pro badge'}
+              </p>
             </div>
             <ChevronRight size={16} aria-hidden className="text-white/40" />
           </motion.button>
@@ -615,9 +734,7 @@ export function ProfileScreen() {
                     <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Workforce</p>
                     <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-4">
                       <SettingRow icon={Bookmark} label="Saved Workers" onTap={() => go('/saved')} />
-                      {profile.role === 'staffer' && (
-                        <SettingRow icon={Users} label="My Roster" onTap={() => go('/roster')} />
-                      )}
+                      <SettingRow icon={Users} label="My Roster" onTap={() => go('/roster')} />
                     </div>
                   </>
                 )}

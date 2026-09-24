@@ -223,6 +223,7 @@ function FollowButton({ profileId, username, asRoster }: {
   const { isFollowing, followerCount: _count, follow, unfollow, isFollowPending } = useFollow(profileId, {
     onFollowSuccess:   () => showToast(asRoster ? `${name} added to your roster` : `Following ${name}`),
     onUnfollowSuccess: () => showToast(asRoster ? `${name} removed from your roster` : `Unfollowed ${name}`),
+    onError:           (msg) => showToast(msg, 'error'),
   });
 
   function handlePress() {
@@ -340,15 +341,22 @@ export function WorkerProfileScreen() {
   const [showRequestSheet, setShowRequestSheet] = useState(false);
   const [showReport, setShowReport] = useState(false);
 
-  const { followerCount } = useFollow(profile?.id ?? '');
+  // Only workers can be followed (that is what a roster is), so the follower
+  // count and Follow button exist for worker profiles alone.
+  const isWorkerProfile = profile?.role === 'worker';
+  const { followerCount } = useFollow(isWorkerProfile ? profile?.id : undefined);
   const { data: workerPosts = [] } = usePosts(profile?.id);
   const toggleLike = useToggleLike();
   const canRequestShift =
     !!authUser && !!profile && authUser.id !== profile.id &&
     (role === 'client' || role === 'staffer') && profile.role === 'worker';
+  // Agencies keep workers on their roster (Add to Roster); the separate
+  // bookmark is a client's list, so it is hidden for staffers.
+  const canSave = canRequestShift && role === 'client';
   const { saved, toggle: toggleSaved, isPending: savePending } = useSavedWorker(
-    canRequestShift ? profile?.id : undefined,
+    canSave ? profile?.id : undefined,
   );
+  const goBack = () => { if (window.history.length > 1) window.history.back(); else navigate('/home'); };
 
   useEffect(() => {
     if (!params.username) return;
@@ -409,7 +417,7 @@ export function WorkerProfileScreen() {
   if (notFound || !profile) {
     return (
       <div className="flex flex-col h-full bg-white text-black items-center justify-center px-6">
-        <button type="button" aria-label="Go back" onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/explore'); }}
+        <button type="button" aria-label="Go back" onClick={goBack}
           className="absolute top-12 left-4 w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
           <ChevronLeft size={20} className="text-black" />
         </button>
@@ -417,7 +425,7 @@ export function WorkerProfileScreen() {
         <p className="text-[#737373] text-[14px] text-center mb-6">
           @{params.username} doesn't exist on 365 Connect yet.
         </p>
-        <button onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/explore'); }} className="text-[#0095F6] font-semibold text-[14px]">
+        <button onClick={goBack} className="text-[#0095F6] font-semibold text-[14px]">
           Go back
         </button>
       </div>
@@ -432,7 +440,7 @@ export function WorkerProfileScreen() {
 
       {/* Hero / Profile photo */}
       <div className="relative">
-        <button type="button" aria-label="Go back" onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/explore'); }}
+        <button type="button" aria-label="Go back" onClick={goBack}
           className="absolute top-12 left-4 z-10 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform">
           <ChevronLeft size={20} className="text-white" />
         </button>
@@ -519,9 +527,9 @@ export function WorkerProfileScreen() {
           </div>
         )}
 
-        {/* Stats row */}
+        {/* Stats row — a worker's shifts and followers; a poster's reviews */}
         <div className="flex items-center justify-around bg-[#FAFAFA] rounded-[12px] border border-[#DBDBDB] py-4 px-3 mb-6">
-          <StatItem value={profile.pastShifts.length} label="Shifts" />
+          <StatItem value={profile.pastShifts.length} label={isWorkerProfile ? 'Shifts' : 'Reviews'} />
           <div className="w-px h-8 bg-[#DBDBDB]" />
           <div className="flex flex-col items-center gap-[2px]">
             <span className="text-black font-bold text-[18px] leading-none">
@@ -532,32 +540,36 @@ export function WorkerProfileScreen() {
               <span className="text-[#737373] text-[11px] font-medium leading-none">Rating</span>
             </div>
           </div>
-          <div className="w-px h-8 bg-[#DBDBDB]" />
-          <StatItem value={followerCount} label="Followers" />
+          {isWorkerProfile && (
+            <>
+              <div className="w-px h-8 bg-[#DBDBDB]" />
+              <StatItem value={followerCount} label="Followers" />
+            </>
+          )}
         </div>
 
-        {/* Action buttons */}
+        {/* Action buttons — Follow only exists for workers (the API rejects
+            following a client or agency), and the bookmark is a client's list. */}
+        {(isWorkerProfile || authUser?.id !== profile.id) && (
         <div className="flex gap-3 mb-3">
-          <FollowButton profileId={profile.id} username={profile.username} asRoster={canRequestShift} />
+          {isWorkerProfile && (
+            <FollowButton profileId={profile.id} username={profile.username} asRoster={canRequestShift} />
+          )}
           {authUser?.id !== profile.id && (
             <button type="button" onClick={() => void handleMessage()} disabled={isStartingChat}
               className="flex-1 bg-white border border-[#DBDBDB] text-black font-bold text-[14px] py-[14px] rounded-[8px] active:scale-[0.98] transition-transform disabled:opacity-50">
               {isStartingChat ? 'Opening…' : 'Message'}
             </button>
           )}
-          {canRequestShift ? (
+          {canSave && (
             <button type="button" aria-label={saved ? 'Unsave worker' : 'Save worker'}
               onClick={() => toggleSaved()} disabled={savePending}
               className="w-[52px] bg-white border border-[#DBDBDB] py-[14px] rounded-[8px] active:scale-[0.98] transition-transform flex items-center justify-center disabled:opacity-60">
               <Bookmark size={18} aria-hidden className={saved ? 'fill-[#0A1628] text-[#0A1628]' : 'text-black'} />
             </button>
-          ) : (
-            <button type="button" aria-label="More options"
-              className="w-[52px] bg-white border border-[#DBDBDB] text-black font-bold py-[14px] rounded-[8px] active:scale-[0.98] transition-transform flex items-center justify-center">
-              <span className="text-[16px] leading-none tracking-widest">···</span>
-            </button>
           )}
         </div>
+        )}
 
         {canRequestShift && (
           <button type="button" onClick={() => setShowRequestSheet(true)}
@@ -603,11 +615,11 @@ export function WorkerProfileScreen() {
           </div>
         )}
 
-        {/* Past shifts */}
+        {/* Past shifts (a worker) / reviews from workers (a client or agency) */}
         {profile.pastShifts.length > 0 ? (
           <div>
             <h2 className="text-[13px] font-semibold text-[#737373] uppercase tracking-widest mb-4">
-              Past Shifts
+              {isWorkerProfile ? 'Past Shifts' : 'Reviews from workers'}
             </h2>
             <div className="flex flex-col gap-3">
               {profile.pastShifts.map((shift) => (
@@ -632,8 +644,10 @@ export function WorkerProfileScreen() {
           </div>
         ) : (
           <div className="text-center py-8">
-            <p className="text-[#737373] text-[14px]">No rated shifts yet.</p>
-            <p className="text-[#AAAAAA] text-[12px] mt-1">Shifts appear here after they're reviewed.</p>
+            <p className="text-[#737373] text-[14px]">{isWorkerProfile ? 'No rated shifts yet.' : 'No reviews from workers yet.'}</p>
+            <p className="text-[#AAAAAA] text-[12px] mt-1">
+              {isWorkerProfile ? "Shifts appear here after they're reviewed." : 'Workers can rate them after a shift.'}
+            </p>
           </div>
         )}
 

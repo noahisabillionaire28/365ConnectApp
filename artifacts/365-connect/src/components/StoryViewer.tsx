@@ -98,7 +98,7 @@ export function StoryViewer({
   const initials = (group.username ?? '??').slice(0, 2).toUpperCase();
 
   return (
-    <div className="fixed inset-0 z-[120] bg-black flex items-center justify-center select-none">
+    <div data-no-pull className="fixed inset-0 z-[120] bg-black flex items-center justify-center select-none">
       <div className="relative w-full max-w-app h-full max-h-[100dvh] bg-black overflow-hidden">
         {/* The photo */}
         <img

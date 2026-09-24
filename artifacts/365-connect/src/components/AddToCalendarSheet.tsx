@@ -30,10 +30,10 @@ export function AddToCalendarSheet({ open, event, onClose }: {
       {open && event && (
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={onClose} className="fixed inset-0 bg-black/40 z-[60]" />
+            onClick={onClose} data-no-pull className="fixed inset-0 bg-black/40 z-[60]" />
           <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 400, damping: 38 }}
-            role="dialog" aria-modal="true" aria-label="Add to calendar"
+            data-no-pull role="dialog" aria-modal="true" aria-label="Add to calendar"
             className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app z-[61] bg-white rounded-t-[20px] px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-2xl">
             <div className="flex items-center justify-between mb-1">
               <p className="font-bold text-[16px] text-[#111827]">Add to calendar</p>

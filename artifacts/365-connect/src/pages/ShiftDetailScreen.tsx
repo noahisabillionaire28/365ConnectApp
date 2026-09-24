@@ -457,7 +457,8 @@ export function ShiftDetailScreen() {
     setEditLoading(true);
     try {
       const raw = await apiClient(user.id).get<Record<string, unknown>>(`/shifts/${shiftId}`);
-      if (!raw || raw.client_id !== user.id) return;
+      // Owner or admin — the same rule the server applies to the edit itself.
+      if (!raw || (raw.client_id !== user.id && !profile.isAdmin)) return;
       // Times are instants; edit them as the venue's wall clock, in the
       // venue's own zone (which the edit keeps, wherever it is made from).
       const tz    = (raw.timezone as string | null) || DEFAULT_SHIFT_TZ;
@@ -525,7 +526,7 @@ export function ShiftDetailScreen() {
     <ConfirmSheet
       open={confirmBroadcast}
       title="Invite matching workers?"
-      body={<>Every available worker whose roles match <b>{shift.jobTypes.join(', ')}</b> gets a notification and an offer to accept a spot. Workers who already applied or were invited are skipped.</>}
+      body={<>Every available worker{shift.rosterOnly ? ' on your roster' : ''} whose roles match <b>{shift.jobTypes.join(', ')}</b> gets a notification and an offer to accept a spot. Workers who already applied or were invited are skipped.</>}
       confirmLabel="Send invites"
       busy={inviting}
       onConfirm={() => { setConfirmBroadcast(false); void handleBroadcast(); }}
@@ -555,7 +556,7 @@ export function ShiftDetailScreen() {
     />
     {/* Cancel confirm overlay */}
     {showCancelConfirm && (
-      <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 backdrop-blur-sm px-4 pb-8"
+      <div data-no-pull className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 backdrop-blur-sm px-4 pb-8"
         role="dialog" aria-modal="true" aria-label="Confirm shift cancellation">
         <div className="w-full max-w-app bg-white rounded-[20px] p-5 shadow-xl">
           <h2 className="text-[#111827] font-bold text-[18px] mb-2">Cancel this shift?</h2>
@@ -642,6 +643,12 @@ export function ShiftDetailScreen() {
             {shift.eventType && (
               <span className="bg-[#F3F4F6] text-[#0A1628] text-[12px] font-bold px-3 py-1.5 rounded-full border border-[#E5E7EB]">
                 {shift.eventType}
+              </span>
+            )}
+            {shift.rosterOnly && (
+              <span className="bg-[#F3F4F6] text-[#0A1628] text-[12px] font-bold px-3 py-1.5 rounded-full border border-[#E5E7EB]"
+                title="Only workers on this poster's roster can take this shift">
+                Roster only{shift.clientUsername ? ` · @${shift.clientUsername}` : ''}
               </span>
             )}
             {lifecycle === 'in_progress' && (
@@ -839,9 +846,10 @@ export function ShiftDetailScreen() {
               <>
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   onClick={() => setDirectionsOpen(false)}
-                  className="fixed inset-0 bg-black/40 z-[60]" />
+                  data-no-pull className="fixed inset-0 bg-black/40 z-[60]" />
                 <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
                   transition={{ type: 'spring', stiffness: 400, damping: 38 }}
+                  data-no-pull
                   className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app z-[61] bg-white rounded-t-[20px] px-5 pt-4 pb-9 shadow-2xl">
                   <div className="flex items-center justify-between mb-1">
                     <p className="font-bold text-[16px] text-[#111827]">Get directions</p>
@@ -1170,7 +1178,7 @@ export function ShiftDetailScreen() {
         {/* Owner management — inline, scrolls with content (never overlaps) */}
         {canManage && (
           <div className="px-5 pt-2 pb-8 flex flex-col gap-2 border-t border-[#DBDBDB] mt-2">
-            {profile.role === 'staffer' && lifecycle !== 'ended' && shift.status !== 'cancelled' && (
+            {lifecycle !== 'ended' && shift.status !== 'cancelled' && (
               <motion.button type="button" whileTap={{ scale: 0.97 }}
                 onClick={() => navigate(`/shift/${shiftId}/assign`)}
                 aria-label="Assign workers from your roster"
@@ -1386,7 +1394,7 @@ export function ShiftDetailScreen() {
 
       {/* Withdraw / leave-waitlist confirmation sheet (pending + standby) */}
       {confirmDrop && (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40"
+        <div data-no-pull className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40"
           role="dialog" aria-modal="true" aria-label="Confirm dropping this shift"
           onClick={() => { if (!dropping) setConfirmDrop(false); }}>
           <div className="w-full max-w-app bg-white rounded-t-[20px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+20px)]"

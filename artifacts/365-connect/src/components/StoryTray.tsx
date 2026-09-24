@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRole } from '@/contexts/RoleContext';
 import { useToast } from '@/contexts/ToastContext';
 import { uploadStoryPhoto } from '@/lib/storage';
 import {
@@ -40,10 +41,14 @@ function Ring({ group, onTap }: { group: StoryGroup; onTap: () => void }) {
 
 /**
  * Horizontal story tray for the top of the Explore feed.
- * Always leads with a "Your story" add tile, then rings for people you follow.
+ * Leads with a "Your story" add tile for workers (stories are shown to the
+ * people who follow you, and only workers can be followed), then rings for
+ * people you follow.
  */
 export function StoryTray() {
   const { user } = useAuth();
+  const { role } = useRole();
+  const canPostStory = role === 'worker';
   const { showToast } = useToast();
   const { groups } = useStoryTray();
   const createStory = useCreateStory();
@@ -87,6 +92,7 @@ export function StoryTray() {
       <div className="flex gap-1 px-3 py-3 overflow-x-auto scrollbar-none border-b border-[#EFEFEF]"
         style={{ WebkitOverflowScrolling: 'touch' }}>
         {/* Your story — add tile */}
+        {(canPostStory || myGroup) && (
         <div className="flex flex-col items-center gap-1 flex-shrink-0 w-[70px]">
           <button type="button" onClick={openMine} disabled={uploading}
             aria-label={myGroup ? 'View your story' : 'Add to your story'}
@@ -112,6 +118,7 @@ export function StoryTray() {
             {uploading ? 'Posting…' : 'Your story'}
           </span>
         </div>
+        )}
 
         {/* Followed users' stories */}
         {otherGroups.map((g) => (

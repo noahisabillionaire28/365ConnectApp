@@ -9,6 +9,7 @@ import {
   createContext, useContext, useEffect, useState, type ReactNode,
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { hydrateForUser, clearUser } from '@/store/feedStore';
 import { clearQueryCache } from '@/lib/queryPersist';
@@ -49,6 +50,7 @@ function toSimpleUser(session: Session | null): SimpleUser | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser]       = useState<SimpleUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let active = true;
@@ -83,7 +85,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.id, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signOut = async () => {
-    clearQueryCache(); // don't leak one user's cached data to the next
+    // Don't leak one user's data to the next: the on-device snapshot, the
+    // in-memory query cache and the admin "view as" choice all go.
+    clearQueryCache();
+    queryClient.clear();
+    try { localStorage.removeItem('admin_preview_role'); } catch { /* ignore */ }
     await supabase.auth.signOut();
   };
 
