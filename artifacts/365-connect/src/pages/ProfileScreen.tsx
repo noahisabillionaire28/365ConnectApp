@@ -540,7 +540,11 @@ export function ProfileScreen() {
           <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] p-4 flex flex-col items-center gap-1 text-center">
             <Star size={22} aria-hidden className="text-[#DBDBDB] mb-1" />
             <p className="text-[#737373] text-[13px] font-medium">No reviews yet</p>
-            <p className="text-[#AAAAAA] text-[12px]">Reviews from clients will appear here after your first shift.</p>
+            <p className="text-[#AAAAAA] text-[12px]">
+              {profile.role === 'worker'
+                ? 'Reviews from clients will appear here after your first shift.'
+                : 'Reviews from the workers you book will appear here after your first shift.'}
+            </p>
           </div>
         )}
       </div>

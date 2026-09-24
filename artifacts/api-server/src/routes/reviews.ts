@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { sendError } from '../lib/httpError.js';
+import { createNotification } from './notifications.js';
 
 const router = Router();
 
@@ -150,11 +151,25 @@ router.get('/:userId', async (req, res) => {
     }
   }
 
+  // The shift each review is for, so a profile can list "Past shifts".
+  const shiftIds = [...new Set(rows.map((r) => r.shift_id).filter((id) => id != null))];
+  const shiftMap = new Map<string, { title: string | null; start_time: string | null }>();
+  if (shiftIds.length) {
+    const { data: shifts } = await adminDb
+      .from('shifts')
+      .select('id, title, start_time')
+      .in('id', shiftIds);
+    for (const s of shifts ?? []) shiftMap.set(s.id, { title: s.title ?? null, start_time: s.start_time ?? null });
+  }
+
   const result = rows.map((r) => {
     const reviewer = reviewerMap.get(r.reviewer_id);
+    const shift = r.shift_id ? shiftMap.get(r.shift_id) : undefined;
     return {
       id: r.id,
       shift_id: r.shift_id,
+      shift_title: shift?.title ?? null,
+      shift_start_time: shift?.start_time ?? null,
       reviewer_id: r.reviewer_id,
       reviewee_id: r.reviewee_id,
       rating: r.rating,
@@ -201,9 +216,16 @@ router.post('/', requireAuth, async (req, res) => {
 
   try {
     const { data: shift, error: sErr } = await adminDb
-      .from('shifts').select('id, client_id').eq('id', shift_id).maybeSingle();
+      .from('shifts').select('id, client_id, title, end_time, status').eq('id', shift_id).maybeSingle();
     if (sErr) return res.status(500).json({ error: sErr.message });
     if (!shift) return res.status(404).json({ error: 'Shift not found' });
+
+    // Reviews are for shifts that happened: not before the end, not cancelled.
+    if (shift.status === 'cancelled') return res.status(409).json({ error: 'This shift was cancelled, so it cannot be reviewed.' });
+    const endMs = shift.end_time ? Date.parse(shift.end_time) : NaN;
+    if (shift.status !== 'completed' && Number.isFinite(endMs) && endMs > Date.now()) {
+      return res.status(409).json({ error: 'You can rate this shift once it has ended.' });
+    }
 
     let allowed = false;
     if (shift.client_id === req.userId) {
@@ -231,6 +253,20 @@ router.post('/', requireAuth, async (req, res) => {
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(409).json({ error: 'Review already submitted' });
+
+    // Tell the person who was rated. Their own reviews live on their profile.
+    const { data: reviewer } = await adminDb.from('users').select('username').eq('id', req.userId).maybeSingle();
+    const who = reviewer?.username ? `@${reviewer.username}` : (shift.client_id === req.userId ? 'The organizer' : 'A worker');
+    const stars = `${ratingNum} star${ratingNum === 1 ? '' : 's'}`;
+    await createNotification({
+      userId: reviewee_id,
+      fromUserId: req.userId,
+      type: 'new_review',
+      title: 'New review',
+      body: `${who} rated you ${stars} for ${shift.title ? `"${shift.title}"` : 'a shift'}.`,
+      shiftId: shift_id,
+      url: '/profile',
+    });
     return res.status(201).json(data);
   } catch (e) {
     return sendError(res, e);

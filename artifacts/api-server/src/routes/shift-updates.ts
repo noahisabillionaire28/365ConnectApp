@@ -15,16 +15,16 @@ async function ownsShift(userId: string, shiftId: string): Promise<boolean> {
   return (count ?? 0) > 0;
 }
 
-/** GET /api/shift-updates/:shiftId — updates for a shift (owner or booked worker). */
+/** GET /api/shift-updates/:shiftId — updates for a shift (owner, booked or standby worker). */
 router.get('/:shiftId', requireAuth, async (req, res) => {
   const shiftId = String(req.params.shiftId);
-  // Access: shift owner, a booked worker, or an admin.
+  // Access: shift owner, a booked or waitlisted worker, or an admin.
   const owner = await ownsShift(req.userId!, shiftId);
   let allowed = owner;
   if (!allowed) {
     const { count } = await adminDb
       .from('applications').select('*', { count: 'exact', head: true })
-      .eq('shift_id', shiftId).eq('worker_id', req.userId).eq('status', 'accepted');
+      .eq('shift_id', shiftId).eq('worker_id', req.userId).in('status', ['accepted', 'standby']);
     allowed = (count ?? 0) > 0;
   }
   if (!allowed) allowed = (await getRoleInfo(req.userId!)).isAdmin;

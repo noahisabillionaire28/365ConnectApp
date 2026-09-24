@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { broadcastToUser } from '../lib/sseManager.js';
+import { getRoleInfo } from '../lib/roleCache.js';
 import {
   memberFilter, participantsOf, conversationForUser, ensureShiftGroupChat,
   isBlockedEitherWay, blockedIdsFor, flushScheduledMessages, notifyConversationUpdate,
@@ -137,7 +138,12 @@ router.get('/unread-count', requireAuth, async (req, res) => {
   }
 });
 
-/** POST /api/conversations — get or create a DM between two users */
+/**
+ * POST /api/conversations — get or create the ONE direct thread between two
+ * users. A pair only ever has a single DM: when a shift_id is sent and the
+ * thread already exists, it is re-pinned to that shift instead of a second
+ * thread being created.
+ */
 router.post('/', requireAuth, async (req, res) => {
   const { other_user_id, shift_id } = req.body as Record<string, string | undefined>;
   const myId = req.userId!;
@@ -147,22 +153,36 @@ router.post('/', requireAuth, async (req, res) => {
   if (await isBlockedEitherWay(myId, otherId)) return res.status(403).json({ error: "You can't message this person." });
 
   const findConversation = async () => {
-    let q = adminDb.from('conversations').select('*').eq('is_group', false);
-    q = shift_id ? q.eq('shift_id', shift_id) : q.is('shift_id', null);
-    q = q.or(
-      `and(participant_a_id.eq.${myId},participant_b_id.eq.${otherId}),` +
-        `and(participant_a_id.eq.${otherId},participant_b_id.eq.${myId})`,
-    );
-    const { data } = await q.limit(1).maybeSingle();
-    return data;
+    const { data } = await adminDb
+      .from('conversations')
+      .select('*')
+      .eq('is_group', false)
+      .or(
+        `and(participant_a_id.eq.${myId},participant_b_id.eq.${otherId}),` +
+          `and(participant_a_id.eq.${otherId},participant_b_id.eq.${myId})`,
+      )
+      // Prefer the thread already pinned to this shift, then the most recent.
+      .order('last_message_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(10);
+    const rows = (data ?? []) as ConversationRow[];
+    if (!rows.length) return null;
+    return (shift_id && rows.find((c) => c.shift_id === shift_id)) || rows[0];
   };
 
   try {
     const existing = await findConversation();
     if (existing) {
+      const patch: Record<string, unknown> = {};
       // Re-surface a thread I had deleted for myself.
       if ((existing.deleted_by ?? []).includes(myId)) {
-        await adminDb.from('conversations').update({ deleted_by: (existing.deleted_by as string[]).filter((id: string) => id !== myId) }).eq('id', existing.id);
+        patch.deleted_by = (existing.deleted_by as string[]).filter((id: string) => id !== myId);
+      }
+      // Re-pin the thread to the shift being discussed now.
+      if (shift_id && existing.shift_id !== shift_id) patch.shift_id = shift_id;
+      if (Object.keys(patch).length) {
+        await adminDb.from('conversations').update(patch).eq('id', existing.id);
+        Object.assign(existing, patch);
       }
       return res.json(existing);
     }
@@ -184,15 +204,16 @@ router.post('/', requireAuth, async (req, res) => {
 
 /**
  * POST /api/conversations/shift/:shiftId — open the shift's group chat.
- * Owner/staffer: created on demand with every confirmed worker. Confirmed
- * workers: returned if they're already a member.
+ * Owner (or admin): created on demand with every confirmed worker. Confirmed
+ * workers: returned if they're already a member. A staffer who does not own
+ * the shift is just another non-member.
  */
 router.post('/shift/:shiftId', requireAuth, async (req, res) => {
   const me = req.userId!;
   const shiftId = String(req.params.shiftId);
   const { data: shift } = await adminDb.from('shifts').select('id, client_id').eq('id', shiftId).maybeSingle();
   if (!shift) return res.status(404).json({ error: 'Shift not found' });
-  const isOwner = shift.client_id === me || req.userRole === 'staffer' || req.userRole === 'admin';
+  const isOwner = shift.client_id === me || (await getRoleInfo(me)).isAdmin;
 
   const conv = await ensureShiftGroupChat(shiftId);
   if (!conv) return res.status(500).json({ error: 'Could not open the shift chat' });

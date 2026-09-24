@@ -249,12 +249,27 @@ router.patch('/:id', requireAuth, async (req, res) => {
     if (!reqRow) return res.status(404).json({ error: 'Not found or not authorized' });
     if (reqRow.status !== 'pending') return res.status(409).json({ error: 'Already decided' });
 
-    // Decline is a simple status flip.
+    // Decline: flip the status and tell the owner, so they can invite someone else.
     if (status === 'declined') {
       const { data, error } = await adminDb
         .from('shift_requests').update({ status: 'declined' })
         .eq('id', reqRow.id).select().maybeSingle();
       if (error) return res.status(500).json({ error: error.message });
+      if (reqRow.client_id) {
+        const [{ data: me }, { data: sh }] = await Promise.all([
+          adminDb.from('users').select('username').eq('id', req.userId).maybeSingle(),
+          adminDb.from('shifts').select('title').eq('id', reqRow.shift_id).maybeSingle(),
+        ]);
+        await createNotification({
+          userId: reqRow.client_id,
+          fromUserId: req.userId,
+          type: 'invite_declined',
+          title: 'Invite declined',
+          body: `${me?.username ? `@${me.username}` : 'A worker'} declined your invite to ${sh?.title ? `"${sh.title}"` : 'a shift'}.`,
+          shiftId: reqRow.shift_id,
+          url: `/shift/${reqRow.shift_id}/applicants`,
+        });
+      }
       return res.json(data);
     }
 

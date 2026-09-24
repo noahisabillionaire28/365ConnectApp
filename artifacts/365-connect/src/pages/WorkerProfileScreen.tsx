@@ -29,6 +29,8 @@ type PublicUserRow = {
   hourly_rate: number | null;
   is_pro: boolean;
   availability: Record<string, boolean> | null;
+  /** Clients and agencies: the business they post shifts as. */
+  company_name?: string | null;
   created_at: string;
 };
 
@@ -465,7 +467,11 @@ export function WorkerProfileScreen() {
           )}
         </div>
 
-        <p className="text-[#737373] text-[13px] font-medium mb-1 capitalize">{profile.role}</p>
+        <p className="text-[#737373] text-[13px] font-medium mb-1">
+          {profile.role !== 'worker' && profile.company_name
+            ? <><span className="text-black font-semibold">{profile.company_name}</span> · <span className="capitalize">{profile.role === 'staffer' ? 'Agency' : profile.role}</span></>
+            : <span className="capitalize">{profile.role === 'staffer' ? 'Agency' : profile.role}</span>}
+        </p>
 
         {profile.role === 'worker' && profile.hourly_rate != null && (
           <div className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[12px] font-bold px-2.5 py-1 rounded-full mt-1">
