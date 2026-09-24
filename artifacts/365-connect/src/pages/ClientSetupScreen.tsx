@@ -275,7 +275,9 @@ export function ClientSetupScreen() {
 
   async function continueStep1() {
     if (!fullName.trim()) return;
-    await saveAndAdvance({ bio: fullName.trim() }, 2);
+    // The display name is what workers see as the poster on every shift
+    // until a company name is set on the next step.
+    await saveAndAdvance({ bio: fullName.trim(), company_name: fullName.trim() }, 2);
   }
 
   async function continueStep2() {

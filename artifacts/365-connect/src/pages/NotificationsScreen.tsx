@@ -24,6 +24,7 @@ const ICON_META: Record<string, { icon: React.ComponentType<{ size?: number; cla
   shift_reminder_day:    { icon: AlarmClock,  color: 'navy'  },
   shift_unfilled:        { icon: AlarmClock,  color: 'gold'  },
   timesheet_approved:    { icon: DollarSign,  color: 'green' },
+  payment:               { icon: DollarSign,  color: 'green' },
   shift_update:          { icon: Bell,        color: 'navy'  },
   shift_announcement:    { icon: Bell,        color: 'navy'  },
   booking:               { icon: CheckCheck,  color: 'green' },

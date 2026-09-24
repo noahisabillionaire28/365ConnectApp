@@ -179,17 +179,45 @@ export type ApplicationRow = {
   created_at: string;
 };
 
+/** Every `type` the API server writes to `notifications` (see routes/*.ts). */
 export type NotificationType =
+  // Applications and bookings
   | 'application_received'
-  | 'application_accepted'
   | 'application_declined'
-  | 'new_shift_match'
-  | 'payment_received'
-  | 'new_review'
-  | 'new_follower'
-  | 'direct_shift_request'
+  | 'booking'
+  | 'booking_removed'
+  | 'receipt'
+  | 'shift_invite'
+  | 'invite_declined'
+  | 'arrival_status'
+  | 'call_out'
+  | 'no_show'
+  // Shift lifecycle
   | 'shift_cancelled'
-  | 'shift_starting_soon';
+  | 'shift_update'
+  | 'shift_announcement'
+  | 'shift_starting_soon'
+  | 'shift_reminder_day'
+  | 'shift_unfilled'
+  | 'saved_search'
+  // Timesheets and money
+  | 'hours_recorded'
+  | 'hours_updated'
+  | 'hours_disputed'
+  | 'timesheet_submitted'
+  | 'timesheet_approved'
+  | 'payment'
+  | 'payment_received'
+  // Ratings
+  | 'rate_client'
+  | 'rate_client_reminder'
+  | 'rate_crew'
+  | 'rate_crew_reminder'
+  | 'new_review'
+  // Social
+  | 'new_follower'
+  | 'post_like'
+  | 'post_comment';
 
 /** Matches the live `notifications` table exactly (read_at, not a boolean `read`). */
 export type NotificationRow = {

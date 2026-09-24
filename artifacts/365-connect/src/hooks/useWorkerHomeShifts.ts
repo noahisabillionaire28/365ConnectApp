@@ -9,7 +9,7 @@ const FEED_RADIUS_MI = 25;
 
 export function useWorkerHomeShifts() {
   const profile = useProfile();
-  const { coords, loading: locLoading } = useMyLocation();
+  const { coords, loading: locLoading, isDefault } = useMyLocation();
 
   const workerTypes = [profile.primaryJobType, ...profile.secondaryJobTypes].filter(Boolean) as string[];
 
@@ -24,11 +24,12 @@ export function useWorkerHomeShifts() {
   });
 
   const allShifts = query.data ?? [];
+  // With no real location the distances are measured from a fallback point,
+  // so a radius filter would hide shifts at random: show everything instead.
+  const nearby = (s: MockShift) => isDefault || s.distanceMiles <= FEED_RADIUS_MI;
   const filtered = workerTypes.length
-    ? allShifts.filter(
-        (s) => s.jobTypes.some((t) => workerTypes.includes(t)) && s.distanceMiles <= FEED_RADIUS_MI,
-      )
-    : allShifts.filter((s) => s.distanceMiles <= FEED_RADIUS_MI);
+    ? allShifts.filter((s) => s.jobTypes.some((t) => workerTypes.includes(t)) && nearby(s))
+    : allShifts.filter(nearby);
 
   return {
     shifts: filtered,
