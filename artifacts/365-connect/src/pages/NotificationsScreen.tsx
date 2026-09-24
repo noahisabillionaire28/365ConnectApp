@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import {
   MapPin, CheckCheck, XCircle, Bell, DollarSign, Star, UserPlus, Send, AlarmClock, Ban, Settings,
-  Heart, MessageCircle, Clock3, FileClock, AlertTriangle, BellRing, UserMinus, Pencil,
+  Heart, MessageCircle, Clock3, FileClock, AlertTriangle, BellRing, UserMinus, Pencil, Repeat2,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { BottomTabNav } from '@/components/BottomTabNav';
@@ -52,6 +52,12 @@ const ICON_META: Record<string, { icon: React.ComponentType<{ size?: number; cla
   shift_invite:          { icon: Send,        color: 'navy'  },
   // Alerts
   saved_search:          { icon: BellRing,    color: 'blue'  },
+  // Shift swaps
+  swap_offer:            { icon: Repeat2,     color: 'navy'  },
+  swap_accepted:         { icon: Repeat2,     color: 'blue'  },
+  swap_pending:          { icon: Repeat2,     color: 'gold'  },
+  swap_approved:         { icon: CheckCheck,  color: 'green' },
+  swap_declined:         { icon: XCircle,     color: 'red'   },
 };
 
 const COLOR_CLASSES: Record<IconColor, { bg: string; icon: string }> = {

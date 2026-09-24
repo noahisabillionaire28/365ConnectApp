@@ -10,6 +10,7 @@ import { HttpError, sendError } from '../lib/httpError.js';
 import { assertShiftOwner, assertWorkerTarget, loadShift, rosterAllows } from '../lib/shiftAccess.js';
 import { bookWorker, markRequestAccepted, syncShiftCapacity } from '../lib/booking.js';
 import { shiftDayLabel } from '../lib/shiftLabel.js';
+import { cancelActiveSwapsFor } from '../lib/swaps.js';
 
 const router = Router();
 
@@ -307,21 +308,67 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-/** GET /api/applications/status/:shiftId - caller's own status for a shift */
+/**
+ * GET /api/applications/status/:shiftId - caller's own status for a shift,
+ * plus the swap state the shift page needs: `swap` is the latest swap the
+ * caller started from this booking (any status, so a decline can be shown
+ * and an approved one explains why they are no longer booked), and
+ * `incoming_swap` is an open offer made TO the caller for this shift.
+ */
 router.get('/status/:shiftId', requireAuth, async (req, res) => {
+  const shiftId = String(req.params.shiftId);
   try {
     const { data, error } = await adminDb
       .from('applications')
-      .select('id, status, arrival_status, arrival_status_at')
-      .eq('shift_id', req.params.shiftId)
+      .select('id, status, arrival_status, arrival_status_at, callout_reason')
+      .eq('shift_id', shiftId)
       .eq('worker_id', req.userId)
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
+
+    let swap: Record<string, unknown> | null = null;
+    if (data?.id) {
+      const { data: s } = await adminDb
+        .from('shift_swaps')
+        .select('id, status, to_worker_id, note, created_at, responded_at, decided_at')
+        .eq('application_id', data.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (s) {
+        const { data: u } = await adminDb.from('users').select('username').eq('id', s.to_worker_id).maybeSingle();
+        swap = { ...s, to_username: u?.username ?? null };
+      }
+    }
+    let incoming: Record<string, unknown> | null = null;
+    const { data: offer } = await adminDb
+      .from('shift_swaps')
+      .select('id, status, from_worker_id, note, created_at')
+      .eq('shift_id', shiftId)
+      .eq('to_worker_id', req.userId)
+      .eq('status', 'offered')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (offer) {
+      const { data: u } = await adminDb
+        .from('users').select('username, photo_url, rating').eq('id', offer.from_worker_id).maybeSingle();
+      incoming = {
+        ...offer,
+        from_username: u?.username ?? null,
+        from_photo_url: u?.photo_url ?? null,
+        from_rating: u?.rating ?? null,
+      };
+    }
+
     return res.json({
       status: data?.status ?? null,
       id: data?.id ?? null,
       arrival_status: data?.arrival_status ?? null,
       arrival_status_at: data?.arrival_status_at ?? null,
+      callout_reason: data?.callout_reason ?? null,
+      swap,
+      incoming_swap: incoming,
     });
   } catch (e) {
     return res.status(500).json({ error: String(e) });
@@ -522,7 +569,11 @@ router.patch('/:id', requireAuth, async (req, res) => {
       // (trg_handle_application_released) decrements spots_filled for
       // withdrawn/declined/rejected; deriving from the accepted count keeps it
       // exact for every transition (incl. accepted → pending) without double-counting.
-      if (appRow.status === 'accepted') await syncShiftCapacity(appRow.shift_id);
+      if (appRow.status === 'accepted') {
+        await syncShiftCapacity(appRow.shift_id);
+        // A worker who lost their spot can no longer hand it to someone else.
+        await cancelActiveSwapsFor(appRow.shift_id, appRow.worker_id);
+      }
     }
 
     // Keep the shift group chat in step with the roster.
@@ -666,6 +717,7 @@ router.post('/withdraw', requireAuth, requireRole('worker'), async (req, res) =>
       await removeWorkerFromShiftChat(shift_id, req.userId!);
       // Spot freed (the DB trigger decrements; this derives the exact count).
       await syncShiftCapacity(shift_id);
+      await cancelActiveSwapsFor(shift_id, req.userId!);
     }
 
     // Let the owner know — a dropped booking reopens a spot; a withdrawn
@@ -890,6 +942,8 @@ router.post('/:id/call-out', requireAuth, requireRole('worker'), async (req, res
     if (!released) return res.status(409).json({ error: "You're not booked for this shift." });
     await removeWorkerFromShiftChat(app.shift_id, req.userId!);
     await syncShiftCapacity(app.shift_id);
+    // Any swap they had in flight is void now that the spot is gone.
+    await cancelActiveSwapsFor(app.shift_id, req.userId!);
 
     // 2. Auto-fill from standby: earliest first, skipping time conflicts.
     const { data: standbys } = await adminDb

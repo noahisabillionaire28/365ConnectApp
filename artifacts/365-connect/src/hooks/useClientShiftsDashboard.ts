@@ -25,12 +25,16 @@ type RawShift = {
   event_id?: string | null;
   /** Applicants still waiting on a decision (computed by the API). */
   pending_count?: number;
+  /** Swaps both workers agreed on that only the poster can finish. */
+  swap_count?: number;
 };
 
 export type ClientShift = RawShift & {
   applicationCount: number;
   /** Alias for applicationCount */
   applicantCount: number;
+  /** Swaps waiting on the poster's approval */
+  swapCount: number;
   /** camelCase aliases */
   eventType: string | null;
   jobType: string | null;
@@ -50,6 +54,7 @@ function toClientShift(s: RawShift): ClientShift {
     ...s,
     applicationCount: appCount,
     applicantCount:   appCount,
+    swapCount:        s.swap_count ?? 0,
     eventType:        s.event_type  ?? null,
     jobType:          s.job_type    ?? null,
     companyName:      s.company_name ?? null,

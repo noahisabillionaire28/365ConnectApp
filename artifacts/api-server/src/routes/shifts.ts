@@ -213,7 +213,19 @@ router.get('/my', requireAuth, async (req, res) => {
       .eq('status', 'pending');
     for (const a of apps ?? []) pending.set(a.shift_id, (pending.get(a.shift_id) ?? 0) + 1);
   }
-  return res.json((data ?? []).map((s) => ({ ...s, pending_count: pending.get(s.id) ?? 0 })));
+  // Swaps the worker side has agreed on and only the poster can finish.
+  const swaps = new Map<string, number>();
+  if (ids.length) {
+    const { data: sw } = await adminDb
+      .from('shift_swaps')
+      .select('shift_id')
+      .in('shift_id', ids)
+      .eq('status', 'accepted');
+    for (const s of sw ?? []) swaps.set(s.shift_id, (swaps.get(s.shift_id) ?? 0) + 1);
+  }
+  return res.json((data ?? []).map((s) => ({
+    ...s, pending_count: pending.get(s.id) ?? 0, swap_count: swaps.get(s.id) ?? 0,
+  })));
 });
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

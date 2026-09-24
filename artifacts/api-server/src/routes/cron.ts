@@ -15,6 +15,7 @@ import { adminDb } from '../lib/supabaseAdmin.js';
 import { createNotification } from './notifications.js';
 import { logger } from '../lib/logger.js';
 import { shiftDayLabel } from '../lib/shiftLabel.js';
+import { expireSwaps } from '../lib/swaps.js';
 
 const router = Router();
 
@@ -373,7 +374,7 @@ async function sweepEnded(): Promise<number> {
 async function tick() {
   const now = Date.now();
   const H = 3600_000;
-  const [startingSoon, tomorrow, unfilled, completed, savedSearch] = await Promise.all([
+  const [startingSoon, tomorrow, unfilled, completed, savedSearch, expiredSwaps] = await Promise.all([
     // "Starts in about 2 hours" — 15-minute pg_cron cadence keeps this tight.
     remindWorkers(now + 1.75 * H, now + 2.25 * H, 'shift_starting_soon', (s) => reminderBody(s, '(in 2h)')),
     // Day-before reminder — anything starting in the next 20–28 hours.
@@ -381,11 +382,13 @@ async function tick() {
     nudgeUnfilled(),
     sweepEnded(),
     alertSavedSearches(),
+    // A swap still in flight when its shift starts is void.
+    expireSwaps(),
   ]);
   // After the sweep so a just-ended shift is already 'completed'.
   const ratePrompts = await promptRatings(1, 3, { worker: 'rate_client', poster: 'rate_crew' });
   const rateReminders = await promptRatings(25, 27, { worker: 'rate_client_reminder', poster: 'rate_crew_reminder' });
-  return { startingSoon, tomorrow, unfilled, completed, savedSearch, ratePrompts, rateReminders };
+  return { startingSoon, tomorrow, unfilled, completed, savedSearch, expiredSwaps, ratePrompts, rateReminders };
 }
 
 async function handle(req: import('express').Request, res: import('express').Response) {

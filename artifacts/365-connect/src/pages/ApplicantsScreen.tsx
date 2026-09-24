@@ -3,8 +3,9 @@ import { useParams, useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   ChevronLeft, Check, X, Star, Send, UserPlus, Users, AlarmClock,
-  CheckCircle2, Flag, DollarSign, Clock3, MessageCircle, MessagesSquare,
+  CheckCircle2, Flag, DollarSign, Clock3, MessageCircle, MessagesSquare, ArrowRight, Repeat2,
 } from 'lucide-react';
+import { useShiftSwaps, useDecideSwap, isSwapActive, type ShiftSwap, type SwapPerson } from '@/hooks/useSwaps';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { useShiftRanking } from '@/hooks/useMatch';
 import { getOrCreateDirectConversation, openShiftGroupChat } from '@/hooks/useConversations';
@@ -77,6 +78,29 @@ function dayOfSummary(workers: AcceptedWorker[]): string {
   if (n('arrived'))      parts.push(`${n('arrived')} arrived`);
   if (n('clocked_in'))   parts.push(`${n('clocked_in')} clocked in`);
   return parts.length ? parts.join(' · ') : 'No day-of updates from workers yet.';
+}
+
+/** One side of a swap: avatar, handle, rating, shifts worked. */
+function SwapPersonCell({ p, muted }: { p: SwapPerson; muted?: boolean }) {
+  return (
+    <div className="flex-1 min-w-0 flex items-center gap-2">
+      <Avatar url={p.photoUrl} name={p.username} size={32} />
+      <div className="min-w-0">
+        <p className={`font-semibold text-[13px] truncate ${muted ? 'text-[#6B7280]' : 'text-[#111827]'}`}>
+          {p.username ? `@${p.username}` : 'Worker'}
+        </p>
+        <p className="text-[#6B7280] text-[11px] flex items-center gap-1 truncate">
+          {(p.rating ?? 0) > 0 && (
+            <span className="flex items-center gap-0.5">
+              <Star size={10} aria-hidden className="text-[#FFD700] fill-[#FFD700]" />{(p.rating ?? 0).toFixed(1)}
+            </span>
+          )}
+          {(p.shiftsWorked ?? 0) > 0 && <span>· {p.shiftsWorked} worked</span>}
+          {!(p.rating ?? 0) && !(p.shiftsWorked ?? 0) && <span>New here</span>}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function SectionHeader({ label, count }: { label: string; count: number }) {
@@ -307,6 +331,10 @@ export function ApplicantsScreen() {
   const { applicants, isLoading: appsLoading, approve, decline, refetch: refetchApps } = useShiftApplicants(id);
   const { workers: confirmed, isLoading: confLoading, refetch: refetchConfirmed } = useAcceptedWorkers(id);
   const { invites, refetch: refetchInvites } = useShiftInvites(id);
+  // Swaps between workers that need (or needed) the poster's decision.
+  const { swaps, refetch: refetchSwaps } = useShiftSwaps(canManage ? id : undefined);
+  const { decide: decideSwap, busyId: swapBusyId } = useDecideSwap();
+  const pendingSwaps = swaps.filter((s) => isSwapActive(s.status));
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -361,7 +389,16 @@ export function ApplicantsScreen() {
   const dayOf = !closed && confirmed.length > 0 && (started || isToday(shift?.startTimeISO));
   const isFull = !!shift && confirmed.length >= total;
 
-  function refetchAll() { void refetchApps(); void refetchConfirmed(); void refetchInvites(); }
+  function refetchAll() { void refetchApps(); void refetchConfirmed(); void refetchInvites(); void refetchSwaps(); }
+
+  /** Approve (the spot moves) or decline a swap the two workers agreed on. */
+  async function handleSwapDecision(s: ShiftSwap, action: 'approve' | 'decline') {
+    const err = await decideSwap(s.id, action, id);
+    if (err) { showToast(err, 'error'); return; }
+    const to = s.toWorker.username ? `@${s.toWorker.username}` : 'the new worker';
+    showToast(action === 'approve' ? `Swap approved — ${to} is now confirmed.` : 'Swap declined.');
+    refetchAll();
+  }
 
   // Auto-refresh every 30s so the roster stays live during a shift.
   useEffect(() => {
@@ -552,6 +589,51 @@ export function ApplicantsScreen() {
           </div>
         ) : (
           <>
+            {/* Swap requests — a booked worker handing their spot to someone */}
+            {pendingSwaps.length > 0 && !closed && (
+              <>
+                <SectionHeader label="Swap requests" count={pendingSwaps.length} />
+                <div className="flex flex-col gap-2">
+                  {pendingSwaps.map((s) => {
+                    const toName = s.toWorker.username ? `@${s.toWorker.username}` : 'the worker';
+                    const busy = swapBusyId === s.id;
+                    return (
+                      <div key={s.id} className="bg-white border border-amber-200 rounded-[12px] px-3.5 py-3 flex flex-col gap-2.5">
+                        <div className="flex items-center gap-2">
+                          <SwapPersonCell p={s.fromWorker} muted />
+                          <ArrowRight size={15} aria-hidden className="text-[#9CA3AF] flex-shrink-0" />
+                          <SwapPersonCell p={s.toWorker} />
+                        </div>
+                        {s.note && <p className="text-[#6B7280] text-[12px] italic leading-snug">“{s.note}”</p>}
+                        {s.status === 'accepted' ? (
+                          <div className="flex gap-2">
+                            <button type="button" disabled={busy} onClick={() => void handleSwapDecision(s, 'decline')}
+                              className="flex-1 h-9 rounded-[8px] border border-[#E5E7EB] text-[#6B7280] text-[12px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60">
+                              <X size={13} aria-hidden /> Decline
+                            </button>
+                            <button type="button" disabled={busy} onClick={() => void handleSwapDecision(s, 'approve')}
+                              className="flex-1 h-9 rounded-[8px] bg-[#10B981] text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
+                              <Repeat2 size={13} aria-hidden /> {busy ? 'Approving…' : 'Approve swap'}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-[#FAFAFA] border-[#DBDBDB] text-[#737373] flex items-center gap-1">
+                              <AlarmClock size={11} aria-hidden /> Waiting for {toName}
+                            </span>
+                            <button type="button" disabled={busy} onClick={() => void handleSwapDecision(s, 'decline')}
+                              className="ml-auto h-8 px-3 rounded-[8px] border border-[#E5E7EB] text-[#6B7280] text-[12px] font-semibold flex items-center gap-1 disabled:opacity-60">
+                              <X size={13} aria-hidden /> Decline
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
             {/* Confirmed */}
             <SectionHeader label="Confirmed" count={confirmed.length} />
             {dayOf && (
@@ -709,7 +791,7 @@ export function ApplicantsScreen() {
               </>
             )}
 
-            {confirmed.length === 0 && pending.length === 0 && invitedPending.length === 0 && standby.length === 0 && (
+            {confirmed.length === 0 && pending.length === 0 && invitedPending.length === 0 && standby.length === 0 && pendingSwaps.length === 0 && (
               <div className="text-center py-10">
                 <p className="text-[#6B7280] text-[13px]">No one on the roster yet. Tap “Request All Workers” to invite people.</p>
               </div>

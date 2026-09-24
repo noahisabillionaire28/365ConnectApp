@@ -24,13 +24,16 @@ function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number):
  * GET /api/workers — the worker directory ("Browse Workers" / Explore).
  * Optional: ?role=worker|client|staffer (default worker) &job_type=Bartender
  *           &lat=25.7&lng=-80.1 (viewer position → distance_miles on each row)
+ *           &q=mar (username contains, for pickers) &exclude_self=1
  * Adds per row: distance_miles (null without lat/lng), is_available,
  * availability, and is_followed. Signed-in only, and home coordinates are
  * coarsened to two decimals for everyone but the viewer themselves and admins
  * (distance is computed from the exact values before that).
  */
 router.get('/', requireAuth, async (req, res) => {
-  const { role = 'worker', job_type, limit = '50', offset = '0', lat, lng } = req.query as Record<string, string>;
+  const {
+    role = 'worker', job_type, limit = '50', offset = '0', lat, lng, q: search, exclude_self,
+  } = req.query as Record<string, string>;
   try {
     const viewerIsAdmin = (await getRoleInfo(req.userId!)).isAdmin;
     const lim = Math.min(Math.max(parseInt(limit) || 50, 1), 100);
@@ -56,6 +59,11 @@ router.get('/', requireAuth, async (req, res) => {
         `primary_job_type.eq.${job_type},job_types.cs.{${job_type}},secondary_job_types.cs.{${job_type}}`,
       );
     }
+    // Name search for pickers (swap sheet). Pattern characters are stripped so
+    // a typed "%" or "_" cannot widen the match.
+    const term = (search ?? '').trim().replace(/^@/, '').replace(/[%_,().\\*]/g, '').slice(0, 40);
+    if (term) q = q.ilike('username', `%${term}%`);
+    if (exclude_self === '1' || exclude_self === 'true') q = q.neq('id', req.userId);
 
     const { data: raw, error } = await q
       .order('rating', { ascending: false })
