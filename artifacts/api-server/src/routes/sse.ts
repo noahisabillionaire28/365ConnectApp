@@ -13,6 +13,8 @@ import { addConnection, removeConnection } from "../lib/sseManager.js";
 import { adminDb } from "../lib/supabaseAdmin.js";
 import { verifySupabaseToken } from "../lib/jwtVerify.js";
 import { logger } from "../lib/logger.js";
+import { getRoleInfo } from "../lib/roleCache.js";
+import { SUSPENDED_ERROR } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -42,6 +44,11 @@ router.get("/sse", async (req, res) => {
   if (!userId && token) userId = await userIdFromToken(token);
   if (!userId) {
     res.status(401).json({ error: "Unauthorized — a valid access token is required" });
+    return;
+  }
+  // A suspended or banned account gets no live stream either.
+  if ((await getRoleInfo(userId)).isSuspended) {
+    res.status(403).json(SUSPENDED_ERROR);
     return;
   }
 

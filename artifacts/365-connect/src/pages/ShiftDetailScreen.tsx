@@ -176,6 +176,7 @@ export function ShiftDetailScreen() {
   const { showToast } = useToast();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [directionsOpen, setDirectionsOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -304,10 +305,12 @@ export function ShiftDetailScreen() {
   // shifts.status, since RLS only lets the shift's client owner update shifts.
   const canClaim = shift.instantClaim && shift.spotsAvailable > 0;
   type CtaState =
-    | 'apply' | 'claim' | 'pending' | 'declined' | 'withdrawn' | 'clock-in' | 'completed'
+    | 'apply' | 'claim' | 'pending' | 'declined' | 'clock-in' | 'completed'
     | 'standby' | 'cancelled' | 'past' | 'full';
   // Order matters: a booked worker still sees clock-in/completed on a past shift,
-  // but an unbooked worker must never be offered Apply on a cancelled/ended/full one.
+  // but an unbooked worker must never be offered Apply on a cancelled/ended one.
+  // A full shift offers the waitlist instead (the server books from it when a
+  // spot opens).
   const ctaState: CtaState =
     shift.status === 'cancelled'
       ? 'cancelled'
@@ -322,9 +325,9 @@ export function ShiftDetailScreen() {
       : applicationStatus === 'declined' || applicationStatus === 'rejected'
       ? 'declined'
       // A dropped application isn't final: while the shift is still open the
-      // worker may apply again (the server flips the row back to pending).
+      // worker may apply (or join the waitlist) again.
       : applicationStatus === 'withdrawn'
-      ? (lifecycle === 'ended' ? 'past' : shift.spotsAvailable <= 0 ? 'withdrawn' : canClaim ? 'claim' : 'apply')
+      ? (lifecycle === 'ended' ? 'past' : shift.spotsAvailable <= 0 ? 'full' : canClaim ? 'claim' : 'apply')
       : lifecycle === 'ended'
       ? 'past'
       : shift.spotsAvailable <= 0
@@ -332,6 +335,7 @@ export function ShiftDetailScreen() {
       : canClaim
       ? 'claim'
       : 'apply';
+  const joiningWaitlist = applying;
 
   // Day-of pills ("On my way" / "Running late") for a booked worker once the
   // shift is within 12 hours or in progress.
@@ -405,15 +409,27 @@ export function ShiftDetailScreen() {
     }
   }
 
+  /** Apply, or join the waitlist when the shift is full — the server decides which. */
+  function handleApply() {
+    if (applying) return;
+    setApplying(true);
+    void submitApplication(
+      shiftId,
+      matchScore ?? undefined,
+      (outcome) => {
+        setApplying(false);
+        showToast(outcome === 'standby'
+          ? "You're on the waitlist. We'll let you know if a spot opens."
+          : 'Applied! The client will review your application.');
+        invalidateShiftCaches();
+        void refetchApplicationStatus();
+      },
+      (msg) => { setApplying(false); showToast(msg, 'error'); void refetchApplicationStatus(); },
+    ).finally(() => setApplying(false));
+  }
+
   function handleCta() {
-    if (ctaState === 'apply') {
-      void submitApplication(
-        shiftId,
-        matchScore ?? undefined,
-        () => { showToast('Applied! The client will review your application.'); void refetchApplicationStatus(); },
-        (msg) => showToast(msg, 'error'),
-      );
-    }
+    if (ctaState === 'apply' || ctaState === 'full') handleApply();
     if (ctaState === 'claim') void handleClaim();
     if (ctaState === 'clock-in' && canClockIn) navigate(`/clock/${shiftId}`);
   }
@@ -442,7 +458,8 @@ export function ShiftDetailScreen() {
     try {
       const raw = await apiClient(user.id).get<Record<string, unknown>>(`/shifts/${shiftId}`);
       if (!raw || raw.client_id !== user.id) return;
-      // Times are instants; edit them as the venue's wall clock.
+      // Times are instants; edit them as the venue's wall clock, in the
+      // venue's own zone (which the edit keeps, wherever it is made from).
       const tz    = (raw.timezone as string | null) || DEFAULT_SHIFT_TZ;
       const start = utcToZonedParts(raw.start_time as string, tz);
       const end   = utcToZonedParts(raw.end_time as string, tz);
@@ -450,6 +467,7 @@ export function ShiftDetailScreen() {
       const start_time = start.time || '18:00';
       const end_time   = end.time   || '23:00';
       const jobTypes   = Array.isArray(raw.job_types) ? (raw.job_types as string[]) : [];
+      const payPeriod  = raw.pay_period === 'day' || raw.pay_period === 'event' ? raw.pay_period : 'hr';
       resetDraft();
       setDraft({
         event_type:      (raw.event_type      as string | null)    ?? '',
@@ -466,8 +484,10 @@ export function ShiftDetailScreen() {
         date:            mode === 'edit' ? date : '',
         start_time,
         end_time,
+        timezone:        tz,
         spots_available: (raw.spots_available as number)           ?? 1,
         pay_rate:        (raw.pay_rate        as number | null)    ?? 0,
+        pay_period:      payPeriod,
         description:     (raw.description     as string | null)    ?? '',
         requirements:    (raw.requirements    as string[] | null)  ?? [],
       });
@@ -646,17 +666,43 @@ export function ShiftDetailScreen() {
           </div>
         </div>
 
-        {/* Client */}
-        <div className="flex items-center gap-4 px-5 py-4 border-b border-[#DBDBDB]">
-          <ClientLogo name={shift.companyName} />
-          <div className="flex-1 min-w-0">
-            <p className="text-black font-bold text-[17px] leading-tight truncate">{shift.companyName}</p>
-            <div className="flex items-center gap-1.5 mt-1">
-              <MapPin size={12} aria-hidden className="text-[#737373] flex-shrink-0" />
-              <p className="text-[#737373] text-[13px] truncate">{shift.location} · {distanceMilesLabel} mi away</p>
-            </div>
-          </div>
-        </div>
+        {/* Client — tap through to the poster's profile (and their reviews) */}
+        {(() => {
+          const profileHref = shift.clientUsername && !isOwner ? `/worker/${shift.clientUsername}` : null;
+          const inner = (
+            <>
+              <ClientLogo name={shift.companyName} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <p className="text-black font-bold text-[17px] leading-tight truncate">{shift.companyName}</p>
+                  {shift.clientRating != null && (
+                    <span className="flex items-center gap-0.5 text-[13px] font-semibold text-[#111827] flex-shrink-0"
+                      aria-label={`Rated ${shift.clientRating.toFixed(1)} out of 5`}>
+                      <Star size={12} aria-hidden className="text-[#FFD700] fill-[#FFD700]" />
+                      {shift.clientRating.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <MapPin size={12} aria-hidden className="text-[#737373] flex-shrink-0" />
+                  <p className="text-[#737373] text-[13px] truncate">
+                    {shift.location}{!myLocationIsDefault ? ` · ${distanceMilesLabel} mi away` : ''}
+                  </p>
+                </div>
+              </div>
+              {profileHref && <span className="text-[#9CA3AF] text-[16px] flex-shrink-0" aria-hidden>→</span>}
+            </>
+          );
+          return profileHref ? (
+            <button type="button" onClick={() => navigate(profileHref)}
+              aria-label={`View ${shift.companyName}'s profile`}
+              className="w-full flex items-center gap-4 px-5 py-4 border-b border-[#DBDBDB] text-left active:bg-[#FAFAFA]">
+              {inner}
+            </button>
+          ) : (
+            <div className="flex items-center gap-4 px-5 py-4 border-b border-[#DBDBDB]">{inner}</div>
+          );
+        })()}
 
         {/* Schedule tiles */}
         <div className="flex gap-3 px-5 pt-4 pb-5" role="group" aria-label="Shift schedule">
@@ -992,13 +1038,15 @@ export function ShiftDetailScreen() {
           )}
         </div>
 
-        {/* Cost breakdown — owner-only, shows gross / 8% fee / total estimate */}
+        {/* Cost breakdown — owner-only: hourly shifts multiply by the hours,
+            day / event rates are a flat amount per worker */}
         {canManage && shift.payRate > 0 && (
           <div className="px-5 pb-6">
             <SectionHeading>Cost Estimate</SectionHeading>
             {(() => {
+              const hourly  = shift.payPeriod === 'hr';
               const durHrs  = calcDurationHours(shift.startTime, shift.endTime);
-              const gross   = shift.payRate * shift.spotsTotal * durHrs;
+              const gross   = hourly ? shift.payRate * shift.spotsTotal * durHrs : shift.payRate * shift.spotsTotal;
               const total   = gross;
               const fmtUsd  = (n: number) =>
                 n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -1006,7 +1054,9 @@ export function ShiftDetailScreen() {
                 <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-4">
                   <div className="flex justify-between items-center py-2 border-b border-[#EFEFEF]">
                     <p className="text-[#737373] text-[13px]">
-                      {shift.spotsTotal} worker{shift.spotsTotal !== 1 ? 's' : ''} × {durHrs.toFixed(1)}h × ${shift.payRate}/hr
+                      {hourly
+                        ? `${shift.spotsTotal} worker${shift.spotsTotal !== 1 ? 's' : ''} × ${durHrs.toFixed(1)}h × $${shift.payRate}/hr`
+                        : `${shift.spotsTotal} worker${shift.spotsTotal !== 1 ? 's' : ''} × $${shift.payRate} per ${shift.payPeriod}`}
                     </p>
                     <p className="text-black font-semibold text-[14px]">{fmtUsd(gross)}</p>
                   </div>
@@ -1015,7 +1065,9 @@ export function ShiftDetailScreen() {
                     <p className="text-black font-bold text-[18px]">{fmtUsd(total)}</p>
                   </div>
                   <p className="text-[#AAAAAA] text-[11px] mt-3 leading-relaxed">
-                    Estimated total based on listed hours and all spots filled. Final cost depends on actual clock-out times.
+                    {hourly
+                      ? 'Estimated total based on listed hours and all spots filled. Final cost depends on actual clock-out times.'
+                      : 'Flat rate per worker with all spots filled. Final cost depends on who works the shift.'}
                   </p>
                 </div>
               );
@@ -1198,10 +1250,10 @@ export function ShiftDetailScreen() {
         </AnimatePresence>
 
         {ctaState === 'apply' && !isOwner && (
-          <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleCta}
+          <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleCta} disabled={applying}
             aria-label={`Apply to ${shift.companyName}`}
-            className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] tracking-wide">
-            Apply Now
+            className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] tracking-wide disabled:opacity-70">
+            {applying ? 'Applying…' : 'Apply Now'}
           </motion.button>
         )}
 
@@ -1240,12 +1292,6 @@ export function ShiftDetailScreen() {
           </div>
         )}
 
-        {ctaState === 'withdrawn' && (
-          <div className="w-full h-[52px] rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center gap-2.5">
-            <span className="text-[#737373] font-semibold text-[15px]">You dropped this shift · now full</span>
-          </div>
-        )}
-
         {ctaState === 'cancelled' && (
           <div className="w-full h-[52px] rounded-[8px] bg-red-50 border border-red-200 flex items-center justify-center gap-2.5">
             <span className="text-red-500 font-semibold text-[15px]">This shift was cancelled</span>
@@ -1259,8 +1305,16 @@ export function ShiftDetailScreen() {
         )}
 
         {ctaState === 'full' && (
-          <div className="w-full h-[52px] rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center gap-2.5">
-            <span className="text-[#737373] font-semibold text-[15px]">This shift is full</span>
+          <div className="flex flex-col gap-2">
+            <p className="text-center text-[#737373] text-[12px]">
+              This shift is full. Join the waitlist and you'll be booked automatically if a spot opens.
+            </p>
+            <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleCta} disabled={joiningWaitlist}
+              aria-label="Join the waitlist for this shift"
+              className="w-full h-[52px] rounded-[8px] border-2 border-[#0A1628] bg-white text-[#0A1628] font-bold text-[16px] tracking-wide flex items-center justify-center gap-2 disabled:opacity-60">
+              <AlarmClock size={18} aria-hidden />
+              {joiningWaitlist ? 'Joining…' : 'Join waitlist'}
+            </motion.button>
           </div>
         )}
 

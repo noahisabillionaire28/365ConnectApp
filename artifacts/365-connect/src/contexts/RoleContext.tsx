@@ -18,7 +18,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 
 export type UserRole = 'worker' | 'client' | 'staffer' | 'admin' | null;
-export type UserStatus = 'active' | 'suspended' | 'flagged' | null;
+export type UserStatus = 'active' | 'suspended' | 'banned' | 'flagged' | null;
+
+/** True when the account is locked out (the server refuses every other request with 403). */
+export function isLockedStatus(status: UserStatus): boolean {
+  return status === 'suspended' || status === 'banned';
+}
 export type PreviewRole = 'worker' | 'client' | 'staffer';
 
 const PREVIEW_KEY = 'admin_preview_role';
@@ -37,7 +42,7 @@ type RoleContextType = {
   role:        UserRole;
   /** The account's true role from the database (unaffected by preview). */
   realRole:    UserRole;
-  /** Admin moderation status — 'suspended' means the account is banned. */
+  /** Admin moderation status — 'suspended' / 'banned' lock the account out. */
   status:      UserStatus;
   /** True when the account can access the admin panel (flag or legacy role). */
   isAdmin:     boolean;

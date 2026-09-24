@@ -1,6 +1,11 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
+import { createNotification } from './notifications.js';
+import { sendError } from '../lib/httpError.js';
+import { assertShiftOwner } from '../lib/shiftAccess.js';
+import { formatUsd } from '../lib/shiftLabel.js';
 
 const router = Router();
 
@@ -80,34 +85,74 @@ function stripeKey(): string | null {
   return process.env['STRIPE_SECRET_KEY'] || null;
 }
 
-/** POST /api/payments/checkout — create a Stripe Checkout session for a shift payment */
+const checkoutBody = z.object({
+  shift_id: z.string().min(1, 'shift_id is required'),
+  worker_id: z.string().min(1, 'worker_id is required'),
+});
+
+/** Has this worker already been paid (a completed shift payment) for the shift? */
+async function alreadyPaid(shiftId: string, workerId: string): Promise<boolean> {
+  const { count } = await adminDb
+    .from('payments')
+    .select('*', { count: 'exact', head: true })
+    .eq('shift_id', shiftId)
+    .eq('worker_id', workerId)
+    .eq('status', 'completed');
+  return (count ?? 0) > 0;
+}
+
+/**
+ * POST /api/payments/checkout { shift_id, worker_id } — create a Stripe
+ * Checkout session for a shift payment. The amount is never taken from the
+ * request: it is the approved pay on the worker's timesheet for that shift.
+ * Only the shift owner (or an admin) may pay, the timesheet must be approved,
+ * and a worker cannot be paid twice for the same shift (409).
+ */
 router.post('/checkout', requireAuth, async (req, res) => {
   const key = stripeKey();
   if (!key) return res.status(503).json({ error: 'Payments are not configured yet.' });
 
-  const { shift_id, worker_id, amount } = req.body as Record<string, unknown>;
-  const amountNum = Number(amount);
-  if (!amountNum || amountNum <= 0) {
-    return res.status(400).json({ error: 'A positive amount is required' });
-  }
-  const origin =
-    (typeof req.headers['origin'] === 'string' && req.headers['origin']) ||
-    'https://365-connect-app.vercel.app';
-
-  const form = new URLSearchParams();
-  form.set('mode', 'payment');
-  form.set('success_url', `${origin}/earnings?paid=1&session_id={CHECKOUT_SESSION_ID}`);
-  form.set('cancel_url', `${origin}/shift/${typeof shift_id === 'string' ? shift_id : ''}`);
-  form.append('line_items[0][quantity]', '1');
-  form.append('line_items[0][price_data][currency]', 'usd');
-  form.append('line_items[0][price_data][unit_amount]', String(Math.round(amountNum * 100)));
-  form.append('line_items[0][price_data][product_data][name]', 'Shift payment');
-  form.append('metadata[shift_id]', typeof shift_id === 'string' ? shift_id : '');
-  form.append('metadata[worker_id]', typeof worker_id === 'string' ? worker_id : '');
-  form.append('metadata[client_id]', String(req.userId));
-  form.append('metadata[amount]', String(amountNum));
+  const parsed = checkoutBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
+  const { shift_id, worker_id } = parsed.data;
 
   try {
+    await assertShiftOwner(shift_id, req.userId!);
+
+    const { data: entry, error: eErr } = await adminDb
+      .from('time_entries')
+      .select('id, approved, approved_pay, total_pay, clock_out')
+      .eq('shift_id', shift_id)
+      .eq('worker_id', worker_id)
+      .maybeSingle();
+    if (eErr) return res.status(500).json({ error: eErr.message });
+    if (!entry || !entry.clock_out) return res.status(409).json({ error: 'This worker has not clocked out of the shift yet.' });
+    if (!entry.approved) return res.status(409).json({ error: 'Approve the timesheet before paying this worker.' });
+    const amountNum = Number(entry.approved_pay ?? entry.total_pay ?? 0);
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      return res.status(409).json({ error: 'The approved pay for this timesheet is zero, so there is nothing to charge.' });
+    }
+    if (await alreadyPaid(shift_id, worker_id)) {
+      return res.status(409).json({ error: 'This worker has already been paid for this shift.' });
+    }
+
+    const origin =
+      (typeof req.headers['origin'] === 'string' && req.headers['origin']) ||
+      'https://365-connect-app.vercel.app';
+
+    const form = new URLSearchParams();
+    form.set('mode', 'payment');
+    form.set('success_url', `${origin}/earnings?paid=1&session_id={CHECKOUT_SESSION_ID}`);
+    form.set('cancel_url', `${origin}/shift/${shift_id}/applicants`);
+    form.append('line_items[0][quantity]', '1');
+    form.append('line_items[0][price_data][currency]', 'usd');
+    form.append('line_items[0][price_data][unit_amount]', String(Math.round(amountNum * 100)));
+    form.append('line_items[0][price_data][product_data][name]', 'Shift payment');
+    form.append('metadata[shift_id]', shift_id);
+    form.append('metadata[worker_id]', worker_id);
+    form.append('metadata[client_id]', String(req.userId));
+    form.append('metadata[amount]', String(amountNum));
+
     const r = await fetch(`${STRIPE_API}/checkout/sessions`, {
       method: 'POST',
       headers: {
@@ -118,9 +163,9 @@ router.post('/checkout', requireAuth, async (req, res) => {
     });
     const data = (await r.json()) as { url?: string; error?: { message?: string } };
     if (!r.ok) return res.status(502).json({ error: data.error?.message || 'Stripe error' });
-    return res.json({ url: data.url });
+    return res.json({ url: data.url, amount: amountNum });
   } catch (e) {
-    return res.status(502).json({ error: `Stripe request failed: ${String(e)}` });
+    return sendError(res, e);
   }
 });
 
@@ -169,6 +214,22 @@ router.post('/confirm', requireAuth, async (req, res) => {
       .select()
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
+
+    // A newly recorded payment: tell the worker the money is on its way.
+    if (data && payload.worker_id) {
+      const { data: shift } = payload.shift_id
+        ? await adminDb.from('shifts').select('title').eq('id', payload.shift_id).maybeSingle()
+        : { data: null };
+      await createNotification({
+        userId: payload.worker_id,
+        fromUserId: payload.client_id,
+        type: 'payment_received',
+        title: 'You got paid',
+        body: `${formatUsd(payload.net_amount)} for ${shift?.title ? `"${shift.title}"` : 'your shift'} has been paid.`,
+        shiftId: payload.shift_id,
+        url: '/earnings',
+      });
+    }
     return res.json(data ?? { ok: true, alreadyRecorded: true });
   } catch (e) {
     return res.status(502).json({ error: `Stripe request failed: ${String(e)}` });

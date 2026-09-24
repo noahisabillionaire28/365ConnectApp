@@ -370,12 +370,36 @@ router.get('/:shiftId', requireAuth, async (req, res) => {
   return res.json(data ? entryJson(data as EntryRow) : null);
 });
 
-/** POST /api/time-entries — clock in */
+/** How far from the venue a worker may be and still clock in. */
+const GEOFENCE_MILES = 1;
+
+function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 3958.8;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const clockInBody = z.object({
+  shift_id: z.string().min(1, 'shift_id is required'),
+  /** The worker's live GPS position, checked against the venue. */
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lng: z.coerce.number().min(-180).max(180).optional(),
+});
+
+/**
+ * POST /api/time-entries { shift_id, lat?, lng? } — clock in.
+ * Server-side guards (the app checks the same things for a friendlier flow,
+ * but only this copy is trusted): the worker is booked, the shift is not
+ * cancelled, it has not ended, clock-in has opened (1h before start), and —
+ * when the shift has venue coordinates — the worker is within 1 mile of them.
+ */
 router.post('/', requireAuth, async (req, res) => {
-  const { shift_id } = req.body as Record<string, unknown>;
-  if (!shift_id || typeof shift_id !== 'string') {
-    return res.status(400).json({ error: 'shift_id is required' });
-  }
+  const parsed = clockInBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
+  const { shift_id, lat, lng } = parsed.data;
 
   // Only a worker booked (accepted) onto this shift may clock in.
   const { data: booked } = await adminDb
@@ -389,12 +413,39 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(403).json({ error: 'You are not booked for this shift.' });
   }
 
-  // Clock-in window: not more than 1 hour before the shift's start (call time).
   const { data: sh } = await adminDb
-    .from('shifts').select('start_time').eq('id', shift_id).maybeSingle();
-  const startMs = sh?.start_time ? Date.parse(sh.start_time) : NaN;
-  if (Number.isFinite(startMs) && Date.now() < startMs - 60 * 60 * 1000) {
+    .from('shifts').select('start_time, end_time, status, lat, lng').eq('id', shift_id).maybeSingle();
+  if (!sh) return res.status(404).json({ error: 'Shift not found' });
+  if (sh.status === 'cancelled') {
+    return res.status(409).json({ error: 'This shift was cancelled, so there is nothing to clock in to.' });
+  }
+  const now = Date.now();
+  // Clock-in window: not more than 1 hour before the shift's start (call
+  // time), and never once the shift has ended.
+  const startMs = sh.start_time ? Date.parse(sh.start_time) : NaN;
+  const endMs = sh.end_time ? Date.parse(sh.end_time) : NaN;
+  if (Number.isFinite(startMs) && now < startMs - 60 * 60 * 1000) {
     return res.status(409).json({ error: 'Clock-in has not opened for this shift yet.' });
+  }
+  if (Number.isFinite(endMs) && now > endMs) {
+    return res.status(409).json({ error: 'This shift has already ended, so clock-in is closed. Message the organizer if you worked it.' });
+  }
+
+  // Geofence: with venue coordinates on file, the worker has to be there.
+  const venueLat = sh.lat != null ? Number(sh.lat) : NaN;
+  const venueLng = sh.lng != null ? Number(sh.lng) : NaN;
+  if (Number.isFinite(venueLat) && Number.isFinite(venueLng)) {
+    if (lat === undefined || lng === undefined) {
+      return res.status(400).json({ error: 'We need your location to confirm you are at the venue. Turn on location access and try again.' });
+    }
+    const distance = haversineMiles(lat, lng, venueLat, venueLng);
+    if (distance > GEOFENCE_MILES) {
+      const shown = distance < 10 ? distance.toFixed(1) : Math.round(distance).toString();
+      return res.status(409).json({
+        error: `You're about ${shown} mi from the venue. Get within ${GEOFENCE_MILES} mile to clock in.`,
+        distance_miles: Math.round(distance * 10) / 10,
+      });
+    }
   }
 
   const payload = { shift_id, worker_id: req.userId, clock_in: new Date().toISOString() };
@@ -522,6 +573,19 @@ router.patch('/:id', requireAuth, async (req, res) => {
       shiftId: entry.shift_id,
       url: `/shift/${entry.shift_id}`,
     });
+    // …and the poster that there is a timesheet waiting for them.
+    const owned = await loadShift(entry.shift_id);
+    if (owned?.client_id) {
+      await createNotification({
+        userId: owned.client_id,
+        fromUserId: entry.worker_id,
+        type: 'timesheet_submitted',
+        title: 'Timesheet submitted',
+        body: `${await workerName(entry.worker_id)} clocked out of ${shiftDayLabel(owned)} · ${formatHoursMinutes(hours)} · ${formatUsd(pay)}. Review and approve it from the roster.`,
+        shiftId: entry.shift_id,
+        url: `/shift/${entry.shift_id}/applicants`,
+      });
+    }
     return res.json(entryJson(data as EntryRow));
   } catch (e) {
     return sendError(res, e);

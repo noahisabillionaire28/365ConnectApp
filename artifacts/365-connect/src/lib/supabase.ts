@@ -51,6 +51,10 @@ export type MockShift = {
   lat: number;
   lng: number;
   clientId: string;
+  /** The poster's @username (links to their public profile); null when unknown. */
+  clientUsername: string | null;
+  /** The poster's average rating; null when they have none yet. */
+  clientRating: number | null;
   status: 'open' | 'filled' | 'cancelled' | 'completed';
 };
 
@@ -160,6 +164,9 @@ export type ShiftRow = {
   parking_notes: string | null;
   special_instructions: string | null;
   repeat_type: string;
+  // Poster fields the API joins onto a shift
+  client_username?: string | null;
+  client_rating?: number | string | null;
 };
 
 export type ApplicationRow = {
@@ -461,6 +468,8 @@ export function shiftRowToMockShift(
     lat,
     lng,
     clientId:       row.client_id,
+    clientUsername: row.client_username ?? null,
+    clientRating:   row.client_rating != null && Number(row.client_rating) > 0 ? Number(row.client_rating) : null,
     status:         row.status,
   };
 }
@@ -508,6 +517,8 @@ export function hardenShift(s: MockShift): MockShift {
     lat:            Number.isFinite(raw.lat) ? (raw.lat as number) : MIAMI_BEACH.lat,
     lng:            Number.isFinite(raw.lng) ? (raw.lng as number) : MIAMI_BEACH.lng,
     clientId:       raw.clientId ?? '',
+    clientUsername: raw.clientUsername ?? null,
+    clientRating:   Number.isFinite(raw.clientRating) && (raw.clientRating as number) > 0 ? (raw.clientRating as number) : null,
     status:         raw.status ?? 'open',
   };
 }

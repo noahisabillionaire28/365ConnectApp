@@ -109,15 +109,21 @@ function groupApplications(apps: MyApplication[]) {
   // Soonest first for anything ahead; most recent first for what's done.
   const soonest = (a: MyApplication, b: MyApplication) => Date.parse(a.startTime ?? '') - Date.parse(b.startTime ?? '');
   const latest  = (a: MyApplication, b: MyApplication) => -soonest(a, b);
+  // A cancelled shift is never "upcoming", whatever the application says: it
+  // gets its own section so the worker sees what happened and nothing more.
+  const isCancelled = (a: MyApplication) => a.shiftStatus === 'cancelled';
+  const live = apps.filter((a) => !isCancelled(a));
   return {
-    upcoming:  apps.filter((a) => a.status === 'accepted' && !isOver(a)).sort(soonest),
-    applied:   apps.filter((a) => a.status === 'pending' && !isOver(a)).sort(soonest),
-    standby:   apps.filter((a) => a.status === 'standby' && !isOver(a)).sort(soonest),
-    completed: apps.filter((a) => a.status === 'accepted' && isOver(a)).sort(latest),
+    upcoming:  live.filter((a) => a.status === 'accepted' && !isOver(a)).sort(soonest),
+    applied:   live.filter((a) => a.status === 'pending' && !isOver(a)).sort(soonest),
+    standby:   live.filter((a) => a.status === 'standby' && !isOver(a)).sort(soonest),
+    completed: live.filter((a) => a.status === 'accepted' && isOver(a)).sort(latest),
     // Applications that were never answered before the shift ended.
-    expired:   apps.filter((a) => (a.status === 'pending' || a.status === 'standby') && isOver(a)),
-    dropped:   apps.filter((a) => a.status === 'withdrawn'),
-    notSelected: apps.filter((a) => a.status === 'declined' || a.status === 'rejected'),
+    expired:   live.filter((a) => (a.status === 'pending' || a.status === 'standby') && isOver(a)),
+    dropped:   live.filter((a) => a.status === 'withdrawn'),
+    notSelected: live.filter((a) => a.status === 'declined' || a.status === 'rejected'),
+    // Shifts the organizer cancelled while this worker was booked, applied or waitlisted.
+    cancelled: apps.filter((a) => isCancelled(a) && ['accepted', 'pending', 'standby'].includes(a.status)).sort(latest),
   };
 }
 
@@ -144,20 +150,23 @@ function MyShiftRow({ app, onTap, onCalendar }: {
   /** Upcoming rows only: opens the add-to-calendar sheet. */
   onCalendar?: () => void;
 }) {
+  // Dates and times are shown in the venue's zone, like everywhere else.
   const dateStr = app.startTime
-    ? new Date(app.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    ? new Date(app.startTime).toLocaleDateString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric', timeZone: app.timezone || undefined,
+      })
     : null;
-  const timeStr = app.startTime
-    ? new Date(app.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-    : null;
-  // Clock-in window: opens an hour before the start, closes at the end.
+  const timeStr = app.startTime ? formatTime(app.startTime, app.timezone) : null;
+  const cancelled = app.shiftStatus === 'cancelled';
+  // Clock-in window: opens an hour before the start, closes at the end — and
+  // never for a cancelled shift.
   const now = Date.now();
   const startMs = app.startTime ? Date.parse(app.startTime) : NaN;
   const endMs = app.endTime ? Date.parse(app.endTime) : NaN;
-  const clockInNow = app.status === 'accepted' && Number.isFinite(startMs) &&
+  const clockInNow = !cancelled && app.status === 'accepted' && Number.isFinite(startMs) &&
     now >= startMs - 3_600_000 && (!Number.isFinite(endMs) || now <= endMs);
   // Day-of pills ("On my way" / "Running late") for today's booked shift.
-  const dayOf = app.status === 'accepted' && isToday(app.startTime) && (!Number.isFinite(endMs) || now <= endMs);
+  const dayOf = !cancelled && app.status === 'accepted' && isToday(app.startTime) && (!Number.isFinite(endMs) || now <= endMs);
 
   return (
     <div className="border-b border-[#E5E7EB] last:border-none">
@@ -186,7 +195,11 @@ function MyShiftRow({ app, onTap, onCalendar }: {
           )}
         </div>
       </div>
-      {clockInNow ? (
+      {cancelled ? (
+        <span className="flex-shrink-0 bg-red-50 border border-red-200 text-red-500 text-[11px] font-bold px-2.5 py-1 rounded-full">
+          Cancelled
+        </span>
+      ) : clockInNow ? (
         <span className="flex-shrink-0 bg-[#FFD700] text-black text-[11px] font-bold px-2.5 py-1 rounded-full">
           Clock in
         </span>
@@ -250,7 +263,7 @@ function MyShiftSection({
 function WorkerMyShiftsView() {
   const [, navigate] = useLocation();
   const { applications, isLoading, error } = useMyApplications();
-  const { upcoming, applied, standby, completed, expired, dropped, notSelected } = groupApplications(applications);
+  const { upcoming, applied, standby, completed, expired, dropped, notSelected, cancelled } = groupApplications(applications);
   const goToShift = (a: MyApplication) => navigate(`/shift/${a.shiftId}`);
   const [calendarEvent, setCalendarEvent] = useState<CalendarEvent | null>(null);
 
@@ -293,6 +306,7 @@ function WorkerMyShiftsView() {
         onCalendar={(a) => setCalendarEvent(calendarEventFor(a))} />
       <MyShiftSection label="Standby"      items={standby}      onTap={goToShift} dotColor="#F59E0B" />
       <MyShiftSection label="Applied"      items={applied}      onTap={goToShift} dotColor="#F59E0B" emptyText="No pending applications. Browse Jobs to apply." />
+      <MyShiftSection label="Cancelled"    items={cancelled}    onTap={goToShift} dotColor="#EF4444" />
       <MyShiftSection label="Completed"    items={completed}    onTap={goToShift} dotColor="#6B7280" />
       <MyShiftSection label="Expired"      items={expired}      onTap={goToShift} dotColor="#D1D5DB" />
       <MyShiftSection label="Dropped"      items={dropped}      onTap={goToShift} dotColor="#D1D5DB" />

@@ -3,8 +3,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { MY_APPLICATIONS_KEY } from './useMyApplications';
+import { APPLICATION_STATUS_KEY } from './useApplicationStatus';
 
 export const MY_SHIFT_IDS_KEY = 'my-shift-ids';
+
+/** What the server did with an application: queued for review, or waitlisted (shift full). */
+export type ApplyOutcome = 'pending' | 'standby';
 
 /**
  * The set of shift ids the worker has a live application on (pending,
@@ -34,11 +38,15 @@ export function useApplications() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  /**
+   * Apply to (or, when the shift is full, join the waitlist for) a shift.
+   * `onSuccess` receives the outcome so the screen can say which one happened.
+   */
   const submitApplication = useCallback(
     async (
       shiftId: string,
       matchScore?: number,
-      onSuccess?: () => void,
+      onSuccess?: (outcome: ApplyOutcome) => void,
       onError?: (msg: string) => void,
     ): Promise<void> => {
       if (!user?.id) return;
@@ -48,20 +56,26 @@ export function useApplications() {
       setIds((prev) => new Set([...prev, shiftId]));
 
       try {
-        await apiClient(user.id).post('/applications', {
+        const row = await apiClient(user.id).post<{ status?: string }>('/applications', {
           shift_id:    shiftId,
           match_score: typeof matchScore === 'number' ? Math.round(matchScore) : null,
         });
         inFlight.current.delete(shiftId);
         void qc.invalidateQueries({ queryKey: [MY_APPLICATIONS_KEY] });
-        onSuccess?.();
+        void qc.invalidateQueries({ queryKey: [APPLICATION_STATUS_KEY, shiftId] });
+        void qc.invalidateQueries({ queryKey: ['shift', shiftId] });
+        onSuccess?.(row?.status === 'standby' ? 'standby' : 'pending');
       } catch (e: unknown) {
         inFlight.current.delete(shiftId);
         const msg = e instanceof Error ? e.message : String(e);
         // Roll back the optimistic "applied" state on any failure.
         setIds((prev) => { const next = new Set(prev); next.delete(shiftId); return next; });
         if (msg.includes('Already applied')) {
-          console.info('[Applications] Duplicate insert ignored:', shiftId);
+          // The cached status was stale: pull the real one so the page shows
+          // "applied" instead of an Apply button that never works.
+          void qc.invalidateQueries({ queryKey: [APPLICATION_STATUS_KEY, shiftId] });
+          void qc.invalidateQueries({ queryKey: key });
+          onError?.('You already applied to this shift.');
           return;
         }
         console.error('[Applications] Insert failed:', msg);

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { invalidateRole } from '../lib/roleCache.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireSession } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -12,8 +12,12 @@ const PUBLIC_COLS =
   'rating, primary_job_type, secondary_job_types, availability, ' +
   'lat, lng, is_pro, company_name, hourly_rate, created_at';
 
-/** GET /api/users/me — current user's full profile */
-router.get('/me', requireAuth, async (req, res) => {
+/**
+ * GET /api/users/me — current user's full profile. Uses requireSession (not
+ * requireAuth) on purpose: a suspended account must still be able to read its
+ * own status so the app can render the suspended screen instead of a blank one.
+ */
+router.get('/me', requireSession, async (req, res) => {
   const { data, error } = await adminDb
     .from('users')
     .select('*')

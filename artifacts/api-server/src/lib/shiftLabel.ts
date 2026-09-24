@@ -21,6 +21,33 @@ export function shiftDayLabel(shift: DayLabelShift, opts: { withTitle?: boolean 
   return shift.title ? `"${shift.title}"` : 'the shift';
 }
 
+/** "Sat, Mar 14 · 6:00 PM EDT" — an instant rendered in the shift's own zone. */
+export function formatShiftInstant(iso: string | null | undefined, tz?: string | null, opts: { dateOnly?: boolean; timeOnly?: boolean } = {}): string {
+  const ms = iso ? Date.parse(iso) : NaN;
+  if (!Number.isFinite(ms)) return '';
+  const zone = tz || undefined;
+  const fmt = (o: Intl.DateTimeFormatOptions) => {
+    try { return new Intl.DateTimeFormat('en-US', { ...o, timeZone: zone }).format(new Date(ms)); }
+    catch { return new Intl.DateTimeFormat('en-US', o).format(new Date(ms)); }
+  };
+  const date = fmt({ weekday: 'short', month: 'short', day: 'numeric' });
+  const time = fmt({ hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+  if (opts.dateOnly) return date;
+  if (opts.timeOnly) return time;
+  return `${date} · ${time}`;
+}
+
+/** "Sat, Mar 14 · 6:00 PM – 11:00 PM EDT" for a start/end pair in the shift's zone. */
+export function formatShiftWindow(start: string | null | undefined, end: string | null | undefined, tz?: string | null): string {
+  const s = formatShiftInstant(start, tz);
+  const e = formatShiftInstant(end, tz, { timeOnly: true });
+  if (!s) return '';
+  // Same-day end: "Sat, Mar 14 · 6:00 PM – 11:00 PM EDT"; otherwise spell both out.
+  const sameDay = formatShiftInstant(start, tz, { dateOnly: true }) === formatShiftInstant(end, tz, { dateOnly: true });
+  if (!e) return s;
+  return sameDay ? `${s.replace(/ [A-Z]{2,5}$/, '')} – ${e}` : `${s} – ${formatShiftInstant(end, tz)}`;
+}
+
 /** 5.2 → "5h 12m"; 8 → "8h"; 0.5 → "30m". */
 export function formatHoursMinutes(hours: number): string {
   const total = Math.max(0, Math.round((Number(hours) || 0) * 60));

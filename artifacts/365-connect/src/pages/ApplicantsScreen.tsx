@@ -19,6 +19,14 @@ import { useToast } from '@/contexts/ToastContext';
 import { useProfile } from '@/hooks/useProfile';
 import { apiClient } from '@/lib/api';
 import { startShiftPayment } from '@/lib/checkout';
+import { formatTime } from '@/lib/supabase';
+import { utcToZonedParts, zonedTimeToUtc, zoneAbbrev, DEFAULT_SHIFT_TZ } from '@/lib/timezone';
+
+/** Hourly pay periods; anything else is a flat total. Mirrors the server's computePay. */
+function isHourly(payPeriod: string | null | undefined): boolean {
+  const p = (payPeriod ?? 'hr').trim().toLowerCase();
+  return p === 'hr' || p === 'hour' || p === 'hourly' || p === 'h';
+}
 
 /* ── Small UI atoms ──────────────────────────────────────────────────────── */
 function Avatar({ url, name, size = 40 }: { url: string | null; name: string | null; size?: number }) {
@@ -80,10 +88,12 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
 }
 
 /* ── Confirmed worker row (attendance + pay / no-show / remove) ───────────── */
-function ConfirmedRow({ w, late, closed, onApprove, onPay, onNoShow, onRemove, onReview, onMessage, busy }: {
+function ConfirmedRow({ w, late, closed, timezone, onApprove, onPay, onNoShow, onRemove, onReview, onMessage, busy }: {
   w: AcceptedWorker; late: boolean;
   /** The shift has ended — a worker still "on site" forgot to clock out. */
   closed: boolean;
+  /** The venue's zone: clock times are shown in it, like every other time in the app. */
+  timezone: string | null;
   onApprove: () => void; onPay: () => void; onNoShow: () => void; onRemove: () => void; onReview: () => void;
   onMessage: () => void;
   busy: boolean;
@@ -111,8 +121,8 @@ function ConfirmedRow({ w, late, closed, onApprove, onPay, onNoShow, onRemove, o
             {w.clock_in && (
               <span className="flex items-center gap-1 text-[11px] text-[#6B7280]">
                 <Clock3 size={10} aria-hidden />
-                {new Date(w.clock_in).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                {w.clock_out && ` – ${new Date(w.clock_out).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
+                {formatTime(w.clock_in, timezone)}
+                {w.clock_out && ` – ${formatTime(w.clock_out, timezone)}`}
               </span>
             )}
             {(w.overtimeHours ?? 0) > 0 && (
@@ -191,29 +201,39 @@ function ConfirmedRow({ w, late, closed, onApprove, onPay, onNoShow, onRemove, o
 }
 
 /* ── Timesheet review sheet (approve hours + overtime) ───────────────────── */
-function ReviewSheet({ w, payRate, shiftEndISO, busy, onApprove, onClose }: {
-  w: AcceptedWorker; payRate: number; shiftEndISO: string | null; busy: boolean;
+function ReviewSheet({ w, payRate, payPeriod, timezone, shiftEndISO, busy, onApprove, onClose }: {
+  w: AcceptedWorker; payRate: number; payPeriod: string | null; timezone: string | null;
+  shiftEndISO: string | null; busy: boolean;
   onApprove: (breakMinutes: number, clockOutISO?: string) => void; onClose: () => void;
 }) {
+  const tz = timezone || DEFAULT_SHIFT_TZ;
+  const hourly = isHourly(payPeriod);
   // Forgot to clock out: the manager sets the clock-out (defaults to the
-  // scheduled end) and the server records it before approving.
+  // scheduled end) and the server records it before approving. The picker
+  // works in the venue's wall clock, not the manager's device zone.
   const needsClockOut = !!w.clock_in && !w.clock_out;
-  const toLocalInput = (iso: string) => {
-    const d = new Date(iso);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const toVenueInput = (iso: string) => {
+    const p = utcToZonedParts(iso, tz);
+    return p.date && p.time ? `${p.date}T${p.time}` : '';
+  };
+  const fromVenueInput = (local: string): string | null => {
+    const [date, time] = local.split('T');
+    return date && time ? zonedTimeToUtc(date, time, tz) : null;
   };
   const [clockOutLocal, setClockOutLocal] = useState<string>(() =>
-    needsClockOut ? toLocalInput(shiftEndISO && Date.parse(shiftEndISO) > Date.parse(w.clock_in!) ? shiftEndISO : new Date().toISOString()) : '');
-  const clockOutISO = needsClockOut && clockOutLocal ? new Date(clockOutLocal).toISOString() : (w.clock_out ?? null);
+    needsClockOut ? toVenueInput(shiftEndISO && Date.parse(shiftEndISO) > Date.parse(w.clock_in!) ? shiftEndISO : new Date().toISOString()) : '');
+  const clockOutISO = needsClockOut && clockOutLocal ? fromVenueInput(clockOutLocal) : (w.clock_out ?? null);
   const grossH = w.clock_in && clockOutISO
     ? Math.max(0, (Date.parse(clockOutISO) - Date.parse(w.clock_in)) / 3_600_000) : 0;
   const [breakMin, setBreakMin] = useState<number>(Math.round(w.breakMinutes ?? 0));
   const billable = Math.max(0, grossH - breakMin / 60);
-  const regular = Math.min(billable, 8);
-  const overtime = Math.max(0, billable - 8);
-  const pay = regular * payRate + overtime * payRate * 1.5;
+  // Same rule as the server: hourly pays regular up to 8h then 1.5× beyond;
+  // a day / event rate is a flat amount whatever the hours.
+  const regular = hourly ? Math.min(billable, 8) : billable;
+  const overtime = hourly ? Math.max(0, billable - 8) : 0;
+  const pay = hourly ? regular * payRate + overtime * payRate * 1.5 : (payRate > 0 ? payRate : 0);
   const fmt = (h: number) => `${h.toFixed(2)}h`;
+  const zoneLabel = w.clock_in ? zoneAbbrev(w.clock_in, tz) : '';
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center">
@@ -222,14 +242,16 @@ function ReviewSheet({ w, payRate, shiftEndISO, busy, onApprove, onClose }: {
         <div className="w-10 h-1 rounded-full bg-[#DBDBDB] mx-auto mb-4" />
         <p className="text-[#111827] font-bold text-[17px] mb-1">Review timesheet</p>
         <p className="text-[#6B7280] text-[13px] mb-4">
-          {w.username ? `@${w.username}` : 'Worker'} · {payRate ? `$${payRate}/hr` : ''}
+          {w.username ? `@${w.username}` : 'Worker'} · {payRate ? (hourly ? `$${payRate}/hr` : `$${payRate} flat per ${payPeriod}`) : ''}
         </p>
 
         <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-4 py-3 mb-4 flex flex-col gap-2.5">
           {needsClockOut && (
             <div className="flex flex-col gap-1 pb-1 border-b border-[#E5E7EB]">
-              <p className="text-[12px] text-amber-700 font-semibold">This worker never clocked out. Set when they finished:</p>
-              <input type="datetime-local" value={clockOutLocal} min={w.clock_in ? toLocalInput(w.clock_in) : undefined}
+              <p className="text-[12px] text-amber-700 font-semibold">
+                This worker never clocked out. Set when they finished{zoneLabel ? ` (${zoneLabel}, venue time)` : ''}:
+              </p>
+              <input type="datetime-local" value={clockOutLocal} min={w.clock_in ? toVenueInput(w.clock_in) : undefined}
                 onChange={(e) => setClockOutLocal(e.target.value)} aria-label="Clock-out time"
                 className="h-10 rounded-[8px] border border-[#E5E7EB] bg-white px-2.5 text-[14px] text-[#111827] outline-none focus:border-[#0A1628]" />
             </div>
@@ -245,9 +267,12 @@ function ReviewSheet({ w, payRate, shiftEndISO, busy, onApprove, onClose }: {
             <p className="text-[11px] text-amber-600">Tip: shifts over 6h usually include a 30-min unpaid break.</p>
           )}
           <div className="border-t border-[#E5E7EB] my-0.5" />
-          <div className="flex justify-between text-[14px]"><span className="text-[#6B7280]">Regular hours</span><span className="text-[#111827] font-semibold">{fmt(regular)}</span></div>
+          <div className="flex justify-between text-[14px]"><span className="text-[#6B7280]">{hourly ? 'Regular hours' : 'Billable hours'}</span><span className="text-[#111827] font-semibold">{fmt(regular)}</span></div>
           {overtime > 0 && (
             <div className="flex justify-between text-[14px]"><span className="text-amber-600">Overtime (1.5×)</span><span className="text-amber-600 font-semibold">{fmt(overtime)}</span></div>
+          )}
+          {!hourly && (
+            <p className="text-[11px] text-[#9CA3AF]">Flat {payPeriod} rate — the hours are recorded but do not change the pay.</p>
           )}
           <div className="flex justify-between text-[15px] pt-1"><span className="text-[#111827] font-bold">Approved pay</span><span className="text-[#111827] font-bold">${pay.toFixed(2)}</span></div>
         </div>
@@ -373,9 +398,22 @@ export function ApplicantsScreen() {
     if (!user?.id || !id || busyId) return;
     setBusyId(w.id);
     try {
-      await startShiftPayment(user.id, { shift_id: id, worker_id: w.workerId, amount: w.approvedPay ?? w.totalPay ?? 0 });
-    } catch (e) { showToast(e instanceof Error ? e.message : 'Could not start payment.', 'error'); }
+      // The server charges the approved pay on the timesheet; no amount is sent.
+      await startShiftPayment(user.id, { shift_id: id, worker_id: w.workerId });
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Could not start payment.', 'error'); refetchAll(); }
     finally { setBusyId(null); }
+  }
+
+  /** Approve / decline a pending or standby application, one request at a time per row. */
+  async function handleDecide(applicationId: string, action: 'approve' | 'decline', successMsg: string) {
+    if (busyId) return;
+    if (action === 'approve' && isFull) { showToast('Shift is full — remove someone first.', 'error'); return; }
+    setBusyId(applicationId);
+    try {
+      const err = action === 'approve' ? await approve(applicationId) : await decline(applicationId);
+      showToast(err ?? successMsg, err ? 'error' : 'success');
+      refetchAll();
+    } finally { setBusyId(null); }
   }
 
   async function handleApprove(w: AcceptedWorker, breakMinutes: number, clockOutISO?: string) {
@@ -503,6 +541,7 @@ export function ApplicantsScreen() {
               <div className="flex flex-col gap-2">
                 {confirmed.map((w) => (
                   <ConfirmedRow key={w.id} w={w} late={isLate(w)} closed={closed} busy={busyId === w.id}
+                    timezone={shift?.timezone ?? null}
                     onApprove={() => setReviewing(w)}
                     onPay={() => void handlePay(w)}
                     onNoShow={() => void handleNoShow(w)}
@@ -542,18 +581,17 @@ export function ApplicantsScreen() {
                           <p className="text-[#6B7280] text-[12px] leading-snug mt-0.5 line-clamp-2">{m.reason}</p>
                         )}
                       </div>
-                      <button type="button" aria-label="Decline"
-                        onClick={() => void decline(a.applicationId).then((err) => { showToast(err ?? 'Declined.', err ? 'error' : 'success'); refetchAll(); })}
-                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center">
+                      <button type="button" aria-label="Decline" disabled={!!busyId}
+                        onClick={() => void handleDecide(a.applicationId, 'decline', 'Declined.')}
+                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center disabled:opacity-40">
                         <X size={16} aria-hidden className="text-[#6B7280]" />
                       </button>
-                      <button type="button" aria-label="Approve"
-                        onClick={() => {
-                          if (isFull) { showToast('Shift is full — remove someone first.', 'error'); return; }
-                          void approve(a.applicationId).then((err) => { if (err) { showToast(err, 'error'); return; } showToast('Worker confirmed!'); refetchAll(); });
-                        }}
-                        className="w-9 h-9 rounded-full bg-[#10B981] flex items-center justify-center">
-                        <Check size={17} aria-hidden className="text-white" />
+                      <button type="button" aria-label="Approve" disabled={!!busyId}
+                        onClick={() => void handleDecide(a.applicationId, 'approve', 'Worker confirmed!')}
+                        className="w-9 h-9 rounded-full bg-[#10B981] flex items-center justify-center disabled:opacity-40">
+                        {busyId === a.applicationId
+                          ? <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" aria-hidden />
+                          : <Check size={17} aria-hidden className="text-white" />}
                       </button>
                     </div>
                   );})}
@@ -589,20 +627,17 @@ export function ApplicantsScreen() {
                       <p className="flex-1 min-w-0 text-[#111827] font-semibold text-[14px] truncate">
                         {a.username ? `@${a.username}` : 'Worker'}
                       </p>
-                      <button type="button"
-                        onClick={() => void decline(a.applicationId).then((err) => { showToast(err ?? 'Removed from waitlist.', err ? 'error' : 'success'); refetchAll(); })}
-                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center">
+                      <button type="button" aria-label="Remove from waitlist" disabled={!!busyId}
+                        onClick={() => void handleDecide(a.applicationId, 'decline', 'Removed from waitlist.')}
+                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center disabled:opacity-40">
                         <X size={16} aria-hidden className="text-[#6B7280]" />
                       </button>
                       <button type="button"
-                        disabled={isFull}
+                        disabled={isFull || !!busyId}
                         aria-label={isFull ? 'Shift is full — remove someone to confirm a standby worker' : `Confirm ${a.username ? `@${a.username}` : 'worker'}`}
-                        onClick={() => {
-                          if (isFull) { showToast('Shift is full — remove someone first.', 'error'); return; }
-                          void approve(a.applicationId).then((err) => { showToast(err ?? 'Worker confirmed!', err ? 'error' : 'success'); refetchAll(); });
-                        }}
+                        onClick={() => void handleDecide(a.applicationId, 'approve', 'Worker confirmed!')}
                         className="h-9 px-3 rounded-full bg-[#10B981] text-white text-[12px] font-bold flex items-center gap-1 disabled:opacity-40">
-                        <Check size={14} aria-hidden /> Confirm
+                        <Check size={14} aria-hidden /> {busyId === a.applicationId ? 'Confirming…' : 'Confirm'}
                       </button>
                     </div>
                   ))}
@@ -660,7 +695,8 @@ export function ApplicantsScreen() {
       </div>
 
       {reviewing && (
-        <ReviewSheet w={reviewing} payRate={shift?.payRate ?? 0} shiftEndISO={shift?.endTimeISO ?? null} busy={busyId === reviewing.id}
+        <ReviewSheet w={reviewing} payRate={shift?.payRate ?? 0} payPeriod={shift?.payPeriod ?? null}
+          timezone={shift?.timezone ?? null} shiftEndISO={shift?.endTimeISO ?? null} busy={busyId === reviewing.id}
           onApprove={(brk, clockOut) => void handleApprove(reviewing, brk, clockOut)}
           onClose={() => setReviewing(null)} />
       )}

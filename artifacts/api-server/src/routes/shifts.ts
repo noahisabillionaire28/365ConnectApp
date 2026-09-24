@@ -3,8 +3,29 @@ import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { createNotification } from './notifications.js';
+import { ensureShiftGroupChat, insertSystemMessage } from '../lib/chat.js';
+import { rosterAllows } from '../lib/shiftAccess.js';
+import { getRoleInfo } from '../lib/roleCache.js';
+import { formatShiftInstant, formatShiftWindow, formatUsd } from '../lib/shiftLabel.js';
 
 const router = Router();
+
+/**
+ * Roster-only shifts are readable by the poster, workers on their roster and
+ * admins. Everyone else (including signed-out viewers) gets a 404, the same
+ * answer as a shift that does not exist, so the link discloses nothing.
+ */
+async function canViewShift(
+  shift: { client_id: string | null; visibility?: string | null },
+  viewerId: string | null | undefined,
+): Promise<boolean> {
+  if ((shift.visibility ?? 'public') !== 'roster') return true;
+  if (!viewerId) return false;
+  if (shift.client_id === viewerId) return true;
+  if (await rosterAllows(shift, viewerId)) return true;
+  return (await getRoleInfo(viewerId)).isAdmin;
+}
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
@@ -111,8 +132,17 @@ router.get('/', async (req, res) => {
   if (job_type) {
     q = q.or(`job_type.eq.${job_type},job_types.cs.{${job_type}}`);
   }
-  const { data: shifts, error } = await q.range(off, off + lim - 1);
+  const { data: rawShifts, error } = await q.range(off, off + lim - 1);
   if (error) return res.status(500).json({ error: error.message });
+
+  // The event_id branch skipped the visibility filter above: drop the
+  // roster-only positions this viewer may not see.
+  let shifts = rawShifts ?? [];
+  if (event_id && shifts.some((s: any) => s.visibility === 'roster')) {
+    const visible: any[] = [];
+    for (const s of shifts) if (await canViewShift(s, req.userId)) visible.push(s);
+    shifts = visible;
+  }
 
   const clientIds = [...new Set((shifts ?? []).map((s: any) => s.client_id).filter(Boolean))];
   const userMap = new Map<string, any>();
@@ -178,6 +208,7 @@ router.get('/:id', async (req, res) => {
     .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
   if (!shift) return res.status(404).json({ error: 'Not found' });
+  if (!(await canViewShift(shift, req.userId))) return res.status(404).json({ error: 'Not found' });
 
   // Reflect reality even if the sweep hasn't run for this poster yet.
   if ((shift.status === 'open' || shift.status === 'filled') && Date.parse(shift.end_time) < Date.now()) {
@@ -338,7 +369,7 @@ router.patch('/:id', requireAuth, requireRole('client', 'staffer'), async (req, 
 
   const { data: current, error: curErr } = await adminDb
     .from('shifts')
-    .select('id, client_id, status, start_time, end_time, spots_available')
+    .select('id, client_id, status, title, start_time, end_time, timezone, spots_available, pay_rate, pay_period, location')
     .eq('id', id)
     .maybeSingle();
   if (curErr) return res.status(500).json({ error: curErr.message });
@@ -388,7 +419,113 @@ router.patch('/:id', requireAuth, requireRole('client', 'staffer'), async (req, 
     .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(404).json({ error: 'Not found or not authorized' });
+
+  // Tell the people on the shift what changed. Best-effort: a notification
+  // failure must never turn a saved edit into an error for the poster.
+  try {
+    if (updates.status === 'cancelled' && current.status !== 'cancelled') {
+      await announceCancellation(current, req.userId!);
+    } else if (current.status !== 'cancelled') {
+      await announceChanges(current, data, req.userId!);
+    }
+  } catch (e) {
+    console.error('[shifts] post-update notifications failed:', e);
+  }
   return res.json(data);
 });
+
+type NotifyShift = {
+  id: string; client_id: string | null; title: string | null; timezone: string | null;
+  start_time: string | null; end_time: string | null; spots_available: number | null;
+  pay_rate: number | null; pay_period: string | null; location: string | null;
+};
+
+/** Worker ids with a live (accepted / pending / standby) application on a shift. */
+async function liveWorkers(shiftId: string, statuses: string[]): Promise<Map<string, string>> {
+  const { data } = await adminDb
+    .from('applications').select('worker_id, status').eq('shift_id', shiftId).in('status', statuses);
+  const out = new Map<string, string>();
+  for (const a of data ?? []) if (a.worker_id) out.set(a.worker_id, a.status);
+  return out;
+}
+
+/** Post a system line in the shift's group chat (no-op when there is no chat). */
+async function postSystemLine(shiftId: string, text: string, actorId: string): Promise<void> {
+  const conv = await ensureShiftGroupChat(shiftId);
+  if (conv) await insertSystemMessage(conv, text, actorId);
+}
+
+/**
+ * The shift was cancelled: every worker still in play (booked, applied or on
+ * the waitlist) is told, and the shift chat gets a system line so the record
+ * is visible there too.
+ */
+async function announceCancellation(shift: NotifyShift, actorId: string): Promise<void> {
+  const workers = await liveWorkers(shift.id, ['accepted', 'pending', 'standby']);
+  const when = formatShiftInstant(shift.start_time, shift.timezone);
+  const label = shift.title ? `"${shift.title}"` : 'a shift';
+  await Promise.all([...workers.entries()].map(([workerId, status]) =>
+    createNotification({
+      userId: workerId,
+      fromUserId: actorId,
+      type: 'shift_cancelled',
+      title: 'Shift cancelled',
+      body: status === 'accepted'
+        ? `${label}${when ? ` on ${when}` : ''} was cancelled by the organizer. You are no longer booked for it.`
+        : status === 'standby'
+        ? `${label}${when ? ` on ${when}` : ''} was cancelled, so the waitlist is closed.`
+        : `${label}${when ? ` on ${when}` : ''} was cancelled before your application was reviewed.`,
+      shiftId: shift.id,
+      url: `/shift/${shift.id}`,
+    }),
+  ));
+  if (workers.size) await postSystemLine(shift.id, 'This shift was cancelled by the organizer.', actorId);
+}
+
+/**
+ * Something workers care about changed (time, pay, address or headcount):
+ * booked and pending workers get one notification that says exactly what
+ * changed, in the shift's own time zone, and the chat gets a system line.
+ */
+async function announceChanges(before: NotifyShift, after: NotifyShift, actorId: string): Promise<void> {
+  const tz = after.timezone || before.timezone;
+  const changes: string[] = [];
+  const sameInstant = (a: string | null, b: string | null) =>
+    (a ? Date.parse(a) : NaN) === (b ? Date.parse(b) : NaN);
+  if (!sameInstant(before.start_time, after.start_time) || !sameInstant(before.end_time, after.end_time)) {
+    changes.push(`Time changed to ${formatShiftWindow(after.start_time, after.end_time, tz)}`);
+  }
+  if (Number(before.pay_rate) !== Number(after.pay_rate)) {
+    const per = (after.pay_period ?? before.pay_period ?? 'hr') === 'hr' ? '/hr' : ` per ${after.pay_period ?? before.pay_period}`;
+    changes.push(`Pay changed to ${formatUsd(Number(after.pay_rate))}${per}`);
+  }
+  if ((before.location ?? '').trim() !== (after.location ?? '').trim() && after.location) {
+    changes.push(`Location changed to ${after.location}`);
+  }
+  if (Number(before.spots_available) !== Number(after.spots_available)) {
+    const n = Number(after.spots_available);
+    changes.push(`Headcount changed to ${n} spot${n === 1 ? '' : 's'}`);
+  }
+  if (!changes.length) return;
+
+  const workers = await liveWorkers(after.id, ['accepted', 'pending']);
+  if (!workers.size) return;
+  const label = after.title ? `"${after.title}"` : 'A shift you are on';
+  const body = `${label}: ${changes.join('. ')}.`;
+  await Promise.all([...workers.keys()].map((workerId) =>
+    createNotification({
+      userId: workerId,
+      fromUserId: actorId,
+      type: 'shift_update',
+      title: 'Shift details changed',
+      body,
+      shiftId: after.id,
+      url: `/shift/${after.id}`,
+    }),
+  ));
+  if ([...workers.values()].includes('accepted')) {
+    await postSystemLine(after.id, `Shift details updated: ${changes.join('. ')}.`, actorId);
+  }
+}
 
 export default router;

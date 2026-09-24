@@ -136,10 +136,14 @@ export function useTimeEntry(shiftId: string | undefined) {
 
   useEffect(() => { void load(); }, [load]);
 
-  const clockIn = useCallback(async (): Promise<TimeEntryRow | null> => {
+  /**
+   * Clock in. `coords` is the worker's live GPS position; the server checks it
+   * against the venue (within 1 mile) and rejects a cancelled or ended shift.
+   */
+  const clockIn = useCallback(async (coords?: { lat: number; lng: number } | null): Promise<TimeEntryRow | null> => {
     if (!shiftId || !user?.id) return null;
     try {
-      const row = await apiClient(user.id).post<RawEntry>('/time-entries', { shift_id: shiftId });
+      const row = await apiClient(user.id).post<RawEntry>('/time-entries', { shift_id: shiftId, ...(coords ?? {}) });
       const e = toEntry(row, { alreadyCompleted: false, resumed: false });
       setEntry(e);
       return e;
@@ -150,14 +154,13 @@ export function useTimeEntry(shiftId: string | undefined) {
   }, [shiftId, user?.id]);
 
   /**
-   * Alias used by ClockInScreen.
-   * Accepts optional (shiftId, userId) args that are ignored (shiftId already
-   * bound in hook; userId from auth context).
+   * Used by ClockInScreen: resume an open entry, or clock in with the worker's
+   * live position (`coords`), which the server verifies against the venue.
+   * Throws with the server's message when the clock-in is refused.
    * Returns an enriched TimeEntryRow with `alreadyCompleted`, `resumed` flags.
    */
   const startOrResume = useCallback(async (
-    _shiftId?: string,
-    _userId?: string,
+    coords?: { lat: number; lng: number } | null,
   ): Promise<TimeEntryRow> => {
     if (!shiftId || !user?.id) throw new Error('Missing shift or user');
     // First, check for an existing entry
@@ -173,12 +176,13 @@ export function useTimeEntry(shiftId: string | undefined) {
       setEntry(e);
       return e;
     }
-    // No existing entry — create one
-    const row = await apiClient(user.id).post<RawEntry>('/time-entries', { shift_id: shiftId });
+    // No existing entry — clock in now
+    const row = await apiClient(user.id).post<RawEntry>('/time-entries', { shift_id: shiftId, ...(coords ?? {}) });
     const e = toEntry(row, { alreadyCompleted: false, resumed: false });
     setEntry(e);
+    void qc.invalidateQueries({ queryKey: [TIME_ENTRY_KEY] });
     return e;
-  }, [shiftId, user?.id]);
+  }, [shiftId, user?.id, qc]);
 
   /** Start a server-tracked break on an entry (defaults to the loaded one). */
   const startBreak = useCallback(async (entryId?: string): Promise<TimeEntryRow | null> => {

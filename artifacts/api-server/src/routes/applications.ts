@@ -260,7 +260,7 @@ router.get('/', requireAuth, async (req, res) => {
     const { data: shifts, error: sErr } = await adminDb
       .from('shifts')
       .select(
-        'id, title, job_type, start_time, end_time, timezone, location, pay_rate, pay_period, company_name, point_of_contact, contact_phone',
+        'id, title, job_type, status, start_time, end_time, timezone, location, pay_rate, pay_period, company_name, point_of_contact, contact_phone',
       )
       .in('id', shiftIds);
     if (sErr) return res.status(500).json({ error: sErr.message });
@@ -271,6 +271,9 @@ router.get('/', requireAuth, async (req, res) => {
       return {
         ...a,
         title: s?.title ?? null,
+        // The shift's own lifecycle state, so a cancelled shift can be shown
+        // as cancelled instead of as an upcoming booking.
+        shift_status: s?.status ?? null,
         job_type: s?.job_type ?? null,
         start_time: s?.start_time ?? null,
         end_time: s?.end_time ?? null,
@@ -327,10 +330,12 @@ router.get('/my-shift-ids', requireAuth, async (req, res) => {
 });
 
 /**
- * POST /api/applications - a worker applies to a shift (always as themselves, pending).
- * 409 when the shift is not open / has ended, or when the worker already has a
- * live (pending/accepted/standby) application. A withdrawn/declined row is
- * flipped back to pending so the worker can re-apply.
+ * POST /api/applications - a worker applies to a shift (always as themselves).
+ * An open shift gets a 'pending' application; a full ('filled') shift puts the
+ * worker on the waitlist instead ('standby', the response says so). 409 when
+ * the shift is cancelled / completed / has ended, or when the worker already
+ * has a live (pending/accepted/standby) application. A withdrawn/declined row
+ * is reused so the worker can apply again.
  */
 router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
   const { shift_id, match_score, message } = req.body as Record<string, unknown>;
@@ -340,7 +345,13 @@ router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
   try {
     const shift = await loadShift(shift_id);
     if (!shift) return res.status(404).json({ error: 'Shift not found' });
-    if (shift.status !== 'open') return res.status(409).json({ error: 'This shift is no longer accepting applications.' });
+    if (shift.status !== 'open' && shift.status !== 'filled') {
+      return res.status(409).json({ error: 'This shift is no longer accepting applications.' });
+    }
+    // Full: every spot is taken, so the worker joins the waitlist instead.
+    const capacity = Math.max(1, shift.spots_available ?? 1);
+    const isFull = shift.status === 'filled' || (shift.spots_filled ?? 0) >= capacity;
+    const newStatus = isFull ? 'standby' : 'pending';
     const endMs = shift.end_time ? Date.parse(shift.end_time) : NaN;
     if (Number.isFinite(endMs) && endMs < Date.now()) {
       return res.status(409).json({ error: 'This shift has already ended.' });
@@ -375,11 +386,11 @@ router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
       if (!REAPPLY_STATUSES.has(existing.status)) {
         return res.status(409).json({ error: 'Already applied' });
       }
-      // Re-apply: flip the old row back to pending.
+      // Re-apply: reuse the old row.
       const { data, error } = await adminDb
         .from('applications')
         .update({
-          status: 'pending',
+          status: newStatus,
           match_score: typeof match_score === 'number' ? match_score : null,
           message: typeof message === 'string' ? message : null,
         })
@@ -394,7 +405,7 @@ router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
         .insert({
           shift_id,
           worker_id: req.userId,
-          status: 'pending',
+          status: newStatus,
           match_score: typeof match_score === 'number' ? match_score : null,
           message: typeof message === 'string' ? message : null,
         })
@@ -412,13 +423,17 @@ router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
     // Tell the shift owner a new applicant arrived (in-app + SSE + email via createNotification).
     if (shift.client_id) {
       const label = shift.title ? `"${shift.title}"` : 'your shift';
+      const name = await workerName(req.userId!);
       await createNotification({
         userId: shift.client_id,
         fromUserId: req.userId,
         type: 'application_received',
-        title: 'New applicant',
-        body: `${await workerName(req.userId!)} applied to ${label}.`,
+        title: isFull ? 'Joined the waitlist' : 'New applicant',
+        body: isFull
+          ? `${name} joined the waitlist for ${label}. Confirm them from the roster if a spot opens.`
+          : `${name} applied to ${label}.`,
         shiftId: shift_id,
+        url: `/shift/${shift_id}/applicants`,
       });
     }
     return res.status(201).json(row);
@@ -477,6 +492,12 @@ router.patch('/:id', requireAuth, async (req, res) => {
       // Capacity + status guard, spots_filled derivation, 'filled'/'open' flip.
       const booking = await bookWorker(appRow.shift_id, appRow.worker_id, 'accept');
       data = booking.application as unknown as Record<string, unknown>;
+      // A standby worker confirmed from the roster: keep their invite row (if
+      // any) in step, the same way the call-out auto-fill does.
+      if (appRow.status === 'standby') {
+        await adminDb.from('shift_requests').update({ status: 'accepted' })
+          .eq('shift_id', appRow.shift_id).eq('worker_id', appRow.worker_id).eq('status', 'standby');
+      }
     } else {
       const { data: updated, error } = await adminDb
         .from('applications')
@@ -520,9 +541,25 @@ router.patch('/:id', requireAuth, async (req, res) => {
         shiftId: appRow.shift_id,
       });
     }
-    // Receipt to the owner when they remove (decline/reject) a worker.
+    // The owner declined / removed a worker: tell the worker (what happened
+    // depends on where they were), and send the owner a receipt.
     if ((status === 'declined' || status === 'rejected') && isShiftOwner) {
       const label = await shiftLabel(appRow.shift_id);
+      const wasBooked = appRow.status === 'accepted';
+      const wasStandby = appRow.status === 'standby';
+      await createNotification({
+        userId: appRow.worker_id,
+        fromUserId: req.userId,
+        type: wasBooked ? 'booking_removed' : 'application_declined',
+        title: wasBooked ? 'Removed from a shift' : wasStandby ? 'Removed from the waitlist' : 'Not selected',
+        body: wasBooked
+          ? `The organizer removed you from ${label}. Your spot has been released.`
+          : wasStandby
+          ? `The organizer removed you from the waitlist for ${label}.`
+          : `Your application for ${label} was not selected this time.`,
+        shiftId: appRow.shift_id,
+        url: `/shift/${appRow.shift_id}`,
+      });
       await createNotification({
         userId: req.userId!,
         fromUserId: appRow.worker_id,
@@ -592,31 +629,51 @@ router.post('/withdraw', requireAuth, requireRole('worker'), async (req, res) =>
   const { shift_id } = req.body as Record<string, string>;
   if (!shift_id) return res.status(400).json({ error: 'shift_id is required' });
   try {
+    // What they are leaving decides the copy the owner gets.
+    const { data: prior } = await adminDb
+      .from('applications')
+      .select('id, status')
+      .eq('shift_id', shift_id)
+      .eq('worker_id', req.userId)
+      .in('status', ['accepted', 'standby', 'pending'])
+      .maybeSingle();
+    if (!prior) return res.status(404).json({ error: 'You are not booked for this shift.' });
+    const wasBooked = prior.status === 'accepted';
+
     const { data, error } = await adminDb
       .from('applications')
       .update({ status: 'withdrawn' })
-      .eq('shift_id', shift_id)
-      .eq('worker_id', req.userId)
+      .eq('id', prior.id)
       .in('status', ['accepted', 'standby', 'pending'])
       .select()
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'You are not booked for this shift.' });
-    await removeWorkerFromShiftChat(shift_id, req.userId!);
-    // Spot freed (the DB trigger decrements; this derives the exact count).
-    await syncShiftCapacity(shift_id);
+    if (wasBooked) {
+      await removeWorkerFromShiftChat(shift_id, req.userId!);
+      // Spot freed (the DB trigger decrements; this derives the exact count).
+      await syncShiftCapacity(shift_id);
+    }
 
-    // Let the owner know a spot opened up.
+    // Let the owner know — a dropped booking reopens a spot; a withdrawn
+    // application or waitlist exit does not.
     const { data: shift } = await adminDb
       .from('shifts').select('client_id, title').eq('id', shift_id).maybeSingle();
     if (shift?.client_id) {
+      const name = await workerName(req.userId!);
+      const label = shift.title ? `"${shift.title}"` : 'a shift';
       await createNotification({
         userId: shift.client_id,
         fromUserId: req.userId,
         type: 'receipt',
-        title: 'Worker dropped',
-        body: `${await workerName(req.userId!)} dropped ${shift.title ? `"${shift.title}"` : 'a shift'}. The spot reopened.`,
+        title: wasBooked ? 'Worker dropped' : prior.status === 'standby' ? 'Left the waitlist' : 'Application withdrawn',
+        body: wasBooked
+          ? `${name} dropped ${label}. The spot reopened.`
+          : prior.status === 'standby'
+          ? `${name} left the waitlist for ${label}.`
+          : `${name} withdrew their application for ${label}.`,
         shiftId: shift_id,
+        url: `/shift/${shift_id}/applicants`,
       });
     }
     return res.json({ ok: true });

@@ -30,7 +30,7 @@ import NotFound from '@/pages/not-found';
 import { Route, Switch, Redirect, Router as WouterRouter, useLocation } from 'wouter';
 
 import { AuthProvider } from '@/contexts/AuthContext';
-import { RoleProvider, useRole } from '@/contexts/RoleContext';
+import { RoleProvider, useRole, isLockedStatus } from '@/contexts/RoleContext';
 import { SuspendedGate } from '@/components/SuspendedGate';
 import { AdminFab } from '@/components/AdminFab';
 import { useSSE } from '@/hooks/useSSE';
@@ -126,10 +126,12 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 // ── SSE mount — opens a live event stream once the user is authenticated ──────
 function SSEMount() { useSSE(); return null; }
 
-// ── Suspended-account gate — blocks banned (non-admin) users from the app ─────
+// ── Suspended-account gate — blocks suspended/banned (non-admin) users ────────
+// The API refuses every request from such an account with 403 (except
+// GET /users/me, which is how this guard learns the status).
 function SuspendedGuard() {
   const { status, isAdmin } = useRole();
-  if (status === 'suspended' && !isAdmin) return <SuspendedGate />;
+  if (isLockedStatus(status) && !isAdmin) return <SuspendedGate />;
   return null;
 }
 
