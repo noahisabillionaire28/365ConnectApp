@@ -15,6 +15,16 @@ import { RefreshCw } from 'lucide-react';
 const THRESHOLD = 72;   // px of pull needed to trigger
 const MAX_PULL  = 110;  // px the indicator can stretch
 
+/**
+ * Overlays that own their own gestures (story viewer, image cropper, the map,
+ * bottom sheets) mark themselves with `data-no-pull`; a touch that starts
+ * inside one never arms the refresh.
+ */
+function insideNoPull(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  return !!el?.closest?.('[data-no-pull]');
+}
+
 function scrolledAway(target: EventTarget | null): boolean {
   let el = target as HTMLElement | null;
   while (el && el !== document.body) {
@@ -49,7 +59,7 @@ export function PullToRefresh({ children, disabled = false, onRefresh }: {
 
   function onTouchStart(e: TouchEvent<HTMLDivElement>) {
     if (disabled || refreshing) return;
-    if (scrolledAway(e.target)) { armed.current = false; return; }
+    if (insideNoPull(e.target) || scrolledAway(e.target)) { armed.current = false; return; }
     startY.current = e.touches[0]?.clientY ?? null;
     armed.current = startY.current != null;
   }

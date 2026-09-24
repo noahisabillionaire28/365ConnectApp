@@ -51,6 +51,10 @@ export type MockShift = {
   lat: number;
   lng: number;
   clientId: string;
+  /** The poster's @username (links to their public profile); null when unknown. */
+  clientUsername: string | null;
+  /** The poster's average rating; null when they have none yet. */
+  clientRating: number | null;
   status: 'open' | 'filled' | 'cancelled' | 'completed';
 };
 
@@ -160,6 +164,9 @@ export type ShiftRow = {
   parking_notes: string | null;
   special_instructions: string | null;
   repeat_type: string;
+  // Poster fields the API joins onto a shift
+  client_username?: string | null;
+  client_rating?: number | string | null;
 };
 
 export type ApplicationRow = {
@@ -172,17 +179,45 @@ export type ApplicationRow = {
   created_at: string;
 };
 
+/** Every `type` the API server writes to `notifications` (see routes/*.ts). */
 export type NotificationType =
+  // Applications and bookings
   | 'application_received'
-  | 'application_accepted'
   | 'application_declined'
-  | 'new_shift_match'
-  | 'payment_received'
-  | 'new_review'
-  | 'new_follower'
-  | 'direct_shift_request'
+  | 'booking'
+  | 'booking_removed'
+  | 'receipt'
+  | 'shift_invite'
+  | 'invite_declined'
+  | 'arrival_status'
+  | 'call_out'
+  | 'no_show'
+  // Shift lifecycle
   | 'shift_cancelled'
-  | 'shift_starting_soon';
+  | 'shift_update'
+  | 'shift_announcement'
+  | 'shift_starting_soon'
+  | 'shift_reminder_day'
+  | 'shift_unfilled'
+  | 'saved_search'
+  // Timesheets and money
+  | 'hours_recorded'
+  | 'hours_updated'
+  | 'hours_disputed'
+  | 'timesheet_submitted'
+  | 'timesheet_approved'
+  | 'payment'
+  | 'payment_received'
+  // Ratings
+  | 'rate_client'
+  | 'rate_client_reminder'
+  | 'rate_crew'
+  | 'rate_crew_reminder'
+  | 'new_review'
+  // Social
+  | 'new_follower'
+  | 'post_like'
+  | 'post_comment';
 
 /** Matches the live `notifications` table exactly (read_at, not a boolean `read`). */
 export type NotificationRow = {
@@ -461,6 +496,8 @@ export function shiftRowToMockShift(
     lat,
     lng,
     clientId:       row.client_id,
+    clientUsername: row.client_username ?? null,
+    clientRating:   row.client_rating != null && Number(row.client_rating) > 0 ? Number(row.client_rating) : null,
     status:         row.status,
   };
 }
@@ -508,6 +545,8 @@ export function hardenShift(s: MockShift): MockShift {
     lat:            Number.isFinite(raw.lat) ? (raw.lat as number) : MIAMI_BEACH.lat,
     lng:            Number.isFinite(raw.lng) ? (raw.lng as number) : MIAMI_BEACH.lng,
     clientId:       raw.clientId ?? '',
+    clientUsername: raw.clientUsername ?? null,
+    clientRating:   Number.isFinite(raw.clientRating) && (raw.clientRating as number) > 0 ? (raw.clientRating as number) : null,
     status:         raw.status ?? 'open',
   };
 }

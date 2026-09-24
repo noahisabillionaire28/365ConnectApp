@@ -54,7 +54,8 @@ export function PostShiftStep4Screen() {
   const [instantClaim, setInstantClaim] = useState(initial.instant_claim);
   const [rosterOnly, setRosterOnly]     = useState(initial.visibility === 'roster');
   const { role } = useRole();
-  const isStaffer = role === 'staffer';
+  // Clients and agencies both keep a roster (the workers they follow).
+  const hasRoster = role === 'staffer' || role === 'client';
   const [errors,       setErrors]       = useState<Record<string, string>>({});
 
   const payNum = Number(payRateStr);
@@ -80,7 +81,7 @@ export function PostShiftStep4Screen() {
       description:  description.trim(),
       requirements,
       instant_claim: instantClaim,
-      visibility:    isStaffer && rosterOnly ? 'roster' : 'public',
+      visibility:    hasRoster && rosterOnly ? 'roster' : 'public',
     });
     navigate('/post-shift/step5');
   }
@@ -220,8 +221,8 @@ export function PostShiftStep4Screen() {
           </div>
         </div>
 
-        {/* Roster-only — agencies only */}
-        {isStaffer && (
+        {/* Roster-only — clients and agencies */}
+        {hasRoster && (
           <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-4 mt-3">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">

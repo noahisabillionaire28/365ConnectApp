@@ -16,7 +16,6 @@ import { useMyLocation } from '@/hooks/useMyLocation';
 import { useMyPostedShifts } from '@/hooks/useMyPostedShifts';
 import { useApplications } from '@/hooks/useApplications';
 import { useProfile } from '@/hooks/useProfile';
-import { resetStafferDraft } from '@/store/stafferPostShiftStore';
 import { resetDraft } from '@/store/postShiftStore';
 import { JOB_TYPES } from '@/lib/jobTypes';
 import { EVENT_TYPES } from '@/lib/eventTypes';
@@ -84,8 +83,11 @@ function SavedSearchRow({ current, searches, canSaveMore, saving, onSave, onAppl
 }
 
 /* ── List card — clean Nowsta-style vertical row ─────────────────────────── */
-function ShiftRow({ shift, applied, onTap }: {
-  shift: MockShift; applied: boolean; onTap: () => void;
+function ShiftRow({ shift, applied, showDistance, onTap }: {
+  shift: MockShift; applied: boolean;
+  /** False when the viewer's location is unknown (a distance would be to a default point). */
+  showDistance: boolean;
+  onTap: () => void;
 }) {
   const spotsLow = shift.spotsAvailable < 3;
   return (
@@ -111,6 +113,12 @@ function ShiftRow({ shift, applied, onTap }: {
               <Zap size={9} aria-hidden className="fill-emerald-600 text-emerald-600" /> Claim
             </span>
           )}
+          {shift.rosterOnly && (
+            <span className="text-[10px] font-bold text-[#0A1628] bg-[#F3F4F6] border border-[#E5E7EB] px-2 py-0.5 rounded-full flex-shrink-0 truncate max-w-[140px]"
+              title="Only workers on this poster's roster can take this shift">
+              Roster only{shift.clientUsername ? ` · @${shift.clientUsername}` : ''}
+            </span>
+          )}
         </div>
         {applied && (
           <div aria-label="Already applied" className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
@@ -123,7 +131,7 @@ function ShiftRow({ shift, applied, onTap }: {
         <p className="text-[#111827] font-bold text-[16px] leading-tight truncate">{shift.companyName}</p>
         <div className="flex items-center gap-1 mt-1">
           <MapPin size={12} aria-hidden className="text-[#6B7280] flex-shrink-0" />
-          <p className="text-[#6B7280] text-[12px] truncate">{shift.location} · {shift.distanceMiles} mi</p>
+          <p className="text-[#6B7280] text-[12px] truncate">{shift.location}{showDistance ? ` · ${shift.distanceMiles} mi` : ''}</p>
         </div>
       </div>
 
@@ -160,7 +168,7 @@ function ShiftRowSkeleton() {
 function MapPane({ shifts, selectedId, userCoords, onPinClick, onOpenShift }: {
   shifts: MockShift[];
   selectedId: string | null;
-  /** The viewer's real location (blue dot); null when unknown. */
+  /** The viewer's real location (blue dot); null when unknown — then no distances are shown either. */
   userCoords: { lat: number; lng: number } | null;
   onPinClick: (s: MockShift) => void;
   onOpenShift: (s: MockShift) => void;
@@ -201,7 +209,7 @@ function MapPane({ shifts, selectedId, userCoords, onPinClick, onOpenShift }: {
       : { lat: 25.7913, lng: -80.145 };
 
   return (
-    <div className="flex-1 relative bg-[#F2EFE9]">
+    <div data-no-pull className="flex-1 relative bg-[#F2EFE9]">
       {/* Address bar */}
       <form
         onSubmit={(e) => { e.preventDefault(); void submitAddress(); }}
@@ -275,10 +283,15 @@ function MapPane({ shifts, selectedId, userCoords, onPinClick, onOpenShift }: {
                       {shift.instantClaim && (
                         <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase">Claim</span>
                       )}
+                      {shift.rosterOnly && (
+                        <span className="text-[#0A1628] bg-[#F3F4F6] border border-[#E5E7EB] text-[9px] font-bold px-1.5 py-0.5 rounded-full truncate max-w-[120px]">
+                          Roster only{shift.clientUsername ? ` · @${shift.clientUsername}` : ''}
+                        </span>
+                      )}
                     </div>
                     <p className="text-[#111827] font-bold text-[15px] truncate">{shift.companyName}</p>
                     <p className="text-[#6B7280] text-[11px] truncate flex items-center gap-1">
-                      <MapPin size={10} aria-hidden />{shift.location} · {shift.distanceMiles} mi
+                      <MapPin size={10} aria-hidden />{shift.location}{userCoords ? ` · ${shift.distanceMiles} mi` : ''}
                     </p>
                     <p className="text-[#9CA3AF] text-[11px] truncate mt-0.5">{shift.date} · {shift.startTime}</p>
                   </div>
@@ -333,8 +346,7 @@ export function JobsScreen() {
   const { role } = useProfile();
   const canPost = role === 'staffer' || role === 'client';
   function handlePostShift() {
-    if (role === 'staffer') resetStafferDraft();
-    else resetDraft();
+    resetDraft();
     navigate('/post-shift/name');
   }
 
@@ -440,6 +452,8 @@ export function JobsScreen() {
             {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
           {FILTER_PILLS.map((pill) => {
+            // Distance means nothing until we know where the viewer is.
+            if (pill.key === 'near3' && myLocationIsDefault) return null;
             const active = activeFilter === pill.key;
             return (
               <button key={pill.key} type="button" role="radio" aria-checked={active}
@@ -474,7 +488,7 @@ export function JobsScreen() {
               <motion.div key={shift.id}
                 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.25, ease: 'easeOut' }}>
-                <ShiftRow shift={shift} applied={appliedShiftIds.has(shift.id)}
+                <ShiftRow shift={shift} applied={appliedShiftIds.has(shift.id)} showDistance={!myLocationIsDefault}
                   onTap={() => handleSelectShift(shift)} />
               </motion.div>
             ))}

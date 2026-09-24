@@ -103,9 +103,12 @@ export function PostShiftStep5Screen() {
   // ── Derived ──────────────────────────────────────────────────────────────────
   const durHrs   = durationHours(draft.start_time, draft.end_time);
   const durLabel = durationLabel(draft.start_time, draft.end_time);
-  const grossCost    = draft.pay_rate * draft.spots_available * durHrs;
+  // Hourly shifts multiply by the hours; a day / event rate is flat per worker.
+  const hourly       = draft.pay_period === 'hr';
+  const grossCost    = hourly ? draft.pay_rate * draft.spots_available * durHrs : draft.pay_rate * draft.spots_available;
   const platformFee  = 0; // platform fee removed for now
   const totalCost    = grossCost + platformFee;
+  const rateLabel    = hourly ? `$${draft.pay_rate.toFixed(2)}/hr` : `$${draft.pay_rate.toFixed(2)} per ${draft.pay_period}`;
 
   const readiness = [
     { label: 'Job type selected',    done: !!draft.job_type },
@@ -126,8 +129,10 @@ export function PostShiftStep5Screen() {
       return;
     }
 
-    // The venue's zone: the poster's device zone (venues are posted locally).
-    const timezone   = browserTimeZone();
+    // The venue's zone. A new shift uses the poster's device zone (venues are
+    // posted locally); an edit keeps the zone the shift was posted with, so
+    // editing from another zone never rewrites the venue's wall-clock times.
+    const timezone   = (isEditing && draft.timezone) || browserTimeZone();
     const start_time = buildIso(draft.date, draft.start_time, undefined, timezone);
     const end_time   = buildIso(draft.date, draft.end_time, draft.start_time, timezone);
 
@@ -259,7 +264,7 @@ export function PostShiftStep5Screen() {
           <SummaryRow
             icon={<DollarSign size={15} aria-hidden className="text-[#0A1628]" />}
             label="Pay rate"
-            value={draft.pay_rate > 0 ? `$${draft.pay_rate.toFixed(2)}/hr` : '—'}
+            value={draft.pay_rate > 0 ? rateLabel : '—'}
           />
           {draft.description && (
             <SummaryRow
@@ -277,15 +282,19 @@ export function PostShiftStep5Screen() {
           <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-4 mb-4">
             <p className="text-[#111827] font-bold text-[15px] mb-3">Estimated Cost</p>
             <CostRow
-              label={`${draft.spots_available} worker${draft.spots_available !== 1 ? 's' : ''} × ${durLabel} × $${draft.pay_rate}/hr`}
+              label={hourly
+                ? `${draft.spots_available} worker${draft.spots_available !== 1 ? 's' : ''} × ${durLabel} × $${draft.pay_rate}/hr`
+                : `${draft.spots_available} worker${draft.spots_available !== 1 ? 's' : ''} × $${draft.pay_rate} per ${draft.pay_period}`}
               value={`$${grossCost.toFixed(2)}`}
               muted
             />
             <div className="border-t border-[#E5E7EB] my-2" />
             <CostRow label="Total Estimated Cost" value={`$${totalCost.toFixed(2)}`} highlight />
             <p className="text-[#9CA3AF] text-[11px] mt-3 leading-relaxed">
-              Estimated total based on listed hours. Final cost may vary if shift hours change.
-              Workers are paid after successful clock-out confirmation.
+              {hourly
+                ? 'Estimated total based on listed hours. Final cost may vary if shift hours change.'
+                : 'Flat rate per worker. Final cost depends on how many spots are filled.'}
+              {' '}Workers are paid after successful clock-out confirmation.
             </p>
           </div>
         )}

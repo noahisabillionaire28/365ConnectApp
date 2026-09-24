@@ -31,19 +31,25 @@ export function notificationDeepLink(
   /** optional usernames map (ignored — route is built from n.shift_id / n.type) */
   _usernames?: Record<string, string>,
 ): string {
-  // A booking (worker accepted for a shift) sends the worker to their home.
-  if (n.type === 'booking') return '/home';
+  // A booking (worker accepted for a shift) opens that shift; without a shift
+  // id it falls back to the schedule.
+  if (n.type === 'booking') return n.shift_id ? `/shift/${n.shift_id}` : '/home';
   // A shift offer is accepted/declined on the Home → Requests tab, not on the
   // shift page (which would only show "Apply").
   if (n.type === 'shift_invite' || n.type === 'direct_shift_request') return '/home?tab=requests';
+  // Money lands on the earnings screen; a review on the recipient's profile.
+  if (n.type === 'payment_received') return '/earnings';
+  if (n.type === 'new_review') return '/profile';
+  if (n.type === 'saved_search') return n.shift_id ? `/shift/${n.shift_id}` : '/jobs';
   if (n.post_id) return `/post/${n.post_id}`;
   // "Rate them" opens the review flow for the poster who sent the prompt.
   if (n.shift_id && n.from_user_id && (n.type === 'rate_client' || n.type === 'rate_client_reminder')) {
     return `/review/${n.shift_id}/${n.from_user_id}`;
   }
-  // A new applicant is handled on the applicants list, not the shift page.
+  // Anything the poster acts on from the roster opens the applicants list.
   if (n.shift_id && (n.type === 'application_received' || n.type === 'new_application' || n.type === 'application'
-    || n.type === 'arrival_status' || n.type === 'call_out'
+    || n.type === 'arrival_status' || n.type === 'call_out' || n.type === 'invite_declined'
+    || n.type === 'timesheet_submitted'
     || n.type === 'rate_crew' || n.type === 'rate_crew_reminder' || n.type === 'hours_disputed')) {
     return `/shift/${n.shift_id}/applicants`;
   }
@@ -84,15 +90,36 @@ export function useNotifications() {
     return map;
   }, [items]);
 
-  // Live updates: prepend incoming notifications
+  // Live updates: prepend incoming notifications, and refresh every cache
+  // the event may have made stale (a booking, removal, cancellation or
+  // payment changes what the shift page and the schedule should show — and
+  // refetchOnWindowFocus is off, so nothing else would notice).
   useEffect(() => {
     return onSSE<NotificationWithSender>('new_notification', (notification) => {
       setItems((prev) => {
         if (prev.some((n) => n.id === notification.id)) return prev;
         return [notification, ...prev];
       });
+      const shiftId = notification.shift_id;
+      if (shiftId) {
+        void qc.invalidateQueries({ queryKey: ['application-status', shiftId] });
+        void qc.invalidateQueries({ queryKey: ['shift', shiftId] });
+        void qc.invalidateQueries({ queryKey: ['shift-applicants', shiftId] });
+        void qc.invalidateQueries({ queryKey: ['accepted-workers', shiftId] });
+        void qc.invalidateQueries({ queryKey: ['time-entry', shiftId] });
+        void qc.invalidateQueries({ queryKey: ['my-applications'] });
+        void qc.invalidateQueries({ queryKey: ['my-shift-ids'] });
+        void qc.invalidateQueries({ queryKey: ['client-shifts'] });
+      }
+      if (notification.type === 'shift_invite' || notification.type === 'direct_shift_request') {
+        void qc.invalidateQueries({ queryKey: ['shift-requests'] });
+      }
+      if (notification.type === 'payment_received' || notification.type === 'timesheet_approved'
+        || notification.type === 'hours_updated' || notification.type === 'hours_recorded') {
+        void qc.invalidateQueries({ queryKey: ['payments'] });
+      }
     });
-  }, [setItems]);
+  }, [setItems, qc]);
 
   const unreadCount = items.filter((n) => !n.read_at).length;
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocation, useSearch } from 'wouter';
+import { useLocation, useSearch, Redirect } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   Bell, Search, PlusCircle, SlidersHorizontal,
@@ -15,7 +15,7 @@ import { usePeopleFeed } from '@/hooks/usePeopleFeed';
 import { useApplications } from '@/hooks/useApplications';
 import { useMyApplications, type MyApplication } from '@/hooks/useMyApplications';
 import { useClientShiftsDashboard, type ClientShift } from '@/hooks/useClientShiftsDashboard';
-import { useShiftRequests } from '@/hooks/useShiftRequests';
+import { useShiftRequests, isLiveOffer } from '@/hooks/useShiftRequests';
 import { useProfile } from '@/hooks/useProfile';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useRole } from '@/contexts/RoleContext';
@@ -24,7 +24,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { friendlyDate, formatTime } from '@/lib/supabase';
 import { Check, X, Inbox } from 'lucide-react';
 import { JOB_TYPES } from '@/lib/jobTypes';
-import { resetStafferDraft } from '@/store/stafferPostShiftStore';
+import { resetDraft } from '@/store/postShiftStore';
 import { ArrivalPills } from '@/components/ArrivalPills';
 import { RatePromptCard } from '@/components/home/RatePromptCard';
 import { WeekEarningsCard } from '@/components/home/WeekEarningsCard';
@@ -109,15 +109,21 @@ function groupApplications(apps: MyApplication[]) {
   // Soonest first for anything ahead; most recent first for what's done.
   const soonest = (a: MyApplication, b: MyApplication) => Date.parse(a.startTime ?? '') - Date.parse(b.startTime ?? '');
   const latest  = (a: MyApplication, b: MyApplication) => -soonest(a, b);
+  // A cancelled shift is never "upcoming", whatever the application says: it
+  // gets its own section so the worker sees what happened and nothing more.
+  const isCancelled = (a: MyApplication) => a.shiftStatus === 'cancelled';
+  const live = apps.filter((a) => !isCancelled(a));
   return {
-    upcoming:  apps.filter((a) => a.status === 'accepted' && !isOver(a)).sort(soonest),
-    applied:   apps.filter((a) => a.status === 'pending' && !isOver(a)).sort(soonest),
-    standby:   apps.filter((a) => a.status === 'standby' && !isOver(a)).sort(soonest),
-    completed: apps.filter((a) => a.status === 'accepted' && isOver(a)).sort(latest),
+    upcoming:  live.filter((a) => a.status === 'accepted' && !isOver(a)).sort(soonest),
+    applied:   live.filter((a) => a.status === 'pending' && !isOver(a)).sort(soonest),
+    standby:   live.filter((a) => a.status === 'standby' && !isOver(a)).sort(soonest),
+    completed: live.filter((a) => a.status === 'accepted' && isOver(a)).sort(latest),
     // Applications that were never answered before the shift ended.
-    expired:   apps.filter((a) => (a.status === 'pending' || a.status === 'standby') && isOver(a)),
-    dropped:   apps.filter((a) => a.status === 'withdrawn'),
-    notSelected: apps.filter((a) => a.status === 'declined' || a.status === 'rejected'),
+    expired:   live.filter((a) => (a.status === 'pending' || a.status === 'standby') && isOver(a)),
+    dropped:   live.filter((a) => a.status === 'withdrawn'),
+    notSelected: live.filter((a) => a.status === 'declined' || a.status === 'rejected'),
+    // Shifts the organizer cancelled while this worker was booked, applied or waitlisted.
+    cancelled: apps.filter((a) => isCancelled(a) && ['accepted', 'pending', 'standby'].includes(a.status)).sort(latest),
   };
 }
 
@@ -144,20 +150,23 @@ function MyShiftRow({ app, onTap, onCalendar }: {
   /** Upcoming rows only: opens the add-to-calendar sheet. */
   onCalendar?: () => void;
 }) {
+  // Dates and times are shown in the venue's zone, like everywhere else.
   const dateStr = app.startTime
-    ? new Date(app.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    ? new Date(app.startTime).toLocaleDateString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric', timeZone: app.timezone || undefined,
+      })
     : null;
-  const timeStr = app.startTime
-    ? new Date(app.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-    : null;
-  // Clock-in window: opens an hour before the start, closes at the end.
+  const timeStr = app.startTime ? formatTime(app.startTime, app.timezone) : null;
+  const cancelled = app.shiftStatus === 'cancelled';
+  // Clock-in window: opens an hour before the start, closes at the end — and
+  // never for a cancelled shift.
   const now = Date.now();
   const startMs = app.startTime ? Date.parse(app.startTime) : NaN;
   const endMs = app.endTime ? Date.parse(app.endTime) : NaN;
-  const clockInNow = app.status === 'accepted' && Number.isFinite(startMs) &&
+  const clockInNow = !cancelled && app.status === 'accepted' && Number.isFinite(startMs) &&
     now >= startMs - 3_600_000 && (!Number.isFinite(endMs) || now <= endMs);
   // Day-of pills ("On my way" / "Running late") for today's booked shift.
-  const dayOf = app.status === 'accepted' && isToday(app.startTime) && (!Number.isFinite(endMs) || now <= endMs);
+  const dayOf = !cancelled && app.status === 'accepted' && isToday(app.startTime) && (!Number.isFinite(endMs) || now <= endMs);
 
   return (
     <div className="border-b border-[#E5E7EB] last:border-none">
@@ -186,7 +195,11 @@ function MyShiftRow({ app, onTap, onCalendar }: {
           )}
         </div>
       </div>
-      {clockInNow ? (
+      {cancelled ? (
+        <span className="flex-shrink-0 bg-red-50 border border-red-200 text-red-500 text-[11px] font-bold px-2.5 py-1 rounded-full">
+          Cancelled
+        </span>
+      ) : clockInNow ? (
         <span className="flex-shrink-0 bg-[#FFD700] text-black text-[11px] font-bold px-2.5 py-1 rounded-full">
           Clock in
         </span>
@@ -250,7 +263,7 @@ function MyShiftSection({
 function WorkerMyShiftsView() {
   const [, navigate] = useLocation();
   const { applications, isLoading, error } = useMyApplications();
-  const { upcoming, applied, standby, completed, expired, dropped, notSelected } = groupApplications(applications);
+  const { upcoming, applied, standby, completed, expired, dropped, notSelected, cancelled } = groupApplications(applications);
   const goToShift = (a: MyApplication) => navigate(`/shift/${a.shiftId}`);
   const [calendarEvent, setCalendarEvent] = useState<CalendarEvent | null>(null);
 
@@ -293,6 +306,7 @@ function WorkerMyShiftsView() {
         onCalendar={(a) => setCalendarEvent(calendarEventFor(a))} />
       <MyShiftSection label="Standby"      items={standby}      onTap={goToShift} dotColor="#F59E0B" />
       <MyShiftSection label="Applied"      items={applied}      onTap={goToShift} dotColor="#F59E0B" emptyText="No pending applications. Browse Jobs to apply." />
+      <MyShiftSection label="Cancelled"    items={cancelled}    onTap={goToShift} dotColor="#EF4444" />
       <MyShiftSection label="Completed"    items={completed}    onTap={goToShift} dotColor="#6B7280" />
       <MyShiftSection label="Expired"      items={expired}      onTap={goToShift} dotColor="#D1D5DB" />
       <MyShiftSection label="Dropped"      items={dropped}      onTap={goToShift} dotColor="#D1D5DB" />
@@ -353,23 +367,15 @@ function WorkerAvailableView() {
 }
 
 /* ─── Worker: Requests (direct shift offers to accept/decline) ───────────────── */
-/** A shift offer is stale once it has already started. */
-function isFutureOffer(startTime: string | null | undefined): boolean {
-  if (!startTime) return true;
-  const t = Date.parse(startTime);
-  return !Number.isFinite(t) || t > Date.now();
-}
-
 /** Receives the single shared useShiftRequests() instance from WorkerHomeFeed so
  *  the tab badge and this list never disagree. */
 function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType<typeof useShiftRequests>) {
   const [, navigate] = useLocation();
   const { showToast } = useToast();
   const { user } = useAuth();
-  // Only genuine offers TO this worker (not invites they sent), and not past.
-  const pending = requests.filter(
-    (r) => r.status === 'pending' && r.worker_id === user?.id && isFutureOffer(r.startTime ?? r.start_time),
-  );
+  // Only genuine offers TO this worker (not invites they sent) that can still
+  // be answered: not cancelled, not started.
+  const pending = requests.filter((r) => r.worker_id === user?.id && isLiveOffer(r));
 
   if (isLoading) {
     return (
@@ -389,7 +395,7 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
         </div>
         <p className="text-[#111827] font-semibold text-[16px]">No shift offers</p>
         <p className="text-[#6B7280] text-[13px] max-w-[240px]">
-          When a staffer requests you for a shift, it shows up here to accept or decline.
+          When a client or agency requests you for a shift, it shows up here to accept or decline.
         </p>
       </div>
     );
@@ -409,14 +415,14 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
           </button>
           <div className="flex gap-2 mt-3.5">
             <button type="button"
-              onClick={() => void decline(r.id).then((ok) => showToast(ok ? 'Declined.' : 'Could not decline.', ok ? 'success' : 'error'))}
+              onClick={() => void decline(r.id).then((res) => showToast(res.ok ? 'Declined.' : (res.message ?? 'Could not decline.'), res.ok ? 'success' : 'error'))}
               className="flex-1 h-10 rounded-[8px] border border-[#E5E7EB] bg-white text-[#111827] font-semibold text-[13px] flex items-center justify-center gap-1.5">
               <X size={15} aria-hidden />
               Decline
             </button>
             <button type="button"
               onClick={() => void accept(r.id).then((res) => {
-                if (!res.ok) { showToast('Could not accept this offer.', 'error'); return; }
+                if (!res.ok) { showToast(res.message ?? 'Could not accept this offer.', 'error'); return; }
                 showToast(res.status === 'standby'
                   ? "Shift is full — you're on standby. We'll notify you if a spot opens."
                   : "You're booked! Clock in when you arrive.");
@@ -461,9 +467,7 @@ function WorkerHomeFeed() {
   const { user } = useAuth();
   const shiftRequests = useShiftRequests();
   const { requests } = shiftRequests;
-  const pendingCount = requests.filter(
-    (r) => r.status === 'pending' && r.worker_id === user?.id && isFutureOffer(r.startTime ?? r.start_time),
-  ).length;
+  const pendingCount = requests.filter((r) => r.worker_id === user?.id && isLiveOffer(r)).length;
 
   const subtitle =
     tab === 'schedule' ? 'Your upcoming shifts' :
@@ -832,7 +836,7 @@ function StafferHomeFeed() {
   const [tab, setTab] = useState<'browse' | 'my-shifts'>(useInitialPosterTab());
 
   function handlePostShift() {
-    resetStafferDraft();
+    resetDraft();
     navigate('/post-shift/name');
   }
 
@@ -873,9 +877,10 @@ function StafferHomeFeed() {
 
 /* ─── HomeScreen — role router ────────────────────────────────────────────────── */
 export function HomeScreen() {
-  const { role, roleLoading } = useRole();
+  const { role, roleLoading, roleError } = useRole();
+  const { user, loading: authLoading } = useAuth();
 
-  if (roleLoading) {
+  if (roleLoading || authLoading) {
     return (
       <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
         <div className="pt-4 flex flex-col gap-4">
@@ -885,6 +890,12 @@ export function HomeScreen() {
       </div>
     );
   }
+
+  // Signed out → splash (which routes to login); signed in with no role yet
+  // (onboarding never finished) → pick one. A failed profile read is not "no
+  // role", so it falls through to the default feed rather than bouncing.
+  if (!user) return <Redirect to="/" />;
+  if (!role && !roleError) return <Redirect to="/role-select" />;
 
   if (role === 'worker') return <WorkerHomeFeed />;
   if (role === 'staffer') return <StafferHomeFeed />;

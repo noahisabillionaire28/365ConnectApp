@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import {
   MapPin, CheckCheck, XCircle, Bell, DollarSign, Star, UserPlus, Send, AlarmClock, Ban, Settings,
-  Heart, MessageCircle,
+  Heart, MessageCircle, Clock3, FileClock, AlertTriangle, BellRing, UserMinus, Pencil,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { BottomTabNav } from '@/components/BottomTabNav';
@@ -24,6 +24,7 @@ const ICON_META: Record<string, { icon: React.ComponentType<{ size?: number; cla
   shift_reminder_day:    { icon: AlarmClock,  color: 'navy'  },
   shift_unfilled:        { icon: AlarmClock,  color: 'gold'  },
   timesheet_approved:    { icon: DollarSign,  color: 'green' },
+  payment:               { icon: DollarSign,  color: 'green' },
   shift_update:          { icon: Bell,        color: 'navy'  },
   shift_announcement:    { icon: Bell,        color: 'navy'  },
   booking:               { icon: CheckCheck,  color: 'green' },
@@ -35,6 +36,22 @@ const ICON_META: Record<string, { icon: React.ComponentType<{ size?: number; cla
   call_out:              { icon: Ban,         color: 'gold'  },
   post_like:             { icon: Heart,          color: 'red'  },
   post_comment:          { icon: MessageCircle,  color: 'blue' },
+  // Timesheets
+  hours_recorded:        { icon: Clock3,      color: 'navy'  },
+  hours_updated:         { icon: Pencil,      color: 'gold'  },
+  hours_disputed:        { icon: AlertTriangle, color: 'red' },
+  timesheet_submitted:   { icon: FileClock,   color: 'blue'  },
+  // Ratings
+  rate_client:           { icon: Star,        color: 'gold'  },
+  rate_client_reminder:  { icon: Star,        color: 'gold'  },
+  rate_crew:             { icon: Star,        color: 'gold'  },
+  rate_crew_reminder:    { icon: Star,        color: 'gold'  },
+  // Roster changes
+  booking_removed:       { icon: UserMinus,   color: 'red'   },
+  invite_declined:       { icon: XCircle,     color: 'navy'  },
+  shift_invite:          { icon: Send,        color: 'navy'  },
+  // Alerts
+  saved_search:          { icon: BellRing,    color: 'blue'  },
 };
 
 const COLOR_CLASSES: Record<IconColor, { bg: string; icon: string }> = {

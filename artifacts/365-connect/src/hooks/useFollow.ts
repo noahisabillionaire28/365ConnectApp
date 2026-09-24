@@ -6,6 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 type FollowOptions = {
   onFollowSuccess?:   () => void;
   onUnfollowSuccess?: () => void;
+  /** The server refused (e.g. "You can only follow workers.") — show it, don't swallow it. */
+  onError?:           (message: string) => void;
   /**
    * When the list that rendered this card already knows the follow state
    * (the workers directory returns is_followed), pass it here and the hook
@@ -60,6 +62,7 @@ export function useFollow(
     } catch (e) {
       setLocal(false, -1);
       console.error('[useFollow] follow failed:', e);
+      options.onError?.(e instanceof Error ? e.message : 'Could not follow this user.');
     } finally {
       setFollowPending(false);
     }
@@ -77,6 +80,7 @@ export function useFollow(
     } catch (e) {
       setLocal(true, 1);
       console.error('[useFollow] unfollow failed:', e);
+      options.onError?.(e instanceof Error ? e.message : 'Could not unfollow this user.');
     } finally {
       setFollowPending(false);
     }

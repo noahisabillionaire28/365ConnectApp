@@ -10,6 +10,7 @@
 import { adminDb } from './supabaseAdmin.js';
 import { getRoleInfo } from './roleCache.js';
 import { HttpError } from './httpError.js';
+import { isBlockedEitherWay } from './chat.js';
 
 export type ShiftRow = {
   id: string;
@@ -55,6 +56,30 @@ export async function assertShiftOwner(shiftId: string, userId: string): Promise
   const { isAdmin } = await getRoleInfo(userId);
   if (isAdmin) return shift;
   throw new HttpError(403, 'Forbidden');
+}
+
+/**
+ * The person a poster is booking, inviting or saving must be a worker who is
+ * not the poster themselves, and neither side may have blocked the other.
+ * Throws HttpError 404 / 409 / 403 with a message the poster can be shown.
+ */
+export async function assertWorkerTarget(
+  workerId: string,
+  actorId: string,
+  shift?: { client_id: string | null } | null,
+): Promise<void> {
+  if (!workerId || typeof workerId !== 'string') throw new HttpError(400, 'worker_id is required');
+  if (workerId === actorId || (shift?.client_id && workerId === shift.client_id)) {
+    throw new HttpError(409, "You can't book the shift's poster.");
+  }
+  const { data: target, error } = await adminDb
+    .from('users').select('id, role').eq('id', workerId).maybeSingle();
+  if (error) throw new HttpError(500, error.message);
+  if (!target) throw new HttpError(404, 'Worker not found');
+  if (target.role !== 'worker') throw new HttpError(409, 'Only worker accounts can be booked for shifts.');
+  if (await isBlockedEitherWay(actorId, workerId)) {
+    throw new HttpError(403, "You can't book this worker.");
+  }
 }
 
 /**

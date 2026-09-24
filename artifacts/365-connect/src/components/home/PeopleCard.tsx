@@ -20,6 +20,7 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
   const { isFollowing, follow, unfollow, isFollowPending } = useFollow(person.id, {
     onFollowSuccess:   () => showToast(`@${person.username} added to your roster`),
     onUnfollowSuccess: () => showToast(`@${person.username} removed from your roster`),
+    onError:           (msg) => showToast(msg, 'error'),
     // The directory already tells us — no extra request per card.
     initialFollowing:  person.isFollowed,
   });

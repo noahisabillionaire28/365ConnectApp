@@ -77,16 +77,50 @@ export async function attachUserId(
   next();
 }
 
+/** The 403 body every route returns for a suspended or banned account. */
+export const SUSPENDED_ERROR = { error: "Account suspended" } as const;
+
 /**
- * Rejects requests with no authenticated user (401).
+ * Rejects requests with no authenticated user (401). Does NOT check the
+ * account's moderation status — only for the handful of routes a suspended
+ * user must still reach (GET /users/me, so the app can show the suspended
+ * screen). Everything else uses requireAuth.
  */
-export function requireAuth(
+export function requireSession(
   req: Request,
   res: Response,
   next: NextFunction,
 ): void {
   if (!req.userId) {
     res.status(401).json({ error: `Unauthorized — ${req.authReason ?? "no session"}` });
+    return;
+  }
+  next();
+}
+
+/**
+ * Rejects requests with no authenticated user (401) and requests from a
+ * suspended or banned account (403 { error: 'Account suspended' }).
+ */
+export async function requireAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  if (!req.userId) {
+    res.status(401).json({ error: `Unauthorized — ${req.authReason ?? "no session"}` });
+    return;
+  }
+  try {
+    // Cached for 60s per user — see lib/roleCache.ts.
+    const info = await getRoleInfo(req.userId);
+    if (info.isSuspended) {
+      res.status(403).json(SUSPENDED_ERROR);
+      return;
+    }
+    req.userRole = info.role;
+  } catch {
+    res.status(500).json({ error: "Auth check failed" });
     return;
   }
   next();
@@ -116,7 +150,11 @@ export function requireRole(...roles: string[]) {
     }
     try {
       // Cached for 60s per user — see lib/roleCache.ts.
-      const { role, isAdmin } = await getRoleInfo(req.userId);
+      const { role, isAdmin, isSuspended } = await getRoleInfo(req.userId);
+      if (isSuspended) {
+        res.status(403).json(SUSPENDED_ERROR);
+        return;
+      }
       req.userRole = role;
       // Admins are superusers: they can act in any role (this powers the
       // in-app "view as worker/client/staffer" switcher).

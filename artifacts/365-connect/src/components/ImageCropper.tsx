@@ -108,6 +108,7 @@ export function ImageCropper({
   return (
     // Full-screen modal — sits above all content
     <div
+      data-no-pull
       className="fixed inset-0 z-50 flex flex-col"
       style={{ background: '#000' }}
       aria-modal="true"

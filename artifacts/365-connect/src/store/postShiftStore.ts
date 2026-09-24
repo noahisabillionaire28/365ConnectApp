@@ -29,8 +29,17 @@ export type PostShiftDraft = {
 
   // ── Step 4: Compensation + details ───────────────────────────────────────
   pay_rate:     number;
+  /** 'hr' (the wizard default) or a flat 'day' / 'event' rate on an edited shift. */
+  pay_period:   'hr' | 'day' | 'event';
   description:  string;
   requirements: string[]; // one requirement per line → string[]
+
+  /**
+   * The venue's IANA zone. Empty for a new shift (the poster's device zone is
+   * used); set when editing so the stored zone survives an edit made from
+   * somewhere else.
+   */
+  timezone: string;
 
   // ── Booking mode ─────────────────────────────────────────────────────────
   instant_claim: boolean; // true = any qualified worker can grab it, no approval
@@ -58,8 +67,10 @@ function empty(): PostShiftDraft {
     end_time:        '23:00',
     spots_available: 1,
     pay_rate:        0,
+    pay_period:      'hr',
     description:     '',
     requirements:    [],
+    timezone:        '',
     instant_claim:   false,
     visibility:      'public',
   };

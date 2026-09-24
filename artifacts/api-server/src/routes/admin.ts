@@ -281,6 +281,8 @@ router.patch('/disputes/:id', async (req, res) => {
         .from('users')
         .update({ status: 'banned', is_banned: true })
         .eq('id', dispute.reported_user_id);
+      // The ban takes effect on their next request, not a minute later.
+      invalidateRole(String(dispute.reported_user_id));
     }
     res.json({ ok: true });
   } catch (err) {

@@ -13,6 +13,7 @@ import { haversineMiles } from '@/lib/supabase';
 import { useTimeEntry } from '@/hooks/useTimeEntry';
 import { useToast } from '@/contexts/ToastContext';
 import { getOrCreateDirectConversation } from '@/hooks/useConversations';
+import { geocodeAddress } from '@/lib/geocode';
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 function fmtHMS(secs: number): string {
@@ -35,7 +36,8 @@ function fmtMoney(n: number): string { return `$${n.toFixed(2)}`; }
 
 /* ── Phase types ─────────────────────────────────────────────────────────── */
 type Phase = 'geo-check' | 'geo-success' | 'geo-fail' | 'active' | 'on-break' | 'transfer' | 'summary' | 'already-done' | 'end-error';
-type GeoFailReason = 'too-far' | 'denied' | 'unavailable';
+/** 'refused' = the server said no (ended, cancelled, not booked…) and gave a reason. */
+type GeoFailReason = 'too-far' | 'denied' | 'unavailable' | 'refused';
 
 /* ── Geo-check ───────────────────────────────────────────────────────────── */
 function GeoCheckScreen() {
@@ -100,13 +102,17 @@ const FAIL_COPY: Record<GeoFailReason, { title: string; body: string }> = {
   'too-far':     { title: "You're too far from the venue", body: 'You appear to be more than 1 mile away from the shift location.' },
   'denied':      { title: 'Location permission needed', body: 'Enable location access for this site, then try again to clock in.' },
   'unavailable': { title: "Couldn't verify location", body: "Your device didn't return a GPS signal. Try again outdoors or near a window." },
+  'refused':     { title: "Can't clock in right now", body: 'The clock-in was not accepted. Please try again or contact the organizer.' },
 };
 
-function GeoFailScreen({ reason, distance, shiftLocation, onRetry, onContact, contacting }: {
-  reason: GeoFailReason; distance: number | null; shiftLocation: string; onRetry: () => void;
+function GeoFailScreen({ reason, distance, message, shiftLocation, onRetry, onContact, contacting }: {
+  reason: GeoFailReason; distance: number | null;
+  /** The server's own explanation, shown in place of the generic copy when present. */
+  message?: string | null;
+  shiftLocation: string; onRetry: () => void;
   onContact: () => void; contacting: boolean;
 }) {
-  const copy = FAIL_COPY[reason];
+  const copy = { ...FAIL_COPY[reason], ...(message ? { body: message } : {}) };
   return (
     <motion.div key="geo-fail" initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 280, damping: 22 }}
@@ -456,6 +462,7 @@ export function ClockInScreen() {
   const [phase,      setPhase]      = useState<Phase>('geo-check');
   const [failReason, setFailReason] = useState<GeoFailReason>('too-far');
   const [failDistance, setFailDistance] = useState<number | null>(null);
+  const [failMessage, setFailMessage] = useState<string | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [shiftSecs,  setShiftSecs]  = useState(0);
   const [breakSecs,  setBreakSecs]  = useState(0);
@@ -487,21 +494,33 @@ export function ClockInScreen() {
   const runGeoCheck = useCallback(() => {
     if (!shift || !user?.id) return;
     setPhase('geo-check');
+    setFailMessage(null);
     const MIN_SPINNER_MS = 1200;
     const startedAt = Date.now();
 
-    const finish = (result: { ok: true } | { ok: false; reason: GeoFailReason; distance: number | null }) => {
+    type GeoResult =
+      | { ok: true; coords: { lat: number; lng: number } }
+      | { ok: false; reason: GeoFailReason; distance: number | null; message?: string | null };
+
+    const fail = (reason: GeoFailReason, distance: number | null, message?: string | null) => {
+      setFailReason(reason);
+      setFailDistance(distance);
+      setFailMessage(message ?? null);
+      setPhase('geo-fail');
+    };
+
+    const finish = (result: GeoResult) => {
       const elapsed = Date.now() - startedAt;
       const wait = Math.max(0, MIN_SPINNER_MS - elapsed);
       setTimeout(async () => {
         if (!result.ok) {
-          setFailReason(result.reason);
-          setFailDistance(result.distance);
-          setPhase('geo-fail');
+          fail(result.reason, result.distance, result.message);
           return;
         }
         try {
-          const entry = await startOrResume(shift.id, user.id);
+          // The server re-checks the distance (and that the shift is still
+          // on, and hasn't ended) before it records anything.
+          const entry = await startOrResume(result.coords);
           if (entry.alreadyCompleted) {
             setEntryId(entry.id);
             const priorNet = entry.totalPay !== null && entry.fee !== null ? entry.totalPay - entry.fee : null;
@@ -523,9 +542,11 @@ export function ClockInScreen() {
           setPhase('geo-success');
         } catch (e) {
           console.error('[ClockIn] failed to start time entry:', e);
-          setFailReason('unavailable');
-          setFailDistance(null);
-          setPhase('geo-fail');
+          const msg = e instanceof Error ? e.message : '';
+          // The server's geofence: it tells us how far off we are.
+          const far = /about ([\d.]+) mi from the venue/.exec(msg);
+          if (far) fail('too-far', Number(far[1]) || null, msg);
+          else fail(msg ? 'refused' : 'unavailable', null, msg || null);
         }
       }, wait);
     };
@@ -536,9 +557,18 @@ export function ClockInScreen() {
     }
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const distance = haversineMiles(pos.coords.latitude, pos.coords.longitude, shift.lat, shift.lng);
-        if (distance <= 1) finish({ ok: true });
+      async (pos) => {
+        const me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        // The same venue the shift page maps: the address's coordinates when
+        // they resolve (cached), the stored ones otherwise — so "0.3 mi away"
+        // on the shift page and the check here never disagree.
+        const addr = shift.location?.trim();
+        const venue = (addr ? await geocodeAddress(addr) : null) ?? { lat: shift.lat, lng: shift.lng };
+        const distance = Math.min(
+          haversineMiles(me.lat, me.lng, venue.lat, venue.lng),
+          haversineMiles(me.lat, me.lng, shift.lat, shift.lng),
+        );
+        if (distance <= 1) finish({ ok: true, coords: me });
         else finish({ ok: false, reason: 'too-far', distance });
       },
       (geoError) => {
@@ -696,7 +726,7 @@ export function ClockInScreen() {
         {phase === 'geo-check' && <GeoCheckScreen key="geo-check" />}
         {phase === 'geo-success' && <GeoSuccessScreen key="geo-success" locationLabel={shift.location} />}
         {phase === 'geo-fail' && (
-          <GeoFailScreen key="geo-fail" reason={failReason} distance={failDistance}
+          <GeoFailScreen key="geo-fail" reason={failReason} distance={failDistance} message={failMessage}
             shiftLocation={shift.location} onRetry={runGeoCheck}
             onContact={() => void handleContactManager()} contacting={contacting} />
         )}

@@ -22,20 +22,26 @@ function AssignCardSkeleton() {
   );
 }
 
-function AssignCard({ worker, shiftFull, shiftJobTypes, isAssigning, isOffering, onAssign, onOffer }: {
-  worker: AssignableWorker; shiftFull: boolean; shiftJobTypes: string[];
+function AssignCard({ worker, shiftFull, shiftStarted, shiftJobTypes, isAssigning, isOffering, onAssign, onOffer }: {
+  worker: AssignableWorker; shiftFull: boolean;
+  /** The shift has started: any unanswered offer has expired (the server refuses it too). */
+  shiftStarted: boolean;
+  shiftJobTypes: string[];
   isAssigning: boolean; isOffering: boolean;
   onAssign: (id: string) => void; onOffer: (id: string) => void;
 }) {
   const initials = (worker.username ?? 'W').replace('@', '').slice(0, 2).toUpperCase();
   const alreadyAssigned = worker.applicationStatus === 'accepted';
   const onStandby = worker.applicationStatus === 'standby';
-  const offerPending = worker.requestStatus === 'pending';
-  const offerDeclined = worker.requestStatus === 'declined';
+  const offerPending = worker.requestStatus === 'pending' && !shiftStarted;
+  const offerExpired = worker.requestStatus === 'pending' && shiftStarted;
+  const offerDeclined = worker.requestStatus === 'declined' || worker.requestStatus === 'expired' || worker.requestStatus === 'cancelled';
   const busy = isAssigning || isOffering;
   const disabled = alreadyAssigned || busy || (shiftFull && !alreadyAssigned);
-  const roles = [worker.primaryJobType, ...(worker.job_types ?? [])].filter((r): r is string => !!r);
-  const matches = shiftJobTypes.filter((t) => roles.includes(t));
+  // Same rule as the server's job-type match: case-insensitive, trimmed.
+  const norm = (s: string) => s.trim().toLowerCase();
+  const roles = [worker.primaryJobType, ...(worker.job_types ?? [])].filter((r): r is string => !!r).map(norm);
+  const matches = shiftJobTypes.filter((t) => roles.includes(norm(t)));
   const roleMismatch = shiftJobTypes.length > 0 && roles.length > 0 && matches.length === 0;
 
   return (
@@ -90,8 +96,10 @@ function AssignCard({ worker, shiftFull, shiftJobTypes, isAssigning, isOffering,
             </button>
             {offerPending ? (
               <span className="text-[11px] font-semibold text-[#6B7280]">Offer sent · awaiting reply</span>
+            ) : offerExpired ? (
+              <span className="text-[11px] font-semibold text-[#9CA3AF]">Offer expired · no reply</span>
             ) : (
-              <button type="button" disabled={busy || shiftFull} onClick={() => onOffer(worker.id)}
+              <button type="button" disabled={busy || shiftFull || shiftStarted} onClick={() => onOffer(worker.id)}
                 aria-label={`Send ${worker.username ? `@${worker.username}` : 'worker'} an offer they can accept or decline`}
                 className="h-[30px] px-3 rounded-[8px] text-[11px] font-bold flex items-center gap-1 border border-[#E5E7EB] text-[#0A1628] disabled:opacity-50">
                 <Send size={12} aria-hidden /> {isOffering ? 'Sending…' : offerDeclined ? 'Offer again' : 'Send offer'}
@@ -132,9 +140,11 @@ export function AssignWorkersScreen() {
     });
   }
 
+  // Clients and agencies both assign from their roster (the workers they follow).
+  const hasRoster = role === 'staffer' || role === 'client';
   useEffect(() => {
-    if (!roleLoading && role !== 'staffer') navigate('/home');
-  }, [roleLoading, role, navigate]);
+    if (!roleLoading && !hasRoster) navigate('/home');
+  }, [roleLoading, hasRoster, navigate]);
 
   // Arriving from the roster with ?worker=<id>: bring that person to the top
   // so the assign button is the first thing under the thumb.
@@ -143,9 +153,11 @@ export function AssignWorkersScreen() {
     ? [...workers].sort((a, b) => (a.id === preselect ? -1 : b.id === preselect ? 1 : 0))
     : workers;
 
-  if (roleLoading || role !== 'staffer') return null;
+  if (roleLoading || !hasRoster) return null;
 
   const shiftFull = !!shift && shift.spotsAvailable <= 0;
+  const shiftStartMs = shift?.startTimeISO ? Date.parse(shift.startTimeISO) : NaN;
+  const shiftStarted = Number.isFinite(shiftStartMs) && shiftStartMs < Date.now();
   const isLoadingAny = shiftLoading || isLoading;
   const assignedCount = workers.filter((w) => w.applicationStatus === 'accepted').length;
 
@@ -176,7 +188,11 @@ export function AssignWorkersScreen() {
               {shift.spotsAvailable} of {shift.spotsTotal} spot{shift.spotsTotal !== 1 ? 's' : ''} open
               {assignedCount > 0 && ` · ${assignedCount} assigned from roster`}
             </p>
-            {shiftFull ? (
+            {shiftStarted ? (
+              <p className="text-[#EF4444] text-[12px] font-medium mt-1">
+                This shift has already started — unanswered offers have expired.
+              </p>
+            ) : shiftFull ? (
               <p className="text-[#EF4444] text-[12px] font-medium mt-1">
                 This shift is fully booked — remove a worker before assigning another.
               </p>
@@ -210,7 +226,7 @@ export function AssignWorkersScreen() {
         ) : (
           <div className="flex flex-col gap-3">
             {ordered.map((w) => (
-              <AssignCard key={w.id} worker={w} shiftFull={shiftFull} shiftJobTypes={shift?.jobTypes ?? []}
+              <AssignCard key={w.id} worker={w} shiftFull={shiftFull} shiftStarted={shiftStarted} shiftJobTypes={shift?.jobTypes ?? []}
                 isAssigning={assigningId === w.id} isOffering={offeringId === w.id}
                 onAssign={handleAssign} onOffer={handleOffer} />
             ))}

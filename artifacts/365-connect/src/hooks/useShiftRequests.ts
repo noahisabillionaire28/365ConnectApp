@@ -9,11 +9,13 @@ export type ShiftRequestRow = {
   shift_id: string;
   client_id: string;
   worker_id: string;
-  status: 'pending' | 'accepted' | 'declined';
+  status: 'pending' | 'accepted' | 'declined' | 'standby' | 'cancelled' | 'expired';
   message: string | null;
   created_at: string;
   // Snake_case joined fields
   shift_title?: string;
+  /** The shift's own lifecycle — an offer on a cancelled shift is dead. */
+  shift_status?: 'open' | 'filled' | 'cancelled' | 'completed' | null;
   job_type?: string;
   start_time?: string;
   end_time?: string;
@@ -91,6 +93,19 @@ function mapRow(r: ShiftRequestRow): ShiftRequestRow {
 
 export const SHIFT_REQUESTS_KEY = 'shift-requests';
 
+/**
+ * An offer the worker can still act on: pending, for a shift that is still
+ * open or filling, and that has not started yet (same rule as the server).
+ */
+export function isLiveOffer(r: Pick<ShiftRequestRow, 'status' | 'shift_status' | 'start_time' | 'startTime'>): boolean {
+  if (r.status !== 'pending') return false;
+  if (r.shift_status === 'cancelled' || r.shift_status === 'completed') return false;
+  const start = r.startTime ?? r.start_time;
+  if (!start) return true;
+  const t = Date.parse(start);
+  return !Number.isFinite(t) || t > Date.now();
+}
+
 export function useShiftRequests(
   /** Optional userId override — if omitted, reads from AuthContext */
   _userId?: string,
@@ -121,39 +136,50 @@ export function useShiftRequests(
     return result.ok;
   }, [user?.id, qc]);
 
-  /** Accept an offer. Resolves to the booking outcome: booked, or waitlisted (standby). */
-  const accept = useCallback(async (id: string): Promise<{ ok: boolean; status?: 'accepted' | 'standby' }> => {
-    if (!user?.id) return { ok: false };
+  /**
+   * Accept an offer. Resolves to the booking outcome: booked, or waitlisted
+   * (standby). On failure `message` carries the server's reason (a time
+   * conflict, a full or cancelled shift, an expired offer).
+   */
+  const accept = useCallback(async (id: string): Promise<{ ok: boolean; status?: 'accepted' | 'standby'; message?: string }> => {
+    if (!user?.id) return { ok: false, message: 'Not signed in.' };
     try {
       const r = await apiClient(user.id).patch<{ status?: 'accepted' | 'standby' }>(
         `/shift-requests/${id}`, { status: 'accepted' },
       );
-      patchLocal(id, 'accepted');
-      // The worker's schedule and applied-set changed too.
+      patchLocal(id, r?.status === 'standby' ? 'standby' : 'accepted');
+      // The worker's schedule, applied-set and the shift itself changed too.
+      const shiftId = qc.getQueryData<ShiftRequestRow[]>(key)?.find((x) => x.id === id)?.shift_id;
       void qc.invalidateQueries({ queryKey: [MY_APPLICATIONS_KEY] });
       void qc.invalidateQueries({ queryKey: ['my-shift-ids'] });
       void qc.invalidateQueries({ queryKey: ['worker-home-shifts'] });
+      void qc.invalidateQueries({ queryKey: ['application-status'] });
+      void qc.invalidateQueries({ queryKey: shiftId ? ['shift', shiftId] : ['shift'] });
       return { ok: true, status: r?.status ?? 'accepted' };
     } catch (e) {
       console.error('[useShiftRequests] accept failed:', e);
-      return { ok: false };
+      // A dead offer (cancelled / started) should leave the list, not linger.
+      void qc.invalidateQueries({ queryKey: [SHIFT_REQUESTS_KEY] });
+      return { ok: false, message: e instanceof Error ? e.message : 'Could not accept this offer.' };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, patchLocal, qc]);
 
-  const decline = useCallback(async (id: string): Promise<boolean> => {
-    if (!user?.id) return false;
+  const decline = useCallback(async (id: string): Promise<{ ok: boolean; message?: string }> => {
+    if (!user?.id) return { ok: false, message: 'Not signed in.' };
     try {
       await apiClient(user.id).patch(`/shift-requests/${id}`, { status: 'declined' });
       patchLocal(id, 'declined');
-      return true;
+      return { ok: true };
     } catch (e) {
       console.error('[useShiftRequests] decline failed:', e);
-      return false;
+      void qc.invalidateQueries({ queryKey: [SHIFT_REQUESTS_KEY] });
+      return { ok: false, message: e instanceof Error ? e.message : 'Could not decline this offer.' };
     }
-  }, [user?.id, patchLocal]);
+  }, [user?.id, patchLocal, qc]);
 
   const respondToRequest = useCallback(async (id: string, status: 'accepted' | 'declined'): Promise<boolean> => {
-    return status === 'accepted' ? (await accept(id)).ok : decline(id);
+    return status === 'accepted' ? (await accept(id)).ok : (await decline(id)).ok;
   }, [accept, decline]);
 
   return {

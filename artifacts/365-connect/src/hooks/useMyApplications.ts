@@ -16,6 +16,8 @@ type RawApplication = {
   arrival_status_at?: string | null;
   // Joined shift fields
   title?: string | null;
+  /** The shift's own lifecycle state (a cancelled shift is not "upcoming"). */
+  shift_status?: 'open' | 'filled' | 'cancelled' | 'completed' | null;
   job_type?: string | null;
   start_time?: string | null;
   end_time?: string | null;
@@ -36,6 +38,7 @@ export type MyApplication = RawApplication & {
   shiftId: string;
   applicationId: string;
   shiftTitle: string | null;
+  shiftStatus: 'open' | 'filled' | 'cancelled' | 'completed' | null;
   companyName: string | null;
   startTime: string | null;
   endTime: string | null;
@@ -60,6 +63,7 @@ function toMyApplication(r: RawApplication): MyApplication {
     shiftId:       r.shift_id,
     applicationId: r.id,
     shiftTitle:    r.title    ?? null,
+    shiftStatus:   r.shift_status ?? null,
     companyName:   r.company_name ?? null,
     startTime:     r.start_time  ?? null,
     endTime:       r.end_time    ?? null,

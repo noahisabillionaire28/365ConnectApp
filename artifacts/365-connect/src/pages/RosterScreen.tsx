@@ -140,9 +140,11 @@ export function RosterScreen() {
   const [assigning, setAssigning] = useState<RosterWorker | null>(null);
   const [removing, setRemoving] = useState<RosterWorker | null>(null);
 
+  // Clients and agencies both have a roster: the workers they follow.
+  const hasRoster = role === 'staffer' || role === 'client';
   useEffect(() => {
-    if (!roleLoading && role !== 'staffer') navigate('/home');
-  }, [roleLoading, role, navigate]);
+    if (!roleLoading && !hasRoster) navigate('/home');
+  }, [roleLoading, hasRoster, navigate]);
 
   const upcoming = useMemo(() => {
     const now = Date.now();
@@ -161,7 +163,7 @@ export function RosterScreen() {
       (w.job_types ?? []).some((j) => j.toLowerCase().includes(q)));
   }, [workers, query]);
 
-  if (roleLoading || role !== 'staffer') return null;
+  if (roleLoading || !hasRoster) return null;
 
   async function message(w: RosterWorker) {
     if (!user?.id) return;
@@ -185,7 +187,7 @@ export function RosterScreen() {
               {isLoading ? 'Loading…' : `${workers.length} worker${workers.length !== 1 ? 's' : ''}`}
             </p>
           </div>
-          <button type="button" onClick={() => navigate('/explore')}
+          <button type="button" onClick={() => navigate('/home?tab=browse')}
             className="h-9 px-3 rounded-[8px] border border-[#0A1628] text-[#0A1628] text-[12px] font-bold flex-shrink-0">
             + Add workers
           </button>
@@ -220,7 +222,7 @@ export function RosterScreen() {
             <p className="text-[#6B7280] text-[13px]">
               Add workers you trust so you can assign them to shifts in one tap.
             </p>
-            <button type="button" onClick={() => navigate('/explore')}
+            <button type="button" onClick={() => navigate('/home?tab=browse')}
               className="mt-2 h-[40px] px-5 rounded-[8px] text-white text-[13px] font-bold"
               style={{ background: '#0A1628' }}>
               Browse Workers

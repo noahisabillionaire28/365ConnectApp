@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
+import { assertWorkerTarget } from '../lib/shiftAccess.js';
+import { sendError } from '../lib/httpError.js';
 
 const router = Router();
 
@@ -40,10 +42,15 @@ router.get('/status/:workerId', requireAuth, async (req, res) => {
   return res.json({ saved: (count ?? 0) > 0 });
 });
 
-/** POST /api/saved-workers { worker_id } — save a worker */
+/** POST /api/saved-workers { worker_id } — save a worker (only worker accounts can be saved) */
 router.post('/', requireAuth, async (req, res) => {
   const { worker_id } = req.body as { worker_id: string };
   if (!worker_id) return res.status(400).json({ error: 'worker_id is required' });
+  try {
+    await assertWorkerTarget(worker_id, req.userId!);
+  } catch (e) {
+    return sendError(res, e);
+  }
   const { error } = await adminDb
     .from('saved_workers')
     .upsert({ owner_id: req.userId, worker_id }, { onConflict: 'owner_id,worker_id', ignoreDuplicates: true });
