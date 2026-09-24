@@ -192,6 +192,12 @@ export type NotificationType =
   | 'arrival_status'
   | 'call_out'
   | 'no_show'
+  // Shift swaps
+  | 'swap_offer'
+  | 'swap_accepted'
+  | 'swap_pending'
+  | 'swap_approved'
+  | 'swap_declined'
   // Shift lifecycle
   | 'shift_cancelled'
   | 'shift_update'

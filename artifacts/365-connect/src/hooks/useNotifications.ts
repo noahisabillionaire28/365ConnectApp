@@ -41,6 +41,9 @@ export function notificationDeepLink(
   if (n.type === 'payment_received') return '/earnings';
   if (n.type === 'new_review') return '/profile';
   if (n.type === 'saved_search') return n.shift_id ? `/shift/${n.shift_id}` : '/jobs';
+  // Swaps: the poster approves from the roster; both workers act on the shift page.
+  if (n.type === 'swap_pending') return n.shift_id ? `/shift/${n.shift_id}/applicants` : '/home';
+  if (n.type.startsWith('swap_')) return n.shift_id ? `/shift/${n.shift_id}` : '/home?tab=requests';
   if (n.post_id) return `/post/${n.post_id}`;
   // "Rate them" opens the review flow for the poster who sent the prompt.
   if (n.shift_id && n.from_user_id && (n.type === 'rate_client' || n.type === 'rate_client_reminder')) {
@@ -113,6 +116,10 @@ export function useNotifications() {
       }
       if (notification.type === 'shift_invite' || notification.type === 'direct_shift_request') {
         void qc.invalidateQueries({ queryKey: ['shift-requests'] });
+      }
+      // Any swap step changes what the other side's lists and the roster show.
+      if (typeof notification.type === 'string' && notification.type.startsWith('swap_')) {
+        void qc.invalidateQueries({ queryKey: ['swaps'] });
       }
       if (notification.type === 'payment_received' || notification.type === 'timesheet_approved'
         || notification.type === 'hours_updated' || notification.type === 'hours_recorded') {

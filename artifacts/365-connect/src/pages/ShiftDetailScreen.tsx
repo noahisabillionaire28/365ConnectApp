@@ -33,6 +33,8 @@ import { broadcastShiftRequest } from '@/hooks/useShiftRequests';
 import { openShiftGroupChat } from '@/hooks/useConversations';
 import { ArrivalPills } from '@/components/ArrivalPills';
 import { CallOutSheet } from '@/components/CallOutSheet';
+import { SwapSheet, type SwapCandidate } from '@/components/SwapSheet';
+import { useOfferSwap, useRespondSwap, useCancelSwap, isSwapActive } from '@/hooks/useSwaps';
 import { AddToCalendarSheet } from '@/components/AddToCalendarSheet';
 import { useArrivalStatus, isDayOfWindow } from '@/hooks/useArrivalStatus';
 
@@ -145,9 +147,16 @@ export function ShiftDetailScreen() {
   const { submitApplication }             = useApplications();
   const {
     status: applicationStatus, applicationId, arrivalStatus, arrivalStatusAt,
+    swap: mySwap, incomingSwap,
     refetch: refetchApplicationStatus,
   } = useApplicationStatus(id);
   const { callOut, busy: callingOut } = useArrivalStatus();
+  // Shift swaps: offer my spot, answer an offer made to me, pull my offer.
+  const { offer: offerSwap, busy: offeringSwap } = useOfferSwap();
+  const { respond: respondSwap, busyId: respondingSwapId } = useRespondSwap();
+  const { cancel: cancelSwap, busyId: cancellingSwapId } = useCancelSwap();
+  const [swapOpen, setSwapOpen] = useState(false);
+  const [dismissedSwapId, setDismissedSwapId] = useState<string | null>(null);
   const profile                           = useProfile();
   const { coords: myCoords, isDefault: myLocationIsDefault } = useMyLocation();
   // Distance (and therefore the AI Match Score's distance component) is
@@ -342,6 +351,21 @@ export function ShiftDetailScreen() {
   const showArrivalPills = ctaState === 'clock-in' && !!applicationId
     && isDayOfWindow(shift.startTimeISO, shift.endTimeISO);
 
+  // Swap state for the booked worker (only before the shift starts).
+  const canSwap = ctaState === 'clock-in' && lifecycle === 'upcoming' && !!applicationId;
+  const swapActive = canSwap && !!mySwap && isSwapActive(mySwap.status);
+  const swapDeclined = canSwap && !!mySwap && !swapActive
+    && (mySwap.status === 'declined_by_worker' || mySwap.status === 'declined_by_poster')
+    && mySwap.id !== dismissedSwapId;
+  // The spot was handed over: the worker is off the roster, with a note why.
+  const swappedAway = applicationStatus === 'withdrawn' && mySwap?.status === 'approved';
+  // An open offer TO this worker for this shift.
+  const showIncomingSwap = isWorker && !isOwner && !!incomingSwap
+    && lifecycle === 'upcoming' && shift.status !== 'cancelled' && applicationStatus !== 'accepted';
+  const swapName = mySwap?.to_username ? `@${mySwap.to_username}` : 'the worker';
+  // The fixed worker bar grows with the swap cards; keep the content clear of it.
+  const workerBarPad = showArrivalPills || showIncomingSwap || swapActive || swapDeclined ? 'pb-[240px]' : 'pb-[150px]';
+
   /** Refresh every cache that reflects this shift's booking state. */
   function invalidateShiftCaches() {
     void qc.invalidateQueries({ queryKey: ['worker-home-shifts'] });
@@ -381,6 +405,30 @@ export function ShiftDetailScreen() {
     setDisputeOpen(false);
     setDisputeNote('');
     showToast(action === 'accept' ? 'Thanks — your hours are confirmed.' : 'The poster has been told. Our team will review it.');
+  }
+
+  /** Runs after the worker picks someone in the swap sheet. */
+  async function handleOfferSwap(worker: SwapCandidate, note: string) {
+    const err = await offerSwap(shiftId, worker.id, note);
+    if (err) { showToast(err, 'error'); return; }
+    setSwapOpen(false);
+    showToast(`Swap offer sent to ${worker.username ? `@${worker.username}` : 'the worker'}. You keep your spot until the poster approves.`);
+  }
+
+  /** Accept / decline a swap offered to me for this shift. */
+  async function handleRespondSwap(action: 'accept' | 'decline') {
+    if (!incomingSwap) return;
+    const err = await respondSwap(incomingSwap.id, action, shiftId);
+    if (err) { showToast(err, 'error'); return; }
+    showToast(action === 'accept' ? 'Accepted! The poster needs to approve the swap.' : 'Offer declined.');
+  }
+
+  /** Pull my own swap offer while it is still in flight. */
+  async function handleCancelSwap() {
+    if (!mySwap) return;
+    const err = await cancelSwap(mySwap.id, shiftId);
+    if (err) { showToast(err, 'error'); return; }
+    showToast('Swap cancelled. You keep your spot.');
   }
 
   /** Runs after the worker picks a reason in the call-out sheet. */
@@ -581,7 +629,7 @@ export function ShiftDetailScreen() {
 
       {/* Reserve room for the fixed worker CTA bar only when it renders (it can be
           up to ~160px tall in the clock-in / standby states); owners get none. */}
-      <div className={`flex-1 overflow-y-auto ${profile.role === 'worker' && !isOwner ? (showArrivalPills ? 'pb-[200px]' : 'pb-[150px]') : 'pb-8'}`}>
+      <div className={`flex-1 overflow-y-auto ${profile.role === 'worker' && !isOwner ? workerBarPad : 'pb-8'}`}>
 
         {/* Hero photo */}
         <div className="relative w-full h-[300px] flex-shrink-0 overflow-hidden">
@@ -1257,7 +1305,49 @@ export function ShiftDetailScreen() {
           )}
         </AnimatePresence>
 
-        {ctaState === 'apply' && !isOwner && (
+        {/* A swap offered TO this worker: accept or decline before anything else */}
+        {showIncomingSwap && incomingSwap && (
+          <div className="mb-2.5 rounded-[12px] border border-[#0A1628] bg-white px-3.5 py-3" role="status"
+            aria-label="Shift swap offer">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center overflow-hidden flex-shrink-0" aria-hidden>
+                {incomingSwap.from_photo_url
+                  ? <img src={incomingSwap.from_photo_url} alt="" className="w-full h-full object-cover" />
+                  : <span className="text-black font-bold text-[12px]">{(incomingSwap.from_username ?? 'W').slice(0, 2).toUpperCase()}</span>}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[#111827] font-bold text-[14px] truncate">
+                  {incomingSwap.from_username ? `@${incomingSwap.from_username}` : 'A worker'} offered you their spot
+                </p>
+                <p className="text-[#6B7280] text-[12px] truncate">
+                  {shift.date} · {shift.startTime}{shift.payRate > 0 ? ` · $${shift.payRate}/${shift.payPeriod}` : ''}
+                </p>
+                {incomingSwap.note && (
+                  <p className="text-[#6B7280] text-[12px] mt-0.5 italic line-clamp-2">“{incomingSwap.note}”</p>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button type="button" disabled={!!respondingSwapId} onClick={() => void handleRespondSwap('decline')}
+                className="flex-1 h-10 rounded-[8px] border border-[#E5E7EB] bg-white text-[#111827] font-semibold text-[13px] flex items-center justify-center gap-1.5 disabled:opacity-60">
+                <X size={15} aria-hidden /> Decline
+              </button>
+              <button type="button" disabled={!!respondingSwapId} onClick={() => void handleRespondSwap('accept')}
+                className="flex-1 h-10 rounded-[8px] bg-[#10B981] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5 disabled:opacity-60">
+                <CheckCircle2 size={15} aria-hidden /> {respondingSwapId ? 'Working…' : 'Accept'}
+              </button>
+            </div>
+            <p className="text-[#9CA3AF] text-[11px] mt-2 text-center">The poster approves the swap before you are booked.</p>
+          </div>
+        )}
+
+        {swappedAway && (
+          <p className="text-center text-[#6B7280] text-[12px] mb-2 flex items-center justify-center gap-1.5" role="status">
+            <Repeat2 size={12} aria-hidden /> You swapped this shift to {swapName}
+          </p>
+        )}
+
+        {ctaState === 'apply' && !isOwner && !showIncomingSwap && (
           <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleCta} disabled={applying}
             aria-label={`Apply to ${shift.companyName}`}
             className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] tracking-wide disabled:opacity-70">
@@ -1265,7 +1355,7 @@ export function ShiftDetailScreen() {
           </motion.button>
         )}
 
-        {ctaState === 'claim' && !isOwner && (
+        {ctaState === 'claim' && !isOwner && !showIncomingSwap && (
           <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleCta}
             disabled={claiming}
             aria-label={`Claim this shift at ${shift.companyName} — instant confirmation`}
@@ -1312,7 +1402,7 @@ export function ShiftDetailScreen() {
           </div>
         )}
 
-        {ctaState === 'full' && (
+        {ctaState === 'full' && !showIncomingSwap && (
           <div className="flex flex-col gap-2">
             <p className="text-center text-[#737373] text-[12px]">
               This shift is full. Join the waitlist and you'll be booked automatically if a spot opens.
@@ -1347,13 +1437,52 @@ export function ShiftDetailScreen() {
           </motion.button>
         )}
 
-        {/* Before the start a booked worker calls out (spot released + standby
-            auto-filled); once it's underway they talk to the poster instead. */}
-        {ctaState === 'clock-in' && lifecycle === 'upcoming' && applicationId && (
-          <button type="button" onClick={() => setConfirmCallOut(true)} disabled={callingOut}
-            className="w-full h-9 mt-2 text-[#6B7280] font-semibold text-[13px] disabled:opacity-50">
-            {callingOut ? 'Releasing your spot…' : "Can't make it?"}
-          </button>
+        {/* A swap the worker started that was turned down — dismissable */}
+        {swapDeclined && mySwap && (
+          <div className="mt-2 rounded-[12px] border border-[#E5E7EB] bg-[#FAFAFA] px-3.5 py-2.5 flex items-center gap-2" role="status">
+            <Repeat2 size={14} aria-hidden className="text-[#9CA3AF] flex-shrink-0" />
+            <p className="flex-1 min-w-0 text-[#374151] text-[12px] font-semibold truncate">
+              {mySwap.status === 'declined_by_worker' ? `Swap declined by ${swapName}` : 'Swap declined by the poster'}
+            </p>
+            <button type="button" onClick={() => { setDismissedSwapId(mySwap.id); setSwapOpen(true); }}
+              className="text-[#0A1628] text-[12px] font-bold flex-shrink-0">Try another worker</button>
+            <button type="button" aria-label="Dismiss" onClick={() => setDismissedSwapId(mySwap.id)}
+              className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
+              <X size={14} aria-hidden className="text-[#9CA3AF]" />
+            </button>
+          </div>
+        )}
+
+        {/* A swap in flight: waiting on the other worker, then on the poster */}
+        {swapActive && mySwap && (
+          <div className="mt-2 rounded-[12px] border border-amber-200 bg-amber-50 px-3.5 py-2.5 flex items-center gap-2" role="status">
+            <Repeat2 size={14} aria-hidden className="text-amber-600 flex-shrink-0" />
+            <p className="flex-1 min-w-0 text-amber-800 text-[12px] font-semibold">
+              {mySwap.status === 'offered'
+                ? `Swap offered to ${swapName} · waiting for them`
+                : `Accepted by ${swapName} · waiting for poster approval`}
+            </p>
+            <button type="button" disabled={!!cancellingSwapId} onClick={() => void handleCancelSwap()}
+              className="text-amber-800 text-[12px] font-bold flex-shrink-0 disabled:opacity-50">
+              {cancellingSwapId ? 'Cancelling…' : 'Cancel'}
+            </button>
+          </div>
+        )}
+
+        {/* Before the start a booked worker can call out (spot released + standby
+            auto-filled) or hand the spot to someone else; once it's underway
+            they talk to the poster instead. */}
+        {canSwap && !swapActive && (
+          <div className="flex gap-2 mt-2">
+            <button type="button" onClick={() => setConfirmCallOut(true)} disabled={callingOut}
+              className="flex-1 h-9 text-[#6B7280] font-semibold text-[13px] disabled:opacity-50">
+              {callingOut ? 'Releasing your spot…' : "Can't make it?"}
+            </button>
+            <button type="button" onClick={() => setSwapOpen(true)} disabled={callingOut}
+              className="flex-1 h-9 rounded-[8px] border border-[#E5E7EB] text-[#0A1628] font-semibold text-[13px] flex items-center justify-center gap-1.5 disabled:opacity-50">
+              <Repeat2 size={14} aria-hidden /> Swap shift
+            </button>
+          </div>
         )}
         {ctaState === 'clock-in' && lifecycle === 'in_progress' && (
           <p className="text-center text-[#9CA3AF] text-[12px] mt-2">
@@ -1390,6 +1519,15 @@ export function ShiftDetailScreen() {
         busy={callingOut}
         onConfirm={(reason) => void handleCallOut(reason)}
         onCancel={() => setConfirmCallOut(false)}
+      />
+
+      {/* Swap sheet — booked worker offers their spot to another worker */}
+      <SwapSheet
+        open={swapOpen}
+        shiftLabel={`${shift.date} · ${shift.startTime}`}
+        busy={offeringSwap}
+        onSend={(worker, note) => void handleOfferSwap(worker, note)}
+        onCancel={() => setSwapOpen(false)}
       />
 
       {/* Withdraw / leave-waitlist confirmation sheet (pending + standby) */}

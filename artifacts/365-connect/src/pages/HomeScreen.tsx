@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Bell, Search, PlusCircle, SlidersHorizontal,
   Briefcase, CalendarDays, Clock3, DollarSign, MapPin,
-  Users, ChevronRight, CalendarPlus,
+  Users, ChevronRight, CalendarPlus, Repeat2,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { InstallBanner } from '@/components/InstallBanner';
@@ -16,6 +16,7 @@ import { useApplications } from '@/hooks/useApplications';
 import { useMyApplications, type MyApplication } from '@/hooks/useMyApplications';
 import { useClientShiftsDashboard, type ClientShift } from '@/hooks/useClientShiftsDashboard';
 import { useShiftRequests, isLiveOffer } from '@/hooks/useShiftRequests';
+import { useMySwaps, useRespondSwap, type MySwap } from '@/hooks/useSwaps';
 import { useProfile } from '@/hooks/useProfile';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useRole } from '@/contexts/RoleContext';
@@ -369,6 +370,43 @@ function WorkerAvailableView() {
 /* ─── Worker: Requests (direct shift offers to accept/decline) ───────────────── */
 /** Receives the single shared useShiftRequests() instance from WorkerHomeFeed so
  *  the tab badge and this list never disagree. */
+function SwapOfferCard({ s, busy, onRespond }: {
+  s: MySwap; busy: boolean; onRespond: (action: 'accept' | 'decline') => void;
+}) {
+  const [, navigate] = useLocation();
+  const from = s.counterpart.username ? `@${s.counterpart.username}` : 'A worker';
+  const sh = s.shift;
+  return (
+    <div className="rounded-[14px] border border-[#0A1628] p-4 bg-white">
+      <button type="button" onClick={() => navigate(`/shift/${s.shiftId}`)} className="w-full text-left">
+        <p className="text-[#111827] font-bold text-[15px] truncate flex items-center gap-1.5">
+          <Repeat2 size={14} aria-hidden className="text-[#0A1628] flex-shrink-0" />
+          {from} offered you their spot
+        </p>
+        <p className="text-[#6B7280] text-[12px] mt-[2px] truncate">
+          {[sh?.jobType, sh?.companyName].filter(Boolean).join(' · ')}
+          {sh?.startTime ? ` · ${friendlyDate(sh.startTime, sh.timezone)} · ${formatTime(sh.startTime, sh.timezone)}` : ''}
+          {sh?.payRate != null && sh.payRate > 0 ? ` · $${sh.payRate}/${sh.payPeriod ?? 'hr'}` : ''}
+        </p>
+        {s.note && <p className="text-[#6B7280] text-[12px] mt-1 italic line-clamp-2">“{s.note}”</p>}
+      </button>
+      <div className="flex gap-2 mt-3.5">
+        <button type="button" disabled={busy} onClick={() => onRespond('decline')}
+          className="flex-1 h-10 rounded-[8px] border border-[#E5E7EB] bg-white text-[#111827] font-semibold text-[13px] flex items-center justify-center gap-1.5 disabled:opacity-60">
+          <X size={15} aria-hidden />
+          Decline
+        </button>
+        <button type="button" disabled={busy} onClick={() => onRespond('accept')}
+          className="flex-1 h-10 rounded-[8px] bg-[#10B981] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5 disabled:opacity-60">
+          <Check size={15} aria-hidden />
+          {busy ? 'Working…' : 'Accept'}
+        </button>
+      </div>
+      <p className="text-[#9CA3AF] text-[11px] mt-2 text-center">The poster approves the swap before you are booked.</p>
+    </div>
+  );
+}
+
 function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType<typeof useShiftRequests>) {
   const [, navigate] = useLocation();
   const { showToast } = useToast();
@@ -376,6 +414,16 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
   // Only genuine offers TO this worker (not invites they sent) that can still
   // be answered: not cancelled, not started.
   const pending = requests.filter((r) => r.worker_id === user?.id && isLiveOffer(r));
+  // Spots other workers want to hand to me.
+  const { incoming: swapOffers } = useMySwaps();
+  const { respond: respondSwap, busyId: swapBusyId } = useRespondSwap();
+
+  function answerSwap(s: MySwap, action: 'accept' | 'decline') {
+    void respondSwap(s.id, action, s.shiftId).then((err) => {
+      if (err) { showToast(err, 'error'); return; }
+      showToast(action === 'accept' ? 'Accepted! The poster needs to approve the swap.' : 'Offer declined.');
+    });
+  }
 
   if (isLoading) {
     return (
@@ -387,7 +435,7 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
     );
   }
 
-  if (pending.length === 0) {
+  if (pending.length === 0 && swapOffers.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-8 pt-20">
         <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
@@ -395,7 +443,7 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
         </div>
         <p className="text-[#111827] font-semibold text-[16px]">No shift offers</p>
         <p className="text-[#6B7280] text-[13px] max-w-[240px]">
-          When a client or agency requests you for a shift, it shows up here to accept or decline.
+          When a client or agency requests you for a shift, or another worker offers you their spot, it shows up here to accept or decline.
         </p>
       </div>
     );
@@ -403,6 +451,15 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
 
   return (
     <div className="flex-1 overflow-y-auto pt-4 pb-4 px-4 flex flex-col gap-3">
+      {swapOffers.length > 0 && (
+        <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.16em] px-1">Swap offers</p>
+      )}
+      {swapOffers.map((s) => (
+        <SwapOfferCard key={s.id} s={s} busy={swapBusyId === s.id} onRespond={(a) => answerSwap(s, a)} />
+      ))}
+      {swapOffers.length > 0 && pending.length > 0 && (
+        <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.16em] px-1 mt-2">Shift offers</p>
+      )}
       {pending.map((r) => (
         <div key={r.id} className="rounded-[14px] border border-[#E5E7EB] p-4 bg-white">
           <button type="button" onClick={() => navigate(`/shift/${r.shift_id}`)} className="w-full text-left">
@@ -467,7 +524,8 @@ function WorkerHomeFeed() {
   const { user } = useAuth();
   const shiftRequests = useShiftRequests();
   const { requests } = shiftRequests;
-  const pendingCount = requests.filter((r) => r.worker_id === user?.id && isLiveOffer(r)).length;
+  const { incoming: swapOffers } = useMySwaps();
+  const pendingCount = requests.filter((r) => r.worker_id === user?.id && isLiveOffer(r)).length + swapOffers.length;
 
   const subtitle =
     tab === 'schedule' ? 'Your upcoming shifts' :
@@ -648,6 +706,12 @@ function ClientShiftCard({
                 </span>
               );
             })()}
+            {shift.swapCount > 0 && (
+              <span className="inline-flex items-center gap-1 border rounded-full px-2 py-0.5 text-[11px] font-bold bg-amber-50 border-amber-200 text-amber-700"
+                aria-label={`${shift.swapCount} swap${shift.swapCount === 1 ? '' : 's'} waiting for your approval`}>
+                <Repeat2 size={11} aria-hidden />{shift.swapCount} swap{shift.swapCount === 1 ? '' : 's'} to approve
+              </span>
+            )}
             {showCount && (
               <div className="flex flex-col items-center bg-[#F3F4F6] rounded-[8px] px-2.5 py-1.5 min-w-[44px] text-center">
                 <span className="text-[#111827] font-bold text-[16px] leading-tight">{shift.applicantCount}</span>
