@@ -1,16 +1,28 @@
 import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
-import { invalidateRole } from '../lib/roleCache.js';
+import { invalidateRole, getRoleInfo } from '../lib/roleCache.js';
 import { requireAuth, requireSession } from '../middleware/auth.js';
 
 const router = Router();
 
-// Note: notification preferences are private and read via GET /me (select *),
-// so they are intentionally NOT part of the public column set.
+// Note: notification preferences, email and moderation status are private and
+// read via GET /me (select *), so they are intentionally NOT part of the
+// public column set.
 const PUBLIC_COLS =
-  'id, email, role, username, photo_url, bio, job_types, certifications, ' +
+  'id, role, username, photo_url, bio, job_types, certifications, ' +
   'rating, primary_job_type, secondary_job_types, availability, ' +
   'lat, lng, is_pro, company_name, hourly_rate, created_at';
+
+/**
+ * A public profile as another signed-in user may see it: the home location
+ * is coarsened to ~1 km (two decimals) so a profile never pins someone's
+ * house. The user themselves and admins get the exact coordinates.
+ */
+async function publicView(row: Record<string, unknown>, viewerId: string | null): Promise<Record<string, unknown>> {
+  if (viewerId && (viewerId === row.id || (await getRoleInfo(viewerId)).isAdmin)) return row;
+  const round = (v: unknown) => (v == null || !Number.isFinite(Number(v)) ? null : Math.round(Number(v) * 100) / 100);
+  return { ...row, lat: round(row.lat), lng: round(row.lng) };
+}
 
 /**
  * GET /api/users/me — current user's full profile. Uses requireSession (not
@@ -107,8 +119,19 @@ router.patch('/me', requireAuth, async (req, res) => {
   return res.json(data);
 });
 
-/** GET /api/users/by-username/:username — look up a user by their username */
-router.get('/by-username/:username', async (req, res) => {
+/** GET /api/users/blocks — ids I've blocked (registered before /:id so it is never shadowed) */
+router.get('/blocks', requireAuth, async (req, res) => {
+  const { data, error } = await adminDb.from('user_blocks').select('blocked_id, created_at').eq('blocker_id', req.userId);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json((data ?? []).map((r) => r.blocked_id));
+});
+
+/**
+ * GET /api/users/by-username/:username — look up a user by their username.
+ * Signed-in only: the app always sends a session token (the username
+ * availability check during setup runs after sign-in too).
+ */
+router.get('/by-username/:username', requireAuth, async (req, res) => {
   const { data, error } = await adminDb
     .from('users')
     .select(PUBLIC_COLS)
@@ -116,11 +139,11 @@ router.get('/by-username/:username', async (req, res) => {
     .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(404).json({ error: 'Not found' });
-  return res.json(data);
+  return res.json(await publicView(data as unknown as Record<string, unknown>, req.userId));
 });
 
-/** GET /api/users/:id — public profile of any user */
-router.get('/:id', async (req, res) => {
+/** GET /api/users/:id — public profile of any user (signed-in only) */
+router.get('/:id', requireAuth, async (req, res) => {
   const { data, error } = await adminDb
     .from('users')
     .select(PUBLIC_COLS)
@@ -128,14 +151,7 @@ router.get('/:id', async (req, res) => {
     .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(404).json({ error: 'Not found' });
-  return res.json(data);
-});
-
-/** GET /api/users/blocks — ids I've blocked */
-router.get('/blocks', requireAuth, async (req, res) => {
-  const { data, error } = await adminDb.from('user_blocks').select('blocked_id, created_at').eq('blocker_id', req.userId);
-  if (error) return res.status(500).json({ error: error.message });
-  return res.json((data ?? []).map((r) => r.blocked_id));
+  return res.json(await publicView(data as unknown as Record<string, unknown>, req.userId));
 });
 
 /** POST /api/users/:id/block — block a user (they can no longer message me). */

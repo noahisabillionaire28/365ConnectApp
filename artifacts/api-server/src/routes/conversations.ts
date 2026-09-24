@@ -279,12 +279,23 @@ router.delete('/:id', requireAuth, async (req, res) => {
   return res.json({ ok: true });
 });
 
-/** POST /api/conversations/:id/members { user_id } — owner adds someone to a group chat. */
+/**
+ * POST /api/conversations/:id/members { user_id } — the group's owner adds
+ * someone. Owner = whoever created the group, or the owner of the shift it
+ * belongs to (or an admin); a member's role alone grants nothing.
+ */
 router.post('/:id/members', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
-  const conv = await conversationForUser(String(req.params.id), req.userId!);
+  const me = req.userId!;
+  const conv = await conversationForUser(String(req.params.id), me);
   if (!conv || !conv.is_group) return res.status(404).json({ error: 'Group not found' });
   const { user_id } = req.body as { user_id?: string };
   if (!user_id) return res.status(400).json({ error: 'user_id required' });
+  let isOwner = conv.created_by === me || (await getRoleInfo(me)).isAdmin;
+  if (!isOwner && conv.shift_id) {
+    const { data: shift } = await adminDb.from('shifts').select('client_id').eq('id', conv.shift_id).maybeSingle();
+    isOwner = shift?.client_id === me;
+  }
+  if (!isOwner) return res.status(403).json({ error: 'Only the group owner can add members.' });
   const members = new Set(conv.participant_ids ?? []); members.add(user_id);
   await adminDb.from('conversations').update({ participant_ids: [...members] }).eq('id', conv.id);
   notifyConversationUpdate({ ...conv, participant_ids: [...members] });

@@ -7,8 +7,8 @@ import {
   addWorkerToShiftChat, removeWorkerFromShiftChat, ensureShiftGroupChat, insertSystemMessage,
 } from '../lib/chat.js';
 import { HttpError, sendError } from '../lib/httpError.js';
-import { assertShiftOwner, loadShift, rosterAllows } from '../lib/shiftAccess.js';
-import { bookWorker, syncShiftCapacity } from '../lib/booking.js';
+import { assertShiftOwner, assertWorkerTarget, loadShift, rosterAllows } from '../lib/shiftAccess.js';
+import { bookWorker, markRequestAccepted, syncShiftCapacity } from '../lib/booking.js';
 import { shiftDayLabel } from '../lib/shiftLabel.js';
 
 const router = Router();
@@ -92,7 +92,20 @@ export async function findTimeConflict(
   const { data: target } = await adminDb
     .from('shifts').select('start_time, end_time').eq('id', targetShiftId).maybeSingle();
   if (!target?.start_time || !target?.end_time) return null;
-  const tStart = Date.parse(target.start_time), tEnd = Date.parse(target.end_time);
+  return findTimeConflictInWindow(workerId, targetShiftId, target.start_time, target.end_time);
+}
+
+/**
+ * Same check against an explicit window — used when a poster moves a shift,
+ * to see whether the NEW time would double-book anyone already confirmed.
+ */
+export async function findTimeConflictInWindow(
+  workerId: string,
+  targetShiftId: string,
+  startISO: string,
+  endISO: string,
+): Promise<{ title: string | null; start: string; end: string } | null> {
+  const tStart = Date.parse(startISO), tEnd = Date.parse(endISO);
   if (!Number.isFinite(tStart) || !Number.isFinite(tEnd)) return null;
 
   const { data: apps } = await adminDb
@@ -492,12 +505,9 @@ router.patch('/:id', requireAuth, async (req, res) => {
       // Capacity + status guard, spots_filled derivation, 'filled'/'open' flip.
       const booking = await bookWorker(appRow.shift_id, appRow.worker_id, 'accept');
       data = booking.application as unknown as Record<string, unknown>;
-      // A standby worker confirmed from the roster: keep their invite row (if
-      // any) in step, the same way the call-out auto-fill does.
-      if (appRow.status === 'standby') {
-        await adminDb.from('shift_requests').update({ status: 'accepted' })
-          .eq('shift_id', appRow.shift_id).eq('worker_id', appRow.worker_id).eq('status', 'standby');
-      }
+      // Any live offer for the same worker is now moot: mark it accepted so a
+      // later decline can never un-book them.
+      await markRequestAccepted(appRow.shift_id, appRow.worker_id);
     } else {
       const { data: updated, error } = await adminDb
         .from('applications')
@@ -577,7 +587,8 @@ router.patch('/:id', requireAuth, async (req, res) => {
 
 /**
  * POST /api/applications/assign - directly assign a worker to a shift.
- * Only the shift's owning client (or an admin) may do this.
+ * Only the shift's owning client (or an admin) may do this, and only a worker
+ * account (not the poster, not anyone blocked either way) can be assigned.
  */
 router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const { shift_id, worker_id } = req.body as Record<string, string>;
@@ -585,7 +596,8 @@ router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req
     return res.status(400).json({ error: 'shift_id and worker_id are required' });
   }
   try {
-    await assertShiftOwner(shift_id, req.userId!);
+    const shift = await assertShiftOwner(shift_id, req.userId!);
+    await assertWorkerTarget(worker_id, req.userId!, shift);
     // Double-booking guard.
     const assignConflict = await findTimeConflict(worker_id, shift_id);
     if (assignConflict) {
@@ -594,6 +606,7 @@ router.post('/assign', requireAuth, requireRole('client', 'staffer'), async (req
       });
     }
     const booking = await bookWorker(shift_id, worker_id, 'assign');
+    await markRequestAccepted(shift_id, worker_id);
     await addWorkerToShiftChat(shift_id, worker_id);
 
     const label = await shiftLabel(shift_id);
@@ -710,6 +723,7 @@ router.post('/claim', requireAuth, requireRole('worker'), async (req, res) => {
 
     // Confirm the worker directly (capacity-checked; bumps spots_filled).
     const booking = await bookWorker(shift_id, req.userId!, 'claim');
+    await markRequestAccepted(shift_id, req.userId!);
     await addWorkerToShiftChat(shift_id, req.userId!);
 
     const label = await shiftLabel(shift_id);
@@ -886,6 +900,8 @@ router.post('/:id/call-out', requireAuth, requireRole('worker'), async (req, res
       .order('created_at', { ascending: true });
     let promotedId: string | null = null;
     for (const s of standbys ?? []) {
+      // A roster-only shift never auto-fills with someone who left the roster.
+      if (!(await rosterAllows(shift, s.worker_id))) continue;
       if (await findTimeConflict(s.worker_id, app.shift_id)) continue;
       try {
         await bookWorker(app.shift_id, s.worker_id, 'accept');
@@ -899,8 +915,7 @@ router.post('/:id/call-out', requireAuth, requireRole('worker'), async (req, res
     }
     // Keep the standby worker's request row (if any) in step with the booking.
     if (promotedId) {
-      await adminDb.from('shift_requests').update({ status: 'accepted' })
-        .eq('shift_id', app.shift_id).eq('worker_id', promotedId).eq('status', 'standby');
+      await markRequestAccepted(app.shift_id, promotedId);
       await addWorkerToShiftChat(app.shift_id, promotedId);
     }
 

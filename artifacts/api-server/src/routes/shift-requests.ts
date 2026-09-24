@@ -5,13 +5,17 @@ import { createNotification } from './notifications.js';
 import { findTimeConflict } from './applications.js';
 import { addWorkerToShiftChat } from '../lib/chat.js';
 import { HttpError, sendError } from '../lib/httpError.js';
-import { assertShiftOwner } from '../lib/shiftAccess.js';
+import { assertShiftOwner, assertWorkerTarget } from '../lib/shiftAccess.js';
+import { blockedIdsFor } from '../lib/chat.js';
 import { bookWorker, isAcceptingWorkers, MSG_CLOSED, MSG_FULL } from '../lib/booking.js';
 
 const router = Router();
 
 /** Max workers invited by one broadcast call. */
 const BROADCAST_CAP = 200;
+
+/** Where a worker answers an offer: the Requests tab on Home. */
+const REQUESTS_URL = '/home?tab=requests';
 
 /** GET /api/shift-requests?shift_id= — my shift requests (worker or client) */
 router.get('/', requireAuth, async (req, res) => {
@@ -33,7 +37,7 @@ router.get('/', requireAuth, async (req, res) => {
     if (shiftIds.length) {
       const { data: shifts, error: shiftsError } = await adminDb
         .from('shifts')
-        .select('id, title, job_type, start_time, end_time, location, pay_rate, pay_period, company_name')
+        .select('id, title, job_type, start_time, end_time, location, pay_rate, pay_period, company_name, status')
         .in('id', shiftIds);
       if (shiftsError) return res.status(500).json({ error: shiftsError.message });
       shiftsById = new Map((shifts ?? []).map((s: any) => [s.id, s]));
@@ -55,6 +59,9 @@ router.get('/', requireAuth, async (req, res) => {
       return {
         ...r,
         shift_title: s?.title ?? null,
+        // The shift's own lifecycle, so a cancelled shift's offer is not shown
+        // as something the worker can still accept.
+        shift_status: s?.status ?? null,
         job_type: s?.job_type ?? null,
         start_time: s?.start_time ?? null,
         end_time: s?.end_time ?? null,
@@ -72,7 +79,13 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-/** POST /api/shift-requests — create a shift request (owner invites one worker) */
+/**
+ * POST /api/shift-requests — create a shift request (owner invites one worker).
+ * The target must be a worker who is not the poster and not blocked either
+ * way, must not already be booked on an overlapping shift, and must not have
+ * a live (pending / accepted / standby) request already. A declined offer can
+ * be sent again: the old row goes back to pending and the worker is told.
+ */
 router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const { shift_id, worker_id, message } = req.body as Record<string, string>;
   if (!shift_id || !worker_id) {
@@ -82,16 +95,51 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
     const shift = await assertShiftOwner(shift_id, req.userId!);
     if (!isAcceptingWorkers(shift)) return res.status(409).json({ error: MSG_CLOSED });
     if (worker_id === req.userId) return res.status(409).json({ error: "You can't request yourself." });
+    await assertWorkerTarget(worker_id, req.userId!, shift);
 
-    const { data, error } = await adminDb
+    // Say so now, not when the worker taps Accept and finds out for them.
+    const conflict = await findTimeConflict(worker_id, shift_id);
+    if (conflict) {
+      return res.status(409).json({
+        error: `This worker is already booked for an overlapping shift${conflict.title ? ` ("${conflict.title}")` : ''}.`,
+      });
+    }
+
+    const { data: existing, error: exErr } = await adminDb
       .from('shift_requests')
-      .upsert(
-        { shift_id, client_id: req.userId, worker_id, message: message ?? null },
-        { onConflict: 'shift_id,worker_id', ignoreDuplicates: true },
-      )
-      .select()
+      .select('id, status')
+      .eq('shift_id', shift_id)
+      .eq('worker_id', worker_id)
       .maybeSingle();
-    if (error) return res.status(500).json({ error: error.message });
+    if (exErr) return res.status(500).json({ error: exErr.message });
+
+    let data: Record<string, unknown> | null = null;
+    if (existing) {
+      if (existing.status === 'pending') return res.status(409).json({ error: 'This worker already has an offer for this shift.' });
+      if (existing.status === 'accepted' || existing.status === 'standby') {
+        return res.status(409).json({ error: 'This worker already accepted an offer for this shift.' });
+      }
+      // Declined (or cancelled) earlier: offer again on the same row.
+      const { data: reopened, error } = await adminDb
+        .from('shift_requests')
+        .update({ status: 'pending', message: message ?? null, created_at: new Date().toISOString() })
+        .eq('id', existing.id)
+        .select()
+        .maybeSingle();
+      if (error) return res.status(500).json({ error: error.message });
+      data = reopened;
+    } else {
+      const { data: inserted, error } = await adminDb
+        .from('shift_requests')
+        .insert({ shift_id, client_id: req.userId, worker_id, message: message ?? null })
+        .select()
+        .maybeSingle();
+      if (error) {
+        if (error.code === '23505') return res.status(409).json({ error: 'This worker already has an offer for this shift.' });
+        return res.status(500).json({ error: error.message });
+      }
+      data = inserted;
+    }
     if (!data) return res.status(409).json({ error: 'Request already exists' });
 
     const { data: w } = await adminDb.from('users').select('username').eq('id', worker_id).maybeSingle();
@@ -101,9 +149,10 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
       userId: worker_id,
       fromUserId: req.userId,
       type: 'shift_invite',
-      title: 'Shift request',
+      title: existing ? 'Shift request (again)' : 'Shift request',
       body: `You've been requested for ${label}. Accept to claim your spot.`,
       shiftId: shift_id,
+      url: REQUESTS_URL,
     });
     // Receipt to the requester.
     await createNotification({
@@ -169,6 +218,8 @@ router.post('/broadcast', requireAuth, requireRole('client', 'staffer'), async (
     for (const r of existingReqs ?? []) skip.add(r.worker_id);
     for (const a of existingApps ?? []) skip.add(a.worker_id);
     if (shift.client_id) skip.add(shift.client_id);
+    // Nobody who has blocked the poster, or whom the poster has blocked.
+    for (const id of await blockedIdsFor(req.userId!)) skip.add(id);
 
     // A roster-only shift is only ever offered to the poster's own roster.
     let rosterOnly: Set<string> | null = null;
@@ -207,6 +258,7 @@ router.post('/broadcast', requireAuth, requireRole('client', 'staffer'), async (
         title: 'New shift available',
         body: `You've been invited to ${label}. Accept to claim your spot.`,
         shiftId: shift_id,
+        url: REQUESTS_URL,
       }),
     ));
     // Receipt to the requester.
@@ -275,10 +327,18 @@ router.patch('/:id', requireAuth, async (req, res) => {
 
     const { data: shift } = await adminDb
       .from('shifts')
-      .select('id, title, client_id, status, end_time')
+      .select('id, title, client_id, status, start_time, end_time')
       .eq('id', reqRow.shift_id).maybeSingle();
     if (!shift) return res.status(404).json({ error: 'Shift not found' });
     const label = shift.title ? `"${shift.title}"` : 'a shift';
+
+    // An offer is only good until the shift starts (the app hides it then too).
+    if (shift.status === 'cancelled') return res.status(409).json({ error: 'This shift was cancelled.' });
+    const startMs = shift.start_time ? Date.parse(shift.start_time) : NaN;
+    if (Number.isFinite(startMs) && startMs < Date.now()) {
+      await adminDb.from('shift_requests').update({ status: 'expired' }).eq('id', reqRow.id).eq('status', 'pending');
+      return res.status(409).json({ error: 'This offer has expired — the shift has already started.' });
+    }
 
     // Don't book into a time-overlapping shift.
     const conflict = await findTimeConflict(req.userId!, reqRow.shift_id);

@@ -169,6 +169,22 @@ async function bookViaTs(shiftId: string, workerId: string): Promise<BookingResu
 }
 
 /**
+ * A worker who was booked by any path (assign, approve, claim, call-out
+ * auto-fill) may still have a live offer for the same shift. Flip it to
+ * accepted so a later decline can never un-book them and the poster's roster
+ * does not keep showing "awaiting reply". Best-effort.
+ */
+export async function markRequestAccepted(shiftId: string, workerId: string): Promise<void> {
+  const { error } = await adminDb
+    .from('shift_requests')
+    .update({ status: 'accepted' })
+    .eq('shift_id', shiftId)
+    .eq('worker_id', workerId)
+    .in('status', ['pending', 'standby']);
+  if (error) console.error('[booking] markRequestAccepted failed:', error.message);
+}
+
+/**
  * Confirm `workerId` onto `shiftId`. Throws HttpError(404/409) — never a raw
  * 500 for a business-rule failure. `source` is recorded for logging only.
  */

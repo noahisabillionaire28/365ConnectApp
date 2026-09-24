@@ -4,12 +4,34 @@ import { z } from 'zod';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
+import { findTimeConflictInWindow } from './applications.js';
 import { ensureShiftGroupChat, insertSystemMessage } from '../lib/chat.js';
-import { rosterAllows } from '../lib/shiftAccess.js';
+import { rosterAllows, assertShiftOwner } from '../lib/shiftAccess.js';
 import { getRoleInfo } from '../lib/roleCache.js';
+import { sendError } from '../lib/httpError.js';
 import { formatShiftInstant, formatShiftWindow, formatUsd } from '../lib/shiftLabel.js';
 
 const router = Router();
+
+/**
+ * Day-of details (who to call, where to park, special instructions) are for
+ * the people actually on the shift. Everyone else sees the listing without
+ * them.
+ */
+const PRIVATE_SHIFT_FIELDS = ['contact_phone', 'point_of_contact', 'special_instructions', 'parking_notes'] as const;
+
+/** Owner, admin, or a worker who is booked / on the waitlist for the shift. */
+async function canSeePrivateDetails(shift: { id: string; client_id: string | null }, viewerId: string): Promise<boolean> {
+  if (shift.client_id === viewerId) return true;
+  const { count } = await adminDb
+    .from('applications')
+    .select('*', { count: 'exact', head: true })
+    .eq('shift_id', shift.id)
+    .eq('worker_id', viewerId)
+    .in('status', ['accepted', 'standby']);
+  if ((count ?? 0) > 0) return true;
+  return (await getRoleInfo(viewerId)).isAdmin;
+}
 
 /**
  * Roster-only shifts are readable by the poster, workers on their roster and
@@ -109,8 +131,8 @@ async function sweepEnded(clientId?: string) {
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
-/** GET /api/shifts — open shifts, optional filters (past shifts are never returned) */
-router.get('/', async (req, res) => {
+/** GET /api/shifts — open shifts, optional filters (past shifts are never returned). Signed-in only. */
+router.get('/', requireAuth, async (req, res) => {
   const { job_type, status = 'open', limit = '50', offset = '0', event_id } = req.query as Record<string, string>;
   const lim = Math.min(Math.max(parseInt(limit) || 50, 1), 100);
   const off = Math.max(parseInt(offset) || 0, 0);
@@ -118,14 +140,15 @@ router.get('/', async (req, res) => {
   let q = event_id
     ? adminDb.from('shifts').select('*').eq('event_id', event_id)
     : adminDb.from('shifts').select('*').eq('status', status);
+  if (!event_id) {
+    // Roster-only shifts are visible to the poster and to workers on their
+    // roster, whatever status is asked for.
+    const allowed = [req.userId!, ...await rosterPostersFor(req.userId!)];
+    q = q.or(`visibility.eq.public,client_id.in.(${allowed.join(',')})`);
+  }
   if (!event_id && status === 'open') {
     // The feed shows what a worker can still take: not ended, soonest first.
     q = q.gt('end_time', new Date().toISOString()).order('start_time', { ascending: true });
-    // Roster-only shifts are visible to the poster and to workers on their roster.
-    const allowed = req.userId ? [req.userId, ...await rosterPostersFor(req.userId)] : [];
-    q = allowed.length
-      ? q.or(`visibility.eq.public,client_id.in.(${allowed.join(',')})`)
-      : q.eq('visibility', 'public');
   } else {
     q = q.order('created_at', { ascending: false });
   }
@@ -195,20 +218,29 @@ router.get('/my', requireAuth, async (req, res) => {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** GET /api/shifts/:id — single shift */
-router.get('/:id', async (req, res) => {
+/**
+ * GET /api/shifts/:id — single shift. Signed-in only. Contact and day-of
+ * details are stripped unless the viewer owns the shift, is booked or
+ * waitlisted on it, or is an admin.
+ */
+router.get('/:id', requireAuth, async (req, res) => {
   const id = String(req.params.id);
   if (!UUID_RE.test(id)) {
     return res.status(404).json({ error: 'Not found' });
   }
-  const { data: shift, error } = await adminDb
+  const { data: full, error } = await adminDb
     .from('shifts')
     .select('*')
     .eq('id', id)
     .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
-  if (!shift) return res.status(404).json({ error: 'Not found' });
-  if (!(await canViewShift(shift, req.userId))) return res.status(404).json({ error: 'Not found' });
+  if (!full) return res.status(404).json({ error: 'Not found' });
+  if (!(await canViewShift(full, req.userId))) return res.status(404).json({ error: 'Not found' });
+
+  const shift: Record<string, any> = { ...full };
+  if (!(await canSeePrivateDetails(full, req.userId!))) {
+    for (const f of PRIVATE_SHIFT_FIELDS) shift[f] = null;
+  }
 
   // Reflect reality even if the sweep hasn't run for this poster yet.
   if ((shift.status === 'open' || shift.status === 'filled') && Date.parse(shift.end_time) < Date.now()) {
@@ -353,7 +385,7 @@ router.post('/event', requireAuth, requireRole('client', 'staffer'), async (req,
   return res.status(201).json({ event_id, positions: data });
 });
 
-/** PATCH /api/shifts/:id — update shift (owner only) */
+/** PATCH /api/shifts/:id — update shift (owner or admin) */
 router.patch('/:id', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const id = String(req.params.id);
   if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Not found' });
@@ -367,15 +399,19 @@ router.patch('/:id', requireAuth, requireRole('client', 'staffer'), async (req, 
   for (const [k, v] of Object.entries(b)) if (v !== undefined) updates[k] = v;
   if (!Object.keys(updates).length) return res.status(400).json({ error: 'No valid fields' });
 
+  // Owner or admin — the same rule every other shift action uses.
+  try {
+    await assertShiftOwner(id, req.userId!);
+  } catch (e) {
+    return sendError(res, e);
+  }
   const { data: current, error: curErr } = await adminDb
     .from('shifts')
     .select('id, client_id, status, title, start_time, end_time, timezone, spots_available, pay_rate, pay_period, location')
     .eq('id', id)
     .maybeSingle();
   if (curErr) return res.status(500).json({ error: curErr.message });
-  if (!current || current.client_id !== req.userId) {
-    return res.status(404).json({ error: 'Not found or not authorized' });
-  }
+  if (!current) return res.status(404).json({ error: 'Not found' });
 
   // Status transitions: a cancelled or completed shift stays that way.
   if (b.status && b.status !== current.status) {
@@ -386,12 +422,28 @@ router.patch('/:id', requireAuth, requireRole('client', 'staffer'), async (req, 
   // Times: validate the resulting pair, and only require the future when the
   // poster is actually moving the shift.
   if (b.start_time || b.end_time) {
-    const problem = timeProblems(
-      (b.start_time ?? current.start_time) as string,
-      (b.end_time ?? current.end_time) as string,
-      true,
-    );
+    const newStart = (b.start_time ?? current.start_time) as string;
+    const newEnd = (b.end_time ?? current.end_time) as string;
+    const problem = timeProblems(newStart, newEnd, true);
     if (problem) return res.status(400).json({ error: problem });
+
+    // Moving the shift must not double-book anyone already confirmed on it.
+    const movedStart = Date.parse(newStart) !== Date.parse(current.start_time as string);
+    const movedEnd = Date.parse(newEnd) !== Date.parse(current.end_time as string);
+    if (movedStart || movedEnd) {
+      const booked = await liveWorkers(id, ['accepted']);
+      const clashing: string[] = [];
+      for (const workerId of booked.keys()) {
+        if (await findTimeConflictInWindow(workerId, id, newStart, newEnd)) clashing.push(workerId);
+      }
+      if (clashing.length) {
+        const { data: names } = await adminDb.from('users').select('id, username').in('id', clashing);
+        const handles = (names ?? []).map((u) => (u.username ? `@${u.username}` : 'a worker'));
+        return res.status(409).json({
+          error: `That time overlaps another shift for ${handles.join(', ')}. Remove them from this shift first or pick another time.`,
+        });
+      }
+    }
   }
 
   // Headcount can't drop below the workers already booked.
@@ -414,11 +466,10 @@ router.patch('/:id', requireAuth, requireRole('client', 'staffer'), async (req, 
     .from('shifts')
     .update(updates)
     .eq('id', id)
-    .eq('client_id', req.userId)
     .select()
     .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
-  if (!data) return res.status(404).json({ error: 'Not found or not authorized' });
+  if (!data) return res.status(404).json({ error: 'Not found' });
 
   // Tell the people on the shift what changed. Best-effort: a notification
   // failure must never turn a saved edit into an error for the poster.
@@ -461,6 +512,10 @@ async function postSystemLine(shiftId: string, text: string, actorId: string): P
  * is visible there too.
  */
 async function announceCancellation(shift: NotifyShift, actorId: string): Promise<void> {
+  // Offers still waiting on an answer die with the shift, so they leave the
+  // workers' Requests tab and can no longer be accepted.
+  await adminDb.from('shift_requests').update({ status: 'cancelled' })
+    .eq('shift_id', shift.id).eq('status', 'pending');
   const workers = await liveWorkers(shift.id, ['accepted', 'pending', 'standby']);
   const when = formatShiftInstant(shift.start_time, shift.timezone);
   const label = shift.title ? `"${shift.title}"` : 'a shift';

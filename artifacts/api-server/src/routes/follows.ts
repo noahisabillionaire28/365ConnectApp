@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
+import { createNotification } from './notifications.js';
 
 const router = Router();
 
@@ -45,12 +46,16 @@ router.get('/status/:userId', requireAuth, async (req, res) => {
   return res.json({ following: (count ?? 0) > 0 });
 });
 
-/** GET /api/follows/followers/:userId — who follows this user */
+/**
+ * GET /api/follows/followers/:userId — who follows this user. For a worker
+ * these are the clients and agencies whose roster they are on.
+ */
 router.get('/followers/:userId', async (req, res) => {
   const { data: follows, error } = await adminDb
     .from('follows')
-    .select('follower_id')
-    .eq('following_id', req.params.userId);
+    .select('follower_id, created_at')
+    .eq('following_id', req.params.userId)
+    .order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
 
   const ids = [...new Set((follows ?? []).map((f) => f.follower_id).filter(Boolean))];
@@ -58,10 +63,29 @@ router.get('/followers/:userId', async (req, res) => {
 
   const { data: users, error: uErr } = await adminDb
     .from('users')
-    .select('id, username, photo_url, role')
+    .select('id, username, photo_url, role, company_name')
     .in('id', ids);
   if (uErr) return res.status(500).json({ error: uErr.message });
-  return res.json(users ?? []);
+  const byId = new Map((users ?? []).map((u) => [u.id, u]));
+  return res.json(
+    (follows ?? [])
+      .map((f) => { const u = byId.get(f.follower_id); return u ? { ...u, followed_at: f.created_at } : null; })
+      .filter(Boolean),
+  );
+});
+
+/**
+ * DELETE /api/follows/followers/:followerId — leave someone's roster: removes
+ * the follow where they follow ME. A worker's way out of an agency's list.
+ */
+router.delete('/followers/:followerId', requireAuth, async (req, res) => {
+  const { error } = await adminDb
+    .from('follows')
+    .delete()
+    .eq('follower_id', req.params.followerId)
+    .eq('following_id', req.userId);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ ok: true });
 });
 
 /** GET /api/follows/counts/:userId — follower + following counts */
@@ -88,13 +112,30 @@ router.post('/', requireAuth, async (req, res) => {
   if (!target) return res.status(404).json({ error: 'User not found' });
   if (target.role !== 'worker') return res.status(409).json({ error: 'You can only follow workers.' });
 
-  const { error } = await adminDb
+  const { data: inserted, error } = await adminDb
     .from('follows')
     .upsert(
       { follower_id: req.userId, following_id },
       { onConflict: 'follower_id,following_id', ignoreDuplicates: true },
-    );
+    )
+    .select('follower_id')
+    .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
+
+  // A new roster entry: tell the worker who listed them (once, not on re-follows).
+  if (inserted) {
+    const { data: me } = await adminDb
+      .from('users').select('username, company_name, role').eq('id', req.userId).maybeSingle();
+    const who = me?.company_name || (me?.username ? `@${me.username}` : me?.role === 'staffer' ? 'An agency' : 'A client');
+    await createNotification({
+      userId: following_id,
+      fromUserId: req.userId,
+      type: 'new_follower',
+      title: 'Added to a roster',
+      body: `${who} added you to their roster. They can offer you their shifts directly; you can leave the roster from your profile.`,
+      url: '/profile',
+    });
+  }
   return res.json({ ok: true });
 });
 

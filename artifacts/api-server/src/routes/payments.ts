@@ -5,6 +5,8 @@ import { requireAuth } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
 import { sendError } from '../lib/httpError.js';
 import { assertShiftOwner } from '../lib/shiftAccess.js';
+import { getRoleInfo } from '../lib/roleCache.js';
+import { HttpError } from '../lib/httpError.js';
 import { formatUsd } from '../lib/shiftLabel.js';
 
 const router = Router();
@@ -169,7 +171,13 @@ router.post('/checkout', requireAuth, async (req, res) => {
   }
 });
 
-/** POST /api/payments/confirm — verify a completed Checkout session and record the payment */
+/**
+ * POST /api/payments/confirm — verify a completed Checkout session and record
+ * the payment. The session's metadata names the owner who started it and the
+ * shift it pays for; the caller must be that owner (or an admin) and must
+ * still own the shift, so a session id cannot be replayed by someone else to
+ * mark a worker as paid.
+ */
 router.post('/confirm', requireAuth, async (req, res) => {
   const key = stripeKey();
   if (!key) return res.status(503).json({ error: 'Payments are not configured yet.' });
@@ -179,21 +187,30 @@ router.post('/confirm', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'session_id is required' });
   }
 
+  let s: { payment_status?: string; metadata?: Record<string, string>; error?: { message?: string } };
   try {
     const r = await fetch(`${STRIPE_API}/checkout/sessions/${encodeURIComponent(session_id)}`, {
       headers: { Authorization: `Bearer ${key}` },
     });
-    const s = (await r.json()) as {
-      payment_status?: string;
-      metadata?: Record<string, string>;
-      error?: { message?: string };
-    };
+    s = (await r.json()) as typeof s;
     if (!r.ok) return res.status(502).json({ error: s.error?.message || 'Stripe error' });
-    if (s.payment_status !== 'paid') {
-      return res.status(400).json({ error: 'Payment has not completed' });
-    }
+  } catch (e) {
+    return res.status(502).json({ error: `Stripe request failed: ${String(e)}` });
+  }
+  if (s.payment_status !== 'paid') {
+    return res.status(400).json({ error: 'Payment has not completed' });
+  }
 
+  try {
     const m = s.metadata ?? {};
+    if (!m.shift_id || !m.worker_id || !m.client_id) {
+      return res.status(400).json({ error: 'This checkout session is not a shift payment.' });
+    }
+    const { isAdmin } = await getRoleInfo(req.userId!);
+    if (m.client_id !== req.userId && !isAdmin) {
+      return res.status(403).json({ error: 'This payment was started by another account.' });
+    }
+    await assertShiftOwner(m.shift_id, req.userId!);
     const amount = Number(m.amount || 0);
     const fee = Math.round(amount * PLATFORM_FEE_PCT * 100) / 100;
     const payload = {
@@ -232,7 +249,8 @@ router.post('/confirm', requireAuth, async (req, res) => {
     }
     return res.json(data ?? { ok: true, alreadyRecorded: true });
   } catch (e) {
-    return res.status(502).json({ error: `Stripe request failed: ${String(e)}` });
+    if (e instanceof HttpError) return sendError(res, e);
+    return res.status(500).json({ error: `Could not record the payment: ${String(e)}` });
   }
 });
 

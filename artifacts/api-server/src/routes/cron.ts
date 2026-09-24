@@ -159,6 +159,7 @@ type NewShift = {
   id: string; client_id: string; title: string | null; job_type: string | null; job_types: string[] | null;
   event_type: string | null; company_name: string | null; pay_rate: number | null; pay_period: string | null;
   start_time: string; timezone: string | null; lat: number | null; lng: number | null;
+  visibility: string | null;
 };
 
 function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -190,31 +191,41 @@ function matchSavedSearch(
 }
 
 /**
- * New open public shifts (posted in the last 20 minutes) matched against every
- * worker's saved searches. One notification per worker per tick, never to the
- * poster or to someone who already applied, deduped per (worker, shift) via
- * the notifications table so overlapping windows never double-send.
+ * New open shifts (posted in the last 20 minutes) matched against every
+ * worker's saved searches. Roster-only shifts count too, but only for the
+ * workers on that poster's roster. One notification per worker per tick,
+ * never to the poster or to someone who already applied, deduped per
+ * (worker, shift) via the notifications table so overlapping windows never
+ * double-send.
  */
 async function alertSavedSearches(): Promise<number> {
   const since = new Date(Date.now() - 20 * 60_000).toISOString();
   const { data: shifts } = await adminDb
     .from('shifts')
-    .select('id, client_id, title, job_type, job_types, event_type, company_name, pay_rate, pay_period, start_time, timezone, lat, lng')
-    .eq('status', 'open').eq('visibility', 'public')
+    .select('id, client_id, title, job_type, job_types, event_type, company_name, pay_rate, pay_period, start_time, timezone, lat, lng, visibility')
+    .eq('status', 'open')
     .gte('created_at', since)
     .gt('start_time', new Date().toISOString());
   const list = (shifts ?? []) as NewShift[];
   if (!list.length) return 0;
   const shiftIds = list.map((s) => s.id);
+  const rosterPosters = [...new Set(list.filter((s) => s.visibility === 'roster').map((s) => s.client_id))];
 
-  const [{ data: searches }, done, { data: apps }] = await Promise.all([
+  const [{ data: searches }, done, { data: apps }, { data: rosterRows }] = await Promise.all([
     adminDb.from('saved_searches').select('id, user_id, job_types, max_distance_miles, min_pay, event_type'),
     alreadyNotified('saved_search', shiftIds),
     adminDb.from('applications').select('shift_id, worker_id').in('shift_id', shiftIds),
+    rosterPosters.length
+      ? adminDb.from('follows').select('follower_id, following_id').in('follower_id', rosterPosters)
+      : Promise.resolve({ data: [] as { follower_id: string; following_id: string }[] }),
   ]);
   const searchList = (searches ?? []) as SavedSearch[];
   if (!searchList.length) return 0;
   const applied = new Set((apps ?? []).map((a) => `${a.worker_id}:${a.shift_id}`));
+  // poster:worker pairs where the worker is on the poster's roster.
+  const onRoster = new Set((rosterRows ?? []).map((r) => `${r.follower_id}:${r.following_id}`));
+  const canSee = (shift: NewShift, workerId: string) =>
+    (shift.visibility ?? 'public') !== 'roster' || onRoster.has(`${shift.client_id}:${workerId}`);
 
   const userIds = [...new Set(searchList.map((s) => s.user_id))];
   const { data: users } = await adminDb.from('users').select('id, lat, lng, role').in('id', userIds);
@@ -231,6 +242,7 @@ async function alertSavedSearches(): Promise<number> {
     let hit: { shift: NewShift; distance: number | null; searchId: string } | null = null;
     for (const shift of list) {
       if (shift.client_id === userId) continue;
+      if (!canSee(shift, userId)) continue;
       if (applied.has(`${userId}:${shift.id}`) || done.has(`${userId}:${shift.id}`)) continue;
       for (const search of mySearches) {
         const r = matchSavedSearch(search, shift, { lat: u.lat, lng: u.lng });

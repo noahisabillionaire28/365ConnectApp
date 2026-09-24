@@ -1,7 +1,15 @@
 import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
+import { requireAuth } from '../middleware/auth.js';
+import { getRoleInfo } from '../lib/roleCache.js';
 
 const router = Router();
+
+/** Coarsen a coordinate to two decimals (~1 km) for the public directory. */
+function coarse(v: unknown): number | null {
+  const n = v == null ? NaN : Number(v);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
+}
 
 function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 3958.8;
@@ -17,11 +25,14 @@ function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number):
  * Optional: ?role=worker|client|staffer (default worker) &job_type=Bartender
  *           &lat=25.7&lng=-80.1 (viewer position → distance_miles on each row)
  * Adds per row: distance_miles (null without lat/lng), is_available,
- * availability, and is_followed (when the viewer is signed in).
+ * availability, and is_followed. Signed-in only, and home coordinates are
+ * coarsened to two decimals for everyone but the viewer themselves and admins
+ * (distance is computed from the exact values before that).
  */
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   const { role = 'worker', job_type, limit = '50', offset = '0', lat, lng } = req.query as Record<string, string>;
   try {
+    const viewerIsAdmin = (await getRoleInfo(req.userId!)).isAdmin;
     const lim = Math.min(Math.max(parseInt(limit) || 50, 1), 100);
     const off = Math.max(parseInt(offset) || 0, 0);
     const vLat = lat !== undefined ? Number(lat) : NaN;
@@ -74,8 +85,11 @@ router.get('/', async (req, res) => {
         const distance = hasViewerPos && Number.isFinite(uLat) && Number.isFinite(uLng)
           ? Math.round(haversineMiles(vLat, vLng, uLat, uLng) * 10) / 10
           : null;
+        const exact = viewerIsAdmin || u.id === req.userId;
         return {
           ...pub,
+          lat: exact ? u.lat : coarse(u.lat),
+          lng: exact ? u.lng : coarse(u.lng),
           is_available: u.is_available !== false,
           distance_miles: distance,
           is_followed: followed.has(u.id),
