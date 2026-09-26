@@ -3,8 +3,9 @@ import { useParams, useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   ChevronLeft, Check, X, Star, Send, UserPlus, Users, AlarmClock,
-  CheckCircle2, Flag, DollarSign, Clock3, MessageCircle, MessagesSquare, ArrowRight, Repeat2,
+  CheckCircle2, Flag, DollarSign, Clock3, MessageCircle, MessagesSquare, ArrowRight, Repeat2, Banknote,
 } from 'lucide-react';
+import { usePaymentsConfig, useMarkPaid } from '@/hooks/usePayments';
 import { useShiftSwaps, useDecideSwap, isSwapActive, type ShiftSwap, type SwapPerson } from '@/hooks/useSwaps';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { useShiftRanking } from '@/hooks/useMatch';
@@ -113,13 +114,15 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
 }
 
 /* ── Confirmed worker row (attendance + pay / no-show / remove) ───────────── */
-function ConfirmedRow({ w, late, closed, timezone, onApprove, onPay, onNoShow, onRemove, onReview, onMessage, busy }: {
+function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onPay, onMarkPaid, onNoShow, onRemove, onReview, onMessage, busy }: {
   w: AcceptedWorker; late: boolean;
   /** The shift has ended — a worker still "on site" forgot to clock out. */
   closed: boolean;
   /** The venue's zone: clock times are shown in it, like every other time in the app. */
   timezone: string | null;
-  onApprove: () => void; onPay: () => void; onNoShow: () => void; onRemove: () => void; onReview: () => void;
+  /** Stripe Checkout is wired on the server; otherwise only "Mark as paid" is offered. */
+  stripeEnabled: boolean;
+  onApprove: () => void; onPay: () => void; onMarkPaid: () => void; onNoShow: () => void; onRemove: () => void; onReview: () => void;
   onMessage: () => void;
   busy: boolean;
 }) {
@@ -183,11 +186,20 @@ function ConfirmedRow({ w, late, closed, timezone, onApprove, onPay, onNoShow, o
             {forgotClockOut ? 'Set clock-out & approve' : w.workerAck === 'disputed' ? 'Adjust & re-approve' : 'Review & Approve'}
           </button>
         )}
-        {w.attendance === 'done' && w.approved && !w.paid && (
+        {w.attendance === 'done' && w.approved && !w.paid && stripeEnabled && (
           <button type="button" disabled={busy} onClick={onPay}
             className="flex-1 h-9 rounded-[8px] bg-emerald-600 text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
             <DollarSign size={13} aria-hidden />
             Pay ${(w.approvedPay ?? 0).toFixed(2)}
+          </button>
+        )}
+        {/* Paid outside the app (cash, Venmo, payroll): records the shift as paid without Stripe. */}
+        {w.attendance === 'done' && w.approved && !w.paid && (
+          <button type="button" disabled={busy} onClick={onMarkPaid}
+            className={`flex-1 h-9 rounded-[8px] text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60 ${
+              stripeEnabled ? 'border border-emerald-600 bg-white text-emerald-700' : 'bg-emerald-600 text-white'}`}>
+            <Banknote size={13} aria-hidden />
+            Mark as paid
           </button>
         )}
         {w.paid && (
@@ -359,6 +371,11 @@ export function ApplicantsScreen() {
   }
   const [reviewing, setReviewing] = useState<AcceptedWorker | null>(null);
   const [confirmBroadcast, setConfirmBroadcast] = useState(false);
+  // Paying: Stripe Checkout when the server has it, and always "Mark as paid"
+  // for money handed over outside the app.
+  const { stripe: stripeEnabled } = usePaymentsConfig();
+  const { markPaid, busy: markingPaid } = useMarkPaid();
+  const [markPaidFor, setMarkPaidFor] = useState<AcceptedWorker | null>(null);
 
   const loading = shiftLoading || appsLoading || confLoading;
   const pending = applicants.filter((a) => a.status === 'pending');
@@ -447,6 +464,17 @@ export function ApplicantsScreen() {
     finally { setBusyId(null); }
   }
 
+  /** The poster paid the worker outside the app: record it so both sides see "Paid". */
+  async function handleMarkPaid() {
+    if (!markPaidFor || !id) return;
+    const w = markPaidFor;
+    const err = await markPaid(id, w.workerId);
+    if (err) { showToast(err, 'error'); return; }
+    setMarkPaidFor(null);
+    showToast(`Marked as paid. ${w.username ? `@${w.username}` : 'The worker'} has been told.`);
+    refetchAll();
+  }
+
   /** Approve / decline a pending or standby application, one request at a time per row. */
   async function handleDecide(applicationId: string, action: 'approve' | 'decline', successMsg: string) {
     if (busyId) return;
@@ -509,6 +537,16 @@ export function ApplicantsScreen() {
           </p>
         </div>
       </div>
+
+      <ConfirmSheet
+        open={!!markPaidFor}
+        title="Mark as paid?"
+        body={<>Confirm you paid <b>{markPaidFor?.username ? `@${markPaidFor.username}` : 'this worker'}</b> <b>${(markPaidFor?.approvedPay ?? 0).toFixed(2)}</b> outside the app (cash, Venmo, payroll). This records the shift as paid and tells them.</>}
+        confirmLabel="Yes, mark as paid"
+        busy={markingPaid}
+        onConfirm={() => void handleMarkPaid()}
+        onCancel={() => setMarkPaidFor(null)}
+      />
 
       <div className="flex-1 overflow-y-auto px-5 pt-5 pb-10">
         {/* Fill bar */}
@@ -648,8 +686,10 @@ export function ApplicantsScreen() {
                 {confirmed.map((w) => (
                   <ConfirmedRow key={w.id} w={w} late={isLate(w)} closed={closed} busy={busyId === w.id}
                     timezone={shift?.timezone ?? null}
+                    stripeEnabled={stripeEnabled}
                     onApprove={() => setReviewing(w)}
                     onPay={() => void handlePay(w)}
+                    onMarkPaid={() => setMarkPaidFor(w)}
                     onNoShow={() => void handleNoShow(w)}
                     onRemove={() => void handleRemove(w)}
                     onReview={() => navigate(`/review/${id}/${w.workerId}`)}

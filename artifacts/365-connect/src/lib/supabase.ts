@@ -33,6 +33,11 @@ export type MockShift = {
   timezone: string;
   /** When set, this shift is one position of a multi-position event. */
   eventId: string | null;
+  /** When set, this shift is one occurrence of a recurring series. */
+  seriesId: string | null;
+  /** 1-based position in the series and its size ("3 of 5"); null off-series. */
+  seriesIndex: number | null;
+  seriesCount: number | null;
   distanceMiles: number;
   spotsAvailable: number;
   spotsTotal: number;
@@ -164,6 +169,10 @@ export type ShiftRow = {
   parking_notes: string | null;
   special_instructions: string | null;
   repeat_type: string;
+  /** Recurring series this shift belongs to (null for a one-off). */
+  series_id?: string | null;
+  series_index?: number | null;
+  series_count?: number | null;
   // Poster fields the API joins onto a shift
   client_username?: string | null;
   client_rating?: number | string | null;
@@ -486,6 +495,9 @@ export function shiftRowToMockShift(
     endTimeISO:     row.end_time,
     timezone:       row.timezone || DEFAULT_SHIFT_TZ,
     eventId:        (row as { event_id?: string | null }).event_id ?? null,
+    seriesId:       row.series_id ?? null,
+    seriesIndex:    row.series_index ?? null,
+    seriesCount:    row.series_count ?? null,
     distanceMiles:  Math.round(haversineMiles(refCoords.lat, refCoords.lng, lat, lng) * 10) / 10,
     spotsAvailable,
     spotsTotal:     row.spots_available ?? 1,
@@ -535,6 +547,9 @@ export function hardenShift(s: MockShift): MockShift {
     endTimeISO:     raw.endTimeISO ?? '',
     timezone:       raw.timezone || DEFAULT_SHIFT_TZ,
     eventId:        raw.eventId ?? null,
+    seriesId:       raw.seriesId ?? null,
+    seriesIndex:    raw.seriesIndex ?? null,
+    seriesCount:    raw.seriesCount ?? null,
     distanceMiles:  Number.isFinite(raw.distanceMiles) ? (raw.distanceMiles as number) : 0,
     spotsAvailable: Number(raw.spotsAvailable ?? 0) || 0,
     spotsTotal:     Number(raw.spotsTotal ?? 1) || 1,

@@ -6,6 +6,7 @@ import {
   ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, UserPlus,
   Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText, MessagesSquare, Repeat2, DollarSign, Star, CalendarPlus,
+  BookmarkPlus,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -17,14 +18,18 @@ import { useShiftById } from '@/hooks/useShifts';
 import { useProfile } from '@/hooks/useProfile';
 import { useMyLocation } from '@/hooks/useMyLocation';
 import { computeMatchScore } from '@/lib/matchScore';
-import { haversineMiles, formatTime } from '@/lib/supabase';
+import { haversineMiles, formatTime, friendlyDate } from '@/lib/supabase';
 import { apiClient } from '@/lib/api';
-import { resetDraft, setDraft, setEditShiftId } from '@/store/postShiftStore';
+import { resetDraft, setDraft, setEditShiftId, type TemplatePayload } from '@/store/postShiftStore';
 import { utcToZonedParts, DEFAULT_SHIFT_TZ } from '@/lib/timezone';
+import { useSeriesShifts, useCancelSeriesFuture } from '@/hooks/useShiftSeries';
+import { shiftRowToTemplatePayload } from '@/hooks/useTemplates';
+import { TemplateNameSheet } from '@/components/TemplateNameSheet';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { useMyMatch } from '@/hooks/useMatch';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyTimeEntry, useAckHours, formatHoursMinutes } from '@/hooks/useTimeEntry';
+import { PayTimeline } from '@/components/PayTimeline';
 import { useExistingReview } from '@/hooks/useReviews';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
 import { useAcceptedWorkers } from '@/hooks/useAcceptedWorkers';
@@ -179,6 +184,11 @@ export function ShiftDetailScreen() {
     isOwnerForHooks ? user?.id : undefined,
   );
   const { positions: eventPositions } = useEventPositions(shift?.eventId ?? undefined);
+  // Recurring series: the owner sees the sibling dates and can cancel forward.
+  const { shifts: seriesShifts } = useSeriesShifts(isOwnerForHooks ? shift?.seriesId : undefined);
+  const { cancelFuture, busy: cancellingFuture } = useCancelSeriesFuture();
+  const [templatePayload, setTemplatePayload] = useState<TemplatePayload | null>(null);
+  const [templateLoading, setTemplateLoading] = useState(false);
   // Server-side insight (real history + Claude when configured). Declared here,
   // before the loading/error returns, so the hook order never changes.
   const myMatch = useMyMatch(shift?.id, profile.role === 'worker');
@@ -539,14 +549,50 @@ export function ShiftDetailScreen() {
         pay_period:      payPeriod,
         description:     (raw.description     as string | null)    ?? '',
         requirements:    (raw.requirements    as string[] | null)  ?? [],
+        // Day-of details have no wizard step; carry them so an edit or re-post keeps them.
+        dress_code_items:     (raw.dress_code_items as string[] | null) ?? [],
+        point_of_contact:     (raw.point_of_contact as string | null) ?? '',
+        contact_phone:        (raw.contact_phone    as string | null) ?? '',
+        parking_notes:        (raw.parking_notes    as string | null) ?? '',
+        special_instructions: (raw.special_instructions as string | null) ?? '',
       });
-      setEditShiftId(mode === 'edit' ? shiftId : null);
+      // An edit inside a series only ever changes this one shift.
+      setEditShiftId(mode === 'edit' ? shiftId : null, { inSeries: !!raw.series_id });
       // keep=1 stops the name step from wiping the draft we just built.
       navigate('/post-shift/name?keep=1');
     } catch (e) {
       console.error('[ShiftDetail] edit prefill failed:', e);
     } finally {
       setEditLoading(false);
+    }
+  }
+
+  /** Save this shift's details (not its date) as a template: open the name sheet. */
+  async function handleSaveTemplate() {
+    if (!user?.id || templateLoading) return;
+    setTemplateLoading(true);
+    try {
+      const raw = await apiClient(user.id).get<Record<string, unknown>>(`/shifts/${shiftId}`);
+      if (!raw || (raw.client_id !== user.id && !profile.isAdmin)) return;
+      setTemplatePayload(shiftRowToTemplatePayload(raw));
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not load the shift details.', 'error');
+    } finally {
+      setTemplateLoading(false);
+    }
+  }
+
+  /** Cancel this shift and every later, not-yet-started shift in its series. */
+  async function handleCancelSeriesFuture() {
+    if (!user?.id || cancellingFuture) return;
+    try {
+      const out = await cancelFuture(shiftId);
+      invalidateShiftCaches();
+      setShowCancelConfirm(false);
+      showToast(`Cancelled ${out.cancelled} shift${out.cancelled === 1 ? '' : 's'}.`);
+      navigate('/home?tab=my-shifts');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not cancel the series.', 'error');
     }
   }
 
@@ -610,15 +656,25 @@ export function ShiftDetailScreen() {
           <h2 className="text-[#111827] font-bold text-[18px] mb-2">Cancel this shift?</h2>
           <p className="text-[#6B7280] text-[14px] leading-relaxed mb-5">
             Workers who applied will be notified. This cannot be undone.
+            {shift.seriesId && ' This shift is part of a recurring series.'}
           </p>
           <div className="flex flex-col gap-2">
             <button type="button" onClick={() => void handleCancelShift()}
-              disabled={cancelling}
+              disabled={cancelling || cancellingFuture}
               className="w-full h-[50px] bg-[#EF4444] text-white font-bold text-[15px] rounded-[12px] disabled:opacity-60">
-              {cancelling ? 'Cancelling…' : 'Yes, Cancel Shift'}
+              {cancelling ? 'Cancelling…' : shift.seriesId ? 'Cancel this shift only' : 'Yes, Cancel Shift'}
             </button>
+            {shift.seriesId && (
+              <button type="button" onClick={() => void handleCancelSeriesFuture()}
+                disabled={cancelling || cancellingFuture}
+                aria-label="Cancel this and all future shifts in the series"
+                className="w-full h-[50px] border border-[#EF4444] text-[#EF4444] font-bold text-[15px] rounded-[12px] disabled:opacity-60">
+                {cancellingFuture ? 'Cancelling…' : 'Cancel this and all future shifts'}
+              </button>
+            )}
             <button type="button" onClick={() => setShowCancelConfirm(false)}
-              className="w-full h-[50px] border border-[#E5E7EB] text-[#6B7280] font-semibold text-[15px] rounded-[12px]">
+              disabled={cancelling || cancellingFuture}
+              className="w-full h-[50px] border border-[#E5E7EB] text-[#6B7280] font-semibold text-[15px] rounded-[12px] disabled:opacity-60">
               Keep Shift
             </button>
           </div>
@@ -765,6 +821,19 @@ export function ShiftDetailScreen() {
           <StatTile icon={<Clock size={14} aria-hidden className="text-[#737373]" />} label="Time" value={shift.startTime} sub={`Ends ${shift.endTime}`} />
           <StatTile icon={<Timer size={14} aria-hidden className="text-[#0095F6]" />} label="Duration" value={duration} accent />
         </div>
+
+        {/* Part of a recurring series — the owner can jump between the dates */}
+        {isOwner && shift.seriesId && (
+          <div className="px-5 pb-5" data-testid="series-info">
+            <button type="button"
+              onClick={() => document.getElementById('series-dates')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+              className="flex items-center gap-2 text-[#0A1628] text-[13px] font-semibold">
+              <Repeat2 size={14} aria-hidden />
+              Part of a series{shift.seriesIndex && shift.seriesCount ? ` · ${shift.seriesIndex} of ${shift.seriesCount}` : ''}
+              <span className="text-[#9CA3AF] font-medium">· See all dates</span>
+            </button>
+          </div>
+        )}
 
         {/* Dress code */}
         <div className="px-5 pb-6">
@@ -967,6 +1036,12 @@ export function ShiftDetailScreen() {
                     <span className="text-[#111827] font-bold">{usd(Number(pay) || 0)}</span>
                   </div>
                 </div>
+                {/* Where the money is: Worked → Approved → Paid, stamped in the venue's zone. */}
+                {e.payTimeline && (
+                  <div className="mt-4 pt-3.5 border-t border-[#EFEFEF]">
+                    <PayTimeline timeline={e.payTimeline} tz={tz} />
+                  </div>
+                )}
                 {!approved && (
                   <p className="text-[#9CA3AF] text-[11px] mt-3 leading-relaxed">
                     The poster reviews your timesheet before paying. You will be told if anything changes.
@@ -1182,6 +1257,41 @@ export function ShiftDetailScreen() {
           </div>
         )}
 
+        {/* Series dates — every shift created with this one (owner only) */}
+        {isOwner && shift.seriesId && seriesShifts.length > 1 && (
+          <div id="series-dates" className="px-5 pt-2 pb-4">
+            <p className="text-[13px] font-semibold text-[#737373] uppercase tracking-widest mb-2">
+              Series dates ({seriesShifts.length})
+            </p>
+            <div className="flex flex-col gap-2">
+              {seriesShifts.map((s) => {
+                const isThis = s.id === shiftId;
+                const left = Math.max(0, (s.spots_available ?? 1) - (s.spots_filled ?? 0));
+                const state = s.status === 'cancelled' ? 'Cancelled'
+                  : s.status === 'completed' ? 'Ended'
+                  : left === 0 ? 'Full' : `${left} spot${left === 1 ? '' : 's'} left`;
+                return (
+                  <button key={s.id} type="button" disabled={isThis}
+                    onClick={() => navigate(`/shift/${s.id}`)}
+                    className={`w-full flex items-center justify-between rounded-[10px] border px-3.5 py-2.5 text-left ${
+                      isThis ? 'border-[#0A1628] bg-[#0A1628]/5' : 'border-[#E5E7EB] bg-white'
+                    } ${s.status === 'cancelled' ? 'opacity-60' : ''}`}>
+                    <div className="min-w-0">
+                      <p className="text-[#111827] font-semibold text-[14px] truncate">
+                        {friendlyDate(s.start_time, s.timezone)}{isThis && ' · this one'}
+                      </p>
+                      <p className="text-[#6B7280] text-[12px]">
+                        {formatTime(s.start_time, s.timezone)} – {formatTime(s.end_time, s.timezone)} · {state}
+                      </p>
+                    </div>
+                    {!isThis && <span className="text-[#9CA3AF] text-[16px] flex-shrink-0">→</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Add to calendar — a booked worker, while the shift is still ahead */}
         {isWorker && applicationStatus === 'accepted' && lifecycle !== 'ended' && shift.status !== 'cancelled' && (
           <div className="px-5 pt-2">
@@ -1288,8 +1398,22 @@ export function ShiftDetailScreen() {
                 {editLoading ? 'Loading…' : 'Post again'}
               </motion.button>
             )}
+            <motion.button type="button" whileTap={{ scale: 0.97 }}
+              onClick={() => void handleSaveTemplate()}
+              disabled={templateLoading}
+              aria-label="Save this shift as a template"
+              className="w-full h-[44px] rounded-[8px] text-[#0A1628] font-semibold text-[14px] flex items-center justify-center gap-2 disabled:opacity-60">
+              <BookmarkPlus size={15} aria-hidden />
+              {templateLoading ? 'Loading…' : 'Save as template'}
+            </motion.button>
           </div>
         )}
+        <TemplateNameSheet
+          open={!!templatePayload}
+          payload={templatePayload}
+          defaultName={templatePayload?.title || shift.jobType}
+          onClose={() => setTemplatePayload(null)}
+        />
       </div>
 
       {/* Fixed CTA — worker actions only (apply/claim/clock-in). Clients and

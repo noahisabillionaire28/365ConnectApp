@@ -89,6 +89,7 @@ const PostShiftStep2Screen = lazyNamed(() => import('@/pages/PostShiftStep2Scree
 const PostShiftStep3Screen = lazyNamed(() => import('@/pages/PostShiftStep3Screen'), 'PostShiftStep3Screen');
 const PostShiftStep4Screen = lazyNamed(() => import('@/pages/PostShiftStep4Screen'), 'PostShiftStep4Screen');
 const PostShiftStep5Screen = lazyNamed(() => import('@/pages/PostShiftStep5Screen'), 'PostShiftStep5Screen');
+const TemplatesScreen = lazyNamed(() => import('@/pages/TemplatesScreen'), 'TemplatesScreen');
 const ProUpgradeScreen = lazyNamed(() => import('@/pages/ProUpgradeScreen'), 'ProUpgradeScreen');
 const EarningsScreen = lazyNamed(() => import('@/pages/EarningsScreen'), 'EarningsScreen');
 
@@ -218,6 +219,7 @@ function MobileRouter() {
             <Route path="/post-shift/step4" component={PostShiftStep4Screen} />
             <Route path="/post-shift/step5" component={PostShiftStep5Screen} />
             <Route path="/post-shift/success" component={PostShiftSuccessScreen} />
+            <Route path="/templates"          component={TemplatesScreen} />
 
             <Route component={NotFound} />
           </Switch>

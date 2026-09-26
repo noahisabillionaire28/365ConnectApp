@@ -5,12 +5,24 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
-import { ChevronLeft, Calendar, Clock, Users, Minus, Plus } from 'lucide-react';
+import { ChevronLeft, Calendar, Clock, Users, Minus, Plus, Repeat2 } from 'lucide-react';
 import {
-  getDraft, setDraft,
+  getDraft, setDraft, getEditShiftId,
   durationLabel, durationHours, fmt12h, fmtDate,
 } from '@/store/postShiftStore';
+import {
+  expandOccurrences, summarizeSeries, weekdayOf, addDays,
+  MAX_SERIES_OCCURRENCES, WEEKDAY_LABELS, WEEKDAY_NAMES, type RepeatRule, type RepeatType,
+} from '@/lib/recurrence';
+import { MultiDatePicker } from '@/components/MultiDatePicker';
 import { BottomTabNav } from '@/components/BottomTabNav';
+
+const REPEAT_OPTIONS: { value: RepeatType; label: string }[] = [
+  { value: 'none',   label: "Doesn't repeat" },
+  { value: 'daily',  label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'custom', label: 'Custom dates' },
+];
 
 // ─── Wizard primitives ────────────────────────────────────────────────────────
 function StepBar({ current, total }: { current: number; total: number }) {
@@ -95,10 +107,41 @@ export function PostShiftStep3Screen() {
   const [startTime, setStartTime] = useState(initial.start_time);
   const [endTime,   setEndTime]   = useState(initial.end_time);
   const [spots,     setSpots]     = useState(initial.spots_available);
+  const [repeat,    setRepeat]    = useState<RepeatRule>(initial.repeat);
   const [errors,    setErrors]    = useState<Record<string, string>>({});
+  // An existing shift is edited on its own; recurrence only applies to new posts.
+  const isEditing = !!getEditShiftId();
 
   const durLabel = durationLabel(startTime, endTime);
   const durHrs   = durationHours(startTime, endTime);
+
+  const occurrences = isEditing ? [date] : expandOccurrences(date, repeat);
+  const isSeries = !isEditing && repeat.type !== 'none';
+
+  function patchRepeat(p: Partial<RepeatRule>) {
+    setRepeat((r) => ({ ...r, ...p }));
+    setErrors((prev) => ({ ...prev, repeat: '' }));
+  }
+
+  function chooseRepeat(type: RepeatType) {
+    patchRepeat({
+      type,
+      // Weekly starts from the chosen date's weekday.
+      weekdays: type === 'weekly' && !repeat.weekdays.length && date ? [weekdayOf(date)] : repeat.weekdays,
+      end_date: repeat.end_date || (date ? addDays(date, type === 'daily' ? 6 : 28) : ''),
+    });
+  }
+
+  function toggleWeekday(d: number) {
+    const has = repeat.weekdays.includes(d);
+    const next = has ? repeat.weekdays.filter((x) => x !== d) : [...repeat.weekdays, d].sort();
+    patchRepeat({ weekdays: next });
+  }
+
+  function toggleCustomDate(d: string) {
+    const has = repeat.custom_dates.includes(d);
+    patchRepeat({ custom_dates: has ? repeat.custom_dates.filter((x) => x !== d) : [...repeat.custom_dates, d].sort() });
+  }
 
   function validate() {
     const e: Record<string, string> = {};
@@ -107,13 +150,22 @@ export function PostShiftStep3Screen() {
     if (!endTime)   e.endTime   = 'Please set an end time';
     if (durHrs < 0.5) e.endTime = 'Shift must be at least 30 minutes';
     if (durHrs > 24)  e.endTime = 'Shift cannot exceed 24 hours';
+    if (isSeries) {
+      if (repeat.type === 'weekly' && !repeat.weekdays.length) e.repeat = 'Pick at least one weekday';
+      if (repeat.ends === 'on' && repeat.type !== 'custom' && (!repeat.end_date || repeat.end_date < date)) e.repeat = 'Pick an end date after the shift date';
+      if (!occurrences.length) e.repeat = 'This repeat rule creates no shifts';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
   function handleContinue() {
     if (!validate()) return;
-    setDraft({ date, start_time: startTime, end_time: endTime, spots_available: spots });
+    setDraft({
+      date, start_time: startTime, end_time: endTime, spots_available: spots,
+      // Custom dates only make sense from the chosen shift date onward.
+      repeat: isEditing ? { ...repeat, type: 'none' } : { ...repeat, custom_dates: repeat.custom_dates.filter((d) => d > date) },
+    });
     navigate('/post-shift/step4');
   }
 
@@ -220,6 +272,112 @@ export function PostShiftStep3Screen() {
           )}
         </div>
 
+        {/* Repeat — new posts only; an edit only ever touches its own shift */}
+        {!isEditing && (
+          <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-6 h-6 rounded-[7px] bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center">
+                <Repeat2 size={13} aria-hidden className="text-[#0A1628]" />
+              </div>
+              <h2 className="text-[#111827] font-bold text-[15px]">Repeat</h2>
+            </div>
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Repeat">
+              {REPEAT_OPTIONS.map((o) => {
+                const on = repeat.type === o.value;
+                return (
+                  <button key={o.value} type="button" role="radio" aria-checked={on}
+                    onClick={() => chooseRepeat(o.value)}
+                    className={`h-9 px-3.5 rounded-full border text-[13px] font-semibold transition-colors ${
+                      on ? 'bg-[#0A1628] border-[#0A1628] text-white' : 'bg-white border-[#E5E7EB] text-[#111827] active:bg-[#F3F4F6]'}`}>
+                    {o.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {repeat.type === 'weekly' && (
+              <div className="mt-4">
+                <FieldLabel>On these days</FieldLabel>
+                <div className="flex gap-1.5" role="group" aria-label="Weekdays">
+                  {WEEKDAY_LABELS.map((l, d) => {
+                    const on = repeat.weekdays.includes(d);
+                    return (
+                      <button key={d} type="button" aria-label={WEEKDAY_NAMES[d]} aria-pressed={on}
+                        onClick={() => toggleWeekday(d)}
+                        className={`flex-1 h-9 rounded-[10px] border text-[13px] font-bold transition-colors ${
+                          on ? 'bg-[#0A1628] border-[#0A1628] text-white' : 'bg-white border-[#E5E7EB] text-[#6B7280]'}`}>
+                        {l}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {(repeat.type === 'daily' || repeat.type === 'weekly') && (
+              <div className="mt-4">
+                <FieldLabel>Ends</FieldLabel>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-3">
+                    <input type="radio" name="ends" checked={repeat.ends === 'after'}
+                      onChange={() => patchRepeat({ ends: 'after' })} aria-label="Ends after a number of shifts"
+                      className="accent-[#0A1628] w-4 h-4" />
+                    <span className="text-[#111827] text-[14px] font-medium flex-1">After</span>
+                    <div className="flex items-center gap-2">
+                      <button type="button" aria-label="Fewer shifts" disabled={repeat.count <= 1}
+                        onClick={() => patchRepeat({ ends: 'after', count: Math.max(1, repeat.count - 1) })}
+                        className="w-8 h-8 rounded-[8px] bg-white border border-[#E5E7EB] flex items-center justify-center disabled:opacity-40">
+                        <Minus size={13} aria-hidden className="text-[#6B7280]" />
+                      </button>
+                      <span className="text-[#0A1628] font-bold text-[15px] w-6 text-center tabular-nums">{repeat.count}</span>
+                      <button type="button" aria-label="More shifts" disabled={repeat.count >= MAX_SERIES_OCCURRENCES}
+                        onClick={() => patchRepeat({ ends: 'after', count: Math.min(MAX_SERIES_OCCURRENCES, repeat.count + 1) })}
+                        className="w-8 h-8 rounded-[8px] bg-white border border-[#E5E7EB] flex items-center justify-center disabled:opacity-40">
+                        <Plus size={13} aria-hidden className="text-[#0A1628]" />
+                      </button>
+                      <span className="text-[#6B7280] text-[13px] w-12">shifts</span>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3">
+                    <input type="radio" name="ends" checked={repeat.ends === 'on'}
+                      onChange={() => patchRepeat({ ends: 'on' })} aria-label="Ends on a date"
+                      className="accent-[#0A1628] w-4 h-4" />
+                    <span className="text-[#111827] text-[14px] font-medium">On</span>
+                    <input type="date" value={repeat.end_date} min={date || today}
+                      onChange={(e) => patchRepeat({ ends: 'on', end_date: e.target.value })}
+                      aria-label="Series end date"
+                      className={INPUT_CLS + ' flex-1 h-[40px]'} />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {repeat.type === 'custom' && (
+              <div className="mt-4">
+                <FieldLabel>Tap the dates to add</FieldLabel>
+                <MultiDatePicker
+                  selected={repeat.custom_dates}
+                  onToggle={toggleCustomDate}
+                  min={date || today}
+                  locked={date ? [date] : []}
+                  max={MAX_SERIES_OCCURRENCES - 1}
+                />
+              </div>
+            )}
+
+            {repeat.type !== 'none' && (
+              <p className="mt-3 text-[#0A1628] text-[13px] font-semibold bg-[#F0F4FF] border border-[#D1D9F0] rounded-[10px] px-3 py-2"
+                aria-live="polite" data-testid="series-summary">
+                {summarizeSeries(occurrences)}
+                {occurrences.length >= MAX_SERIES_OCCURRENCES && (
+                  <span className="block text-[#6B7280] text-[11px] font-medium mt-0.5">A series can have up to {MAX_SERIES_OCCURRENCES} shifts.</span>
+                )}
+              </p>
+            )}
+            {errors.repeat && <p className="text-[#EF4444] text-[11px] mt-1.5">{errors.repeat}</p>}
+          </div>
+        )}
+
         {/* Headcount */}
         <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-4">
           <div className="flex items-center gap-2 mb-3">
@@ -227,6 +385,7 @@ export function PostShiftStep3Screen() {
               <Users size={13} aria-hidden className="text-[#0A1628]" />
             </div>
             <h2 className="text-[#111827] font-bold text-[15px]">Spots Available</h2>
+            {isSeries && <span className="text-[#9CA3AF] text-[11px] font-medium">per shift</span>}
           </div>
           <SpotsStepper
             count={spots}

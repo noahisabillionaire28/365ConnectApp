@@ -5,6 +5,7 @@
  */
 
 import { browserTimeZone, zonedTimeToUtc } from '@/lib/timezone';
+import { emptyRepeat, type RepeatRule } from '@/lib/recurrence';
 
 export type PostShiftDraft = {
   // ── Step 1: Event type ───────────────────────────────────────────────────
@@ -26,6 +27,8 @@ export type PostShiftDraft = {
   start_time:      string; // HH:MM (24-hour)
   end_time:        string; // HH:MM (24-hour)
   spots_available: number;
+  /** Recurrence: "Doesn't repeat" posts one shift; anything else posts a series. */
+  repeat: RepeatRule;
 
   // ── Step 4: Compensation + details ───────────────────────────────────────
   pay_rate:     number;
@@ -33,6 +36,13 @@ export type PostShiftDraft = {
   pay_period:   'hr' | 'day' | 'event';
   description:  string;
   requirements: string[]; // one requirement per line → string[]
+
+  // ── Day-of details (no wizard step yet; carried by templates and re-posts) ─
+  dress_code_items:     string[];
+  point_of_contact:     string;
+  contact_phone:        string;
+  parking_notes:        string;
+  special_instructions: string;
 
   /**
    * The venue's IANA zone. Empty for a new shift (the poster's device zone is
@@ -66,10 +76,16 @@ function empty(): PostShiftDraft {
     start_time:      '18:00',
     end_time:        '23:00',
     spots_available: 1,
+    repeat:          emptyRepeat(),
     pay_rate:        0,
     pay_period:      'hr',
     description:     '',
     requirements:    [],
+    dress_code_items:     [],
+    point_of_contact:     '',
+    contact_phone:        '',
+    parking_notes:        '',
+    special_instructions: '',
     timezone:        '',
     instant_claim:   false,
     visibility:      'public',
@@ -120,7 +136,10 @@ const DRAFT_KEY = '365connect:post-shift-draft';
 function loadPersistedDraft(): PostShiftDraft {
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
-    if (raw) return { ...empty(), ...JSON.parse(raw) };
+    if (raw) {
+      const saved = JSON.parse(raw) as Partial<PostShiftDraft>;
+      return { ...empty(), ...saved, repeat: { ...emptyRepeat(), ...(saved.repeat ?? {}) } };
+    }
   } catch { /* corrupt — start fresh */ }
   return empty();
 }
@@ -129,7 +148,13 @@ let draft: PostShiftDraft = loadPersistedDraft();
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 export function getDraft(): PostShiftDraft {
-  return { ...draft, requirements: [...draft.requirements], job_types: [...draft.job_types] };
+  return {
+    ...draft,
+    requirements: [...draft.requirements],
+    job_types: [...draft.job_types],
+    dress_code_items: [...draft.dress_code_items],
+    repeat: { ...draft.repeat, weekdays: [...draft.repeat.weekdays], custom_dates: [...draft.repeat.custom_dates] },
+  };
 }
 export function setDraft(updates: Partial<PostShiftDraft>): void {
   draft = { ...draft, ...updates };
@@ -138,6 +163,7 @@ export function setDraft(updates: Partial<PostShiftDraft>): void {
 export function resetDraft(): void {
   draft = empty();
   editShiftId = null;
+  editInSeries = false;
   try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
 }
 
@@ -145,8 +171,124 @@ export function resetDraft(): void {
 // Kept separate from draft fields — not a form value, just routing metadata.
 // Set by the client when opening an existing shift for editing; cleared on resetDraft().
 let editShiftId: string | null = null;
+/** The shift being edited belongs to a recurring series (the edit only touches it). */
+let editInSeries = false;
 export function getEditShiftId(): string | null { return editShiftId; }
-export function setEditShiftId(id: string | null): void { editShiftId = id; }
+export function setEditShiftId(id: string | null, opts: { inSeries?: boolean } = {}): void {
+  editShiftId = id;
+  editInSeries = !!id && !!opts.inSeries;
+}
+export function getEditInSeries(): boolean { return editInSeries; }
+
+// ─── Templates ────────────────────────────────────────────────────────────────
+
+/** Everything a template keeps: the draft minus its dates and recurrence. */
+export type TemplatePayload = {
+  title?: string;
+  event_type?: string | null;
+  job_type?: string;
+  job_types?: string[];
+  location?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  unit_info?: string | null;
+  pay_rate?: number;
+  pay_period?: 'hr' | 'day' | 'event';
+  spots_available?: number;
+  dress_code?: string | null;
+  dress_code_items?: string[];
+  requirements?: string[];
+  description?: string | null;
+  point_of_contact?: string | null;
+  contact_phone?: string | null;
+  parking_notes?: string | null;
+  special_instructions?: string | null;
+  visibility?: 'public' | 'roster';
+  instant_claim?: boolean;
+  /** Venue wall-clock HH:MM. */
+  start_time?: string;
+  end_time?: string;
+  timezone?: string;
+};
+
+/** The template a draft would save. */
+export function draftToTemplatePayload(d: PostShiftDraft = draft): TemplatePayload {
+  return {
+    title:            d.title,
+    event_type:       d.event_type || null,
+    job_type:         d.job_type,
+    job_types:        d.job_types.length ? d.job_types : (d.job_type ? [d.job_type] : []),
+    location:         d.location || null,
+    lat:              d.lat,
+    lng:              d.lng,
+    unit_info:        d.unit_info || null,
+    pay_rate:         d.pay_rate,
+    pay_period:       d.pay_period,
+    spots_available:  d.spots_available,
+    dress_code_items: d.dress_code_items,
+    requirements:     d.requirements,
+    description:      d.description || null,
+    point_of_contact: d.point_of_contact || null,
+    contact_phone:    d.contact_phone || null,
+    parking_notes:    d.parking_notes || null,
+    special_instructions: d.special_instructions || null,
+    visibility:       d.visibility,
+    instant_claim:    d.instant_claim,
+    start_time:       d.start_time,
+    end_time:         d.end_time,
+    timezone:         d.timezone || browserTimeZone(),
+  };
+}
+
+const strList = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+
+/**
+ * Start a fresh draft from a template. Dates and recurrence stay empty so the
+ * poster only has to pick when; everything else is filled in.
+ */
+export function loadDraftFromTemplate(p: TemplatePayload): void {
+  const base = empty();
+  const jobTypes = strList(p.job_types);
+  const jobType = p.job_type || jobTypes[0] || '';
+  const payPeriod = p.pay_period === 'day' || p.pay_period === 'event' ? p.pay_period : 'hr';
+  draft = {
+    ...base,
+    title:            p.title ?? '',
+    event_type:       p.event_type ?? '',
+    job_type:         jobType,
+    job_types:        jobTypes.length ? jobTypes : (jobType ? [jobType] : []),
+    location:         p.location ?? '',
+    lat:              typeof p.lat === 'number' && Number.isFinite(p.lat) ? p.lat : base.lat,
+    lng:              typeof p.lng === 'number' && Number.isFinite(p.lng) ? p.lng : base.lng,
+    unit_info:        p.unit_info ?? '',
+    start_time:       p.start_time || base.start_time,
+    end_time:         p.end_time || base.end_time,
+    spots_available:  Math.max(1, Number(p.spots_available) || 1),
+    pay_rate:         Math.max(0, Number(p.pay_rate) || 0),
+    pay_period:       payPeriod,
+    description:      p.description ?? '',
+    requirements:     strList(p.requirements),
+    dress_code_items: strList(p.dress_code_items),
+    point_of_contact: p.point_of_contact ?? '',
+    contact_phone:    p.contact_phone ?? '',
+    parking_notes:    p.parking_notes ?? '',
+    special_instructions: p.special_instructions ?? '',
+    // The venue zone is chosen when the shift is posted, not by the template.
+    timezone:         '',
+    instant_claim:    !!p.instant_claim,
+    visibility:       p.visibility === 'roster' ? 'roster' : 'public',
+  };
+  editShiftId = null;
+  editInSeries = false;
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch { /* ignore */ }
+}
+
+// ─── Last post (for "Save as template" on the success screen) ─────────────────
+// The draft is cleared the moment a post succeeds; the success screen still
+// needs the details to offer saving them as a template.
+let lastPosted: TemplatePayload | null = null;
+export function rememberLastPosted(p: TemplatePayload): void { lastPosted = p; }
+export function getLastPosted(): TemplatePayload | null { return lastPosted; }
 
 // ─── Derived helpers ──────────────────────────────────────────────────────────
 

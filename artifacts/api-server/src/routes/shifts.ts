@@ -10,8 +10,14 @@ import { rosterAllows, assertShiftOwner } from '../lib/shiftAccess.js';
 import { getRoleInfo } from '../lib/roleCache.js';
 import { sendError } from '../lib/httpError.js';
 import { formatShiftInstant, formatShiftWindow, formatUsd } from '../lib/shiftLabel.js';
+import {
+  zonedTimeToUtc, utcToZonedParts, nextCalendarDay, isCalendarDate, formatCalendarDate,
+} from '../lib/shiftTime.js';
 
 const router = Router();
+
+/** A recurring series creates at most this many shifts. */
+export const MAX_SERIES_OCCURRENCES = 12;
 
 /**
  * Day-of details (who to call, where to park, special instructions) are for
@@ -271,8 +277,20 @@ router.get('/:id', requireAuth, async (req, res) => {
     u = user;
   }
 
+  // Where this shift sits in its recurring series ("3 of 5"); a series has at
+  // most 12 shifts, so this is one small query.
+  let series_index: number | null = null;
+  let series_count: number | null = null;
+  if (shift.series_id) {
+    const siblings = await seriesSiblings(shift.series_id);
+    const idx = siblings.findIndex((s) => s.id === id);
+    if (idx >= 0) { series_index = idx + 1; series_count = siblings.length; }
+  }
+
   return res.json({
     ...shift,
+    series_index,
+    series_count,
     company_name: shift.company_name || u?.company_name || u?.bio || (u?.username ? `@${u.username}` : null),
     client_username: u?.username ?? null,
     client_company: u?.company_name ?? null,
@@ -288,17 +306,21 @@ async function posterCompanyName(userId: string): Promise<string | null> {
   return data?.company_name || data?.bio || (data?.username ? `@${data.username}` : null);
 }
 
-/** POST /api/shifts — create shift */
-router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
-  const parsed = shiftFields.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: firstIssue(parsed.error) });
-  const b = parsed.data;
-  const problem = timeProblems(b.start_time, b.end_time, true);
-  if (problem) return res.status(400).json({ error: problem });
+type ShiftFields = z.infer<typeof shiftFields>;
 
+/**
+ * The row a validated create body becomes. Shared by the single-shift create
+ * and the recurring series, so every occurrence is built exactly like a
+ * one-off shift (only the instants and the series link differ).
+ */
+async function createShiftRow(
+  b: ShiftFields,
+  clientId: string,
+  overrides: Partial<{ start_time: string; end_time: string; series_id: string; repeat_type: string; company_name: string | null }> = {},
+) {
   const jobTypes = b.job_types?.length ? b.job_types : [b.job_type];
-  const payload = {
-    client_id: req.userId,
+  return {
+    client_id: clientId,
     title: b.title,
     description: b.description ?? null,
     location: b.location ?? null,
@@ -317,7 +339,7 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
     lng: b.lng ?? null,
     cover_image: b.cover_image ?? null,
     // Never show "Private Client" for a real poster — default to their name.
-    company_name: b.company_name || await posterCompanyName(req.userId!),
+    company_name: b.company_name || await posterCompanyName(clientId),
     requirements: b.requirements ?? [],
     dress_code: b.dress_code ?? null,
     dress_code_items: b.dress_code_items ?? [],
@@ -329,7 +351,19 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
     repeat_type: b.repeat_type ?? 'once',
     instant_claim: b.instant_claim ?? false,
     visibility: b.visibility ?? 'public',
+    ...overrides,
   };
+}
+
+/** POST /api/shifts — create shift */
+router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
+  const parsed = shiftFields.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: firstIssue(parsed.error) });
+  const b = parsed.data;
+  const problem = timeProblems(b.start_time, b.end_time, true);
+  if (problem) return res.status(400).json({ error: problem });
+
+  const payload = await createShiftRow(b, req.userId!);
   const { data, error } = await adminDb
     .from('shifts')
     .insert(payload)
@@ -337,6 +371,160 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
     .single();
   if (error) return res.status(500).json({ error: error.message });
   return res.status(201).json(data);
+});
+
+/**
+ * POST /api/shifts/series — create a recurring series: one shift per local
+ * date in `occurrences`, all with the same details. `start_time`/`end_time`
+ * are the first occurrence's instants exactly as the single-shift create
+ * sends them; their wall-clock times in the shift's zone are re-applied to
+ * every date (an end before the start rolls to the next day, as today).
+ */
+const localDate = z.string().refine(isCalendarDate, 'Dates must be YYYY-MM-DD');
+const seriesRule = z.object({
+  type:     z.enum(['daily', 'weekly', 'custom']),
+  weekdays: z.array(z.number().int().min(0).max(6)).max(7).optional(),
+  ends:     z.enum(['on', 'after']).optional(),
+  end_date: z.string().max(10).optional(),
+  count:    z.number().int().min(1).max(MAX_SERIES_OCCURRENCES).optional(),
+}).optional();
+const seriesSchema = shiftFields.extend({
+  occurrences: z.array(localDate).min(1, 'Pick at least one date').max(MAX_SERIES_OCCURRENCES, `A series can have at most ${MAX_SERIES_OCCURRENCES} shifts`),
+  rule: seriesRule,
+});
+
+router.post('/series', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
+  const parsed = seriesSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: firstIssue(parsed.error) });
+  const b = parsed.data;
+  const tz = b.timezone ?? 'America/New_York';
+
+  // The template pair must itself be a valid shift (length rules).
+  const shape = timeProblems(b.start_time, b.end_time, false);
+  if (shape) return res.status(400).json({ error: shape });
+
+  const startLocal = utcToZonedParts(b.start_time, tz);
+  const endLocal   = utcToZonedParts(b.end_time, tz);
+  if (!startLocal.time || !endLocal.time) return res.status(400).json({ error: 'Invalid date/time' });
+  const overnight = endLocal.time <= startLocal.time;
+
+  const dates = [...new Set(b.occurrences)].sort();
+  if (dates.length > MAX_SERIES_OCCURRENCES) {
+    return res.status(400).json({ error: `A series can have at most ${MAX_SERIES_OCCURRENCES} shifts` });
+  }
+  const windows = dates.map((date) => ({
+    date,
+    start_time: zonedTimeToUtc(date, startLocal.time, tz),
+    end_time:   zonedTimeToUtc(overnight ? nextCalendarDay(date) : date, endLocal.time, tz),
+  }));
+  const bad = windows.filter((w) => timeProblems(w.start_time, w.end_time, true)).map((w) => formatCalendarDate(w.date));
+  if (bad.length) {
+    return res.status(400).json({
+      error: bad.length === 1
+        ? `${bad[0]} has already passed. Remove it or pick a later time.`
+        : `These dates have already passed: ${bad.join(', ')}. Remove them or pick a later time.`,
+    });
+  }
+
+  const { data: series, error: sErr } = await adminDb
+    .from('shift_series')
+    .insert({
+      client_id: req.userId,
+      title: b.title,
+      rule: { ...(b.rule ?? { type: 'custom' }), occurrences: dates },
+      timezone: tz,
+    })
+    .select('id')
+    .single();
+  if (sErr || !series) return res.status(500).json({ error: sErr?.message ?? 'Could not create the series' });
+
+  const companyName = b.company_name || await posterCompanyName(req.userId!);
+  const rows = [];
+  for (const w of windows) {
+    rows.push(await createShiftRow(b, req.userId!, {
+      start_time: w.start_time, end_time: w.end_time, series_id: series.id,
+      repeat_type: b.rule?.type ?? 'custom', company_name: companyName,
+    }));
+  }
+  const { data, error } = await adminDb.from('shifts').insert(rows).select().order('start_time', { ascending: true });
+  if (error) {
+    // Leave no empty series behind.
+    await adminDb.from('shift_series').delete().eq('id', series.id);
+    return res.status(500).json({ error: error.message });
+  }
+  return res.status(201).json({ series_id: series.id, shifts: data ?? [] });
+});
+
+/** The ordered siblings of a series (ids + starts), oldest first. */
+async function seriesSiblings(seriesId: string) {
+  const { data } = await adminDb
+    .from('shifts')
+    .select('id, title, start_time, end_time, timezone, status, spots_available, spots_filled')
+    .eq('series_id', seriesId)
+    .order('start_time', { ascending: true });
+  return data ?? [];
+}
+
+/** GET /api/shifts/series/:id — every shift in a series (owner or admin). */
+router.get('/series/:id', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
+  const id = String(req.params.id);
+  if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Not found' });
+  const { data: series, error } = await adminDb
+    .from('shift_series').select('id, client_id, title, rule, timezone, created_at').eq('id', id).maybeSingle();
+  if (error) return res.status(500).json({ error: error.message });
+  if (!series) return res.status(404).json({ error: 'Not found' });
+  if (series.client_id !== req.userId && !(await getRoleInfo(req.userId!)).isAdmin) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  const shifts = await seriesSiblings(id);
+  return res.json({ ...series, shifts: shifts.map((s, i) => ({ ...s, series_index: i + 1, series_count: shifts.length })) });
+});
+
+/**
+ * POST /api/shifts/:id/cancel-series-future — cancel this shift and every
+ * later shift in its series that has not started. Each one is cancelled the
+ * way a single cancel is (workers told, offers closed, chat line posted).
+ */
+router.post('/:id/cancel-series-future', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
+  const id = String(req.params.id);
+  if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Not found' });
+  try {
+    await assertShiftOwner(id, req.userId!);
+  } catch (e) {
+    return sendError(res, e);
+  }
+  const { data: current, error: curErr } = await adminDb
+    .from('shifts').select('id, series_id, start_time').eq('id', id).maybeSingle();
+  if (curErr) return res.status(500).json({ error: curErr.message });
+  if (!current) return res.status(404).json({ error: 'Not found' });
+  if (!current.series_id) return res.status(400).json({ error: 'This shift is not part of a series' });
+
+  const nowIso = new Date().toISOString();
+  const { data: targets, error: tErr } = await adminDb
+    .from('shifts')
+    .select('id, client_id, title, timezone, start_time, end_time, spots_available, pay_rate, pay_period, location, status')
+    .eq('series_id', current.series_id)
+    .gte('start_time', current.start_time)
+    .gt('start_time', nowIso)
+    .in('status', ['open', 'filled'])
+    .order('start_time', { ascending: true });
+  if (tErr) return res.status(500).json({ error: tErr.message });
+
+  const cancelled: string[] = [];
+  for (const shift of targets ?? []) {
+    const { data: updated } = await adminDb
+      .from('shifts').update({ status: 'cancelled' })
+      .eq('id', shift.id).in('status', ['open', 'filled'])
+      .select('id').maybeSingle();
+    if (!updated) continue;
+    cancelled.push(shift.id);
+    try {
+      await announceCancellation(shift, req.userId!);
+    } catch (e) {
+      console.error('[shifts] series cancel notifications failed:', e);
+    }
+  }
+  return res.json({ cancelled: cancelled.length, ids: cancelled });
 });
 
 /**

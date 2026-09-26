@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { PAYMENTS_QUERY_KEY } from './usePayments';
+import { PAYMENTS_QUERY_KEY, toTimeline, type PayTimeline, type RawPayTimeline } from './usePayments';
 
 export type WorkerAck = 'accepted' | 'disputed' | null;
 
@@ -32,6 +32,10 @@ export type TimeEntryRow = {
   worker_ack?: WorkerAck;
   worker_ack_at?: string | null;
   dispute_note?: string | null;
+  /** Worked → Approved → Paid, from GET /time-entries/:shiftId (absent on clock-in/out responses). */
+  timeline?: RawPayTimeline | null;
+  expected_pay?: number | null;
+  paid?: boolean;
   /** camelCase aliases */
   clockInISO: string;
   breakMinutes: number;
@@ -39,13 +43,15 @@ export type TimeEntryRow = {
   approvedPay: number | null;
   hoursChanged: boolean;
   workerAck: WorkerAck;
+  payTimeline: PayTimeline | null;
+  expectedPay: number | null;
   /** enriched flags added by startOrResume */
   alreadyCompleted?: boolean;
   resumed?: boolean;
 };
 
 type RawEntry = Omit<TimeEntryRow,
-  'clockInISO' | 'breakMinutes' | 'totalPay' | 'approvedPay' | 'hoursChanged' | 'workerAck' | 'alreadyCompleted' | 'resumed'>;
+  'clockInISO' | 'breakMinutes' | 'totalPay' | 'approvedPay' | 'hoursChanged' | 'workerAck' | 'payTimeline' | 'expectedPay' | 'alreadyCompleted' | 'resumed'>;
 
 function toEntry(r: RawEntry, flags?: { alreadyCompleted?: boolean; resumed?: boolean }): TimeEntryRow {
   return {
@@ -56,6 +62,8 @@ function toEntry(r: RawEntry, flags?: { alreadyCompleted?: boolean; resumed?: bo
     approvedPay:     r.approved_pay ?? null,
     hoursChanged:    !!r.hours_changed,
     workerAck:       r.worker_ack ?? null,
+    payTimeline:     toTimeline(r.timeline),
+    expectedPay:     r.expected_pay != null ? Number(r.expected_pay) : null,
     alreadyCompleted: flags?.alreadyCompleted ?? false,
     resumed:          flags?.resumed          ?? false,
   };
