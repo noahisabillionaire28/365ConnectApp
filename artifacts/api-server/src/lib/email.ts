@@ -73,9 +73,32 @@ export async function sendEmail({ to, subject, html, text }: SendEmailInput): Pr
   }
 }
 
+/** Escape text for an HTML body or attribute value. */
+export function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Only http(s) links may become the button; anything else drops the button. */
+function safeHref(href: string | undefined): string | null {
+  if (!href) return null;
+  try {
+    const u = new URL(href);
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Branded wrapper for a simple notification email: a heading, a body line, and
  * an optional call-to-action button. Kept inline-styled for email-client support.
+ * Every piece of copy is escaped: titles and bodies carry user-written text
+ * (shift titles, dispute notes, handles).
  */
 export function renderNotificationEmail(opts: {
   title: string;
@@ -84,16 +107,19 @@ export function renderNotificationEmail(opts: {
   ctaHref?: string;
   preheader?: string;
 }): { html: string; text: string } {
-  const { title, body, ctaLabel, ctaHref, preheader } = opts;
-  const cta = ctaLabel && ctaHref
+  const { ctaLabel, preheader } = opts;
+  const title = escapeHtml(opts.title);
+  const body = escapeHtml(opts.body);
+  const href = safeHref(opts.ctaHref);
+  const cta = ctaLabel && href
     ? `<tr><td style="padding:8px 0 4px;">
-         <a href="${ctaHref}" style="display:inline-block;background:#0A1628;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 22px;border-radius:10px;">${ctaLabel}</a>
+         <a href="${escapeHtml(href)}" style="display:inline-block;background:#0A1628;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 22px;border-radius:10px;">${escapeHtml(ctaLabel)}</a>
        </td></tr>`
     : '';
   const html = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;background:#F3F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-  <span style="display:none;visibility:hidden;opacity:0;height:0;width:0;overflow:hidden;">${preheader ?? body}</span>
+  <span style="display:none;visibility:hidden;opacity:0;height:0;width:0;overflow:hidden;">${preheader != null ? escapeHtml(preheader) : body}</span>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6;padding:24px 0;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:460px;background:#ffffff;border:1px solid #E5E7EB;border-radius:16px;overflow:hidden;">
@@ -115,6 +141,6 @@ export function renderNotificationEmail(opts: {
     </td></tr>
   </table>
 </body></html>`;
-  const text = `${title}\n\n${body}${ctaHref ? `\n\n${ctaLabel}: ${ctaHref}` : ''}\n\n— 365 Connect\nTurn off emails in Settings → Notifications.`;
+  const text = `${opts.title}\n\n${opts.body}${href ? `\n\n${ctaLabel}: ${href}` : ''}\n\n— 365 Connect\nTurn off emails in Settings → Notifications.`;
   return { html, text };
 }

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
+import { blockedIdsFor } from '../lib/chat.js';
 
 const router = Router();
 
@@ -26,11 +27,14 @@ router.get('/', requireAuth, async (req, res) => {
   const me = req.userId!;
   const nowIso = new Date().toISOString();
 
-  // Who to show: everyone I follow + myself.
-  const { data: follows, error: fErr } = await adminDb
-    .from('follows').select('following_id').eq('follower_id', me);
+  // Who to show: everyone I follow + myself, minus anyone blocked either way.
+  const [{ data: follows, error: fErr }, blocked] = await Promise.all([
+    adminDb.from('follows').select('following_id').eq('follower_id', me),
+    blockedIdsFor(me),
+  ]);
   if (fErr) return res.status(500).json({ error: fErr.message });
-  const authorIds = [...new Set([me, ...(follows ?? []).map((f) => f.following_id)])];
+  const authorIds = [...new Set([me, ...(follows ?? []).map((f) => f.following_id)])]
+    .filter((id) => !blocked.has(id));
 
   const { data: stories, error: sErr } = await adminDb
     .from('stories')

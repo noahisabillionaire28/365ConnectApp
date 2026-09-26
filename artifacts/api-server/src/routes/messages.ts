@@ -7,6 +7,7 @@ import {
   enrichMessages, fanOutMessage, isBlockedEitherWay, flushScheduledMessages,
   type ConversationRow, type MessageRow,
 } from '../lib/chat.js';
+import { cronAuthorized } from './cron.js';
 
 const router = Router();
 
@@ -236,15 +237,18 @@ router.delete('/schedule/:id', requireAuth, async (req, res) => {
   return res.json({ ok: true });
 });
 
-/** POST /api/messages/flush-scheduled — cron / manual delivery of due scheduled messages. */
-router.post('/flush-scheduled', async (_req, res) => {
+/**
+ * POST|GET /api/messages/flush-scheduled — the daily Vercel cron delivers any
+ * due scheduled messages (reads also flush opportunistically). Same bearer
+ * check as /cron/tick, and closed when no CRON_SECRET is configured.
+ */
+async function flushScheduledHandler(req: import('express').Request, res: import('express').Response) {
+  if (!cronAuthorized(req.headers['authorization'])) return res.status(401).json({ error: 'Unauthorized' });
   const n = await flushScheduledMessages(100);
   return res.json({ ok: true, sent: n });
-});
-router.get('/flush-scheduled', async (_req, res) => {
-  const n = await flushScheduledMessages(100);
-  return res.json({ ok: true, sent: n });
-});
+}
+router.post('/flush-scheduled', flushScheduledHandler);
+router.get('/flush-scheduled', flushScheduledHandler);
 
 /** PATCH /api/messages/:id — edit the text of one of my messages. */
 router.patch('/:id', requireAuth, async (req, res) => {

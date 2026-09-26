@@ -13,6 +13,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { hydrateForUser, clearUser } from '@/store/feedStore';
 import { clearQueryCache } from '@/lib/queryPersist';
+import { forgetPushSubscription } from '@/lib/pushSession';
 
 export type SimpleUser = {
   id:       string;
@@ -86,7 +87,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     // Don't leak one user's data to the next: the on-device snapshot, the
-    // in-memory query cache and the admin "view as" choice all go.
+    // in-memory query cache, the admin "view as" choice and this device's
+    // push subscription (which would otherwise keep delivering the previous
+    // user's messages to whoever signs in next) all go. Push needs the
+    // session token, so it is released before the session is.
+    const uid = user?.id;
+    if (uid) await forgetPushSubscription(uid);
     clearQueryCache();
     queryClient.clear();
     try { localStorage.removeItem('admin_preview_role'); } catch { /* ignore */ }

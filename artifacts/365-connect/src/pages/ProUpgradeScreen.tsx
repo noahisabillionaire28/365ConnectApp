@@ -161,20 +161,11 @@ export function ProUpgradeScreen() {
     setError(null);
 
     try {
-      // 1. Write simulated subscription payment row
-      await apiClient(user.id).post('/payments', {
-        shift_id:     null,
-        payment_type: 'pro_subscription',
-        amount:       17.00,
-        fee:          0,
-        net_amount:   17.00,
-        status:       'simulated',
-      });
+      // 1. Record the (simulated) subscription; the server grants Pro against
+      //    it. Profiles cannot set is_pro themselves.
+      await apiClient(user.id).post('/payments', { payment_type: 'pro_subscription' });
 
-      // 2. Set is_pro = true on the user's profile
-      await apiClient(user.id).patch('/users/me', { is_pro: true });
-
-      // 3. Invalidate profile and payments queries so UI refreshes
+      // 2. Invalidate profile and payments queries so UI refreshes
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['profile', user.id] }),
         queryClient.invalidateQueries({ queryKey: [...PAYMENTS_QUERY_KEY] }),

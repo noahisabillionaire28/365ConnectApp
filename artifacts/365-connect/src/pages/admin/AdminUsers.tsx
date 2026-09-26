@@ -10,7 +10,10 @@ import { useAdminUsers, useUpdateUser, useDeleteUser } from '@/hooks/useAdminDat
 import type { AdminUserRow } from '@/lib/adminApi';
 
 /* ── Shared types ────────────────────────────────────────────────────────── */
-type FilterOpt = 'all' | 'worker' | 'client' | 'admin' | 'staffer' | 'active' | 'suspended' | 'flagged';
+type FilterOpt = 'all' | 'worker' | 'client' | 'admin' | 'staffer' | 'active' | 'suspended' | 'flagged' | 'banned';
+
+/** Suspended and banned accounts are both locked out; both can be restored. */
+const isLockedStatus = (status: string | null | undefined) => status === 'suspended' || status === 'banned';
 
 /* ── Badges ──────────────────────────────────────────────────────────────── */
 const ROLE_CLS: Record<string, string> = {
@@ -23,6 +26,7 @@ const ROLE_CLS: Record<string, string> = {
 const STATUS_CLS: Record<string, string> = {
   active:    'bg-emerald-50  border-emerald-200 text-emerald-600',
   suspended: 'bg-red-50      border-red-200    text-red-600',
+  banned:    'bg-red-100     border-red-300    text-red-700',
   flagged:   'bg-amber-50    border-amber-200  text-amber-600',
 };
 
@@ -35,7 +39,7 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const label = status === 'suspended' ? 'Suspended' : status === 'flagged' ? 'Flagged ⚠' : 'Active';
+  const label = status === 'suspended' ? 'Suspended' : status === 'banned' ? 'Banned' : status === 'flagged' ? 'Flagged ⚠' : 'Active';
   return (
     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_CLS[status] ?? STATUS_CLS.active}`}>
       {label}
@@ -108,7 +112,7 @@ function UserDetailSheet({
     finally { setBusy(false); setConfirmOp(null); }
   }
 
-  const isBanned  = user.status === 'suspended';
+  const isBanned  = isLockedStatus(user.status);
   const isFlagged = user.status === 'flagged';
   const joinDate  = new Date(user.created_at).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
@@ -300,7 +304,7 @@ function UserListRow({ user, onOpen }: { user: AdminUserRow; onOpen: (u: AdminUs
             </span>
           </div>
         )}
-        {user.status === 'suspended' && (
+        {isLockedStatus(user.status) && (
           <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full border border-white flex items-center justify-center">
             <Ban size={8} aria-hidden className="text-white" />
           </div>
@@ -349,6 +353,7 @@ const FILTERS: { key: FilterOpt; label: string }[] = [
   { key: 'active',    label: 'Active'    },
   { key: 'flagged',   label: 'Flagged'   },
   { key: 'suspended', label: 'Suspended' },
+  { key: 'banned',    label: 'Banned'    },
 ];
 
 /* ── AdminUsers ──────────────────────────────────────────────────────────── */

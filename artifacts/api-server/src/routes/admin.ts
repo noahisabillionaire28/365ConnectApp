@@ -84,10 +84,12 @@ router.get('/users', async (_req, res) => {
   try {
     const { data, error } = await adminDb
       .from('users')
-      .select('id, email, role, username, photo_url, is_pro, rating, status, created_at')
+      .select('id, email, role, username, photo_url, is_pro, rating, status, is_banned, created_at')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    res.json(data ?? []);
+    // A ban set through a dispute stores is_banned=true; surface it as the
+    // status so the panel never shows a banned account as "Active".
+    res.json((data ?? []).map((u) => ({ ...u, status: u.is_banned ? 'banned' : (u.status ?? 'active') })));
   } catch (err) {
     console.error('[admin/users]', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -99,12 +101,21 @@ router.patch('/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const allowed = ['role', 'is_pro', 'status'] as const;
+    const STATUSES = new Set(['active', 'suspended', 'flagged', 'banned']);
     const body = req.body as Record<string, unknown>;
     const updates: Record<string, unknown> = {};
     for (const k of allowed) {
       if (k in body) updates[k] = body[k];
     }
     if (!Object.keys(updates).length) { res.status(400).json({ error: 'No valid fields' }); return; }
+    if ('status' in updates) {
+      if (typeof updates.status !== 'string' || !STATUSES.has(updates.status)) {
+        res.status(400).json({ error: 'status must be active, suspended, flagged or banned' });
+        return;
+      }
+      // Keep the legacy flag in step so a restore really restores access.
+      updates.is_banned = updates.status === 'banned';
+    }
     const { error } = await adminDb.from('users').update(updates).eq('id', id);
     if (error) throw error;
     invalidateRole(String(id));

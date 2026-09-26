@@ -16,6 +16,7 @@ import { ChevronLeft, AlertCircle, CreditCard, Lock, CheckCircle2, Camera } from
 import { uploadAvatar } from '@/lib/storage';
 import { apiClient } from '@/lib/api';
 import { posterSetupDone } from '@/lib/setupRoute';
+import { saveHandleWithRetry } from '@/lib/username';
 import { useAuth }  from '@/contexts/AuthContext';
 import { ImageCropper } from '@/components/ImageCropper';
 
@@ -346,8 +347,10 @@ export function ClientSetupScreen() {
     if (!user) return;
     setSaving(true); setError(null);
     try {
+      // Handles are unique regardless of case: if "acme_events" is taken the
+      // server says so and a suffixed variant is tried.
       const autoUsername = slugify(fullName || user.email?.split('@')[0] || 'client');
-      await apiClient(user.id).patch('/users/me', { username: autoUsername });
+      await saveHandleWithRetry(autoUsername, (handle) => apiClient(user.id).patch('/users/me', { username: handle }));
       await apiClient(user.id).patch('/users/me', { billing_ref: ref }).catch(() => {});
       localStorage.removeItem(stepKey(user.id));
       setCardDone(true);

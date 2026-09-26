@@ -21,6 +21,7 @@ import { uploadAvatar, uploadPostPhoto } from '@/lib/storage';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { JOB_TYPES } from '@/lib/jobTypes';
+import { isAutoHandle } from '@/lib/username';
 import { ImageCropper } from '@/components/ImageCropper';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
@@ -177,13 +178,16 @@ export function WorkerSetupScreen() {
         if (isEdit) { setStep(1); setInitialized(true); return; }
 
         // Infer resume step: take the highest step we can confirm from DB,
-        // then also check localStorage in case this session progressed further
+        // then also check localStorage in case this session progressed further.
+        // The placeholder handle from role select and the empty arrays the
+        // row is created with do not count as "done" — a brand-new worker
+        // must start at step 1, not be dropped at step 7.
         let inferred = 1;
-        if (data.username)             inferred = Math.max(inferred, 2);
+        if (data.username && !isAutoHandle(data.username, user.email)) inferred = Math.max(inferred, 2);
         if (data.photo_url)            inferred = Math.max(inferred, 3);
         if (data.primary_job_type)     inferred = Math.max(inferred, 5);
-        if (data.secondary_job_types != null) inferred = Math.max(inferred, 6);
-        if (data.certifications != null)      inferred = Math.max(inferred, 7);
+        if ((data.secondary_job_types?.length ?? 0) > 0) inferred = Math.max(inferred, 6);
+        if ((data.certifications?.length ?? 0) > 0)      inferred = Math.max(inferred, 7);
         if (data.availability)         inferred = Math.max(inferred, 8);
 
         const stored = loadStep(user.id);

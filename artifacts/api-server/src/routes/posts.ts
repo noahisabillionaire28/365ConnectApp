@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
+import { blockedIdsFor, isBlockedEitherWay } from '../lib/chat.js';
+import { getRoleInfo } from '../lib/roleCache.js';
 
 const router = Router();
 
@@ -11,11 +13,18 @@ async function handleFor(id: string): Promise<string> {
   return data?.username ? `@${data.username}` : 'Someone';
 }
 
-/** Enrich raw post rows with author + like/comment counts + liked-by-viewer. */
+/**
+ * Enrich raw post rows with author + like/comment counts + liked-by-viewer.
+ * Posts by anyone the viewer has blocked (or who blocked them) are dropped,
+ * so a block holds across the feed, hashtags, profiles and post pages.
+ */
 async function enrichPosts(
-  rows: Array<Record<string, unknown>>,
+  rawRows: Array<Record<string, unknown>>,
   viewerId: string | undefined,
 ): Promise<Array<Record<string, unknown>>> {
+  if (!rawRows.length) return [];
+  const blocked = viewerId ? await blockedIdsFor(viewerId) : new Set<string>();
+  const rows = rawRows.filter((r) => !blocked.has(r.user_id as string));
   if (!rows.length) return [];
   const ids = rows.map((r) => r.id as string);
   const authorIds = [...new Set(rows.map((r) => r.user_id as string))];
@@ -89,6 +98,8 @@ router.get('/detail/:postId', requireAuth, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(404).json({ error: 'Post not found' });
   const [enriched] = await enrichPosts([data], req.userId);
+  // A blocked author's post reads as gone, not as "forbidden".
+  if (!enriched) return res.status(404).json({ error: 'Post not found' });
   return res.json(enriched);
 });
 
@@ -98,6 +109,9 @@ router.post('/:postId/like', requireAuth, async (req, res) => {
   const { data: post } = await adminDb
     .from('posts').select('user_id').eq('id', postId).maybeSingle();
   if (!post) return res.status(404).json({ error: 'Post not found' });
+  if (post.user_id !== req.userId && await isBlockedEitherWay(req.userId!, post.user_id)) {
+    return res.status(404).json({ error: 'Post not found' });
+  }
 
   const { data: existing } = await adminDb
     .from('post_likes').select('id').eq('post_id', postId).eq('user_id', req.userId).maybeSingle();
@@ -122,18 +136,20 @@ router.post('/:postId/like', requireAuth, async (req, res) => {
   return res.json({ liked, like_count: count ?? 0 });
 });
 
-/* ── GET /api/posts/:postId/comments — list comments ───────────────────────── */
-router.get('/:postId/comments', async (req, res) => {
-  const { data: rows, error } = await adminDb
+/* ── GET /api/posts/:postId/comments — list comments (signed-in only) ──────── */
+router.get('/:postId/comments', requireAuth, async (req, res) => {
+  const { data: all, error } = await adminDb
     .from('post_comments').select('*').eq('post_id', req.params.postId)
     .order('created_at', { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
-  const authorIds = [...new Set((rows ?? []).map((c) => c.user_id))];
+  const blocked = await blockedIdsFor(req.userId!);
+  const rows = (all ?? []).filter((c) => !blocked.has(c.user_id));
+  const authorIds = [...new Set(rows.map((c) => c.user_id))];
   const { data: users } = authorIds.length
     ? await adminDb.from('users').select('id, username, photo_url').in('id', authorIds as string[])
     : { data: [] as Array<Record<string, unknown>> };
   const userMap = new Map((users ?? []).map((u) => [u.id, u]));
-  return res.json((rows ?? []).map((c) => ({
+  return res.json(rows.map((c) => ({
     ...c,
     author_username: userMap.get(c.user_id)?.username ?? null,
     author_photo_url: userMap.get(c.user_id)?.photo_url ?? null,
@@ -150,6 +166,9 @@ router.post('/:postId/comments', requireAuth, async (req, res) => {
   const { data: post } = await adminDb
     .from('posts').select('user_id').eq('id', postId).maybeSingle();
   if (!post) return res.status(404).json({ error: 'Post not found' });
+  if (post.user_id !== req.userId && await isBlockedEitherWay(req.userId!, post.user_id)) {
+    return res.status(404).json({ error: 'Post not found' });
+  }
 
   const { data, error } = await adminDb
     .from('post_comments').insert({ post_id: postId, user_id: req.userId, body })
@@ -182,10 +201,8 @@ router.delete('/comments/:commentId', requireAuth, async (req, res) => {
     const { data: post } = await adminDb.from('posts').select('user_id').eq('id', c.post_id).maybeSingle();
     if (post?.user_id === req.userId) allowed = true;
   }
-  if (!allowed) {
-    const { data: me } = await adminDb.from('users').select('role').eq('id', req.userId).maybeSingle();
-    if (me?.role === 'admin') allowed = true;
-  }
+  // Admin is a capability (role 'admin' OR the is_admin flag), as everywhere else.
+  if (!allowed) allowed = (await getRoleInfo(req.userId!)).isAdmin;
   if (!allowed) return res.status(403).json({ error: 'Forbidden' });
   const { error } = await adminDb.from('post_comments').delete().eq('id', c.id);
   if (error) return res.status(500).json({ error: error.message });
@@ -198,10 +215,7 @@ router.delete('/:postId', requireAuth, async (req, res) => {
     .from('posts').select('user_id').eq('id', req.params.postId).maybeSingle();
   if (!post) return res.status(404).json({ error: 'Not found' });
   let allowed = post.user_id === req.userId;
-  if (!allowed) {
-    const { data: me } = await adminDb.from('users').select('role').eq('id', req.userId).maybeSingle();
-    allowed = me?.role === 'admin';
-  }
+  if (!allowed) allowed = (await getRoleInfo(req.userId!)).isAdmin;
   if (!allowed) return res.status(403).json({ error: 'Forbidden' });
   const { error } = await adminDb.from('posts').delete().eq('id', req.params.postId);
   if (error) return res.status(500).json({ error: error.message });
@@ -209,7 +223,7 @@ router.delete('/:postId', requireAuth, async (req, res) => {
 });
 
 /* ── GET /api/posts/:userId — posts by a user (keep LAST: greedy match) ─────── */
-router.get('/:userId', async (req, res) => {
+router.get('/:userId', requireAuth, async (req, res) => {
   const { data, error } = await adminDb
     .from('posts')
     .select('*')

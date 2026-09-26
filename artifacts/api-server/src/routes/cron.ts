@@ -6,9 +6,12 @@
  * the notifications table, and sweeps are conditional updates. So it is safe
  * to call as often as you like.
  *
- * Auth: when CRON_SECRET is set, callers must send `Authorization: Bearer
- * <secret>` (Vercel cron does this automatically). Without it the route is
- * open — the work is harmless and would happen anyway on the next tick.
+ * Auth: callers must send `Authorization: Bearer <CRON_SECRET>` (Vercel cron
+ * does this automatically; the pg_cron job carries the same token). With no
+ * CRON_SECRET configured the route is closed, never open — every tick sends
+ * emails and pushes, so an unauthenticated caller must not be able to run it.
+ * The windows below are wider than the 15-minute cadence so a late or missed
+ * tick still catches everything; dedupe makes the overlap harmless.
  */
 import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
@@ -19,9 +22,13 @@ import { expireSwaps } from '../lib/swaps.js';
 
 const router = Router();
 
-function authorized(authHeader: unknown): boolean {
+/** Shared by every scheduled route: bearer must match CRON_SECRET; fail closed. */
+export function cronAuthorized(authHeader: unknown): boolean {
   const secret = process.env['CRON_SECRET'];
-  if (!secret) return true;
+  if (!secret) {
+    logger.warn('CRON_SECRET is not set — scheduled routes are disabled');
+    return false;
+  }
   return typeof authHeader === 'string' && authHeader === `Bearer ${secret}`;
 }
 
@@ -192,15 +199,15 @@ function matchSavedSearch(
 }
 
 /**
- * New open shifts (posted in the last 20 minutes) matched against every
- * worker's saved searches. Roster-only shifts count too, but only for the
- * workers on that poster's roster. One notification per worker per tick,
- * never to the poster or to someone who already applied, deduped per
- * (worker, shift) via the notifications table so overlapping windows never
- * double-send.
+ * New open shifts (posted in the last 30 minutes — two ticks, so a late one
+ * misses nothing) matched against every worker's saved searches. Roster-only
+ * shifts count too, but only for the workers on that poster's roster. One
+ * notification per worker per tick, never to the poster or to someone who
+ * already applied, deduped per (worker, shift) via the notifications table so
+ * overlapping windows never double-send.
  */
 async function alertSavedSearches(): Promise<number> {
-  const since = new Date(Date.now() - 20 * 60_000).toISOString();
+  const since = new Date(Date.now() - 30 * 60_000).toISOString();
   const { data: shifts } = await adminDb
     .from('shifts')
     .select('id, client_id, title, job_type, job_types, event_type, company_name, pay_rate, pay_period, start_time, timezone, lat, lng, visibility')
@@ -375,8 +382,9 @@ async function tick() {
   const now = Date.now();
   const H = 3600_000;
   const [startingSoon, tomorrow, unfilled, completed, savedSearch, expiredSwaps] = await Promise.all([
-    // "Starts in about 2 hours" — 15-minute pg_cron cadence keeps this tight.
-    remindWorkers(now + 1.75 * H, now + 2.25 * H, 'shift_starting_soon', (s) => reminderBody(s, '(in 2h)')),
+    // "Starts in about 2 hours" — ±20 min around the 2h mark, so one late or
+    // skipped tick still sends it (dedupe stops a second copy).
+    remindWorkers(now + (2 * 60 - 20) * 60_000, now + (2 * 60 + 20) * 60_000, 'shift_starting_soon', (s) => reminderBody(s, '(in 2h)')),
     // Day-before reminder — anything starting in the next 20–28 hours.
     remindWorkers(now + 20 * H, now + 28 * H, 'shift_reminder_day', (s) => reminderBody(s, '(tomorrow)')),
     nudgeUnfilled(),
@@ -385,14 +393,15 @@ async function tick() {
     // A swap still in flight when its shift starts is void.
     expireSwaps(),
   ]);
-  // After the sweep so a just-ended shift is already 'completed'.
-  const ratePrompts = await promptRatings(1, 3, { worker: 'rate_client', poster: 'rate_crew' });
-  const rateReminders = await promptRatings(25, 27, { worker: 'rate_client_reminder', poster: 'rate_crew_reminder' });
+  // After the sweep so a just-ended shift is already 'completed'. Wide windows
+  // (1–4h, 25–28h) tolerate a late tick; each prompt type is sent once.
+  const ratePrompts = await promptRatings(1, 4, { worker: 'rate_client', poster: 'rate_crew' });
+  const rateReminders = await promptRatings(25, 28, { worker: 'rate_client_reminder', poster: 'rate_crew_reminder' });
   return { startingSoon, tomorrow, unfilled, completed, savedSearch, expiredSwaps, ratePrompts, rateReminders };
 }
 
 async function handle(req: import('express').Request, res: import('express').Response) {
-  if (!authorized(req.headers['authorization'])) return res.status(401).json({ error: 'Unauthorized' });
+  if (!cronAuthorized(req.headers['authorization'])) return res.status(401).json({ error: 'Unauthorized' });
   try {
     const result = await tick();
     logger.info(result, 'cron tick');

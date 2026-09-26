@@ -114,8 +114,8 @@ router.get('/pending', requireAuth, async (req, res) => {
   }
 });
 
-/** GET /api/reviews/:userId — reviews for a user */
-router.get('/:userId', async (req, res) => {
+/** GET /api/reviews/:userId — reviews for a user (signed-in only) */
+router.get('/:userId', requireAuth, async (req, res) => {
   let viewerRole: string | null = null;
   if (req.userId) {
     const { data: viewer } = await adminDb

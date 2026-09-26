@@ -52,30 +52,48 @@ export function SignUpScreen() {
   const [googleError, setGoogleError] = useState<string | null>(null);
   const [appleError,  setAppleError]  = useState<string | null>(null);
 
+  /** A session in hand: make sure the profile row exists, then on to role select. */
+  async function finishWithSession(userId: string) {
+    // Do NOT send a role here — the user picks it on the next screen, and
+    // sending 'worker' would pre-set/reset their role. The email is taken
+    // from the verified auth account server-side.
+    await apiClient(userId).post('/users', { id: userId }).catch(() => {}); // ignore if already exists
+    setSignupState('done');
+    setTimeout(() => navigate('/role-select'), 600);
+  }
+
   async function handleSignUp() {
-    if (!email.trim()) { setError('Enter your email address.'); return; }
+    const address = email.trim().toLowerCase();
+    if (!address) { setError('Enter your email address.'); return; }
     if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
     setLoading(true); setError(null);
     try {
-      // Create an already-confirmed account server-side (no email round-trip),
-      // then sign in normally to obtain a session.
-      await apiClient(null).post('/auth/register', { email: email.trim(), password });
+      // The server either creates an already-confirmed account (today's
+      // default) or, when email confirmation is turned on, tells us to run
+      // Supabase's own sign-up so it sends the confirmation email.
+      const reg = await apiClient(null).post<{ ok: boolean; confirm?: boolean }>('/auth/register', { email: address, password });
+
+      if (reg.confirm) {
+        const { data, error: signUpErr } = await supabase.auth.signUp({ email: address, password });
+        if (signUpErr) throw signUpErr;
+        if (data.session) { await finishWithSession(data.session.user.id); return; }
+        setSignupState('confirm');
+        return;
+      }
 
       const { data, error: signInErr } =
-        await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (signInErr) throw signInErr;
-
-      if (data.session) {
-        // Ensure the row exists; do NOT send a role here — the user picks it on
-        // the next screen, and sending 'worker' would pre-set/reset their role.
-        await apiClient(data.session.user.id).post('/users', {
-          id: data.session.user.id, email: email.trim(),
-        }).catch(() => {}); // ignore if already exists
-        setSignupState('done');
-        setTimeout(() => navigate('/role-select'), 600);
-      } else {
-        setSignupState('confirm');
+        await supabase.auth.signInWithPassword({ email: address, password });
+      if (signInErr) {
+        // Register answers the same for new and existing addresses; a
+        // sign-in that fails right after it means the address is already
+        // registered with a different password.
+        if (/invalid login credentials/i.test(signInErr.message)) {
+          throw new Error('An account with this email already exists. Log in instead, or use "Forgot password" on the login screen.');
+        }
+        throw signInErr;
       }
+      if (data.session) await finishWithSession(data.session.user.id);
+      else setSignupState('confirm');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed. Please try again.');
     } finally {

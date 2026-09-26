@@ -2,8 +2,29 @@ import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { invalidateRole, getRoleInfo } from '../lib/roleCache.js';
 import { requireAuth, requireSession } from '../middleware/auth.js';
+import { HttpError, sendError } from '../lib/httpError.js';
+import { normalizeUsername, isUniqueViolation, HANDLE_TAKEN } from '../lib/username.js';
+import { isBlockedEitherWay } from '../lib/chat.js';
 
 const router = Router();
+
+/** The verified email on the Supabase auth account (never taken from the body). */
+async function authEmail(userId: string): Promise<string | null> {
+  try {
+    const { data } = await adminDb.auth.admin.getUserById(userId);
+    return data.user?.email ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** A profile someone has blocked (either way) is not available to them. */
+async function assertNotBlocked(viewerId: string, profileId: string): Promise<void> {
+  if (viewerId === profileId) return;
+  if (await isBlockedEitherWay(viewerId, profileId)) {
+    throw new HttpError(403, "This profile isn't available.");
+  }
+}
 
 // Note: notification preferences, email and moderation status are private and
 // read via GET /me (select *), so they are intentionally NOT part of the
@@ -52,11 +73,13 @@ router.post('/', requireAuth, async (req, res) => {
       : undefined;
 
   // Build the payload with only provided fields so an upsert never nulls out
-  // existing values on conflict.
+  // existing values on conflict. Email, Pro status and moderation status are
+  // never taken from the body: email comes from the auth account, is_pro from
+  // a recorded subscription, status from an admin.
   const optional = [
-    'email', 'username', 'photo_url', 'bio', 'job_types', 'certifications',
+    'username', 'photo_url', 'bio', 'job_types', 'certifications',
     'primary_job_type', 'secondary_job_types', 'availability',
-    'lat', 'lng', 'is_pro', 'company_name', 'status', 'hourly_rate',
+    'lat', 'lng', 'company_name', 'hourly_rate',
   ];
   const payload: Record<string, unknown> = { id: req.userId };
   for (const f of optional) {
@@ -64,11 +87,18 @@ router.post('/', requireAuth, async (req, res) => {
   }
 
   const { data: existing } = await adminDb
-    .from('users').select('role, username').eq('id', req.userId).maybeSingle();
+    .from('users').select('role, username, email').eq('id', req.userId).maybeSingle();
 
   // An auto-generated username (sent at role select) must never replace one
   // the user chose during setup.
   if (payload.username !== undefined && existing?.username) delete payload.username;
+  if (payload.username !== undefined) {
+    try { payload.username = normalizeUsername(payload.username); } catch (e) { return sendError(res, e); }
+  }
+  if (!existing?.email) {
+    const email = await authEmail(req.userId!);
+    if (email) payload.email = email;
+  }
 
   if (safeRole) {
     // Guard: a self-assigned 'worker' must never DOWNGRADE an already-chosen
@@ -87,17 +117,22 @@ router.post('/', requireAuth, async (req, res) => {
     .upsert(payload, { onConflict: 'id' })
     .select()
     .single();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    if (isUniqueViolation(error)) return res.status(409).json({ error: HANDLE_TAKEN });
+    return res.status(500).json({ error: error.message });
+  }
   if (payload.role !== undefined) invalidateRole(req.userId!);
   return res.json(data);
 });
 
 /** PATCH /api/users/me — partial update of current user */
 router.patch('/me', requireAuth, async (req, res) => {
+  // email (verified by auth), is_pro (subscription) and status (admin) are
+  // deliberately not here.
   const allowed = [
-    'email', 'username', 'photo_url', 'bio', 'job_types', 'certifications',
+    'username', 'photo_url', 'bio', 'job_types', 'certifications',
     'primary_job_type', 'secondary_job_types', 'availability',
-    'lat', 'lng', 'company_name', 'is_pro', 'is_available',
+    'lat', 'lng', 'company_name', 'is_available',
     'in_app_notifications', 'email_notifications', 'hourly_rate',
     'quick_replies',
   ];
@@ -107,6 +142,9 @@ router.patch('/me', requireAuth, async (req, res) => {
     if (key in body) updates[key] = body[key];
   }
   if (!Object.keys(updates).length) return res.status(400).json({ error: 'No valid fields' });
+  if ('username' in updates) {
+    try { updates.username = normalizeUsername(updates.username); } catch (e) { return sendError(res, e); }
+  }
 
   const { data, error } = await adminDb
     .from('users')
@@ -114,7 +152,10 @@ router.patch('/me', requireAuth, async (req, res) => {
     .eq('id', req.userId)
     .select()
     .maybeSingle();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    if (isUniqueViolation(error)) return res.status(409).json({ error: HANDLE_TAKEN });
+    return res.status(500).json({ error: error.message });
+  }
   if (!data) return res.status(404).json({ error: 'User not found' });
   return res.json(data);
 });
@@ -135,10 +176,15 @@ router.get('/by-username/:username', requireAuth, async (req, res) => {
   const { data, error } = await adminDb
     .from('users')
     .select(PUBLIC_COLS)
-    .eq('username', req.params.username)
+    .eq('username', String(req.params.username).trim().toLowerCase())
     .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(404).json({ error: 'Not found' });
+  try {
+    await assertNotBlocked(req.userId!, (data as unknown as { id: string }).id);
+  } catch (e) {
+    return sendError(res, e);
+  }
   return res.json(await publicView(data as unknown as Record<string, unknown>, req.userId));
 });
 
@@ -151,6 +197,11 @@ router.get('/:id', requireAuth, async (req, res) => {
     .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(404).json({ error: 'Not found' });
+  try {
+    await assertNotBlocked(req.userId!, (data as unknown as { id: string }).id);
+  } catch (e) {
+    return sendError(res, e);
+  }
   return res.json(await publicView(data as unknown as Record<string, unknown>, req.userId));
 });
 

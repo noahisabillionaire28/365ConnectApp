@@ -25,9 +25,12 @@ export async function uploadFile(
   // Shrink large photos before upload (best-effort; non-images pass through).
   const payload = await compressImage(file);
 
+  // The server (and the bucket) only accept photos, MP4/MOV video, audio and
+  // PDFs up to 25 MB; sending the type and size up front turns a rejected
+  // upload into a clear message instead of a failed transfer.
   const sig = await apiClient(userId).post<{
     bucket: string; path: string; token: string; publicUrl: string;
-  }>('/storage/sign-upload', { name });
+  }>('/storage/sign-upload', { name, contentType: payload.type || file.type || 'application/octet-stream', size: payload.size });
 
   const { error } = await supabase.storage
     .from(sig.bucket)

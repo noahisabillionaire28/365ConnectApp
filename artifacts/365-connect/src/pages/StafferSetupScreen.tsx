@@ -16,6 +16,7 @@ import { ChevronLeft, Camera, AlertCircle, CreditCard, Lock, CheckCircle2 } from
 import { uploadAvatar } from '@/lib/storage';
 import { apiClient } from '@/lib/api';
 import { posterSetupDone } from '@/lib/setupRoute';
+import { saveHandleWithRetry } from '@/lib/username';
 import { useAuth }  from '@/contexts/AuthContext';
 import { ImageCropper } from '@/components/ImageCropper';
 
@@ -299,8 +300,10 @@ export function StafferSetupScreen() {
     if (!user) return;
     setSaving(true); setError(null);
     try {
+      // Handles are unique regardless of case: if the agency's slug is taken
+      // the server says so and a suffixed variant is tried.
       const autoUsername = slugify(agencyName || user.email?.split('@')[0] || 'agency');
-      await apiClient(user.id).patch('/users/me', { username: autoUsername });
+      await saveHandleWithRetry(autoUsername, (handle) => apiClient(user.id).patch('/users/me', { username: handle }));
       // Try storing the simulated billing ref (non-fatal)
       await apiClient(user.id).patch('/users/me', { billing_ref: ref }).catch(() => {});
       localStorage.removeItem(stepKey(user.id));
