@@ -75,6 +75,65 @@ export async function cancelActiveSwapsFor(shiftId: string, workerId: string): P
 }
 
 /**
+ * Has this worker clocked in to the shift? Clock-in opens an hour before the
+ * start, so "not started yet" is not enough to allow a swap or a call-out:
+ * once there is a time entry the worker is on site and the roster is fixed.
+ */
+export async function hasClockedIn(shiftId: string, workerId: string): Promise<boolean> {
+  const { count } = await adminDb
+    .from('time_entries')
+    .select('*', { count: 'exact', head: true })
+    .eq('shift_id', shiftId)
+    .eq('worker_id', workerId)
+    .not('clock_in', 'is', null);
+  return (count ?? 0) > 0;
+}
+
+export const MSG_CLOCKED_IN = "You've already clocked in to this shift, so it can't be handed off now. Message the poster if something is wrong.";
+
+/**
+ * The shift was cancelled: every swap still in flight on it is void. Both
+ * workers of an accepted swap are told (an untouched offer just disappears
+ * with the shift, which they are told about separately). Best-effort.
+ */
+export async function voidSwapsForCancelledShift(shiftId: string, actorId: string | null): Promise<void> {
+  try {
+    const { data: active } = await adminDb
+      .from('shift_swaps')
+      .select('id, from_worker_id, to_worker_id, status')
+      .eq('shift_id', shiftId)
+      .in('status', [...ACTIVE_SWAP_STATUSES]);
+    if (!active?.length) return;
+    const now = new Date().toISOString();
+    await adminDb
+      .from('shift_swaps')
+      .update({ status: 'cancelled', decided_at: now })
+      .in('id', active.map((s) => s.id));
+
+    const accepted = active.filter((s) => s.status === 'accepted');
+    if (!accepted.length) return;
+    const { data: shift } = await adminDb
+      .from('shifts').select('title, start_time, timezone').eq('id', shiftId).maybeSingle();
+    const label = shiftDayLabel(shift ?? {});
+    for (const s of accepted) {
+      for (const userId of [s.from_worker_id, s.to_worker_id]) {
+        await createNotification({
+          userId,
+          fromUserId: actorId,
+          type: 'swap_declined',
+          title: 'Swap cancelled',
+          body: `${label} was cancelled by the organizer, so the swap between you was cancelled too.`,
+          shiftId,
+          url: `/shift/${shiftId}`,
+        });
+      }
+    }
+  } catch (e) {
+    console.error('[swaps] voidSwapsForCancelledShift failed:', e);
+  }
+}
+
+/**
  * Cron: any swap still in flight once its shift has started (or was
  * cancelled) becomes 'expired'. No notification — the shift page already
  * shows the shift as started. Returns how many were expired.

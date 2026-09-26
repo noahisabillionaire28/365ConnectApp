@@ -8,6 +8,8 @@ import { assertShiftOwner } from '../lib/shiftAccess.js';
 import { getRoleInfo } from '../lib/roleCache.js';
 import { HttpError } from '../lib/httpError.js';
 import { formatUsd } from '../lib/shiftLabel.js';
+import { alreadyPaid, MSG_ALREADY_PAID } from '../lib/payments.js';
+import { isUniqueViolation } from '../lib/username.js';
 
 const router = Router();
 
@@ -73,6 +75,10 @@ router.post('/', requireAuth, async (req, res) => {
   };
   const { data, error } = await adminDb.from('payments').insert(payload).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  // Pro is granted here, against the recorded subscription — never from a
+  // profile update the client could send on its own.
+  const { error: proErr } = await adminDb.from('users').update({ is_pro: true }).eq('id', req.userId);
+  if (proErr) return res.status(500).json({ error: proErr.message });
   return res.status(201).json(data);
 });
 
@@ -92,17 +98,6 @@ const checkoutBody = z.object({
   worker_id: z.string().min(1, 'worker_id is required'),
 });
 
-/** Has this worker already been paid (a completed shift payment) for the shift? */
-async function alreadyPaid(shiftId: string, workerId: string): Promise<boolean> {
-  const { count } = await adminDb
-    .from('payments')
-    .select('*', { count: 'exact', head: true })
-    .eq('shift_id', shiftId)
-    .eq('worker_id', workerId)
-    .eq('status', 'completed');
-  return (count ?? 0) > 0;
-}
-
 /**
  * GET /api/payments/config — which ways of paying a worker this server offers
  * (no secrets): `stripe` is true when Checkout is wired up. Marking a shift
@@ -120,18 +115,21 @@ router.get('/config', requireAuth, (_req, res) => {
 async function payableEntry(shiftId: string, workerId: string): Promise<{ amount: number }> {
   const { data: entry, error } = await adminDb
     .from('time_entries')
-    .select('id, approved, approved_pay, total_pay, clock_out')
+    .select('id, approved, approved_pay, total_pay, clock_out, worker_ack')
     .eq('shift_id', shiftId)
     .eq('worker_id', workerId)
     .maybeSingle();
   if (error) throw new HttpError(500, error.message);
   if (!entry || !entry.clock_out) throw new HttpError(409, 'This worker has not clocked out of the shift yet.');
   if (!entry.approved) throw new HttpError(409, 'Approve the timesheet before paying this worker.');
+  if (entry.worker_ack === 'disputed') {
+    throw new HttpError(409, 'The worker disputed these hours. Adjust and re-approve the timesheet before paying.');
+  }
   const amount = Number(entry.approved_pay ?? entry.total_pay ?? 0);
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new HttpError(409, 'The approved pay for this timesheet is zero, so there is nothing to pay.');
   }
-  if (await alreadyPaid(shiftId, workerId)) throw new HttpError(409, 'This worker has already been paid for this shift.');
+  if (await alreadyPaid(shiftId, workerId)) throw new HttpError(409, MSG_ALREADY_PAID);
   return { amount };
 }
 
@@ -162,7 +160,11 @@ router.post('/manual', requireAuth, async (req, res) => {
       payment_type: 'manual',
     };
     const { data, error } = await adminDb.from('payments').insert(payload).select().single();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      // Two taps raced past the check above; the partial unique index wins.
+      if (isUniqueViolation(error)) return res.status(409).json({ error: MSG_ALREADY_PAID });
+      return res.status(500).json({ error: error.message });
+    }
 
     await createNotification({
       userId: worker_id,
@@ -204,6 +206,9 @@ router.post('/checkout', requireAuth, async (req, res) => {
 
     const form = new URLSearchParams();
     form.set('mode', 'payment');
+    // A Checkout link that sits in a tab for a day must not still be payable
+    // after the worker was paid another way: one hour, then Stripe expires it.
+    form.set('expires_at', String(Math.floor(Date.now() / 1000) + 60 * 60));
     form.set('success_url', `${origin}/earnings?paid=1&session_id={CHECKOUT_SESSION_ID}`);
     form.set('cancel_url', `${origin}/shift/${shift_id}/applicants`);
     form.append('line_items[0][quantity]', '1');
@@ -271,6 +276,18 @@ router.post('/confirm', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'This payment was started by another account.' });
     }
     await assertShiftOwner(m.shift_id, req.userId!);
+
+    // Idempotent for the same session (a refresh of the return page), but a
+    // second, different session for a worker who is already paid is refused —
+    // that is a real double charge, so the poster is told to contact support.
+    const { data: recorded } = await adminDb
+      .from('payments').select('*').eq('stripe_session_id', session_id).maybeSingle();
+    if (recorded) return res.json({ ...recorded, alreadyRecorded: true });
+    if (await alreadyPaid(m.shift_id, m.worker_id)) {
+      return res.status(409).json({
+        error: 'This worker was already paid for this shift, so this Stripe payment was not recorded. Contact support to refund it.',
+      });
+    }
     const amount = Number(m.amount || 0);
     const fee = Math.round(amount * PLATFORM_FEE_PCT * 100) / 100;
     const payload = {
@@ -290,7 +307,10 @@ router.post('/confirm', requireAuth, async (req, res) => {
       .upsert(payload, { onConflict: 'stripe_session_id', ignoreDuplicates: true })
       .select()
       .maybeSingle();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      if (isUniqueViolation(error)) return res.status(409).json({ error: MSG_ALREADY_PAID });
+      return res.status(500).json({ error: error.message });
+    }
 
     // A newly recorded payment: tell the worker the money is on its way.
     if (data && payload.worker_id) {

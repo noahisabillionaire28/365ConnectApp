@@ -23,10 +23,13 @@ const router = Router();
 router.get('/', requireAuth, async (req, res) => {
   const { limit = '50' } = req.query as Record<string, string>;
   try {
+    // Hidden rows exist only so the cron jobs can dedupe for users who turned
+    // in-app notifications off; they never surface here.
     const { data: notifications, error } = await adminDb
       .from('notifications')
       .select('*')
       .eq('user_id', req.userId)
+      .eq('hidden', false)
       .order('created_at', { ascending: false })
       .limit(parseInt(limit));
     if (error) return res.status(500).json({ error: error.message });
@@ -115,22 +118,28 @@ export async function createNotification(params: {
       .eq('id', userId)
       .maybeSingle();
 
-    // In-app notification (skipped if the user turned in-app off).
-    if (!pref || pref.in_app_notifications !== false) {
-      const { data, error } = await adminDb
-        .from('notifications')
-        .insert({
-          user_id: userId,
-          from_user_id: fromUserId ?? null,
-          type,
-          title,
-          body,
-          shift_id: shiftId ?? null,
-          post_id: postId ?? null,
-        })
-        .select()
-        .maybeSingle();
-      if (error) throw error;
+    // The row is always written: the cron jobs dedupe reminders against this
+    // table, so a user with in-app notifications off must still leave a
+    // trace or they would get the same email on every tick. For them the row
+    // is hidden + read (the DB gate trigger sets the same), and nothing is
+    // pushed or broadcast.
+    const inAppOn = !pref || pref.in_app_notifications !== false;
+    const { data, error } = await adminDb
+      .from('notifications')
+      .insert({
+        user_id: userId,
+        from_user_id: fromUserId ?? null,
+        type,
+        title,
+        body,
+        shift_id: shiftId ?? null,
+        post_id: postId ?? null,
+        ...(inAppOn ? {} : { hidden: true, read: true, read_at: new Date().toISOString() }),
+      })
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    if (inAppOn) {
       // Push live to the recipient if they're online…
       if (data) broadcastToUser(userId, 'new_notification', data);
       // …and to their phone if they've enabled push (no-op when unconfigured).

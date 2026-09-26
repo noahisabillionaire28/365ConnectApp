@@ -40,10 +40,12 @@ export function PostShiftNameScreen() {
     if (!roleLoading && role === 'worker') navigate('/home');
   }, [role, roleLoading, navigate]);
 
-  // Fresh draft for a brand-new post. Keep it when editing an existing shift or
-  // when the user pressed Back from the next step (?keep=1).
+  // Fresh draft for a brand-new post. Only ?keep=1 preserves it: the edit
+  // entry and "Back" from the next step both pass it. Anything else (the Post
+  // Shift tab, Home's button) starts clean, so an edit abandoned halfway can
+  // never leak into the next post.
   useEffect(() => {
-    if (!getEditShiftId() && !search.includes('keep=1')) resetDraft();
+    if (!search.includes('keep=1')) resetDraft();
     setTitle(getDraft().title);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

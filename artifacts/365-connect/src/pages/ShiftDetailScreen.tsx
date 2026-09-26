@@ -999,7 +999,9 @@ export function ShiftDetailScreen() {
           const changed = approved && e.hoursChanged;
           const hours = e.total_hours ?? 0;
           const pay = approved ? (e.approvedPay ?? e.total_pay ?? 0) : (e.total_pay ?? 0);
-          const needsAnswer = changed && !e.workerAck;
+          // Once paid the hours are final: no "Looks right" / "Dispute".
+          const paid = !!e.paid || e.payTimeline?.stage === 'paid';
+          const needsAnswer = changed && !e.workerAck && !paid;
           const statusLabel = !approved ? 'Pending approval'
             : e.workerAck === 'disputed' ? 'Disputed · under review'
             : changed ? (e.workerAck === 'accepted' ? 'Updated by the poster · accepted' : 'Updated by the poster')
@@ -1063,6 +1065,11 @@ export function ShiftDetailScreen() {
                       </button>
                     </div>
                   </div>
+                )}
+                {changed && !e.workerAck && paid && (
+                  <p className="text-[#6B7280] text-[12px] mt-3 leading-relaxed">
+                    Paid · contact support to adjust these hours.
+                  </p>
                 )}
                 {e.workerAck === 'disputed' && e.dispute_note && (
                   <p className="text-[#6B7280] text-[12px] mt-3 leading-relaxed">Your note: “{e.dispute_note}”</p>

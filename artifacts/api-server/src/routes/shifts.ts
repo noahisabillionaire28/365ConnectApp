@@ -10,6 +10,7 @@ import { rosterAllows, assertShiftOwner } from '../lib/shiftAccess.js';
 import { getRoleInfo } from '../lib/roleCache.js';
 import { sendError } from '../lib/httpError.js';
 import { formatShiftInstant, formatShiftWindow, formatUsd } from '../lib/shiftLabel.js';
+import { voidSwapsForCancelledShift } from '../lib/swaps.js';
 import {
   zonedTimeToUtc, utcToZonedParts, nextCalendarDay, isCalendarDate, formatCalendarDate,
 } from '../lib/shiftTime.js';
@@ -716,6 +717,8 @@ async function announceCancellation(shift: NotifyShift, actorId: string): Promis
   // workers' Requests tab and can no longer be accepted.
   await adminDb.from('shift_requests').update({ status: 'cancelled' })
     .eq('shift_id', shift.id).eq('status', 'pending');
+  // Likewise any swap still in flight: there is no spot left to hand over.
+  await voidSwapsForCancelledShift(shift.id, actorId);
   const workers = await liveWorkers(shift.id, ['accepted', 'pending', 'standby']);
   const when = formatShiftInstant(shift.start_time, shift.timezone);
   const label = shift.title ? `"${shift.title}"` : 'a shift';

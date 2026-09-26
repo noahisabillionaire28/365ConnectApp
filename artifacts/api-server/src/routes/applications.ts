@@ -10,7 +10,7 @@ import { HttpError, sendError } from '../lib/httpError.js';
 import { assertShiftOwner, assertWorkerTarget, loadShift, rosterAllows } from '../lib/shiftAccess.js';
 import { bookWorker, markRequestAccepted, syncShiftCapacity } from '../lib/booking.js';
 import { shiftDayLabel } from '../lib/shiftLabel.js';
-import { cancelActiveSwapsFor } from '../lib/swaps.js';
+import { cancelActiveSwapsFor, hasClockedIn } from '../lib/swaps.js';
 
 const router = Router();
 
@@ -282,6 +282,9 @@ router.get('/', requireAuth, async (req, res) => {
     const shiftMap = new Map((shifts ?? []).map((s) => [s.id, s]));
     const merged = (apps ?? []).map((a) => {
       const s = shiftMap.get(a.shift_id);
+      // The on-site contact is for people who are booked (or next in line),
+      // not for everyone who ever applied.
+      const canContact = a.status === 'accepted' || a.status === 'standby';
       return {
         ...a,
         title: s?.title ?? null,
@@ -296,8 +299,8 @@ router.get('/', requireAuth, async (req, res) => {
         pay_rate: s?.pay_rate ?? null,
         pay_period: s?.pay_period ?? null,
         company_name: s?.company_name ?? null,
-        point_of_contact: s?.point_of_contact ?? null,
-        contact_phone: s?.contact_phone ?? null,
+        point_of_contact: canContact ? (s?.point_of_contact ?? null) : null,
+        contact_phone: canContact ? (s?.contact_phone ?? null) : null,
         arrival_status: a.arrival_status ?? null,
         arrival_status_at: a.arrival_status_at ?? null,
       };
@@ -928,6 +931,11 @@ router.post('/:id/call-out', requireAuth, requireRole('worker'), async (req, res
     const startMs = shift.start_time ? Date.parse(shift.start_time) : NaN;
     if (Number.isFinite(startMs) && Date.now() >= startMs) {
       return res.status(409).json({ error: 'This shift has already started. Please message the poster directly.' });
+    }
+    // Clock-in opens an hour early; a worker who is already on the clock
+    // cannot call out (it would orphan their time entry).
+    if (await hasClockedIn(app.shift_id, req.userId!)) {
+      return res.status(409).json({ error: "You've already clocked in to this shift. Please message the poster directly." });
     }
 
     // 1. Release the spot (same semantics as /withdraw, plus the reason).

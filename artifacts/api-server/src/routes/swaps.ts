@@ -25,7 +25,7 @@ import { bookWorker, markRequestAccepted, syncShiftCapacity } from '../lib/booki
 import { formatShiftInstant, shiftDayLabel } from '../lib/shiftLabel.js';
 import { ensureShiftGroupChat, insertSystemMessage, isBlockedEitherWay } from '../lib/chat.js';
 import { broadcastToUser } from '../lib/sseManager.js';
-import { ACTIVE_SWAP_STATUSES, type SwapRow } from '../lib/swaps.js';
+import { ACTIVE_SWAP_STATUSES, hasClockedIn, MSG_CLOCKED_IN, type SwapRow } from '../lib/swaps.js';
 
 const router = Router();
 
@@ -138,6 +138,7 @@ router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
       .from('applications').select('id, status').eq('shift_id', shift_id).eq('worker_id', me).maybeSingle();
     if (mErr) return res.status(500).json({ error: mErr.message });
     if (!mine || mine.status !== 'accepted') return res.status(409).json({ error: "You're not booked for this shift." });
+    if (await hasClockedIn(shift_id, me)) return res.status(409).json({ error: MSG_CLOCKED_IN });
 
     await assertSwapTarget(to_worker_id, me, shift);
     const them = await workerName(to_worker_id);
@@ -305,6 +306,9 @@ router.post('/:id/respond', requireAuth, requireRole('worker'), async (req, res)
     if (!shift) return res.status(404).json({ error: 'Shift not found' });
     const blocker = swapBlocker(shift);
     if (blocker) return res.status(409).json({ error: blocker });
+    if (parsed.data.action === 'accept' && await hasClockedIn(swap.shift_id, swap.from_worker_id)) {
+      return res.status(409).json({ error: 'The worker offering this shift has already clocked in, so it can no longer be swapped.' });
+    }
 
     const now = new Date().toISOString();
     const fromName = await workerName(swap.from_worker_id);
@@ -452,6 +456,9 @@ router.post('/:id/decide', requireAuth, async (req, res) => {
     }
     const blocker = swapBlocker(shift);
     if (blocker) return res.status(409).json({ error: blocker });
+    if (await hasClockedIn(swap.shift_id, swap.from_worker_id)) {
+      return res.status(409).json({ error: `${fromName} has already clocked in, so this swap can no longer be approved.` });
+    }
     const conflict = await findTimeConflict(swap.to_worker_id, swap.shift_id);
     if (conflict) {
       return res.status(409).json({

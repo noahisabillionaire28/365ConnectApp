@@ -7,6 +7,7 @@ import { HttpError, sendError } from '../lib/httpError.js';
 import { assertShiftOwner, loadShift } from '../lib/shiftAccess.js';
 import { shiftDayLabel, formatHoursMinutes, formatUsd } from '../lib/shiftLabel.js';
 import { setArrivalStatus, workerName } from './applications.js';
+import { alreadyPaid, MSG_PAID_LOCKED } from '../lib/payments.js';
 
 const router = Router();
 
@@ -279,6 +280,11 @@ router.post('/approve', requireAuth, async (req, res) => {
     if (!found) return res.status(404).json({ error: 'Timesheet not found' });
     let entry = found as EntryRow;
     if (!entry.clock_in) return res.status(409).json({ error: 'Worker has not clocked in.' });
+    // Once paid, the hours are final: a re-approval would change what was
+    // owed after the money moved.
+    if (entry.approved && await alreadyPaid(shift_id, worker_id)) {
+      return res.status(409).json({ error: MSG_PAID_LOCKED });
+    }
 
     // Forgot-to-clock-out: the owner supplies the clock_out instant.
     if (!entry.clock_out && body.clock_out != null) {
@@ -385,6 +391,9 @@ router.post('/:id/ack', requireAuth, async (req, res) => {
     const entry = await loadOwnEntry(String(req.params.id), req.userId!);
     if (!entry.approved) return res.status(409).json({ error: 'These hours have not been approved yet.' });
     if (entry.worker_ack) return res.status(409).json({ error: 'You already answered these hours.' });
+    if (action === 'dispute' && await alreadyPaid(entry.shift_id, entry.worker_id)) {
+      return res.status(409).json({ error: 'These hours were already paid. Contact support if the amount is wrong.' });
+    }
 
     const ack = action === 'accept' ? 'accepted' : 'disputed';
     const { data: updated, error } = await adminDb

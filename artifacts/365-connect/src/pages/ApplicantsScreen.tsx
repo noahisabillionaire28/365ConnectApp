@@ -178,15 +178,18 @@ function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onP
       </div>
 
       <div className="flex gap-2">
-        {/* Approve once; after a dispute the manager can adjust and approve again. */}
-        {(w.attendance === 'done' || forgotClockOut) && (!w.approved || w.workerAck === 'disputed') && (
+        {/* Approve once; after a dispute the manager can adjust and approve
+            again — unless the worker has already been paid, when the hours
+            are final (the server refuses too). */}
+        {(w.attendance === 'done' || forgotClockOut) && (!w.approved || w.workerAck === 'disputed') && !w.paid && (
           <button type="button" disabled={busy} onClick={onApprove}
             className="flex-1 h-9 rounded-[8px] bg-[#0A1628] text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
             <Clock3 size={13} aria-hidden />
             {forgotClockOut ? 'Set clock-out & approve' : w.workerAck === 'disputed' ? 'Adjust & re-approve' : 'Review & Approve'}
           </button>
         )}
-        {w.attendance === 'done' && w.approved && !w.paid && stripeEnabled && (
+        {/* Paying is off the table while the worker disputes the hours: adjust and re-approve first. */}
+        {w.attendance === 'done' && w.approved && !w.paid && w.workerAck !== 'disputed' && stripeEnabled && (
           <button type="button" disabled={busy} onClick={onPay}
             className="flex-1 h-9 rounded-[8px] bg-emerald-600 text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
             <DollarSign size={13} aria-hidden />
@@ -194,7 +197,7 @@ function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onP
           </button>
         )}
         {/* Paid outside the app (cash, Venmo, payroll): records the shift as paid without Stripe. */}
-        {w.attendance === 'done' && w.approved && !w.paid && (
+        {w.attendance === 'done' && w.approved && !w.paid && w.workerAck !== 'disputed' && (
           <button type="button" disabled={busy} onClick={onMarkPaid}
             className={`flex-1 h-9 rounded-[8px] text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60 ${
               stripeEnabled ? 'border border-emerald-600 bg-white text-emerald-700' : 'bg-emerald-600 text-white'}`}>
