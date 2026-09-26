@@ -29,6 +29,7 @@ import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { useMyMatch } from '@/hooks/useMatch';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyTimeEntry, useAckHours, formatHoursMinutes } from '@/hooks/useTimeEntry';
+import { PayTimeline } from '@/components/PayTimeline';
 import { useExistingReview } from '@/hooks/useReviews';
 import { useShiftApplicants } from '@/hooks/useShiftApplicants';
 import { useAcceptedWorkers } from '@/hooks/useAcceptedWorkers';
@@ -1035,6 +1036,12 @@ export function ShiftDetailScreen() {
                     <span className="text-[#111827] font-bold">{usd(Number(pay) || 0)}</span>
                   </div>
                 </div>
+                {/* Where the money is: Worked → Approved → Paid, stamped in the venue's zone. */}
+                {e.payTimeline && (
+                  <div className="mt-4 pt-3.5 border-t border-[#EFEFEF]">
+                    <PayTimeline timeline={e.payTimeline} tz={tz} />
+                  </div>
+                )}
                 {!approved && (
                   <p className="text-[#9CA3AF] text-[11px] mt-3 leading-relaxed">
                     The poster reviews your timesheet before paying. You will be told if anything changes.

@@ -28,6 +28,8 @@ type EntryRow = {
   total_pay: number | null;
   fee: number | null;
   approved: boolean | null;
+  approved_at?: string | null;
+  approved_pay?: number | null;
   /** Billable hours as computed at clock-out (before any poster change). */
   clocked_hours?: number | null;
   worker_ack?: 'accepted' | 'disputed' | null;
@@ -73,6 +75,63 @@ function entryJson(entry: EntryRow): Record<string, unknown> {
     dispute_note: entry.dispute_note ?? null,
     hours_changed: hoursChanged(entry),
   };
+}
+
+/** A completed shift payment for one (shift, worker), as the timeline needs it. */
+type PaidRow = { shift_id: string | null; created_at: string; net_amount: number | null; payment_type: string | null };
+
+type PayStage = 'in_progress' | 'worked' | 'approved' | 'paid';
+
+/**
+ * The worker's pay timeline for an entry — Worked → Approved → Paid — with
+ * the instant each step happened (null until it has), the poster's change /
+ * the worker's answer on the Approved step, how the Paid step was recorded
+ * ('stripe' through the app, 'manual' = the poster marked it paid outside the
+ * app), and the stage the entry is at now.
+ */
+function timelineFor(entry: EntryRow, paid: PaidRow | null) {
+  const approved = !!entry.approved;
+  const stage: PayStage = paid ? 'paid' : approved ? 'approved' : entry.clock_out ? 'worked' : 'in_progress';
+  return {
+    worked_at: entry.clock_out ?? null,
+    approved_at: approved ? entry.approved_at ?? null : null,
+    hours_changed: hoursChanged(entry),
+    worker_ack: entry.worker_ack ?? null,
+    acknowledged_at: entry.worker_ack_at ?? null,
+    paid_at: paid?.created_at ?? null,
+    paid_amount: paid ? round2(Number(paid.net_amount ?? 0)) : null,
+    paid_method: paid ? (paid.payment_type === 'manual' ? 'manual' : 'stripe') : null,
+    stage,
+  };
+}
+
+/**
+ * What the entry is worth right now: the approved figure once the poster
+ * signed off, else the clock-out estimate from the same formula the approval
+ * uses (so the two never disagree).
+ */
+function expectedPay(entry: EntryRow, shift: PayShift): number {
+  if (entry.approved && entry.approved_pay != null) return round2(Number(entry.approved_pay));
+  return computePay(round2(Number(entry.total_hours ?? 0)), shift).pay;
+}
+
+/**
+ * Completed shift payments to a worker for these shifts, keyed by shift_id
+ * (the earliest wins) — one batched query, never one per entry.
+ */
+async function paidByShift(workerId: string, shiftIds: string[]): Promise<Map<string, PaidRow>> {
+  const map = new Map<string, PaidRow>();
+  if (!shiftIds.length) return map;
+  const { data, error } = await adminDb
+    .from('payments')
+    .select('shift_id, created_at, net_amount, payment_type')
+    .eq('worker_id', workerId)
+    .eq('status', 'completed')
+    .in('shift_id', shiftIds)
+    .order('created_at', { ascending: true });
+  if (error) throw new HttpError(500, error.message);
+  for (const p of (data ?? []) as PaidRow[]) if (p.shift_id && !map.has(p.shift_id)) map.set(p.shift_id, p);
+  return map;
 }
 
 /** Hourly pay periods; anything else ('day', 'event', 'flat', 'shift') is a flat total. */
@@ -127,35 +186,40 @@ async function loadOwnEntry(id: string, workerId: string): Promise<EntryRow> {
 
 /**
  * GET /api/time-entries/mine — the caller's own time entries, newest first,
- * with the shift's title/company and whether the shift has been paid out.
+ * with the shift's title/company, whether the shift has been paid out, the
+ * pay `timeline` (Worked → Approved → Paid) and the `expected_pay`.
  */
 router.get('/mine', requireAuth, async (req, res) => {
   try {
     const { data: entries, error } = await adminDb
       .from('time_entries')
-      .select('id, shift_id, clock_in, clock_out, break_minutes, total_hours, total_pay, approved, approved_at, approved_pay, regular_hours, overtime_hours, clocked_hours, worker_ack, worker_ack_at, dispute_note')
+      .select('id, shift_id, worker_id, clock_in, clock_out, break_minutes, total_hours, total_pay, fee, approved, approved_at, approved_pay, regular_hours, overtime_hours, clocked_hours, worker_ack, worker_ack_at, dispute_note')
       .eq('worker_id', req.userId)
       .order('clock_in', { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
-    const rows = entries ?? [];
+    const rows = (entries ?? []) as EntryRow[];
     const shiftIds = [...new Set(rows.map((r) => r.shift_id).filter(Boolean))];
 
-    const shiftMap = new Map<string, { title: string | null; company_name: string | null; start_time: string | null }>();
-    const paidSet = new Set<string>();
+    const shiftMap = new Map<string, { title: string | null; company_name: string | null; start_time: string | null } & PayShift>();
+    let paidMap = new Map<string, PaidRow>();
     if (shiftIds.length) {
-      const [{ data: shifts, error: sErr }, { data: pays, error: pErr }] = await Promise.all([
-        adminDb.from('shifts').select('id, title, company_name, start_time').in('id', shiftIds),
-        adminDb.from('payments').select('shift_id')
-          .eq('worker_id', req.userId).eq('status', 'completed').in('shift_id', shiftIds),
+      const [{ data: shifts, error: sErr }, pays] = await Promise.all([
+        adminDb.from('shifts').select('id, title, company_name, start_time, pay_rate, pay_period').in('id', shiftIds),
+        paidByShift(req.userId!, shiftIds),
       ]);
       if (sErr) return res.status(500).json({ error: sErr.message });
-      if (pErr) return res.status(500).json({ error: pErr.message });
-      for (const s of shifts ?? []) shiftMap.set(s.id, { title: s.title ?? null, company_name: s.company_name ?? null, start_time: s.start_time ?? null });
-      for (const p of pays ?? []) if (p.shift_id) paidSet.add(p.shift_id);
+      for (const s of shifts ?? []) {
+        shiftMap.set(s.id, {
+          title: s.title ?? null, company_name: s.company_name ?? null, start_time: s.start_time ?? null,
+          pay_rate: s.pay_rate ?? null, pay_period: s.pay_period ?? null,
+        });
+      }
+      paidMap = pays;
     }
 
     return res.json(rows.map((r) => {
       const s = shiftMap.get(r.shift_id);
+      const paid = paidMap.get(r.shift_id) ?? null;
       return {
         id: r.id,
         shift_id: r.shift_id,
@@ -177,7 +241,9 @@ router.get('/mine', requireAuth, async (req, res) => {
         shift_title: s?.title ?? null,
         company_name: s?.company_name ?? null,
         shift_start_time: s?.start_time ?? null,
-        paid: paidSet.has(r.shift_id),
+        paid: !!paid,
+        timeline: timelineFor(r, paid),
+        expected_pay: expectedPay(r, { pay_rate: s?.pay_rate ?? null, pay_period: s?.pay_period ?? null }),
       };
     }));
   } catch (e) {
@@ -358,16 +424,36 @@ router.post('/:id/ack', requireAuth, async (req, res) => {
   }
 });
 
-/** GET /api/time-entries/:shiftId — time entry for this shift+worker */
+/**
+ * GET /api/time-entries/:shiftId — the caller's own time entry for this shift
+ * (null before clock-in), with its pay `timeline` and `expected_pay`.
+ */
 router.get('/:shiftId', requireAuth, async (req, res) => {
-  const { data, error } = await adminDb
-    .from('time_entries')
-    .select('*')
-    .eq('shift_id', req.params.shiftId)
-    .eq('worker_id', req.userId)
-    .maybeSingle();
-  if (error) return res.status(500).json({ error: error.message });
-  return res.json(data ? entryJson(data as EntryRow) : null);
+  try {
+    const shiftId = String(req.params.shiftId);
+    const { data, error } = await adminDb
+      .from('time_entries')
+      .select('*')
+      .eq('shift_id', shiftId)
+      .eq('worker_id', req.userId)
+      .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.json(null);
+    const entry = data as EntryRow;
+    const [{ data: shift }, paidMap] = await Promise.all([
+      adminDb.from('shifts').select('pay_rate, pay_period').eq('id', shiftId).maybeSingle(),
+      paidByShift(req.userId!, [shiftId]),
+    ]);
+    const paid = paidMap.get(shiftId) ?? null;
+    return res.json({
+      ...entryJson(entry),
+      paid: !!paid,
+      timeline: timelineFor(entry, paid),
+      expected_pay: expectedPay(entry, { pay_rate: shift?.pay_rate ?? null, pay_period: shift?.pay_period ?? null }),
+    });
+  } catch (e) {
+    return sendError(res, e);
+  }
 });
 
 /** How far from the venue a worker may be and still clock in. */

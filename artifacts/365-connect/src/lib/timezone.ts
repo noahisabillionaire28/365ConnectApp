@@ -63,6 +63,16 @@ export function utcToZonedParts(iso: string, tz: string): { date: string; time: 
   return { date: `${p.y}-${pad(p.mo)}-${pad(p.d)}`, time: `${pad(p.h)}:${pad(p.mi)}` };
 }
 
+/** "Sat 11:42 PM" — an instant's weekday and wall-clock time in the venue zone (timeline stamps). */
+export function formatDayTime(iso: string | null | undefined, tz?: string | null): string {
+  const ms = iso ? Date.parse(iso) : NaN;
+  if (!Number.isFinite(ms)) return '';
+  const zone = tz && isValidZone(tz) ? tz : DEFAULT_SHIFT_TZ;
+  return new Date(ms)
+    .toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: zone })
+    .replace(',', '');
+}
+
 /** Short zone label like "EDT" / "PST" for an instant, or '' if unknown. */
 export function zoneAbbrev(iso: string, tz: string): string {
   try {

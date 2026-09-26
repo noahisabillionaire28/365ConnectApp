@@ -104,6 +104,82 @@ async function alreadyPaid(shiftId: string, workerId: string): Promise<boolean> 
 }
 
 /**
+ * GET /api/payments/config — which ways of paying a worker this server offers
+ * (no secrets): `stripe` is true when Checkout is wired up. Marking a shift
+ * as paid outside the app is always available to the poster.
+ */
+router.get('/config', requireAuth, (_req, res) => {
+  return res.json({ stripe: !!stripeKey(), manual: true });
+});
+
+/**
+ * The approved, unpaid timesheet a shift owner may pay: the amount is the
+ * approved pay on the worker's timesheet, never taken from the request.
+ * Throws the same 409s Checkout gives so both paths agree.
+ */
+async function payableEntry(shiftId: string, workerId: string): Promise<{ amount: number }> {
+  const { data: entry, error } = await adminDb
+    .from('time_entries')
+    .select('id, approved, approved_pay, total_pay, clock_out')
+    .eq('shift_id', shiftId)
+    .eq('worker_id', workerId)
+    .maybeSingle();
+  if (error) throw new HttpError(500, error.message);
+  if (!entry || !entry.clock_out) throw new HttpError(409, 'This worker has not clocked out of the shift yet.');
+  if (!entry.approved) throw new HttpError(409, 'Approve the timesheet before paying this worker.');
+  const amount = Number(entry.approved_pay ?? entry.total_pay ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new HttpError(409, 'The approved pay for this timesheet is zero, so there is nothing to pay.');
+  }
+  if (await alreadyPaid(shiftId, workerId)) throw new HttpError(409, 'This worker has already been paid for this shift.');
+  return { amount };
+}
+
+/**
+ * POST /api/payments/manual { shift_id, worker_id } — the shift owner (or an
+ * admin) records that they paid this worker outside the app (cash, Venmo,
+ * payroll…). Same gates as Checkout: an approved timesheet, and never twice
+ * for one shift (409). Inserts a completed payment of the approved pay with
+ * payment_type 'manual' and tells the worker, so their pay timeline reads
+ * "Paid outside the app" instead of "Not yet paid".
+ */
+router.post('/manual', requireAuth, async (req, res) => {
+  const parsed = checkoutBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
+  const { shift_id, worker_id } = parsed.data;
+  try {
+    const shift = await assertShiftOwner(shift_id, req.userId!);
+    const { amount } = await payableEntry(shift_id, worker_id);
+    const payload = {
+      shift_id,
+      client_id: req.userId,
+      worker_id,
+      amount,
+      fee: 0,
+      total: amount,
+      net_amount: amount,
+      status: 'completed',
+      payment_type: 'manual',
+    };
+    const { data, error } = await adminDb.from('payments').insert(payload).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    await createNotification({
+      userId: worker_id,
+      fromUserId: req.userId,
+      type: 'payment_received',
+      title: 'Marked as paid',
+      body: `${formatUsd(amount)} for ${shift.title ? `"${shift.title}"` : 'your shift'} was marked as paid outside the app.`,
+      shiftId: shift_id,
+      url: '/earnings',
+    });
+    return res.status(201).json(data);
+  } catch (e) {
+    return sendError(res, e);
+  }
+});
+
+/**
  * POST /api/payments/checkout { shift_id, worker_id } — create a Stripe
  * Checkout session for a shift payment. The amount is never taken from the
  * request: it is the approved pay on the worker's timesheet for that shift.
@@ -120,23 +196,7 @@ router.post('/checkout', requireAuth, async (req, res) => {
 
   try {
     await assertShiftOwner(shift_id, req.userId!);
-
-    const { data: entry, error: eErr } = await adminDb
-      .from('time_entries')
-      .select('id, approved, approved_pay, total_pay, clock_out')
-      .eq('shift_id', shift_id)
-      .eq('worker_id', worker_id)
-      .maybeSingle();
-    if (eErr) return res.status(500).json({ error: eErr.message });
-    if (!entry || !entry.clock_out) return res.status(409).json({ error: 'This worker has not clocked out of the shift yet.' });
-    if (!entry.approved) return res.status(409).json({ error: 'Approve the timesheet before paying this worker.' });
-    const amountNum = Number(entry.approved_pay ?? entry.total_pay ?? 0);
-    if (!Number.isFinite(amountNum) || amountNum <= 0) {
-      return res.status(409).json({ error: 'The approved pay for this timesheet is zero, so there is nothing to charge.' });
-    }
-    if (await alreadyPaid(shift_id, worker_id)) {
-      return res.status(409).json({ error: 'This worker has already been paid for this shift.' });
-    }
+    const { amount: amountNum } = await payableEntry(shift_id, worker_id);
 
     const origin =
       (typeof req.headers['origin'] === 'string' && req.headers['origin']) ||
