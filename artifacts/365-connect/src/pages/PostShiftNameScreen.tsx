@@ -7,10 +7,12 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { motion } from 'framer-motion';
-import { ChevronLeft, Sparkles } from 'lucide-react';
-import { getDraft, setDraft, resetDraft, getEditShiftId, setEditShiftId } from '@/store/postShiftStore';
+import { ChevronLeft, Sparkles, LayoutTemplate, ChevronRight } from 'lucide-react';
+import { getDraft, setDraft, resetDraft, getEditShiftId, setEditShiftId, loadDraftFromTemplate } from '@/store/postShiftStore';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useRole } from '@/contexts/RoleContext';
+import { useToast } from '@/contexts/ToastContext';
+import { useTemplates, templateSummary, templateUsage } from '@/hooks/useTemplates';
 
 function StepBar({ current, total }: { current: number; total: number }) {
   return (
@@ -50,12 +52,30 @@ export function PostShiftNameScreen() {
   const [err, setErr] = useState('');
   const isEditing = !!getEditShiftId();
   const canContinue = title.trim().length >= 3;
+  const { showToast } = useToast();
+  // Saved templates: a fresh post can start from one and skip to the date step.
+  const { templates, use: useTemplate, using } = useTemplates(!isEditing && !roleLoading && role !== 'worker');
+  const [usingId, setUsingId] = useState<string | null>(null);
 
   function handleContinue() {
     const t = title.trim();
     if (t.length < 3) { setErr('Give the shift a name of at least 3 characters.'); return; }
     setDraft({ title: t });
     navigate('/post-shift/event');
+  }
+
+  async function handleUseTemplate(id: string) {
+    if (using) return;
+    setUsingId(id);
+    try {
+      const t = await useTemplate(id);
+      loadDraftFromTemplate(t.payload);
+      navigate('/post-shift/step3');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not load that template.', 'error');
+    } finally {
+      setUsingId(null);
+    }
   }
 
   return (
@@ -115,6 +135,34 @@ export function PostShiftNameScreen() {
             </button>
           ))}
         </div>
+
+        {/* Start from a template — everything but the dates is filled in */}
+        {!isEditing && templates.length > 0 && (
+          <section aria-label="Start from a template" data-testid="template-list">
+            <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider mt-6 mb-2 flex items-center gap-1.5">
+              <LayoutTemplate size={12} aria-hidden /> Start from a template
+            </p>
+            <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden">
+              {templates.map((t) => (
+                <button key={t.id} type="button"
+                  onClick={() => void handleUseTemplate(t.id)}
+                  disabled={using}
+                  aria-label={`Start from template ${t.name}`}
+                  className="w-full flex items-center gap-3 px-4 py-3 border-b border-[#F3F4F6] last:border-0 text-left active:bg-[#F9FAFB] disabled:opacity-60">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[#111827] text-[14px] font-semibold truncate">{t.name}</p>
+                    <p className="text-[#6B7280] text-[12px] truncate">{templateSummary(t.payload)}</p>
+                    <p className="text-[#9CA3AF] text-[11px]">{templateUsage(t)}</p>
+                  </div>
+                  {usingId === t.id
+                    ? <div className="w-4 h-4 rounded-full border-2 border-[#E5E7EB] border-t-[#0A1628] animate-spin" aria-hidden />
+                    : <ChevronRight size={16} aria-hidden className="text-[#D1D5DB] flex-shrink-0" />}
+                </button>
+              ))}
+            </div>
+            <p className="text-[#9CA3AF] text-[11px] mt-1.5 px-1">Loads the details; you only pick the date and time.</p>
+          </section>
+        )}
       </div>
 
       <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-4 pt-4 bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">

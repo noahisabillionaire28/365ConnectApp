@@ -5,7 +5,7 @@ import {
   Star, ChevronRight, Settings,
   CreditCard, Bell, Shield, HelpCircle, LogOut,
   Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
-  BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck,
+  BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck, LayoutTemplate,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
@@ -735,6 +735,7 @@ export function ProfileScreen() {
                     <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-4">
                       <SettingRow icon={Bookmark} label="Saved Workers" onTap={() => go('/saved')} />
                       <SettingRow icon={Users} label="My Roster" onTap={() => go('/roster')} />
+                      <SettingRow icon={LayoutTemplate} label="Shift templates" onTap={() => go('/templates')} />
                     </div>
                   </>
                 )}
