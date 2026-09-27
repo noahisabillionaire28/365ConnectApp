@@ -24,7 +24,7 @@ export function AdminFab() {
 
   if (!isAdmin) return null;
 
-  const hiddenPrefixes = ['/admin', '/login', '/signup', '/phone-auth', '/reset-password', '/auth', '/role-select', '/onboarding'];
+  const hiddenPrefixes = ['/admin', '/login', '/signup', '/reset-password', '/auth', '/role-select', '/onboarding'];
   if (location === '/' || hiddenPrefixes.some((p) => location === p || location.startsWith(p + '/'))) {
     return null;
   }

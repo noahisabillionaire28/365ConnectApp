@@ -12,6 +12,7 @@
 import webPush from 'web-push';
 import { adminDb } from './supabaseAdmin.js';
 import { apnsConfigured, sendApns } from './apns.js';
+import { unreadMessageTotal } from './chat.js';
 
 const PUBLIC_KEY  = process.env['VAPID_PUBLIC_KEY']  ?? '';
 const PRIVATE_KEY = process.env['VAPID_PRIVATE_KEY'] ?? '';
@@ -38,7 +39,24 @@ export type PushPayload = {
   /** Collapses repeated notifications for the same thread. */
   tag?: string;
   icon?: string;
+  /** App-icon badge count; computed from unread items when omitted. */
+  badge?: number;
 };
+
+/**
+ * What the app icon badge should read: unread notifications plus unread
+ * messages, the same two numbers the in-app tab badges show. The web app
+ * mirrors this with navigator.setAppBadge from its own caches.
+ */
+export async function unreadBadge(userId: string): Promise<number> {
+  const [notifs, messages] = await Promise.all([
+    adminDb.from('notifications').select('*', { count: 'exact', head: true })
+      .eq('user_id', userId).eq('hidden', false).is('read_at', null)
+      .then((r) => r.count ?? 0, () => 0),
+    unreadMessageTotal(userId).catch(() => 0),
+  ]);
+  return Math.max(0, notifs + messages);
+}
 
 /** Send a push to every device a user has subscribed. Dead endpoints are pruned. */
 export async function pushToUser(userId: string, payload: PushPayload): Promise<void> {
@@ -50,14 +68,16 @@ export async function pushToUser(userId: string, payload: PushPayload): Promise<
     .eq('user_id', userId);
   if (!subs?.length) return;
 
-  const body = JSON.stringify({ icon: '/favicon.png', ...payload });
+  // The badge is only worth computing when there is a device to show it on.
+  const badge = payload.badge ?? (subs.some((s) => (s as { platform?: string }).platform === 'ios') ? await unreadBadge(userId) : undefined);
+  const body = JSON.stringify({ icon: '/favicon.png', ...payload, ...(badge !== undefined ? { badge } : {}) });
   await Promise.all(subs.map(async (s) => {
     const platform = (s as { platform?: string }).platform ?? 'web';
 
     // Native iOS device → APNs.
     if (platform === 'ios') {
       if (!nativeOk) return;
-      const r = await sendApns(s.endpoint, { title: payload.title, body: payload.body, url: payload.url, tag: payload.tag });
+      const r = await sendApns(s.endpoint, { title: payload.title, body: payload.body, url: payload.url, tag: payload.tag, badge });
       // 410 / BadDeviceToken / Unregistered = the app was removed → forget it.
       if (!r.ok && (r.status === 410 || r.reason === 'BadDeviceToken' || r.reason === 'Unregistered')) {
         await adminDb.from('push_subscriptions').delete().eq('id', s.id);

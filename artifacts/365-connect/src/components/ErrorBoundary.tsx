@@ -1,10 +1,13 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { clearQueryCache } from '@/lib/queryPersist';
+import { getCachedAccessToken } from '@/lib/supabase';
 
 interface Props  { children: ReactNode; }
 interface State  { hasError: boolean; message: string | null; }
 
-const HOME_PATH = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/home`;
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
+/** Signed in → the feed; signed out → the splash (the feed would only bounce). */
+const homePath = () => `${BASE}${getCachedAccessToken() ? '/home' : '/'}`;
 
 /**
  * Top-level error boundary.
@@ -37,7 +40,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private goHome = () => {
     clearQueryCache();
-    window.location.assign(HOME_PATH);
+    window.location.assign(homePath());
   };
 
   render() {
@@ -60,13 +63,9 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="flex flex-col gap-1.5">
           <p className="text-black font-bold text-[18px]">Something went wrong</p>
           <p className="text-[#737373] text-[13px] leading-relaxed max-w-[280px]">
-            An unexpected error occurred. Your data is safe — tap below to reload the app.
+            This screen hit a snag. Your account and everything you've saved are safe — tap below to reload the app.
           </p>
-          {this.state.message && (
-            <p className="text-[#AAAAAA] text-[11px] leading-relaxed max-w-[280px] mt-1 break-words">
-              {this.state.message}
-            </p>
-          )}
+          {/* The raw error stays in the console for debugging; it is not shown to users. */}
         </div>
 
         <div className="w-full max-w-[280px] flex flex-col gap-2 mt-2">
@@ -82,7 +81,7 @@ export class ErrorBoundary extends Component<Props, State> {
             onClick={this.goHome}
             className="w-full h-[48px] rounded-[8px] bg-white border border-[#DBDBDB] text-[#111827] font-semibold text-[14px]"
           >
-            Go to Home
+            {getCachedAccessToken() ? 'Go to Home' : 'Back to start'}
           </button>
         </div>
       </div>

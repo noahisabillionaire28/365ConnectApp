@@ -914,6 +914,7 @@ export function ChatScreen() {
     if (kind === 'image') { if (cropSrc) URL.revokeObjectURL(cropSrc); setCropSrc(URL.createObjectURL(file)); return; }
     setSending(true);
     if (kind === 'video') {
+      if (file.size > 25 * 1024 * 1024) { showToast('Videos must be under 25 MB.', 'error'); setSending(false); return; }
       const url = await uploadChatVideo(conversationId, file);
       if (url) await sendMessage({ videoUrl: url, reply_to_id: replyTo?.id }); else showToast('Video upload failed.', 'error');
     } else {

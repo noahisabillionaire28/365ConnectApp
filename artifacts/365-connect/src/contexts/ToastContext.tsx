@@ -11,6 +11,7 @@
  *   – Green #10B981, white bold text, checkmark icon
  *   – 3-second auto-dismiss; tappable to dismiss early
  *   – Only ONE toast visible at a time; extras are queued sequentially
+ *   – Identical messages within 3 seconds collapse into one
  *   – pointer-events: none on the overlay so buttons/nav are never blocked
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
@@ -60,12 +61,23 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
 
+  /**
+   * The same message within 3 s is shown once. A double-tap, a retry loop or
+   * two hooks reacting to one event used to stack identical toasts.
+   */
+  const lastShown = useRef<{ message: string; at: number } | null>(null);
+  const DEDUPE_MS = 3000;
+
   /** Add a message to the queue — called from any screen via useToast(). */
   const showToast = useCallback((message: string, variant: ToastVariant = 'success') => {
+    const now = Date.now();
+    const last = lastShown.current;
+    if (last && last.message === message && now - last.at < DEDUPE_MS) return;
+    lastShown.current = { message, at: now };
     const id = typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2);
-    setQueue((prev) => [...prev, { id, message, variant }]);
+    setQueue((prev) => (prev.some((t) => t.message === message) ? prev : [...prev, { id, message, variant }]));
   }, []);
 
   return (

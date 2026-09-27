@@ -100,17 +100,11 @@ router.post('/', requireAuth, async (req, res) => {
     if (email) payload.email = email;
   }
 
-  if (safeRole) {
-    // Guard: a self-assigned 'worker' must never DOWNGRADE an already-chosen
-    // role (staffer/client/admin). Bootstrap sign-in writes used to send
-    // role:'worker' and would reset a real staffer back to worker on conflict.
-    if (safeRole === 'worker') {
-      if (!existing?.role || existing.role === 'worker') payload.role = 'worker';
-      // else: keep their existing non-worker role — do not overwrite.
-    } else {
-      payload.role = safeRole;
-    }
-  }
+  // A role is accepted only while the account has none. Role select is the
+  // one place that sends it; a transient failure to read the profile used to
+  // bounce an existing client back to role select, where a tap on "I'm
+  // Working" silently turned their account into a worker.
+  if (safeRole && !existing?.role) payload.role = safeRole;
 
   const { data, error } = await adminDb
     .from('users')
@@ -158,6 +152,63 @@ router.patch('/me', requireAuth, async (req, res) => {
   }
   if (!data) return res.status(404).json({ error: 'User not found' });
   return res.json(data);
+});
+
+/**
+ * DELETE /api/users/me — self-serve account deletion (an App Store
+ * requirement). Refused while the user still has commitments other people
+ * are counting on: upcoming shifts they are booked on as a worker, or open /
+ * filled future shifts they posted. Everything else cascades from auth.users.
+ */
+router.delete('/me', requireAuth, async (req, res) => {
+  const me = req.userId!;
+  const nowIso = new Date().toISOString();
+  try {
+    const { data: apps, error: aErr } = await adminDb
+      .from('applications')
+      .select('shift_id')
+      .eq('worker_id', me)
+      .eq('status', 'accepted');
+    if (aErr) throw aErr;
+    const bookedIds = (apps ?? []).map((a) => a.shift_id as string);
+    if (bookedIds.length) {
+      const { data: upcoming, error: uErr } = await adminDb
+        .from('shifts')
+        .select('id')
+        .in('id', bookedIds)
+        .in('status', ['open', 'filled'])
+        .gt('end_time', nowIso)
+        .limit(1);
+      if (uErr) throw uErr;
+      if (upcoming?.length) {
+        throw new HttpError(409, "You're booked on an upcoming shift. Withdraw from it first, then delete your account.");
+      }
+    }
+
+    const { data: posted, error: pErr } = await adminDb
+      .from('shifts')
+      .select('id')
+      .eq('client_id', me)
+      .in('status', ['open', 'filled'])
+      .gt('end_time', nowIso)
+      .limit(1);
+    if (pErr) throw pErr;
+    if (posted?.length) {
+      throw new HttpError(409, 'You still have an open or filled upcoming shift. Cancel it first, then delete your account.');
+    }
+
+    // Push subscriptions must not keep delivering to this device for the next
+    // account; they cascade with the profile row, but clear them explicitly
+    // in case the cascade is ever loosened.
+    await adminDb.from('push_subscriptions').delete().eq('user_id', me);
+
+    const { error } = await adminDb.auth.admin.deleteUser(me);
+    if (error) throw error;
+    invalidateRole(me);
+    return res.json({ ok: true });
+  } catch (e) {
+    return sendError(res, e);
+  }
 });
 
 /** GET /api/users/blocks — ids I've blocked (registered before /:id so it is never shadowed) */

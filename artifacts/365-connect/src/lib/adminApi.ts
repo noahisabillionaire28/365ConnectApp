@@ -4,20 +4,35 @@
  * header (and X-Supabase-Token as a proxy-safe fallback), matching lib/api.ts.
  * The server verifies the token and checks the user has role='admin'.
  */
-import { supabase } from '@/lib/supabase';
+import { supabase, getCachedAccessToken } from '@/lib/supabase';
 
 const BASE = '/api/admin';
 
+/**
+ * Same token strategy as lib/api.ts: the module-level cache first (kept
+ * fresh by onAuthStateChange, never touches the auth lock), then a bounded
+ * getSession() only when the cache is empty.
+ */
+async function accessToken(): Promise<string | null> {
+  const cached = getCachedAccessToken();
+  if (cached) return cached;
+  try {
+    return await Promise.race<string | null>([
+      supabase.auth.getSession().then(({ data }) => data.session?.access_token ?? null),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+    ]);
+  } catch {
+    return null;
+  }
+}
+
 async function makeHeaders(): Promise<HeadersInit> {
   const h: Record<string, string> = { 'Content-Type': 'application/json' };
-  try {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (token) {
-      h['Authorization'] = `Bearer ${token}`;
-      h['X-Supabase-Token'] = token;
-    }
-  } catch { /* signed out — request will 401 */ }
+  const token = await accessToken();
+  if (token) {
+    h['Authorization'] = `Bearer ${token}`;
+    h['X-Supabase-Token'] = token;
+  }
   return h;
 }
 
@@ -119,11 +134,21 @@ export type AdminPaymentRow = {
   created_at:   string;
 };
 
+export type AdminDisputeUser = {
+  username:  string | null;
+  email:     string | null;
+  photo_url: string | null;
+  role:      string | null;
+};
+
 export type AdminDisputeRow = {
   id:                  string;
   type:                string;
   reported_user_id:    string | null;
   reported_by_user_id: string | null;
+  /** Who the case is about / who filed it (null when the account is gone). */
+  reported_user?:      AdminDisputeUser | null;
+  reported_by_user?:   AdminDisputeUser | null;
   reason:              string;
   status:              'open' | 'resolved' | 'warned' | 'banned';
   created_at:          string;

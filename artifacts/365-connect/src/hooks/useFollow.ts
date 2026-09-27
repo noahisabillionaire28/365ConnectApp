@@ -36,11 +36,11 @@ export function useFollow(
     staleTime: 30_000,
     placeholderData: keepPreviousData,
     queryFn: async () => {
-      const [status, followers] = await Promise.all([
+      const [status, counts] = await Promise.all([
         apiClient(user!.id).get<{ following: boolean }>(`/follows/status/${targetUserId}`),
-        apiClient(null).get<unknown[]>(`/follows/followers/${targetUserId}`),
+        apiClient(user!.id).get<{ followers: number; following: number }>(`/follows/counts/${targetUserId}`),
       ]);
-      return { following: status.following, count: followers.length };
+      return { following: status.following, count: counts.followers ?? 0 };
     },
   });
   const state = q.data ?? { following: known ?? false, count: 0 };

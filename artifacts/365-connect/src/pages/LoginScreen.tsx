@@ -14,6 +14,7 @@ import { ChevronLeft, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 import { FaApple }  from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
+import { authRedirectUrl } from '@/lib/native';
 import { resolveSetupRoute } from '@/lib/setupRoute';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
@@ -28,10 +29,7 @@ const RED    = '#EF4444';
 // providers are enabled in the Supabase dashboard.
 const SHOW_SOCIAL_AUTH = false;
 
-function callbackUrl() {
-  const base = import.meta.env.BASE_URL ?? '/';
-  return `${window.location.origin}${base.replace(/\/$/, '')}/auth/callback`;
-}
+const callbackUrl = () => authRedirectUrl('auth/callback');
 
 function friendlyProviderError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
@@ -171,7 +169,7 @@ export function LoginScreen() {
     setLoading(true); setError(null); setInfo(null);
     try {
       const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL ?? '/'}reset-password`,
+        redirectTo: authRedirectUrl('reset-password'),
       });
       if (resetErr) throw resetErr;
       setInfo('Check your inbox — we sent a password reset link.');

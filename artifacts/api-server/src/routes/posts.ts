@@ -4,6 +4,8 @@ import { requireAuth } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
 import { blockedIdsFor, isBlockedEitherWay } from '../lib/chat.js';
 import { getRoleInfo } from '../lib/roleCache.js';
+import { requireUploadUrl, cleanCaption } from '../lib/media.js';
+import { sendError } from '../lib/httpError.js';
 
 const router = Router();
 
@@ -80,15 +82,19 @@ router.get('/feed', requireAuth, async (req, res) => {
 router.get('/hashtag/:tag', requireAuth, async (req, res) => {
   const tag = String(req.params.tag).replace(/[^a-z0-9_]/gi, '').toLowerCase();
   if (!tag) return res.json([]);
+  // ilike is only a coarse pre-filter ("#bar" would also match "#bartender");
+  // the exact tag is checked word-by-word below, so over-fetch a little.
   const { data, error } = await adminDb
     .from('posts')
     .select('*')
     .not('photo_url', 'is', null)
     .ilike('caption', `%#${tag}%`)
     .order('created_at', { ascending: false })
-    .limit(60);
+    .limit(120);
   if (error) return res.status(500).json({ error: error.message });
-  return res.json(await enrichPosts(data ?? [], req.userId));
+  const exact = new RegExp(`(^|[^a-z0-9_])#${tag}(?![a-z0-9_])`, 'i');
+  const rows = (data ?? []).filter((p) => typeof p.caption === 'string' && exact.test(p.caption)).slice(0, 60);
+  return res.json(await enrichPosts(rows, req.userId));
 });
 
 /* ── GET /api/posts/detail/:postId — single post (must precede /:userId) ────── */
@@ -239,9 +245,14 @@ router.get('/:userId', requireAuth, async (req, res) => {
 router.post('/', requireAuth, async (req, res) => {
   // Accept either field name — the client sends photo_url; image_url kept for compat.
   const { image_url, photo_url, caption } = req.body as Record<string, unknown>;
+  let url: string; let text: string | null;
+  try {
+    url = requireUploadUrl(photo_url ?? image_url);
+    text = cleanCaption(caption);
+  } catch (e) { return sendError(res, e); }
   const { data, error } = await adminDb
     .from('posts')
-    .insert({ user_id: req.userId, photo_url: (photo_url ?? image_url) ?? null, caption: caption ?? null })
+    .insert({ user_id: req.userId, photo_url: url, caption: text })
     .select()
     .single();
   if (error) return res.status(500).json({ error: error.message });

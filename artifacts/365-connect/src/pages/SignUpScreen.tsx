@@ -11,6 +11,7 @@ import { ChevronLeft, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-reac
 import { FcGoogle } from 'react-icons/fc';
 import { FaApple }  from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
+import { authRedirectUrl } from '@/lib/native';
 import { apiClient } from '@/lib/api';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
@@ -25,10 +26,7 @@ const RED    = '#EF4444';
 // providers are enabled in the Supabase dashboard.
 const SHOW_SOCIAL_AUTH = false;
 
-function callbackUrl() {
-  const base = import.meta.env.BASE_URL ?? '/';
-  return `${window.location.origin}${base.replace(/\/$/, '')}/auth/callback`;
-}
+const callbackUrl = () => authRedirectUrl('auth/callback');
 
 function friendlyProviderError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);

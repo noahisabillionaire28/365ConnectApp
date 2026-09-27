@@ -5,7 +5,7 @@ import {
   Star, ChevronRight, Settings,
   CreditCard, Bell, Shield, HelpCircle, LogOut,
   Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
-  BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck, LayoutTemplate,
+  BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck, LayoutTemplate, Trash2,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
@@ -363,6 +363,31 @@ export function ProfileScreen() {
   async function handleSignOut() {
     await signOut();
     navigate('/');
+  }
+
+  // Self-serve account deletion (an App Store requirement). The server
+  // refuses while there are upcoming bookings or open posted shifts, and the
+  // sheet asks for DELETE to be typed so a stray tap cannot do it.
+  const { showToast: toast } = useToast();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteWord, setDeleteWord] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDeleteAccount() {
+    if (deleteWord.trim() !== 'DELETE' || deleting) return;
+    setDeleting(true); setDeleteError(null);
+    try {
+      await apiClient(user?.id).delete('/users/me');
+      setDeleteOpen(false);
+      await signOut();
+      toast('Your account has been deleted.');
+      navigate('/');
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Couldn't delete your account. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   // Unauthenticated guard — redirect to splash rather than rendering a blank profile.
@@ -748,12 +773,51 @@ export function ProfileScreen() {
 
                 <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
                   <SettingRow icon={LogOut} label="Log Out" onTap={handleSignOut} danger />
+                  {/* The sheet sits below this panel's z-index, so the panel closes first. */}
+                  <SettingRow icon={Trash2} label="Delete account" onTap={() => { setSettingsOpen(false); setDeleteWord(''); setDeleteError(null); setDeleteOpen(true); }} danger />
                 </div>
+                <p className="text-[#9CA3AF] text-[11px] leading-relaxed px-1 mt-2">
+                  Deleting removes your profile, posts, messages and history for good.
+                </p>
               </div>
             </motion.div>
           );
         })()}
       </AnimatePresence>
+
+      <ConfirmSheet
+        open={deleteOpen}
+        title="Delete your account?"
+        body={
+          <div className="flex flex-col gap-3">
+            <p>
+              This permanently removes your profile, posts, messages, reviews and history. It cannot be undone.
+              If you are booked on an upcoming shift, or have an open shift posted, withdraw or cancel it first.
+            </p>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[12px] font-semibold text-[#111827]">Type DELETE to confirm</span>
+              <input
+                type="text"
+                value={deleteWord}
+                onChange={(e) => setDeleteWord(e.target.value)}
+                autoCapitalize="characters"
+                autoComplete="off"
+                placeholder="DELETE"
+                aria-label="Type DELETE to confirm"
+                className="w-full h-[44px] rounded-[10px] border border-[#E5E7EB] px-3 text-[14px] text-[#111827] outline-none focus:border-[#EF4444]"
+                data-testid="input-delete-confirm"
+              />
+            </label>
+            {deleteError && <p className="text-[#EF4444] text-[13px] leading-snug" role="alert">{deleteError}</p>}
+          </div>
+        }
+        confirmLabel="Delete my account"
+        tone="danger"
+        busy={deleting}
+        confirmDisabled={deleteWord.trim() !== 'DELETE'}
+        onConfirm={() => void handleDeleteAccount()}
+        onCancel={() => { if (!deleting) setDeleteOpen(false); }}
+      />
     </div>
   );
 }

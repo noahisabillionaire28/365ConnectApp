@@ -34,6 +34,9 @@ export function StoryViewer({
   const [si, setSi] = useState(0);
   const [progress, setProgress] = useState(0); // 0..1 for the current story
   const [paused, setPaused] = useState(false);
+  // The 5 s clock starts when the photo is on screen, not when the request
+  // starts; on a slow connection the old timer skipped stories unseen.
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
 
   const group = groups[gi];
   const story = group?.stories[si];
@@ -65,8 +68,9 @@ export function StoryViewer({
   }, [story?.id]);
 
   // Auto-advance timer (rAF so the bar animates smoothly) -------------------
+  const imageReady = !!story && loadedUrl === story.photo_url;
   useEffect(() => {
-    if (!story || paused) return;
+    if (!story || paused || !imageReady) return;
     let raf = 0;
     let start = performance.now();
     let elapsedBefore = progress * STORY_MS;
@@ -80,7 +84,7 @@ export function StoryViewer({
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [story?.id, paused, gi, si]);
+  }, [story?.id, paused, gi, si, imageReady]);
 
   // Keyboard support (desktop) ---------------------------------------------
   useEffect(() => {
@@ -102,11 +106,19 @@ export function StoryViewer({
       <div className="relative w-full max-w-app h-full max-h-[100dvh] bg-black overflow-hidden">
         {/* The photo */}
         <img
+          key={story.photo_url}
           src={story.photo_url}
           alt={story.caption ?? 'Story'}
           className="absolute inset-0 w-full h-full object-contain bg-black"
           draggable={false}
+          onLoad={() => setLoadedUrl(story.photo_url)}
+          onError={() => setLoadedUrl(story.photo_url)}
         />
+        {!imageReady && (
+          <div className="absolute inset-0 flex items-center justify-center" aria-label="Loading story">
+            <div className="w-8 h-8 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+          </div>
+        )}
         <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
 

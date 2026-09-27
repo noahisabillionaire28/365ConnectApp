@@ -15,7 +15,7 @@ import {
   createContext, useContext, useCallback, useEffect, useState, type ReactNode,
 } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiClient } from '@/lib/api';
+import { apiClient, isApiStatus } from '@/lib/api';
 
 export type UserRole = 'worker' | 'client' | 'staffer' | 'admin' | null;
 export type UserStatus = 'active' | 'suspended' | 'banned' | 'flagged' | null;
@@ -105,11 +105,13 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       setStatus((data?.status as UserStatus) ?? 'active');
       setIsAdmin(data?.is_admin === true || data?.role === 'admin');
       setRoleError(false);
-    } catch {
+    } catch (e) {
       setRealRole(null);
       setStatus(null);
       setIsAdmin(false);
-      setRoleError(true);
+      // A definite "no profile row" is not an error: the account simply has
+      // no role yet. Anything else (offline, 5xx) is unknown, not "none".
+      setRoleError(!isApiStatus(e, 404));
     }
     setLoadedFor(user.id);
     setFetching(false);

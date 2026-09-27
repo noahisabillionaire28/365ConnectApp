@@ -38,6 +38,7 @@ import { ToastProvider } from '@/contexts/ToastContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { MobileContainer } from '@/components/MobileContainer';
 import { NativeBridge } from '@/components/NativeBridge';
+import { AppBadge } from '@/components/AppBadge';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { AdminNav } from '@/components/AdminNav';
 
@@ -46,7 +47,6 @@ import { AdminNav } from '@/components/AdminNav';
 import { SplashScreen }         from '@/pages/SplashScreen';
 import { LoginScreen }          from '@/pages/LoginScreen';
 const SignUpScreen = lazyNamed(() => import('@/pages/SignUpScreen'), 'SignUpScreen');
-const PhoneAuthScreen = lazyNamed(() => import('@/pages/PhoneAuthScreen'), 'PhoneAuthScreen');
 const ResetPasswordScreen = lazyNamed(() => import('@/pages/ResetPasswordScreen'), 'ResetPasswordScreen');
 const AuthCallbackScreen = lazyNamed(() => import('@/pages/AuthCallbackScreen'), 'AuthCallbackScreen');
 const RoleSelectScreen = lazyNamed(() => import('@/pages/RoleSelectScreen'), 'RoleSelectScreen');
@@ -160,7 +160,6 @@ function MobileRouter() {
             {/* ── Auth (Supabase) ───────────────────────────────── */}
             <Route path="/login"          component={LoginScreen}         />
             <Route path="/signup"         component={SignUpScreen}        />
-            <Route path="/phone-auth"     component={PhoneAuthScreen}     />
             <Route path="/reset-password" component={ResetPasswordScreen} />
             <Route path="/auth/callback"  component={AuthCallbackScreen}  />
 
@@ -278,6 +277,7 @@ function AppShell() {
     <AuthProvider>
       <SSEMount />
       <NativeBridge />
+      <AppBadge />
       <RoleProvider>
         <ToastProvider>
           <TooltipProvider>

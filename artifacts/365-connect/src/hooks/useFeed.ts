@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -15,16 +15,50 @@ export type FeedPost = {
   liked_by_me: boolean;
 };
 
-/** Global content feed — newest photo posts from everyone. */
+/** Posts per page; the server caps a page at 50. */
+export const FEED_PAGE = 20;
+
+type FeedData = InfiniteData<FeedPost[], number>;
+
+/** Longest a caption may be (mirrors the server's MAX_CAPTION). */
+export const MAX_CAPTION = 2200;
+
+/**
+ * Global content feed — newest photo posts from everyone, loaded a page at a
+ * time. `loadMore` fetches the next page; `hasMore` is false once a page
+ * comes back short.
+ */
 export function useFeed() {
   const { user } = useAuth();
-  const q = useQuery({
+  const q = useInfiniteQuery<FeedPost[], Error, FeedData, readonly ['feed'], number>({
     queryKey: ['feed'],
     enabled: !!user?.id,
     staleTime: 30_000,
-    queryFn: () => apiClient(user!.id).get<FeedPost[]>('/posts/feed'),
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      apiClient(user!.id).get<FeedPost[]>(`/posts/feed?limit=${FEED_PAGE}&offset=${pageParam}`),
+    getNextPageParam: (lastPage, pages) =>
+      lastPage.length < FEED_PAGE ? undefined : pages.reduce((n, p) => n + p.length, 0),
   });
-  return { posts: q.data ?? [], isLoading: q.isLoading, isError: q.isError, refetch: q.refetch };
+  const posts = q.data?.pages.flat() ?? [];
+  return {
+    posts,
+    isLoading: q.isLoading,
+    isError: q.isError,
+    refetch: q.refetch,
+    hasMore: q.hasNextPage,
+    isLoadingMore: q.isFetchingNextPage,
+    loadMore: () => { if (q.hasNextPage && !q.isFetchingNextPage) void q.fetchNextPage(); },
+  };
+}
+
+/** Apply `fn` to every post in the paged feed cache (no-op when it is empty). */
+function mapFeed(old: FeedData | undefined, fn: (p: FeedPost) => FeedPost | null): FeedData | undefined {
+  if (!old) return old;
+  return {
+    ...old,
+    pages: old.pages.map((page) => page.map(fn).filter((p): p is FeedPost => p !== null)),
+  };
 }
 
 /** Posts tagged with a given hashtag. */
@@ -64,9 +98,8 @@ export function useToggleLike() {
       apiClient(user!.id).post<{ liked: boolean; like_count: number }>(`/posts/${postId}/like`, {}),
     onMutate: async (postId) => {
       await qc.cancelQueries({ queryKey: ['feed'] });
-      const prevFeed = qc.getQueryData<FeedPost[]>(['feed']);
-      qc.setQueryData<FeedPost[]>(['feed'], (old) =>
-        (old ?? []).map((p) => (p.id === postId ? bump(p) : p)));
+      const prevFeed = qc.getQueryData<FeedData>(['feed']);
+      qc.setQueryData<FeedData>(['feed'], (old) => mapFeed(old, (p) => (p.id === postId ? bump(p) : p)));
       qc.setQueryData<FeedPost>(['post', postId], (old) => (old ? bump(old) : old));
       return { prevFeed };
     },
@@ -83,7 +116,7 @@ export function useDeletePost() {
   return useMutation({
     mutationFn: (postId: string) => apiClient(user!.id).delete(`/posts/${postId}`),
     onSuccess: (_data, postId) => {
-      qc.setQueryData<FeedPost[]>(['feed'], (old) => (old ?? []).filter((p) => p.id !== postId));
+      qc.setQueryData<FeedData>(['feed'], (old) => mapFeed(old, (p) => (p.id === postId ? null : p)));
       qc.invalidateQueries({ queryKey: ['posts'] });
     },
   });

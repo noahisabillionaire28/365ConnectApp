@@ -1,11 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { Search, BadgeCheck, ImagePlus } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { PostCard } from '@/components/PostCard';
 import { StoryTray } from '@/components/StoryTray';
 import { usePeopleFeed, type WorkerPerson } from '@/hooks/usePeopleFeed';
-import { useFeed, useToggleLike, useCreatePost } from '@/hooks/useFeed';
+import { useFeed, useToggleLike, useCreatePost, MAX_CAPTION } from '@/hooks/useFeed';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { uploadPostPhoto } from '@/lib/storage';
@@ -58,7 +58,16 @@ export function ExploreScreen() {
   });
 
   // Feed tab
-  const { posts, isLoading: feedLoading } = useFeed();
+  const { posts, isLoading: feedLoading, hasMore, isLoadingMore, loadMore } = useFeed();
+  // Fetch the next page as the end of the list scrolls into view.
+  const moreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = moreRef.current;
+    if (!el || tab !== 'feed' || !hasMore) return;
+    const io = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) loadMore(); }, { rootMargin: '400px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [tab, hasMore, loadMore, posts.length]);
   const toggleLike = useToggleLike();
   const createPost = useCreatePost();
   const [posting, setPosting] = useState(false);
@@ -200,6 +209,19 @@ export function ExploreScreen() {
                 onLike={(id) => toggleLike.mutate(id)}
                 onOpenComments={(id) => navigate(`/post/${id}`)} />
             ))}
+            {!feedLoading && posts.length > 0 && (
+              <div ref={moreRef} className="flex items-center justify-center py-5">
+                {hasMore ? (
+                  <button type="button" onClick={loadMore} disabled={isLoadingMore}
+                    className="h-[38px] px-5 rounded-full border border-[#E5E7EB] text-[#111827] text-[13px] font-semibold disabled:opacity-60"
+                    aria-label="Load more posts">
+                    {isLoadingMore ? 'Loading…' : 'Load more'}
+                  </button>
+                ) : (
+                  <p className="text-[#9CA3AF] text-[12px]">You're all caught up.</p>
+                )}
+              </div>
+            )}
           </>
         )}
       </main>
@@ -219,7 +241,7 @@ export function ExploreScreen() {
 
       {/* Compose sheet — photo preview + caption with #hashtags */}
       {composeFile && (
-        <div className="fixed inset-0 z-[80] flex flex-col bg-white max-w-app mx-auto" role="dialog" aria-label="New post">
+        <div data-no-pull className="fixed inset-0 z-[80] flex flex-col bg-white max-w-app mx-auto" role="dialog" aria-label="New post">
           <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 border-b border-[#EFEFEF]">
             <button type="button" onClick={closeCompose} disabled={posting}
               className="text-[#111827] text-[15px] font-medium disabled:opacity-50">Cancel</button>
@@ -239,10 +261,14 @@ export function ExploreScreen() {
               onChange={(e) => setComposeCaption(e.target.value)}
               placeholder="Write a caption… add #hashtags like #bartender #miami #wedding"
               rows={4}
+              maxLength={MAX_CAPTION}
               aria-label="Caption"
               className="w-full bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 text-[14px] text-[#111827] placeholder:text-[#9CA3AF] outline-none focus:border-[#0A1628]"
             />
-            <p className="text-[#9CA3AF] text-[12px] mt-2">Tip: #hashtags make your post discoverable by clients searching for talent.</p>
+            <div className="flex items-start justify-between gap-3 mt-2">
+              <p className="text-[#9CA3AF] text-[12px]">Tip: #hashtags make your post discoverable by clients searching for talent.</p>
+              <p className="text-[#9CA3AF] text-[11px] flex-shrink-0 tabular-nums" aria-live="polite">{composeCaption.length}/{MAX_CAPTION}</p>
+            </div>
           </div>
         </div>
       )}

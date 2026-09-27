@@ -151,7 +151,7 @@ export function NotificationSettingsScreen() {
                 divider
                 icon={(on) => <Mail size={17} aria-hidden className={on ? 'text-white' : 'text-[#0A1628]'} />}
                 title="Email notifications"
-                subtitle="Get the same alerts by email. (Email delivery is coming soon.)"
+                subtitle="Bookings, requests, reminders and payments by email too. Likes, comments and roster adds stay in-app."
                 on={prefs.email_notifications}
                 onToggle={() => update({ email_notifications: !prefs.email_notifications })}
                 saving={saving}

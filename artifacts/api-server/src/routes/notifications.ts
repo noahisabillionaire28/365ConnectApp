@@ -6,7 +6,7 @@ import { sendEmail, renderNotificationEmail, appUrl } from '../lib/email.js';
 import { pushToUser } from '../lib/push.js';
 
 /** Notification types that should NOT trigger an email (too high-frequency). */
-const EMAIL_SKIP_TYPES = new Set(['post_like', 'post_comment', 'follow']);
+const EMAIL_SKIP_TYPES = new Set(['post_like', 'post_comment', 'new_follower']);
 
 /** Best-effort deep link into the app for a notification, for the email CTA. */
 function emailCta(type: string, shiftId?: string | null, postId?: string | null):

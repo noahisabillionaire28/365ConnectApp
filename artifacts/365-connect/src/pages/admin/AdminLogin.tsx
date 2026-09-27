@@ -17,9 +17,14 @@ export function AdminLogin() {
     setError('');
     if (!email.trim() || !password.trim()) { setError('Please enter your email and password.'); return; }
     setLoading(true);
-    const ok = await adminLogin(email.trim(), password);
-    if (ok) { navigate('/admin/dashboard'); }
-    else { setError('Invalid credentials, or this account does not have admin access.'); setLoading(false); }
+    const result = await adminLogin(email.trim(), password);
+    if (result.ok) { navigate('/admin/dashboard'); return; }
+    setError(
+      result.reason === 'credentials' ? 'That email and password do not match.'
+      : result.reason === 'not_admin' ? 'This account does not have admin access.'
+      : "Couldn't sign in right now. Check your connection and try again.",
+    );
+    setLoading(false);
   }
 
   return (

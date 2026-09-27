@@ -46,6 +46,21 @@ async function makeHeaders(
   return h;
 }
 
+/** An API reply the server refused; `status` lets callers tell 404 from a network failure. */
+export class ApiError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/** True when the request reached the server and it answered `status`. */
+export function isApiStatus(err: unknown, status: number): boolean {
+  return err instanceof ApiError && err.status === status;
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -60,7 +75,7 @@ async function request<T>(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
-    throw new Error(err.error ?? `API ${method} ${path} → ${res.status}`);
+    throw new ApiError(res.status, err.error ?? `API ${method} ${path} → ${res.status}`);
   }
   return res.json() as Promise<T>;
 }

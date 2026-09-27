@@ -941,7 +941,7 @@ function StafferHomeFeed() {
 
 /* ─── HomeScreen — role router ────────────────────────────────────────────────── */
 export function HomeScreen() {
-  const { role, roleLoading, roleError } = useRole();
+  const { role, roleLoading, roleError, refetchRole } = useRole();
   const { user, loading: authLoading } = useAuth();
 
   if (roleLoading || authLoading) {
@@ -957,9 +957,24 @@ export function HomeScreen() {
 
   // Signed out → splash (which routes to login); signed in with no role yet
   // (onboarding never finished) → pick one. A failed profile read is not "no
-  // role", so it falls through to the default feed rather than bouncing.
+  // role": it gets a retry card, never a bounce to role select (where a tap
+  // would try to rewrite the account) and never a guessed feed.
   if (!user) return <Redirect to="/" />;
-  if (!role && !roleError) return <Redirect to="/role-select" />;
+  if (!role && roleError) {
+    return (
+      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-8 pb-[64px] gap-3 text-center">
+        <p className="text-[#111827] font-bold text-[17px]">Couldn't load your account</p>
+        <p className="text-[#6B7280] text-[14px] leading-relaxed max-w-[280px]">Check your connection and try again.</p>
+        <button type="button" onClick={() => { void refetchRole(); }}
+          className="mt-2 h-[48px] w-full max-w-[280px] rounded-[12px] bg-[#0A1628] text-white text-[15px] font-bold"
+          data-testid="btn-home-retry">
+          Try again
+        </button>
+        <BottomTabNav />
+      </div>
+    );
+  }
+  if (!role) return <Redirect to="/role-select" />;
 
   if (role === 'worker') return <WorkerHomeFeed />;
   if (role === 'staffer') return <StafferHomeFeed />;

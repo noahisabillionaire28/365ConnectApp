@@ -18,8 +18,8 @@ Migration `0031_rls_hardening.sql` (applied):
   readable by signed-in users only; the anon role has no privileges.
 
 The API server uses the service role, so none of this affects it. The only
-direct table reads left in the app are the own-row reads on `LoginScreen` and
-`PhoneAuthScreen`, which the own-row policy allows.
+direct table read left in the app is the own-row read on `LoginScreen`, which
+the own-row policy allows. (The unreachable phone-OTP screen was removed.)
 
 ## Sign-up and `AUTH_AUTOCONFIRM`
 
@@ -46,6 +46,44 @@ Before setting it to `false` in production:
    app's URL so the confirmation link lands on it.
 4. Set `AUTH_AUTOCONFIRM=false` on the `365-connect-api` Vercel project and
    redeploy.
+
+## Roles
+
+`POST /api/users` accepts `role` only while the account has none. Role select
+is the one screen that sends it; once a role is set it cannot be changed from
+the app (an admin can, from the panel). The splash and Home screens no longer
+send a signed-in user to role select when the profile read merely failed:
+they show a retry card, so a network blip can never rewrite an account.
+
+## Account deletion
+
+`DELETE /api/users/me` (signed-in user) deletes the Supabase auth account;
+every table that references `public.users(id)` cascades (profile, posts,
+stories, messages, applications, reviews, follows, notifications, push
+subscriptions, payments rows that reference the user). It answers **409** with
+an explanation while the user still has commitments other people rely on:
+
+- as a worker: an accepted application on an open/filled shift that has not
+  ended yet → "withdraw from it first";
+- as a poster: an open or filled shift that has not ended yet → "cancel it
+  first".
+
+In the app it lives under Profile → Settings → **Delete account**, behind a
+confirmation sheet that requires typing `DELETE`; on success the app signs out
+and returns to the splash screen. The admin panel's *Delete User* is refused
+(409) while the user has shifts, applications or payments; suspend or ban
+instead.
+
+## Native deep links (iOS app)
+
+Inside the Capacitor shell the app asks Supabase to redirect to the custom
+scheme instead of the web origin: `connect365://auth/callback` for OAuth /
+magic links and `connect365://reset-password` for password resets. Both must
+be on the Supabase redirect allow-list (docs/ios-testflight.md, step 5).
+`NativeBridge` reads the tokens from the link fragment, sets the session, and
+opens `/reset-password` when the link is a recovery link (`type=recovery`),
+or the splash route otherwise. A failed link (`#error=…`) is passed through
+to the reset screen, which explains and offers to send a new one.
 
 ## Scheduled routes
 

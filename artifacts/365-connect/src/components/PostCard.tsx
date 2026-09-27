@@ -87,7 +87,7 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
 
       {/* Options action sheet (Instagram-style) */}
       {menuOpen && (
-        <div className="fixed inset-0 z-[80] flex items-end justify-center" role="dialog" aria-modal="true">
+        <div data-no-pull className="fixed inset-0 z-[80] flex items-end justify-center" role="dialog" aria-modal="true">
           <button type="button" aria-label="Close" onClick={() => setMenuOpen(false)}
             className="absolute inset-0 bg-black/40" />
           <div className="relative w-full max-w-app bg-white rounded-t-[18px] pb-6 pt-2 px-3">

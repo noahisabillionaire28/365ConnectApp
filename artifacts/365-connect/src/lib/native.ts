@@ -18,6 +18,19 @@ export function isIOS(): boolean {
 export const APP_SCHEME = 'connect365';
 
 /**
+ * Where Supabase should send the user back after OAuth or a password reset.
+ * Inside the iOS app that is the custom scheme (the web origin would open in
+ * Safari and never reach the app); on the web it is the deployed origin.
+ * Both `connect365://auth/callback` and `connect365://reset-password` must be
+ * on the Supabase redirect allow-list (see docs/ios-testflight.md).
+ */
+export function authRedirectUrl(path: 'auth/callback' | 'reset-password'): string {
+  if (isNative()) return `${APP_SCHEME}://${path}`;
+  const base = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '');
+  return `${window.location.origin}${base}/${path}`;
+}
+
+/**
  * One-time native setup: status bar, splash screen, deep links, and the
  * "app came back to the foreground" signal. Safe to call on the web (no-op).
  */

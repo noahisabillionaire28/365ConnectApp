@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { hydrateForUser, clearUser } from '@/store/feedStore';
 import { clearQueryCache } from '@/lib/queryPersist';
 import { forgetPushSubscription } from '@/lib/pushSession';
+import { setAppBadgeCount } from '@/components/AppBadge';
 
 export type SimpleUser = {
   id:       string;
@@ -96,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearQueryCache();
     queryClient.clear();
     try { localStorage.removeItem('admin_preview_role'); } catch { /* ignore */ }
+    setAppBadgeCount(0);
     await supabase.auth.signOut();
   };
 

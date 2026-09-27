@@ -15,7 +15,8 @@ const NAVY   = '#0A1628';
 const ACTIVE = '#1E3A5F';
 
 /** The live app's home, opened in a new tab so the admin panel stays put. */
-const APP_URL = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/home`;
+// In-app route (wouter applies the base path); a raw anchor would reload the whole app.
+const APP_URL = '/home';
 
 const NAV_ITEMS = [
   { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -58,7 +59,7 @@ export function AdminNav() {
 
         <div className="flex items-center gap-1.5">
           {/* View the live app (opens in a new tab) */}
-          <a
+          <Link
             href={APP_URL}
             aria-label="View the app as a normal user"
             className="h-10 px-3 rounded-[8px] flex items-center gap-1.5 text-white/90 text-[13px] font-semibold transition-colors"
@@ -66,7 +67,7 @@ export function AdminNav() {
           >
             <ExternalLink size={15} aria-hidden />
             View App
-          </a>
+          </Link>
 
           {/* Hamburger */}
           <button
@@ -155,7 +156,7 @@ export function AdminNav() {
 
               {/* View the app */}
               <div className="px-3 pb-2 flex-shrink-0">
-                <a
+                <Link
                   href={APP_URL}
                   onClick={() => setOpen(false)}
                   aria-label="View the app as a normal user"
@@ -166,7 +167,7 @@ export function AdminNav() {
                   <span className="text-[15px] font-semibold" style={{ color: '#FFFFFF' }}>
                     View App
                   </span>
-                </a>
+                </Link>
               </div>
 
               {/* Logout */}

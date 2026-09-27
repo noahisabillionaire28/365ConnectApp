@@ -14,11 +14,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation }                   from 'wouter';
 import { ChevronLeft, Camera, AlertCircle, CreditCard, Lock, CheckCircle2 } from 'lucide-react';
 import { uploadAvatar } from '@/lib/storage';
-import { apiClient } from '@/lib/api';
+import { apiClient, isApiStatus } from '@/lib/api';
 import { posterSetupDone } from '@/lib/setupRoute';
 import { saveHandleWithRetry } from '@/lib/username';
 import { useAuth }  from '@/contexts/AuthContext';
 import { ImageCropper } from '@/components/ImageCropper';
+import { SetupLoadError } from '@/components/SetupLoadError';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const NAVY   = '#0A1628';
@@ -175,6 +176,8 @@ export function StafferSetupScreen() {
   const total = isEdit ? 3 : TOTAL;
 
   const [initialized, setInitialized] = useState(false);
+  const [loadFailed,  setLoadFailed]  = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [step,        setStep]        = useState(1);
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState<string | null>(null);
@@ -209,8 +212,14 @@ export function StafferSetupScreen() {
         const stored = loadStep(user.id);
         setStep(isEdit ? 1 : Math.min(3, Math.max(inferred, stored)));
         setInitialized(true);
+      })
+      .catch((err) => {
+        // No profile row yet → start the wizard fresh. Offline or a server
+        // hiccup → a retry card, not a skeleton forever.
+        if (!isApiStatus(err, 404)) setLoadFailed(true);
+        setInitialized(true);
       });
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, loadAttempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveAndAdvance(patch: Record<string, unknown>, next: number) {
     if (!user) return;
@@ -317,6 +326,15 @@ export function StafferSetupScreen() {
   }
 
   // ── Loading skeleton ──────────────────────────────────────────────────────────
+  if (loadFailed) {
+    return (
+      <SetupLoadError
+        onRetry={() => { setLoadFailed(false); setInitialized(false); setLoadAttempt((n) => n + 1); }}
+        onBack={() => navigate('/home')}
+      />
+    );
+  }
+
   if (!initialized) {
     return (
       <div className="min-h-[100dvh] bg-white flex flex-col">
