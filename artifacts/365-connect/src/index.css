@@ -179,3 +179,33 @@
 /* Apple MapKit JS draws its own chrome; keep it inside the map box too. */
 .apple-map .mk-map-view { position: absolute; inset: 0; }
 .apple-map { overflow: hidden; }
+
+/* ─── Lightweight entrance animations ───────────────────────────────────────
+   CSS stand-ins for the decorative framer-motion effects on first-paint
+   screens (Home, Notifications, toasts), so the animation library only loads
+   with the sheets and viewers that need gestures. ─────────────────────────── */
+@keyframes app-rise-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes app-pop-in {
+  from { opacity: 0; transform: scale(0.6); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes app-toast-in {
+  from { transform: translateY(-80px); }
+  to   { transform: none; }
+}
+@keyframes app-toast-out {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(-16px); }
+}
+@layer utilities {
+  .anim-rise-in  { animation: app-rise-in 0.3s ease-out both; }
+  .anim-pop-in   { animation: app-pop-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+  .anim-toast-in { animation: app-toast-in 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.1) both; }
+  .anim-toast-out { animation: app-toast-out 0.22s ease-in both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim-rise-in, .anim-pop-in, .anim-toast-in, .anim-toast-out { animation-duration: 0.01ms; animation-delay: 0ms !important; }
+}

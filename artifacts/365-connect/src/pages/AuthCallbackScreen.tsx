@@ -20,7 +20,7 @@ import { AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { apiClient } from '@/lib/api';
 import { resolveSetupRoute } from '@/lib/setupRoute';
-import type { Session } from '@supabase/supabase-js';
+import type { Session } from '@supabase/auth-js';
 
 const NAVY = '#0A1628';
 const RED  = '#EF4444';

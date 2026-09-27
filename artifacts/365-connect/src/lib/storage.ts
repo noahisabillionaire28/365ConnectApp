@@ -6,7 +6,7 @@
  * implementation used Replit object storage, which does not exist on the
  * production host.)
  */
-import { supabase } from '@/lib/supabase';
+import { getStorageClient } from '@/lib/supabase';
 import { apiClient } from '@/lib/api';
 import { compressImage } from '@/lib/imageCompression';
 
@@ -32,7 +32,8 @@ export async function uploadFile(
     bucket: string; path: string; token: string; publicUrl: string;
   }>('/storage/sign-upload', { name, contentType: payload.type || file.type || 'application/octet-stream', size: payload.size });
 
-  const { error } = await supabase.storage
+  const storage = await getStorageClient();
+  const { error } = await storage
     .from(sig.bucket)
     .uploadToSignedUrl(sig.path, sig.token, payload);
   if (error) throw new Error(`Upload failed: ${error.message}`);

@@ -27,6 +27,21 @@ export const MAX_SERIES_OCCURRENCES = 12;
  */
 const PRIVATE_SHIFT_FIELDS = ['contact_phone', 'point_of_contact', 'special_instructions', 'parking_notes'] as const;
 
+/**
+ * Every column the list endpoints return, spelled out so a column added to
+ * the table later is not sent to every signed-in user by accident. The
+ * private four are included only so the poster sees their own details; the
+ * list mapper strips them for everyone else.
+ */
+const SHIFT_LIST_COLUMNS = [
+  'id', 'client_id', 'title', 'description', 'location', 'event_type', 'job_type', 'job_types',
+  'pay_rate', 'pay_period', 'start_time', 'end_time', 'timezone', 'date',
+  'spots_available', 'spots_filled', 'instant_claim', 'visibility', 'status', 'created_at',
+  'lat', 'lng', 'cover_image', 'company_name', 'requirements', 'dress_code', 'dress_code_items',
+  'ai_match_pct', 'unit_info', 'repeat_type', 'event_id', 'series_id',
+  ...PRIVATE_SHIFT_FIELDS,
+].join(', ');
+
 /** Owner, admin, or a worker who is booked / on the waitlist for the shift. */
 async function canSeePrivateDetails(shift: { id: string; client_id: string | null }, viewerId: string): Promise<boolean> {
   if (shift.client_id === viewerId) return true;
@@ -145,8 +160,8 @@ router.get('/', requireAuth, async (req, res) => {
   const off = Math.max(parseInt(offset) || 0, 0);
   // event_id lists all positions of one event, regardless of status.
   let q = event_id
-    ? adminDb.from('shifts').select('*').eq('event_id', event_id)
-    : adminDb.from('shifts').select('*').eq('status', status);
+    ? adminDb.from('shifts').select(SHIFT_LIST_COLUMNS).eq('event_id', event_id)
+    : adminDb.from('shifts').select(SHIFT_LIST_COLUMNS).eq('status', status);
   if (!event_id) {
     // Roster-only shifts are visible to the poster and to workers on their
     // roster, whatever status is asked for.
@@ -167,7 +182,7 @@ router.get('/', requireAuth, async (req, res) => {
 
   // The event_id branch skipped the visibility filter above: drop the
   // roster-only positions this viewer may not see.
-  let shifts = rawShifts ?? [];
+  let shifts: any[] = (rawShifts ?? []) as any[];
   if (event_id && shifts.some((s: any) => s.visibility === 'roster')) {
     const visible: any[] = [];
     for (const s of shifts) if (await canViewShift(s, req.userId)) visible.push(s);
@@ -185,14 +200,22 @@ router.get('/', requireAuth, async (req, res) => {
     for (const u of users ?? []) userMap.set(u.id, u);
   }
 
+  // Day-of details (phone, point of contact, parking, instructions) are for
+  // the poster and the people booked on the shift — the shift page hands them
+  // to booked workers; the list never does.
+  const viewerIsAdmin = (await getRoleInfo(req.userId!)).isAdmin;
   const rows = (shifts ?? []).map((s: any) => {
     const u = userMap.get(s.client_id);
-    return {
+    const row: Record<string, any> = {
       ...s,
       client_username: u?.username ?? null,
       client_company: u?.company_name ?? null,
       client_photo_url: u?.photo_url ?? null,
     };
+    if (s.client_id !== req.userId && !viewerIsAdmin) {
+      for (const f of PRIVATE_SHIFT_FIELDS) row[f] = null;
+    }
+    return row;
   });
   return res.json(rows);
 });

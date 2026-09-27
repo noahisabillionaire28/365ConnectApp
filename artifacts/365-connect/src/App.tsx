@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { lazyNamed, warmRoutes } from '@/lib/lazyRoutes';
 
 /**
@@ -32,7 +32,8 @@ import { Route, Switch, Redirect, Router as WouterRouter, useLocation } from 'wo
 import { AuthProvider } from '@/contexts/AuthContext';
 import { RoleProvider, useRole, isLockedStatus } from '@/contexts/RoleContext';
 import { SuspendedGate } from '@/components/SuspendedGate';
-import { AdminFab } from '@/components/AdminFab';
+// Admin-only chrome (and its animation library) loads only for admin accounts.
+const AdminFab = lazy(() => import('@/components/AdminFab').then((m) => ({ default: m.AdminFab })));
 import { useSSE } from '@/hooks/useSSE';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -40,7 +41,7 @@ import { MobileContainer } from '@/components/MobileContainer';
 import { NativeBridge } from '@/components/NativeBridge';
 import { AppBadge } from '@/components/AppBadge';
 import { PullToRefresh } from '@/components/PullToRefresh';
-import { AdminNav } from '@/components/AdminNav';
+const AdminNav = lazy(() => import('@/components/AdminNav').then((m) => ({ default: m.AdminNav })));
 
 // ── Mobile screens ─────────────────────────────────────────────────────────────
 // Auth / onboarding
@@ -126,6 +127,13 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 // ── SSE mount — opens a live event stream once the user is authenticated ──────
 function SSEMount() { useSSE(); return null; }
+
+// ── Admin FAB — fetched only once an admin account is known ──────────────────
+function AdminFabGate() {
+  const { isAdmin } = useRole();
+  if (!isAdmin) return null;
+  return <Suspense fallback={null}><AdminFab /></Suspense>;
+}
 
 // ── Suspended-account gate — blocks suspended/banned (non-admin) users ────────
 // The API refuses every request from such an account with 403 (except
@@ -239,7 +247,7 @@ function AdminRouter() {
       className="min-h-[100dvh] bg-[#FAFAFA]"
       style={{ fontFamily: "'Space Grotesk', sans-serif" }}
     >
-      {showNav && <AdminNav />}
+      {showNav && <Suspense fallback={null}><AdminNav /></Suspense>}
 
       <Suspense fallback={<RouteFallback />}>
       <Switch>
@@ -283,7 +291,7 @@ function AppShell() {
           <TooltipProvider>
             <ErrorBoundary>
               <AppRouter />
-              <AdminFab />
+              <AdminFabGate />
               <SuspendedGuard />
             </ErrorBoundary>
           </TooltipProvider>

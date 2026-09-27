@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import {
   MapPin, CheckCheck, XCircle, Bell, DollarSign, Star, UserPlus, Send, AlarmClock, Ban, Settings,
   Heart, MessageCircle, Clock3, FileClock, AlertTriangle, BellRing, UserMinus, Pencil, Repeat2,
@@ -86,11 +85,10 @@ function formatUsd(amount: number): string {
 function NotificationCard({ item, index, onOpen }: { item: NotificationRowType; index: number; onOpen: () => void }) {
   const isUnread = !item.read_at;
   return (
-    <motion.button
+    <button
       type="button" onClick={onOpen}
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, delay: index * 0.04, ease: 'easeOut' }}
-      className={`w-full flex items-start gap-3 px-4 py-3.5 border-b border-[#DBDBDB] text-left transition-colors ${
+      style={{ animationDelay: `${Math.min(index * 40, 300)}ms` }}
+      className={`anim-rise-in w-full flex items-start gap-3 px-4 py-3.5 border-b border-[#DBDBDB] text-left transition-colors ${
         isUnread ? 'bg-[#F0F4FA]' : 'bg-white'
       }`}
       role="listitem" aria-label={item.title}
@@ -107,7 +105,7 @@ function NotificationCard({ item, index, onOpen }: { item: NotificationRowType; 
         )}
         <p className="text-[#AAAAAA] text-[12px] font-medium mt-1">{relativeTime(item.created_at)}</p>
       </div>
-    </motion.button>
+    </button>
   );
 }
 

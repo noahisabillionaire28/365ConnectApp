@@ -184,6 +184,15 @@ importers:
       '@capacitor/status-bar':
         specifier: ^8.0.3
         version: 8.0.3(@capacitor/core@8.5.2)
+      '@supabase/auth-js':
+        specifier: 2.110.0
+        version: 2.110.0
+      '@supabase/realtime-js':
+        specifier: 2.110.0
+        version: 2.110.0
+      '@supabase/storage-js':
+        specifier: 2.110.0
+        version: 2.110.0
       '@supabase/supabase-js':
         specifier: ^2.110.0
         version: 2.110.0

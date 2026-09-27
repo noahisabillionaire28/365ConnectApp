@@ -304,7 +304,7 @@ function Bubble({ msg, isMine, isGroup, senderName, senderPhoto, receipt, myId, 
   return (
     <div id={`msg-${msg.id}`} className={`flex ${isMine ? 'justify-end' : 'justify-start'} px-4 mb-1.5 gap-2`}>
       {!isMine && isGroup && <div className="self-end mb-5"><Avatar url={senderPhoto} name={senderName} size={26} /></div>}
-      <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[80%]`}>
+      <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[80%] min-w-0`}>
         {!isMine && isGroup && <p className="text-[11px] text-[#6B7280] font-semibold mb-0.5 px-1">{senderName}</p>}
         <div className={`px-3.5 py-2.5 select-none ${bubbleClasses} ${failed ? 'opacity-70' : ''}`}
           {...(onLongPress ? press : {})}
@@ -320,7 +320,7 @@ function Bubble({ msg, isMine, isGroup, senderName, senderPhoto, receipt, myId, 
             </button>
           )}
           {msg.text && (
-            <p className="text-[14.5px] leading-[1.4] whitespace-pre-wrap break-words select-text">
+            <p className="text-[14.5px] leading-[1.4] whitespace-pre-wrap break-words [overflow-wrap:anywhere] select-text">
               <RichText text={msg.text} mine={isMine} />
               {msg.edited_at && <span className={`text-[10px] ml-1.5 ${isMine ? 'text-white/60' : 'text-[#9CA3AF]'}`}>(edited)</span>}
             </p>
@@ -862,11 +862,15 @@ export function ChatScreen() {
   }, [messages, atBottom, user?.id]);
   useEffect(() => { if (!isLoading) setTimeout(() => bottomRef.current?.scrollIntoView({ block: 'end' }), 50); }, [isLoading]);
 
-  // Mark unread messages from others as read whenever they appear.
+  // Mark unread messages from others as read whenever they appear. Debounced
+  // so a burst of incoming rows (initial page, poll merge, SSE) becomes one
+  // request; `markRead` itself skips ids it has already posted.
   useEffect(() => {
     if (isLoading || !user?.id) return;
     const ids = messages.filter((m) => m.sender_id !== user.id && !m.read_at && !m.deleted_at && m.kind !== 'system' && !m._status).map((m) => m.id);
-    if (ids.length) void markRead(ids);
+    if (!ids.length) return;
+    const t = setTimeout(() => { void markRead(ids); }, 300);
+    return () => clearTimeout(t);
   }, [isLoading, messages, user?.id, markRead]);
 
   function handleScroll() {

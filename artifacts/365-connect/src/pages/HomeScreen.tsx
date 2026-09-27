@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { useLocation, useSearch, Redirect } from 'wouter';
-import { motion } from 'framer-motion';
 import {
   Bell, Search, PlusCircle, SlidersHorizontal,
   Briefcase, CalendarDays, Clock3, DollarSign, MapPin,
@@ -29,7 +28,8 @@ import { resetDraft } from '@/store/postShiftStore';
 import { ArrivalPills } from '@/components/ArrivalPills';
 import { RatePromptCard } from '@/components/home/RatePromptCard';
 import { WeekEarningsCard } from '@/components/home/WeekEarningsCard';
-import { AddToCalendarSheet } from '@/components/AddToCalendarSheet';
+// The calendar sheet (and its animation library) only loads when first opened.
+const AddToCalendarSheet = lazy(() => import('@/components/AddToCalendarSheet').then((m) => ({ default: m.AddToCalendarSheet })));
 import type { CalendarEvent } from '@/lib/calendar';
 import { isDayOfWindow } from '@/hooks/useArrivalStatus';
 
@@ -177,8 +177,8 @@ function MyShiftRow({ app, onTap, onCalendar }: {
   return (
     <div className="border-b border-[#E5E7EB] last:border-none">
     <div className="flex items-center">
-    <motion.button type="button" whileTap={{ scale: 0.98 }} onClick={onTap}
-      className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3.5 text-left">
+    <button type="button" onClick={onTap}
+      className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3.5 text-left active:scale-[0.98] transition-transform">
       <div className="w-10 h-10 rounded-[10px] bg-[#F3F4F6] flex items-center justify-center flex-shrink-0">
         <Briefcase size={16} aria-hidden className="text-[#6B7280]" />
       </div>
@@ -212,7 +212,7 @@ function MyShiftRow({ app, onTap, onCalendar }: {
       ) : (
         <ChevronRight size={15} aria-hidden className="text-[#D1D5DB] flex-shrink-0" />
       )}
-    </motion.button>
+    </button>
     {onCalendar && (
       <button type="button" onClick={onCalendar} aria-label={`Add ${app.shiftTitle ?? 'this shift'} to your calendar`}
         className="w-11 h-11 mr-2 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#F3F4F6] flex-shrink-0">
@@ -307,7 +307,11 @@ function WorkerMyShiftsView() {
     <div className="flex-1 overflow-y-auto pt-4 pb-4">
       <RatePromptCard role="worker" />
       <WeekEarningsCard />
-      <AddToCalendarSheet open={!!calendarEvent} event={calendarEvent} onClose={() => setCalendarEvent(null)} />
+      {calendarEvent && (
+        <Suspense fallback={null}>
+          <AddToCalendarSheet open={!!calendarEvent} event={calendarEvent} onClose={() => setCalendarEvent(null)} />
+        </Suspense>
+      )}
       <MyShiftSection label="Upcoming"     items={upcoming}     onTap={goToShift} dotColor="#10B981" emptyText="No confirmed upcoming shifts."
         onCalendar={(a) => setCalendarEvent(calendarEventFor(a))} />
       <MyShiftSection label="Standby"      items={standby}      onTap={goToShift} dotColor="#F59E0B" />
@@ -344,12 +348,10 @@ function WorkerAvailableView() {
         {!isLoading && !error && (
           <div className="flex flex-col gap-4" role="feed" aria-label="Available shifts near you">
             {shifts.map((shift, i) => (
-              <motion.div key={shift.id}
-                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05, duration: 0.3, ease: 'easeOut' }}>
+              <div key={shift.id} className="anim-rise-in" style={{ animationDelay: `${Math.min(i * 50, 300)}ms` }}>
                 <ShiftListCard shift={shift} applied={appliedShiftIds.has(shift.id)}
                   onTap={() => navigate(`/shift/${shift.id}`)} />
-              </motion.div>
+              </div>
             ))}
             {shifts.length === 0 && (
               <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
@@ -654,7 +656,7 @@ function ClientShiftCard({
 
   return (
     <div className="mx-4 mb-3 bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden">
-      <motion.button type="button" whileTap={{ scale: 0.99 }} onClick={onTap} className="w-full text-left px-4 pt-4 pb-3">
+      <button type="button" onClick={onTap} className="w-full text-left px-4 pt-4 pb-3 active:scale-[0.99] transition-transform">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <span className="inline-block bg-[#0A1628] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide mb-1.5">
@@ -732,7 +734,7 @@ function ClientShiftCard({
             )}
           </div>
         </div>
-      </motion.button>
+      </button>
       {onApplicants && (
         <div className="border-t border-[#E5E7EB] px-4 py-2.5">
           <button type="button" onClick={onApplicants}
@@ -932,19 +934,16 @@ function StafferHomeFeed() {
       <div className="pt-3"><InstallBanner compact /></div>
       {tab === 'browse' ? <WorkerDiscoveryBody /> : <ClientMyShiftsView />}
 
-      <motion.button
+      <button
         type="button"
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 28, delay: 0.15 }}
-        whileTap={{ scale: 0.93 }}
         onClick={handlePostShift}
         aria-label="Post a shift"
-        className="fixed bottom-[80px] right-4 z-50 flex items-center gap-2 h-[44px] px-4 bg-[#0A1628] text-white rounded-full shadow-lg font-bold text-[13px]"
+        style={{ animationDelay: '150ms' }}
+        className="anim-pop-in fixed bottom-[80px] right-4 z-50 flex items-center gap-2 h-[44px] px-4 bg-[#0A1628] text-white rounded-full shadow-lg font-bold text-[13px] active:scale-[0.93] transition-transform"
       >
         <PlusCircle size={16} aria-hidden className="flex-shrink-0" />
         Post a Shift
-      </motion.button>
+      </button>
 
       <BottomTabNav />
     </div>
