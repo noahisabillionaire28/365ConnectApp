@@ -38,6 +38,8 @@ export type PostShiftDraft = {
   requirements: string[]; // one requirement per line → string[]
 
   // ── Day-of details (no wizard step yet; carried by templates and re-posts) ─
+  /** Free-text dress code ("black tie", "all black"), alongside the item list. */
+  dress_code:           string;
   dress_code_items:     string[];
   point_of_contact:     string;
   contact_phone:        string;
@@ -55,6 +57,12 @@ export type PostShiftDraft = {
   instant_claim: boolean; // true = any qualified worker can grab it, no approval
   /** 'roster' = only workers on the agency's roster can see and take it. */
   visibility: 'public' | 'roster';
+
+  /**
+   * True when the address came from a template (which stores no coordinates)
+   * and Step 2 must geocode it before the shift is posted.
+   */
+  location_needs_geocode: boolean;
 };
 
 // ─── Default location (updated by initDraftLocation; survives resetDraft) ────
@@ -81,6 +89,7 @@ function empty(): PostShiftDraft {
     pay_period:      'hr',
     description:     '',
     requirements:    [],
+    dress_code:           '',
     dress_code_items:     [],
     point_of_contact:     '',
     contact_phone:        '',
@@ -89,6 +98,7 @@ function empty(): PostShiftDraft {
     timezone:        '',
     instant_claim:   false,
     visibility:      'public',
+    location_needs_geocode: false,
   };
 }
 
@@ -189,8 +199,6 @@ export type TemplatePayload = {
   job_type?: string;
   job_types?: string[];
   location?: string | null;
-  lat?: number | null;
-  lng?: number | null;
   unit_info?: string | null;
   pay_rate?: number;
   pay_period?: 'hr' | 'day' | 'event';
@@ -208,7 +216,6 @@ export type TemplatePayload = {
   /** Venue wall-clock HH:MM. */
   start_time?: string;
   end_time?: string;
-  timezone?: string;
 };
 
 /** The template a draft would save. */
@@ -218,13 +225,14 @@ export function draftToTemplatePayload(d: PostShiftDraft = draft): TemplatePaylo
     event_type:       d.event_type || null,
     job_type:         d.job_type,
     job_types:        d.job_types.length ? d.job_types : (d.job_type ? [d.job_type] : []),
+    // Coordinates and the venue zone are not part of a template: they are
+    // resolved from the address and the device when the shift is posted.
     location:         d.location || null,
-    lat:              d.lat,
-    lng:              d.lng,
     unit_info:        d.unit_info || null,
     pay_rate:         d.pay_rate,
     pay_period:       d.pay_period,
     spots_available:  d.spots_available,
+    dress_code:       d.dress_code || null,
     dress_code_items: d.dress_code_items,
     requirements:     d.requirements,
     description:      d.description || null,
@@ -236,7 +244,6 @@ export function draftToTemplatePayload(d: PostShiftDraft = draft): TemplatePaylo
     instant_claim:    d.instant_claim,
     start_time:       d.start_time,
     end_time:         d.end_time,
-    timezone:         d.timezone || browserTimeZone(),
   };
 }
 
@@ -258,8 +265,8 @@ export function loadDraftFromTemplate(p: TemplatePayload): void {
     job_type:         jobType,
     job_types:        jobTypes.length ? jobTypes : (jobType ? [jobType] : []),
     location:         p.location ?? '',
-    lat:              typeof p.lat === 'number' && Number.isFinite(p.lat) ? p.lat : base.lat,
-    lng:              typeof p.lng === 'number' && Number.isFinite(p.lng) ? p.lng : base.lng,
+    // No coordinates in a template: Step 2 geocodes the address again.
+    location_needs_geocode: !!p.location,
     unit_info:        p.unit_info ?? '',
     start_time:       p.start_time || base.start_time,
     end_time:         p.end_time || base.end_time,
@@ -268,6 +275,7 @@ export function loadDraftFromTemplate(p: TemplatePayload): void {
     pay_period:       payPeriod,
     description:      p.description ?? '',
     requirements:     strList(p.requirements),
+    dress_code:       p.dress_code ?? '',
     dress_code_items: strList(p.dress_code_items),
     point_of_contact: p.point_of_contact ?? '',
     contact_phone:    p.contact_phone ?? '',

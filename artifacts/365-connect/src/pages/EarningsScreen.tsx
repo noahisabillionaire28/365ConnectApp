@@ -42,6 +42,8 @@ const FILTERS: { key: Filter; label: string }[] = [
 /** Which bucket an earned row sits in (null for money out and subscriptions). */
 function rowBucket(p: PaymentRow): Bucket | null {
   if (p.direction === 'out' || p.payment_type === 'pro_subscription') return null;
+  // A timesheet still waiting for its clock-out is pending approval too.
+  if (p.status === 'needs_clock_out') return 'worked';
   if (p.payment_type === 'timesheet') return stageBucket(p.stage);
   return p.status === 'completed' ? 'paid' : null;
 }
@@ -53,6 +55,7 @@ function StatusChip({ status }: { status: string }) {
     simulated:  { label: 'Simulated',  cls: 'bg-[#FFF7ED] text-[#92400E] border-[#FED7AA]',    icon: <Zap size={11} aria-hidden className="text-[#F59E0B]" /> },
     pending:    { label: 'Pending',    cls: 'bg-[#F3F4F6] text-[#6B7280] border-[#E5E7EB]',    icon: <Clock3 size={11} aria-hidden className="text-[#9CA3AF]" /> },
     failed:     { label: 'Failed',     cls: 'bg-red-50 text-[#DC2626] border-red-200',          icon: <AlertCircle size={11} aria-hidden className="text-[#EF4444]" /> },
+    needs_clock_out: { label: 'Needs clock-out', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: <AlertCircle size={11} aria-hidden className="text-amber-500" /> },
   };
   const cfg = map[status] ?? map.pending;
   return (
@@ -69,6 +72,7 @@ function typeLabel(row: PaymentRow): string {
   if (row.direction === 'out') return 'Shift payment sent';
   const title = row.shift_title || row.company_name;
   const hours = typeof row.hours === 'number' && row.hours > 0 ? ` · ${row.hours.toFixed(1)}h` : '';
+  if (row.status === 'needs_clock_out') return `${title ?? 'Shift'} · clock-out missing`;
   if (row.payment_type === 'timesheet') return `${title ?? 'Shift'}${hours}`;
   return title ? `Shift earnings · ${title}` : 'Shift earnings';
 }

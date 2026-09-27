@@ -94,6 +94,8 @@ export type MyTimeEntry = {
   company_name?: string | null;
   /** When the shift itself started (an instant), for week grouping. */
   shift_start_time?: string | null;
+  /** When the shift ended; a clocked-in entry past this needs a clock-out. */
+  shift_end_time?: string | null;
   paid?: boolean;
   timeline?: RawPayTimeline | null;
   /** approved_pay once approved, else the clock-out estimate (server-computed). */
@@ -157,8 +159,16 @@ export function useMyTimeEntries() {
   return { entries: q.data ?? [], isLoading: !!user?.id && q.isLoading, isError: q.isError };
 }
 
+/** The shift is over but the worker never clocked out; the poster closes it at approval. */
+export function needsClockOut(e: Pick<MyTimeEntry, 'clock_in' | 'clock_out' | 'shift_end_time'>, now = Date.now()): boolean {
+  if (!e.clock_in || e.clock_out) return false;
+  const end = e.shift_end_time ? Date.parse(e.shift_end_time) : NaN;
+  return Number.isFinite(end) && end < now;
+}
+
 /** Pipeline state for a finished timesheet as an Earnings row status. */
 function timesheetStatus(e: MyTimeEntry): string {
+  if (needsClockOut(e)) return 'needs_clock_out';
   if (e.payTimeline.stage === 'paid') return 'completed';
   if (!e.approved) return 'awaiting_approval';
   if (e.worker_ack === 'disputed') return 'disputed';
@@ -188,8 +198,10 @@ export function usePayments() {
         apiClient(user!.id).get<PaymentRow[]>('/payments'),
         fetchMyEntries(user!.id).catch(() => [] as MyTimeEntry[]),
       ]);
+      // Finished timesheets, plus any the worker forgot to close (the shift
+      // has ended, they clocked in, never out) so the money is not invisible.
       const timesheets: PaymentRow[] = entries
-        .filter((e) => e.clock_out)
+        .filter((e) => e.clock_out || needsClockOut(e))
         .map((e) => {
           const t = e.payTimeline;
           const amount = entryPay(e);
@@ -207,7 +219,8 @@ export function usePayments() {
             company_name: e.company_name ?? null,
             direction: 'in',
             hours: e.total_hours ?? null,
-            timeline: t,
+            // An open entry has no timeline to draw yet; the status chip explains.
+            timeline: e.clock_out ? t : null,
             stage: t.stage,
           };
         });

@@ -16,6 +16,7 @@ import {
 } from '@/lib/recurrence';
 import { MultiDatePicker } from '@/components/MultiDatePicker';
 import { BottomTabNav } from '@/components/BottomTabNav';
+import { browserTimeZone, zonedTimeToUtc } from '@/lib/timezone';
 
 const REPEAT_OPTIONS: { value: RepeatType; label: string }[] = [
   { value: 'none',   label: "Doesn't repeat" },
@@ -150,6 +151,19 @@ export function PostShiftStep3Screen() {
     if (!endTime)   e.endTime   = 'Please set an end time';
     if (durHrs < 0.5) e.endTime = 'Shift must be at least 30 minutes';
     if (durHrs > 24)  e.endTime = 'Shift cannot exceed 24 hours';
+    // The server refuses a start in the past; catch it here so "today" with
+    // an earlier time (or a series whose first date has gone) is explained
+    // on this step instead of failing at the end of the wizard.
+    if (date && startTime && !isEditing) {
+      const tz = initial.timezone || browserTimeZone();
+      const firstDate = [...occurrences].sort()[0] ?? date;
+      const firstStart = Date.parse(zonedTimeToUtc(firstDate, startTime, tz));
+      if (Number.isFinite(firstStart) && firstStart <= Date.now()) {
+        e.startTime = isSeries && firstDate !== date
+          ? 'The first shift in this series has already passed — pick a later start time or date.'
+          : 'This start time has already passed — pick a later time or date.';
+      }
+    }
     if (isSeries) {
       if (repeat.type === 'weekly' && !repeat.weekdays.length) e.repeat = 'Pick at least one weekday';
       if (repeat.ends === 'on' && repeat.type !== 'custom' && (!repeat.end_date || repeat.end_date < date)) e.repeat = 'Pick an end date after the shift date';

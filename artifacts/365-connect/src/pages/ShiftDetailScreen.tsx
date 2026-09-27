@@ -550,6 +550,7 @@ export function ShiftDetailScreen() {
         description:     (raw.description     as string | null)    ?? '',
         requirements:    (raw.requirements    as string[] | null)  ?? [],
         // Day-of details have no wizard step; carry them so an edit or re-post keeps them.
+        dress_code:           (raw.dress_code as string | null) ?? '',
         dress_code_items:     (raw.dress_code_items as string[] | null) ?? [],
         point_of_contact:     (raw.point_of_contact as string | null) ?? '',
         contact_phone:        (raw.contact_phone    as string | null) ?? '',
@@ -988,6 +989,25 @@ export function ShiftDetailScreen() {
             );
           })()}
         </AnimatePresence>
+
+        {/* Forgot to clock out: the shift is over but the timesheet is still
+            open. The poster closes it at approval; until then the worker sees
+            why nothing has moved rather than an estimate that never resolves. */}
+        {isWorker && myEntry?.clock_in && !myEntry.clock_out && lifecycle === 'ended' && shift.status !== 'cancelled' && (
+          <div className="px-5 pb-4">
+            <div className="rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-4" role="status" data-testid="card-needs-clock-out">
+              <div className="flex items-start gap-3">
+                <AlarmClock size={18} aria-hidden className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-amber-800 font-bold text-[15px]">Timesheet incomplete</p>
+                  <p className="text-amber-700 text-[13px] mt-1 leading-relaxed">
+                    You clocked in at {formatTime(myEntry.clock_in, shift.timezone)} but never clocked out. The poster will set your clock-out time when they approve your hours; message them if it looks wrong.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Your hours — the real timesheet once the worker has clocked out:
             what was recorded, what the poster approved, and (if they changed

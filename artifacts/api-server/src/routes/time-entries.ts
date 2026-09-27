@@ -201,17 +201,17 @@ router.get('/mine', requireAuth, async (req, res) => {
     const rows = (entries ?? []) as EntryRow[];
     const shiftIds = [...new Set(rows.map((r) => r.shift_id).filter(Boolean))];
 
-    const shiftMap = new Map<string, { title: string | null; company_name: string | null; start_time: string | null } & PayShift>();
+    const shiftMap = new Map<string, { title: string | null; company_name: string | null; start_time: string | null; end_time: string | null } & PayShift>();
     let paidMap = new Map<string, PaidRow>();
     if (shiftIds.length) {
       const [{ data: shifts, error: sErr }, pays] = await Promise.all([
-        adminDb.from('shifts').select('id, title, company_name, start_time, pay_rate, pay_period').in('id', shiftIds),
+        adminDb.from('shifts').select('id, title, company_name, start_time, end_time, pay_rate, pay_period').in('id', shiftIds),
         paidByShift(req.userId!, shiftIds),
       ]);
       if (sErr) return res.status(500).json({ error: sErr.message });
       for (const s of shifts ?? []) {
         shiftMap.set(s.id, {
-          title: s.title ?? null, company_name: s.company_name ?? null, start_time: s.start_time ?? null,
+          title: s.title ?? null, company_name: s.company_name ?? null, start_time: s.start_time ?? null, end_time: s.end_time ?? null,
           pay_rate: s.pay_rate ?? null, pay_period: s.pay_period ?? null,
         });
       }
@@ -242,6 +242,7 @@ router.get('/mine', requireAuth, async (req, res) => {
         shift_title: s?.title ?? null,
         company_name: s?.company_name ?? null,
         shift_start_time: s?.start_time ?? null,
+        shift_end_time: s?.end_time ?? null,
         paid: !!paid,
         timeline: timelineFor(r, paid),
         expected_pay: expectedPay(r, { pay_rate: s?.pay_rate ?? null, pay_period: s?.pay_period ?? null }),

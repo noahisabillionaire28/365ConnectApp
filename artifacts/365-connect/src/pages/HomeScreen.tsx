@@ -31,7 +31,7 @@ import { RatePromptCard } from '@/components/home/RatePromptCard';
 import { WeekEarningsCard } from '@/components/home/WeekEarningsCard';
 import { AddToCalendarSheet } from '@/components/AddToCalendarSheet';
 import type { CalendarEvent } from '@/lib/calendar';
-import { isToday } from '@/hooks/useArrivalStatus';
+import { isDayOfWindow } from '@/hooks/useArrivalStatus';
 
 /* ─── Shared header ──────────────────────────────────────────────────────────── */
 function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => void }) {
@@ -121,7 +121,10 @@ function groupApplications(apps: MyApplication[]) {
     completed: live.filter((a) => a.status === 'accepted' && isOver(a)).sort(latest),
     // Applications that were never answered before the shift ended.
     expired:   live.filter((a) => (a.status === 'pending' || a.status === 'standby') && isOver(a)),
-    dropped:   live.filter((a) => a.status === 'withdrawn'),
+    // A spot handed to another worker through an approved swap is not a
+    // drop; it gets its own label so the worker is not told they bailed.
+    swapped:   live.filter((a) => a.status === 'withdrawn' && a.calloutReason === 'swap').sort(latest),
+    dropped:   live.filter((a) => a.status === 'withdrawn' && a.calloutReason !== 'swap'),
     notSelected: live.filter((a) => a.status === 'declined' || a.status === 'rejected'),
     // Shifts the organizer cancelled while this worker was booked, applied or waitlisted.
     cancelled: apps.filter((a) => isCancelled(a) && ['accepted', 'pending', 'standby'].includes(a.status)).sort(latest),
@@ -166,8 +169,10 @@ function MyShiftRow({ app, onTap, onCalendar }: {
   const endMs = app.endTime ? Date.parse(app.endTime) : NaN;
   const clockInNow = !cancelled && app.status === 'accepted' && Number.isFinite(startMs) &&
     now >= startMs - 3_600_000 && (!Number.isFinite(endMs) || now <= endMs);
-  // Day-of pills ("On my way" / "Running late") for today's booked shift.
-  const dayOf = !cancelled && app.status === 'accepted' && isToday(app.startTime) && (!Number.isFinite(endMs) || now <= endMs);
+  // Day-of pills ("On my way" / "Running late"): same window as the shift
+  // page (starts within 12 h or in progress, not ended), so a late-night
+  // shift shows them on Home too, whatever the device's calendar day says.
+  const dayOf = !cancelled && app.status === 'accepted' && isDayOfWindow(app.startTime, app.endTime, now);
 
   return (
     <div className="border-b border-[#E5E7EB] last:border-none">
@@ -264,7 +269,7 @@ function MyShiftSection({
 function WorkerMyShiftsView() {
   const [, navigate] = useLocation();
   const { applications, isLoading, error } = useMyApplications();
-  const { upcoming, applied, standby, completed, expired, dropped, notSelected, cancelled } = groupApplications(applications);
+  const { upcoming, applied, standby, completed, expired, swapped, dropped, notSelected, cancelled } = groupApplications(applications);
   const goToShift = (a: MyApplication) => navigate(`/shift/${a.shiftId}`);
   const [calendarEvent, setCalendarEvent] = useState<CalendarEvent | null>(null);
 
@@ -310,6 +315,7 @@ function WorkerMyShiftsView() {
       <MyShiftSection label="Cancelled"    items={cancelled}    onTap={goToShift} dotColor="#EF4444" />
       <MyShiftSection label="Completed"    items={completed}    onTap={goToShift} dotColor="#6B7280" />
       <MyShiftSection label="Expired"      items={expired}      onTap={goToShift} dotColor="#D1D5DB" />
+      <MyShiftSection label="Swapped"      items={swapped}      onTap={goToShift} dotColor="#D1D5DB" />
       <MyShiftSection label="Dropped"      items={dropped}      onTap={goToShift} dotColor="#D1D5DB" />
       <MyShiftSection label="Not Selected" items={notSelected}  onTap={goToShift} dotColor="#D1D5DB" />
     </div>
@@ -657,6 +663,12 @@ function ClientShiftCard({
             {shift.event_id && (
               <span className="inline-block ml-1.5 bg-[#F3F4F6] text-[#0A1628] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#E5E7EB] mb-1.5">
                 Event position
+              </span>
+            )}
+            {shift.seriesIndex != null && shift.seriesCount != null && (
+              <span className="inline-flex items-center gap-1 ml-1.5 bg-[#F3F4F6] text-[#0A1628] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#E5E7EB] mb-1.5"
+                aria-label={`Shift ${shift.seriesIndex} of ${shift.seriesCount} in a recurring series`}>
+                <Repeat2 size={10} aria-hidden />{shift.seriesIndex} of {shift.seriesCount}
               </span>
             )}
             <p className="text-[#111827] font-bold text-[17px] leading-snug truncate">

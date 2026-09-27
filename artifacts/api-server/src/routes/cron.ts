@@ -190,11 +190,16 @@ function matchSavedSearch(
     const offered = [shift.job_type, ...(shift.job_types ?? [])].filter((t): t is string => !!t).map((t) => t.toLowerCase());
     if (!offered.some((t) => wanted.includes(t))) return false;
   }
-  if (search.min_pay != null && Number(shift.pay_rate ?? 0) < Number(search.min_pay)) return false;
+  // A minimum pay is an hourly figure; a flat day/event rate is not comparable
+  // to it, so it neither passes nor fails on pay.
+  const hourly = !shift.pay_period || shift.pay_period === 'hr';
+  if (search.min_pay != null && hourly && Number(shift.pay_rate ?? 0) < Number(search.min_pay)) return false;
   if (search.event_type && (shift.event_type ?? '').toLowerCase() !== search.event_type.toLowerCase()) return false;
   const canMeasure = user.lat != null && user.lng != null && shift.lat != null && shift.lng != null;
   const distance = canMeasure ? haversineMiles(Number(user.lat), Number(user.lng), Number(shift.lat), Number(shift.lng)) : null;
-  if (search.max_distance_miles != null && distance != null && distance > Number(search.max_distance_miles)) return false;
+  // "Within N miles" cannot be honoured when the distance is unknown: no match
+  // beats an alert for a shift that may be across the country.
+  if (search.max_distance_miles != null && (distance == null || distance > Number(search.max_distance_miles))) return false;
   return distance;
 }
 

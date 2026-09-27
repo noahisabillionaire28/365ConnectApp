@@ -373,6 +373,10 @@ router.post('/:id/respond', requireAuth, requireRole('worker'), async (req, res)
  * A's booking restored. Chat and request rows are synced best-effort.
  */
 async function performSwap(swap: SwapRow, shift: ShiftRow, names: { from: string; to: string }): Promise<void> {
+  // Remember A's day-of status so a failed hand-off puts it back too.
+  const { data: before } = await adminDb
+    .from('applications').select('arrival_status, arrival_status_at').eq('id', swap.application_id).maybeSingle();
+
   // 1. Release A's spot (kept as a withdrawn application tagged 'swap').
   const { data: released, error: rErr } = await adminDb
     .from('applications')
@@ -384,11 +388,15 @@ async function performSwap(swap: SwapRow, shift: ShiftRow, names: { from: string
   if (rErr) throw new HttpError(500, rErr.message);
   if (!released) throw new HttpError(409, `${names.from} is no longer booked for this shift.`);
 
-  // 2. Book B; if that fails for any reason, put A straight back.
+  // 2. Book B; if that fails for any reason, put A straight back, exactly as
+  //    they were (booking, no call-out reason, their arrival status).
   try {
     await bookWorker(shift.id, swap.to_worker_id, 'accept');
   } catch (e) {
-    await adminDb.from('applications').update({ status: 'accepted', callout_reason: null }).eq('id', swap.application_id);
+    await adminDb.from('applications').update({
+      status: 'accepted', callout_reason: null,
+      arrival_status: before?.arrival_status ?? null, arrival_status_at: before?.arrival_status_at ?? null,
+    }).eq('id', swap.application_id);
     await syncShiftCapacity(shift.id);
     throw e;
   }
@@ -458,6 +466,12 @@ router.post('/:id/decide', requireAuth, async (req, res) => {
     if (blocker) return res.status(409).json({ error: blocker });
     if (await hasClockedIn(swap.shift_id, swap.from_worker_id)) {
       return res.status(409).json({ error: `${fromName} has already clocked in, so this swap can no longer be approved.` });
+    }
+    // The target was eligible when the offer was made; re-check now, since
+    // they may have been suspended, blocked, or dropped from the roster since.
+    await assertSwapTarget(swap.to_worker_id, swap.from_worker_id, shift);
+    if (!(await rosterAllows(shift, swap.to_worker_id))) {
+      return res.status(403).json({ error: `This shift is roster-only and ${toName} is no longer on the agency's roster.` });
     }
     const conflict = await findTimeConflict(swap.to_worker_id, swap.shift_id);
     if (conflict) {

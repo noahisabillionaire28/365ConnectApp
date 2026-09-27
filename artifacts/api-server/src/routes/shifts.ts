@@ -230,8 +230,26 @@ router.get('/my', requireAuth, async (req, res) => {
       .eq('status', 'accepted');
     for (const s of sw ?? []) swaps.set(s.shift_id, (swaps.get(s.shift_id) ?? 0) + 1);
   }
+  // Where each shift sits in its recurring series ("2 of 5"). A series
+  // belongs to one poster, so every sibling is already in this list.
+  const seriesPos = new Map<string, { index: number; count: number }>();
+  const bySeries = new Map<string, Array<{ id: string; start_time: string }>>();
+  for (const s of data ?? []) {
+    if (!s.series_id) continue;
+    const list = bySeries.get(s.series_id) ?? [];
+    list.push({ id: s.id, start_time: s.start_time });
+    bySeries.set(s.series_id, list);
+  }
+  for (const list of bySeries.values()) {
+    list.sort((a, b) => a.start_time.localeCompare(b.start_time));
+    list.forEach((s, i) => seriesPos.set(s.id, { index: i + 1, count: list.length }));
+  }
   return res.json((data ?? []).map((s) => ({
-    ...s, pending_count: pending.get(s.id) ?? 0, swap_count: swaps.get(s.id) ?? 0,
+    ...s,
+    pending_count: pending.get(s.id) ?? 0,
+    swap_count: swaps.get(s.id) ?? 0,
+    series_index: seriesPos.get(s.id)?.index ?? null,
+    series_count: seriesPos.get(s.id)?.count ?? null,
   })));
 });
 
@@ -483,8 +501,11 @@ router.get('/series/:id', requireAuth, requireRole('client', 'staffer'), async (
 
 /**
  * POST /api/shifts/:id/cancel-series-future — cancel this shift and every
- * later shift in its series that has not started. Each one is cancelled the
- * way a single cancel is (workers told, offers closed, chat line posted).
+ * later shift in its series that has not started. "This" shift is included
+ * even if it is already in progress (the button is offered until it ends,
+ * exactly like a single cancel); only later shifts must not have started.
+ * Each one is cancelled the way a single cancel is (workers told, offers
+ * closed, chat line posted).
  */
 router.post('/:id/cancel-series-future', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const id = String(req.params.id);
@@ -501,18 +522,19 @@ router.post('/:id/cancel-series-future', requireAuth, requireRole('client', 'sta
   if (!current.series_id) return res.status(400).json({ error: 'This shift is not part of a series' });
 
   const nowIso = new Date().toISOString();
-  const { data: targets, error: tErr } = await adminDb
+  const { data: siblings, error: tErr } = await adminDb
     .from('shifts')
     .select('id, client_id, title, timezone, start_time, end_time, spots_available, pay_rate, pay_period, location, status')
     .eq('series_id', current.series_id)
     .gte('start_time', current.start_time)
-    .gt('start_time', nowIso)
     .in('status', ['open', 'filled'])
     .order('start_time', { ascending: true });
   if (tErr) return res.status(500).json({ error: tErr.message });
+  const targets = (siblings ?? []).filter((s) =>
+    s.id === id ? s.end_time > nowIso : s.start_time > nowIso);
 
   const cancelled: string[] = [];
-  for (const shift of targets ?? []) {
+  for (const shift of targets) {
     const { data: updated } = await adminDb
       .from('shifts').update({ status: 'cancelled' })
       .eq('id', shift.id).in('status', ['open', 'filled'])

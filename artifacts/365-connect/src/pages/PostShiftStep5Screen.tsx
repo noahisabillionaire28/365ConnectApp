@@ -153,6 +153,7 @@ export function PostShiftStep5Screen() {
 
     // Day-of details only travel when set (templates and re-posts carry them).
     const extras = {
+      dress_code:           draft.dress_code || undefined,
       dress_code_items:     draft.dress_code_items.length ? draft.dress_code_items : undefined,
       point_of_contact:     draft.point_of_contact     || undefined,
       contact_phone:        draft.contact_phone        || undefined,
