@@ -153,7 +153,7 @@ function GeoFailScreen({ reason, distance, message, shiftLocation, onRetry, onCo
           Try Again
         </motion.button>
         <button type="button" aria-label="Message your shift manager" onClick={onContact} disabled={contacting}
-          className="text-[#737373] text-[13px] underline underline-offset-2 active:text-black disabled:opacity-50">
+          className="min-h-10 px-3 flex items-center justify-center text-[#737373] text-[13px] underline underline-offset-2 active:text-black disabled:opacity-50">
           {contacting ? 'Opening chat…' : 'Contact shift manager'}
         </button>
       </div>
@@ -179,7 +179,7 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
           {shift.jobType}
         </p>
         <p className="text-black font-bold text-[20px] leading-tight">{shift.companyName}</p>
-        <p className="text-[#AAAAAA] text-[12px] mt-0.5">{shift.location}</p>
+        <p className="text-[#6B7280] text-[12px] mt-0.5">{shift.location}</p>
       </div>
 
       {/* Timer area */}
@@ -210,7 +210,7 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
               {fmtHMS(shiftSecs)}
             </p>
             {breakSecs > 0 && (
-              <p className="text-[#AAAAAA] text-[12px] mt-3 font-medium">
+              <p className="text-[#6B7280] text-[12px] mt-3 font-medium">
                 {fmtHM(breakSecs)} break taken
               </p>
             )}
@@ -372,7 +372,7 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
           <div className="flex items-center justify-between mt-1 pt-4 border-t border-[#DBDBDB]">
             <div>
               <p className="text-black font-bold text-[16px]">Estimated pay</p>
-              <p className="text-[#AAAAAA] text-[11px]">Final after manager approval</p>
+              <p className="text-[#6B7280] text-[11px]">Final after manager approval</p>
             </div>
             <p className="text-black font-bold" style={{ fontSize: 28 }}>{fmtMoney(netPay)}</p>
           </div>
@@ -716,7 +716,7 @@ export function ClockInScreen() {
           <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             type="button" aria-label="Go back to shift details"
             onClick={() => navigate(`/shift/${shift.id}`)}
-            className="absolute top-5 left-4 w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center z-20">
+            className="absolute top-5 left-4 w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center z-20">
             <ChevronLeft size={18} aria-hidden className="text-black" />
           </motion.button>
         )}

@@ -1161,32 +1161,11 @@ CREATE TRIGGER trg_handle_application_assigned
   FOR EACH ROW WHEN (NEW.status = 'accepted')
   EXECUTE FUNCTION public.handle_application_assigned();
 
--- ─── Scheduled: notify workers a confirmed shift starts in ~2 hours ─────────────
--- Requires the `pg_cron` extension (Supabase Dashboard → Database →
--- Extensions → enable "pg_cron"), then run the `cron.schedule(...)` call at
--- the bottom of this block once. Safe to re-run — it dedupes against
--- existing 'shift_starting_soon' notifications for the same user+shift.
-CREATE OR REPLACE FUNCTION public.notify_shifts_starting_soon()
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-  INSERT INTO public.notifications (user_id, type, title, body, shift_id)
-  SELECT a.worker_id, 'shift_starting_soon', 'Shift starting soon',
-         COALESCE(s.title, 'Your shift') || ' starts in about 2 hours.',
-         s.id
-  FROM public.shifts s
-  JOIN public.applications a ON a.shift_id = s.id AND a.status = 'accepted'
-  WHERE s.start_time BETWEEN NOW() + INTERVAL '110 minutes' AND NOW() + INTERVAL '130 minutes'
-    AND NOT EXISTS (
-      SELECT 1 FROM public.notifications n
-      WHERE n.user_id = a.worker_id AND n.shift_id = s.id AND n.type = 'shift_starting_soon'
-    );
-END;
-$$;
-
--- Run this once (after enabling the pg_cron extension) to schedule the job
--- every 15 minutes:
--- SELECT cron.schedule('notify-shifts-starting-soon', '*/15 * * * *',
---   $$SELECT public.notify_shifts_starting_soon();$$);
+-- The "starting soon" reminder is produced by the API's cron tick
+-- (artifacts/api-server/src/routes/cron.ts, driven by the 365connect-tick
+-- pg_cron job from migration 0032) with push + email and dedupe. There is no
+-- SQL producer any more (migration 0034 removes the old
+-- notify_shifts_starting_soon() function wherever it existed).
 
 -- ─── Storage: chat media bucket (photos, videos, voice notes) ───────────────────
 -- PRIVATE bucket (unlike the public avatars/post-photos buckets) — chat

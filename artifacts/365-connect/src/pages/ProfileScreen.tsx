@@ -5,7 +5,7 @@ import {
   Star, ChevronRight, Settings,
   CreditCard, Bell, Shield, HelpCircle, LogOut,
   Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
-  BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck, LayoutTemplate,
+  BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck, LayoutTemplate, Trash2,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
@@ -44,7 +44,7 @@ function SettingRow({ icon: Icon, label, onTap, danger = false }: {
     <motion.button type="button" whileTap={{ backgroundColor: '#FAFAFA' }} onClick={onTap}
       aria-label={label}
       className="w-full flex items-center gap-4 px-5 py-4 border-b border-[#DBDBDB] text-left transition-colors last:border-none">
-      <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center flex-shrink-0 ${
+      <div className={`w-10 h-10 rounded-[10px] flex items-center justify-center flex-shrink-0 ${
         danger ? 'bg-red-50' : 'bg-[#FAFAFA]'
       }`}>
         <Icon size={17} aria-hidden className={danger ? 'text-red-500' : 'text-[#737373]'} />
@@ -89,7 +89,7 @@ function ProfileAvatar({
       {initials ? (
         <span className="font-bold text-[#737373]" style={{ fontSize: size * 0.36 }}>{initials}</span>
       ) : (
-        <UserCircle2 size={size * 0.55} className="text-[#AAAAAA]" />
+        <UserCircle2 size={size * 0.55} className="text-[#6B7280]" />
       )}
     </div>
   );
@@ -197,7 +197,7 @@ function MyApplicationsSection() {
         <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] p-4 flex flex-col items-center gap-1 text-center">
           <Briefcase size={20} aria-hidden className="text-[#DBDBDB] mb-1" />
           <p className="text-[#737373] text-[13px] font-medium">No applications yet</p>
-          <p className="text-[#AAAAAA] text-[12px]">Apply to a shift to see its status here.</p>
+          <p className="text-[#6B7280] text-[12px]">Apply to a shift to see its status here.</p>
         </div>
       )}
     </div>
@@ -254,7 +254,7 @@ function RostersOnSection() {
   return (
     <div className="px-5 mb-6">
       <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-1">Rosters you're on</p>
-      <p className="text-[#AAAAAA] text-[12px] mb-2.5">These clients and agencies can offer you their shifts directly.</p>
+      <p className="text-[#6B7280] text-[12px] mb-2.5">These clients and agencies can offer you their shifts directly.</p>
       <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden" role="list" aria-label="Rosters you are on">
         {q.isLoading ? (
           <div className="flex items-center gap-3 px-4 py-3.5">
@@ -275,7 +275,7 @@ function RostersOnSection() {
               <p className="text-[#737373] text-[12px]">{o.role === 'staffer' ? 'Agency' : 'Client'}{o.company_name && o.username ? ` · @${o.username}` : ''}</p>
             </div>
             <button type="button" onClick={() => setLeaving(o)}
-              className="h-8 px-3 rounded-[8px] border border-[#DBDBDB] text-[#737373] text-[12px] font-semibold flex-shrink-0">
+              className="h-10 px-3 rounded-[8px] border border-[#DBDBDB] text-[#737373] text-[12px] font-semibold flex-shrink-0">
               Leave roster
             </button>
           </div>
@@ -365,6 +365,31 @@ export function ProfileScreen() {
     navigate('/');
   }
 
+  // Self-serve account deletion (an App Store requirement). The server
+  // refuses while there are upcoming bookings or open posted shifts, and the
+  // sheet asks for DELETE to be typed so a stray tap cannot do it.
+  const { showToast: toast } = useToast();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteWord, setDeleteWord] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDeleteAccount() {
+    if (deleteWord.trim() !== 'DELETE' || deleting) return;
+    setDeleting(true); setDeleteError(null);
+    try {
+      await apiClient(user?.id).delete('/users/me');
+      setDeleteOpen(false);
+      await signOut();
+      toast('Your account has been deleted.');
+      navigate('/');
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Couldn't delete your account. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   // Unauthenticated guard — redirect to splash rather than rendering a blank profile.
   // Must live in useEffect; calling navigate() during render causes React to warn
   // "Cannot update a component while rendering a different component".
@@ -427,7 +452,7 @@ export function ProfileScreen() {
 
         {/* Settings gear — opens all settings */}
         <button type="button" aria-label="Settings" onClick={() => setSettingsOpen(true)}
-          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white border border-[#DBDBDB] flex items-center justify-center">
+          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white border border-[#DBDBDB] flex items-center justify-center">
           <Settings size={16} aria-hidden className="text-black" />
         </button>
 
@@ -442,7 +467,7 @@ export function ProfileScreen() {
           <button type="button" aria-pressed={available}
             aria-label={available ? 'Set yourself as unavailable' : 'Set yourself as available'}
             onClick={() => void toggleAvailable()}
-            className={`flex items-center gap-1.5 h-[28px] px-3 rounded-full text-[11px] font-bold border transition-all ${
+            className={`flex items-center gap-1.5 h-10 px-3.5 rounded-full text-[11px] font-bold border transition-all ${
               available ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]'
             }`}>
             <span aria-hidden className={`w-[6px] h-[6px] rounded-full ${available ? 'bg-emerald-500' : 'bg-[#DBDBDB]'}`} />
@@ -462,7 +487,7 @@ export function ProfileScreen() {
         </div>
 
         <p className="text-[#737373] text-[13px] mb-2">
-          {username ? `@${username}` : <span className="italic text-[#AAAAAA]">No username set</span>}
+          {username ? `@${username}` : <span className="italic text-[#6B7280]">No username set</span>}
         </p>
 
         {profile.role === 'worker' && profile.hourlyRate != null && (
@@ -477,7 +502,7 @@ export function ProfileScreen() {
         {bio ? (
           <p className="text-[#737373] text-[14px] leading-relaxed mb-3">{bio}</p>
         ) : (
-          <p className="text-[#AAAAAA] text-[14px] italic mb-3">No bio yet — tap Edit to add one</p>
+          <p className="text-[#6B7280] text-[14px] italic mb-3">No bio yet — tap Edit to add one</p>
         )}
 
         {memberSince && (
@@ -518,7 +543,7 @@ export function ProfileScreen() {
             className={`flex flex-col items-center justify-center py-4 ${i < 2 ? 'border-r border-[#DBDBDB]' : ''}`}>
             <p className="text-black font-bold text-[22px] leading-tight">{value}</p>
             <p className="text-[#737373] text-[10px] font-semibold uppercase tracking-wide mt-0.5">{label}</p>
-            <p className="text-[#AAAAAA] text-[10px] mt-0.5">{sub}</p>
+            <p className="text-[#6B7280] text-[10px] mt-0.5">{sub}</p>
           </div>
         ))}
       </div>
@@ -548,7 +573,7 @@ export function ProfileScreen() {
             ))}
           </div>
         ) : (
-          <p className="text-[#AAAAAA] text-[13px] italic">
+          <p className="text-[#6B7280] text-[13px] italic">
             No specialties added yet — tap Edit to set them.
           </p>
         )}
@@ -571,7 +596,7 @@ export function ProfileScreen() {
             ))}
           </div>
         ) : (
-          <p className="text-[#AAAAAA] text-[13px] italic">
+          <p className="text-[#6B7280] text-[13px] italic">
             No certifications added yet — tap Edit to add them.
           </p>
         )}
@@ -586,7 +611,7 @@ export function ProfileScreen() {
         <div className="flex items-center justify-between mb-3">
           <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em]">Posts</p>
           <button type="button" onClick={() => postFileRef.current?.click()} disabled={postingMoment}
-            className="flex items-center gap-1 text-[#0A1628] text-[12px] font-bold disabled:opacity-50">
+            className="min-h-10 -my-2 px-2 -mr-2 flex items-center gap-1 text-[#0A1628] text-[12px] font-bold disabled:opacity-50">
             <span className="text-[15px] leading-none">＋</span>{postingMoment ? 'Posting…' : 'Share a moment'}
           </button>
         </div>
@@ -605,7 +630,7 @@ export function ProfileScreen() {
         ) : (
           <button type="button" onClick={() => postFileRef.current?.click()} disabled={postingMoment}
             className="w-full rounded-[12px] bg-[#FAFAFA] border border-[#EFEFEF] px-6 py-8 text-center disabled:opacity-50">
-            <p className="text-[#AAAAAA] text-[12px]">{postingMoment ? 'Posting your moment…' : 'No posts yet — tap to share a moment.'}</p>
+            <p className="text-[#6B7280] text-[12px]">{postingMoment ? 'Posting your moment…' : 'No posts yet — tap to share a moment.'}</p>
           </button>
         )}
       </div>
@@ -657,7 +682,7 @@ export function ProfileScreen() {
           <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] p-4 flex flex-col items-center gap-1 text-center">
             <Star size={22} aria-hidden className="text-[#DBDBDB] mb-1" />
             <p className="text-[#737373] text-[13px] font-medium">No reviews yet</p>
-            <p className="text-[#AAAAAA] text-[12px]">
+            <p className="text-[#6B7280] text-[12px]">
               {profile.role === 'worker'
                 ? 'Reviews from clients will appear here after your first shift.'
                 : 'Reviews from the workers you book will appear here after your first shift.'}
@@ -709,7 +734,7 @@ export function ProfileScreen() {
             >
               <div className="sticky top-0 bg-white border-b border-[#EFEFEF] px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
                 <button type="button" aria-label="Close settings" onClick={() => setSettingsOpen(false)}
-                  className="w-9 h-9 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center">
+                  className="w-10 h-10 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center">
                   <ChevronLeft size={18} aria-hidden className="text-[#0A1628]" />
                 </button>
                 <h1 className="text-[#111827] font-bold text-[20px]">Settings</h1>
@@ -748,12 +773,51 @@ export function ProfileScreen() {
 
                 <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
                   <SettingRow icon={LogOut} label="Log Out" onTap={handleSignOut} danger />
+                  {/* The sheet sits below this panel's z-index, so the panel closes first. */}
+                  <SettingRow icon={Trash2} label="Delete account" onTap={() => { setSettingsOpen(false); setDeleteWord(''); setDeleteError(null); setDeleteOpen(true); }} danger />
                 </div>
+                <p className="text-[#9CA3AF] text-[11px] leading-relaxed px-1 mt-2">
+                  Deleting removes your profile, posts, messages and history for good.
+                </p>
               </div>
             </motion.div>
           );
         })()}
       </AnimatePresence>
+
+      <ConfirmSheet
+        open={deleteOpen}
+        title="Delete your account?"
+        body={
+          <div className="flex flex-col gap-3">
+            <p>
+              This permanently removes your profile, posts, messages, reviews and history. It cannot be undone.
+              If you are booked on an upcoming shift, or have an open shift posted, withdraw or cancel it first.
+            </p>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[12px] font-semibold text-[#111827]">Type DELETE to confirm</span>
+              <input
+                type="text"
+                value={deleteWord}
+                onChange={(e) => setDeleteWord(e.target.value)}
+                autoCapitalize="characters"
+                autoComplete="off"
+                placeholder="DELETE"
+                aria-label="Type DELETE to confirm"
+                className="w-full h-[44px] rounded-[10px] border border-[#E5E7EB] px-3 text-[14px] text-[#111827] outline-none focus:border-[#EF4444]"
+                data-testid="input-delete-confirm"
+              />
+            </label>
+            {deleteError && <p className="text-[#EF4444] text-[13px] leading-snug" role="alert">{deleteError}</p>}
+          </div>
+        }
+        confirmLabel="Delete my account"
+        tone="danger"
+        busy={deleting}
+        confirmDisabled={deleteWord.trim() !== 'DELETE'}
+        onConfirm={() => void handleDeleteAccount()}
+        onCancel={() => { if (!deleting) setDeleteOpen(false); }}
+      />
     </div>
   );
 }

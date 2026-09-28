@@ -91,17 +91,17 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
 
       <div className="flex items-center gap-4 text-[12px] text-[#737373] mb-3.5 flex-wrap">
         <span className="flex items-center gap-1">
-          <Calendar size={11} aria-hidden className="text-[#AAAAAA]" />
+          <Calendar size={11} aria-hidden className="text-[#6B7280]" />
           {displayDate}
         </span>
         {(shift.pay_rate ?? 0) > 0 && (
           <span className="flex items-center gap-1">
-            <DollarSign size={11} aria-hidden className="text-[#AAAAAA]" />
+            <DollarSign size={11} aria-hidden className="text-[#6B7280]" />
             ${shift.pay_rate}/hr
           </span>
         )}
         <span className="flex items-center gap-1">
-          <Users size={11} aria-hidden className="text-[#AAAAAA]" />
+          <Users size={11} aria-hidden className="text-[#6B7280]" />
           {spotsLeft} of {shift.spots_available} open
         </span>
       </div>
@@ -224,7 +224,7 @@ export function AdminShifts() {
           <Search size={14} aria-hidden className="text-[#737373] flex-shrink-0" />
           <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by role or venue…" aria-label="Search shifts"
-            className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] focus:outline-none" />
+            className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#9CA3AF] focus:outline-none" />
           {search && (
             <button type="button" aria-label="Clear" onClick={() => setSearch('')}>
               <X size={13} aria-hidden className="text-[#737373]" />
@@ -235,7 +235,7 @@ export function AdminShifts() {
           {FILTERS.map(({ key, label }) => (
             <button key={key} type="button" aria-pressed={filter === key}
               onClick={() => setFilter(key)}
-              className={`flex-shrink-0 h-[32px] px-3.5 rounded-full text-[12px] font-semibold border transition-all ${
+              className={`flex-shrink-0 h-10 px-3.5 rounded-full text-[12px] font-semibold border transition-all ${
                 filter === key ? 'bg-black text-white border-black' : 'bg-white border-[#DBDBDB] text-[#737373]'
               }`}>
               {label}
@@ -249,7 +249,7 @@ export function AdminShifts() {
             </p>
             <button type="button" onClick={handleFixLocations} disabled={fixing}
               aria-label="Fix shift map locations"
-              className="flex items-center gap-1.5 h-[30px] px-3 rounded-full border border-[#DBDBDB] bg-white text-[#0A1628] text-[11px] font-bold disabled:opacity-60">
+              className="flex items-center gap-1.5 h-10 px-3 rounded-full border border-[#DBDBDB] bg-white text-[#0A1628] text-[11px] font-bold disabled:opacity-60">
               {fixing
                 ? <div className="w-3 h-3 border-2 border-[#0A1628]/30 border-t-[#0A1628] rounded-full animate-spin" />
                 : <MapPin size={12} aria-hidden />}
@@ -286,7 +286,7 @@ export function AdminShifts() {
 
         {!isLoading && !isError && filtered.length === 0 && (
           <div className="flex items-center justify-center py-20">
-            <p className="text-[#AAAAAA] text-[14px]">No shifts match this filter.</p>
+            <p className="text-[#6B7280] text-[14px]">No shifts match this filter.</p>
           </div>
         )}
       </div>

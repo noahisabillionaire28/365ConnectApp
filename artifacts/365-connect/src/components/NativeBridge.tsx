@@ -23,16 +23,23 @@ export function NativeBridge() {
     started.current = true;
     void initNative({
       onOpenPath: (path) => {
-        // Auth callbacks arrive as connect365://auth/callback#access_token=…
-        if (path.startsWith('/auth/callback')) {
-          const hash = new URLSearchParams(path.split('#')[1] ?? '');
+        // Supabase links arrive as connect365://auth/callback#access_token=…
+        // (OAuth / magic link) or connect365://reset-password#…&type=recovery
+        // (password reset). Both carry the tokens in the fragment; a failed
+        // link carries `error=` instead, which the reset screen explains.
+        const isAuthLink = path.startsWith('/auth/callback') || path.startsWith('/reset-password');
+        if (isAuthLink) {
+          const [, fragment = ''] = path.split('#');
+          const hash = new URLSearchParams(fragment);
           const access = hash.get('access_token');
           const refresh = hash.get('refresh_token');
+          const recovery = hash.get('type') === 'recovery' || path.startsWith('/reset-password');
           if (access && refresh) {
             void supabase.auth.setSession({ access_token: access, refresh_token: refresh })
-              .then(() => navigate('/'));
+              .then(() => navigate(recovery ? '/reset-password' : '/'));
             return;
           }
+          if (recovery) { navigate(`/reset-password${fragment ? `#${fragment}` : ''}`); return; }
         }
         navigate(path);
       },

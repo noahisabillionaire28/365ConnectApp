@@ -70,7 +70,7 @@ export function TemplatesScreen() {
         <div className="flex items-center gap-3">
           <button type="button" aria-label="Back"
             onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/profile'); }}
-            className="w-9 h-9 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
+            className="w-10 h-10 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
           <div className="flex-1 min-w-0">
@@ -81,12 +81,14 @@ export function TemplatesScreen() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-10">
-        {isLoading && (
-          <div className="flex flex-col gap-2">
+        {/* The list query waits for the role, so "loading" covers both —
+            otherwise the empty state flashes before the first read. */}
+        {(roleLoading || isLoading) && (
+          <div className="flex flex-col gap-2" aria-busy="true" aria-label="Loading templates">
             {[0, 1, 2].map((i) => <div key={i} className="h-[74px] rounded-[12px] bg-white border border-[#E5E7EB] animate-pulse" />)}
           </div>
         )}
-        {!isLoading && templates.length === 0 && (
+        {!roleLoading && !isLoading && templates.length === 0 && (
           <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-6 py-10 text-center">
             <div className="w-12 h-12 rounded-full bg-[#F3F4F6] flex items-center justify-center mx-auto mb-3">
               <LayoutTemplate size={20} aria-hidden className="text-[#6B7280]" />
@@ -97,7 +99,7 @@ export function TemplatesScreen() {
             </p>
           </div>
         )}
-        {!isLoading && templates.length > 0 && (
+        {!roleLoading && !isLoading && templates.length > 0 && (
           <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden">
             {templates.map((t) => (
               <div key={t.id} className="flex items-center gap-2 px-4 py-3 border-b border-[#F3F4F6] last:border-0">
@@ -109,7 +111,7 @@ export function TemplatesScreen() {
                   <p className="text-[#9CA3AF] text-[11px]">{templateUsage(t)}</p>
                 </button>
                 <button type="button" aria-label={`More options for ${t.name}`} onClick={() => setMenuFor(t)}
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#F3F4F6]">
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#F3F4F6]">
                   <MoreHorizontal size={18} aria-hidden />
                 </button>
               </div>

@@ -27,6 +27,10 @@ type RawShift = {
   pending_count?: number;
   /** Swaps both workers agreed on that only the poster can finish. */
   swap_count?: number;
+  /** Position in a recurring series ("2 of 5"); null for a one-off shift. */
+  series_id?: string | null;
+  series_index?: number | null;
+  series_count?: number | null;
 };
 
 export type ClientShift = RawShift & {
@@ -43,6 +47,8 @@ export type ClientShift = RawShift & {
   startTimeISO: string;
   payRate: number | null;
   payPeriod: string | null;
+  seriesIndex: number | null;
+  seriesCount: number | null;
 };
 
 /** @deprecated use ClientShift */
@@ -62,6 +68,8 @@ function toClientShift(s: RawShift): ClientShift {
     startTimeISO:     s.start_time,
     payRate:          s.pay_rate    ?? null,
     payPeriod:        s.pay_period  ?? null,
+    seriesIndex:      s.series_index ?? null,
+    seriesCount:      s.series_count ?? null,
   };
 }
 

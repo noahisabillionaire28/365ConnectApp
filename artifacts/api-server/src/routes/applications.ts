@@ -10,7 +10,7 @@ import { HttpError, sendError } from '../lib/httpError.js';
 import { assertShiftOwner, assertWorkerTarget, loadShift, rosterAllows } from '../lib/shiftAccess.js';
 import { bookWorker, markRequestAccepted, syncShiftCapacity } from '../lib/booking.js';
 import { shiftDayLabel } from '../lib/shiftLabel.js';
-import { cancelActiveSwapsFor } from '../lib/swaps.js';
+import { cancelActiveSwapsFor, hasClockedIn } from '../lib/swaps.js';
 
 const router = Router();
 
@@ -137,7 +137,8 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     if (shift_id) {
       // Only the shift owner (or an admin) may see the applicants for a shift.
-      await assertShiftOwner(shift_id, req.userId!);
+      // The row it loads also carries end_time (no second shifts read).
+      const shiftRow = await assertShiftOwner(shift_id, req.userId!);
       let q = adminDb.from('applications').select('*').eq('shift_id', shift_id);
       if (status) q = q.eq('status', status);
       const { data: apps, error } = await q.order('created_at', { ascending: false });
@@ -145,14 +146,40 @@ router.get('/', requireAuth, async (req, res) => {
 
       const workerIds = [...new Set((apps ?? []).map((a) => a.worker_id))];
 
-      const { data: users, error: uErr } = await adminDb
-        .from('users')
-        .select(
-          'id, username, photo_url, rating, job_types, primary_job_type, certifications, bio',
-        )
-        .in('id', workerIds);
-      if (uErr) return res.status(500).json({ error: uErr.message });
-      const userMap = new Map((users ?? []).map((u) => [u.id, u]));
+      // The four per-worker lookups are independent: run them together
+      // (one network round-trip instead of four in a row).
+      const none = Promise.resolve({ data: [] as any[], error: null });
+      const [usersRes, entriesRes, revsRes, paysRes] = await Promise.all([
+        adminDb
+          .from('users')
+          .select('id, username, photo_url, rating, job_types, primary_job_type, certifications, bio')
+          .in('id', workerIds),
+        workerIds.length
+          ? adminDb
+            .from('time_entries')
+            .select('worker_id, clock_in, clock_out, total_hours, total_pay, approved, approved_pay, overtime_hours, break_minutes, worker_ack, dispute_note')
+            .eq('shift_id', shift_id)
+            .in('worker_id', workerIds)
+          : none,
+        workerIds.length
+          ? adminDb
+            .from('reviews')
+            .select('reviewee_id, rating')
+            .eq('shift_id', shift_id)
+            .eq('reviewer_id', req.userId)
+            .in('reviewee_id', workerIds)
+          : none,
+        workerIds.length
+          ? adminDb
+            .from('payments')
+            .select('worker_id')
+            .eq('shift_id', shift_id)
+            .eq('status', 'completed')
+            .in('worker_id', workerIds)
+          : none,
+      ]);
+      if (usersRes.error) return res.status(500).json({ error: usersRes.error.message });
+      const userMap = new Map((usersRes.data ?? []).map((u: any) => [u.id, u]));
 
       // Time-entry state — clock in/out + the ACTUAL hours & pay for this shift.
       const entryMap = new Map<string, {
@@ -161,58 +188,33 @@ router.get('/', requireAuth, async (req, res) => {
         approved: boolean; approved_pay: number | null; overtime_hours: number | null;
         break_minutes: number | null; worker_ack: string | null; dispute_note: string | null;
       }>();
-      if (workerIds.length) {
-        const { data: entries } = await adminDb
-          .from('time_entries')
-          .select('worker_id, clock_in, clock_out, total_hours, total_pay, approved, approved_pay, overtime_hours, break_minutes, worker_ack, dispute_note')
-          .eq('shift_id', shift_id)
-          .in('worker_id', workerIds);
-        for (const t of entries ?? []) {
-          entryMap.set(t.worker_id, {
-            clock_in: t.clock_in ?? null,
-            clock_out: t.clock_out ?? null,
-            total_hours: t.total_hours ?? null,
-            total_pay: t.total_pay ?? null,
-            approved: t.approved ?? false,
-            approved_pay: t.approved_pay ?? null,
-            overtime_hours: t.overtime_hours ?? null,
-            break_minutes: t.break_minutes ?? null,
-            worker_ack: (t as { worker_ack?: string | null }).worker_ack ?? null,
-            dispute_note: (t as { dispute_note?: string | null }).dispute_note ?? null,
-          });
-        }
+      for (const t of (entriesRes.data ?? []) as any[]) {
+        entryMap.set(t.worker_id, {
+          clock_in: t.clock_in ?? null,
+          clock_out: t.clock_out ?? null,
+          total_hours: t.total_hours ?? null,
+          total_pay: t.total_pay ?? null,
+          approved: t.approved ?? false,
+          approved_pay: t.approved_pay ?? null,
+          overtime_hours: t.overtime_hours ?? null,
+          break_minutes: t.break_minutes ?? null,
+          worker_ack: (t as { worker_ack?: string | null }).worker_ack ?? null,
+          dispute_note: (t as { dispute_note?: string | null }).dispute_note ?? null,
+        });
       }
 
       // Shift end time — used to flag a booked worker who never showed as no-show.
-      const { data: shiftTimes } = await adminDb
-        .from('shifts').select('end_time').eq('id', shift_id).maybeSingle();
-      const shiftEndMs = shiftTimes?.end_time ? Date.parse(shiftTimes.end_time) : NaN;
+      const shiftEndMs = shiftRow.end_time ? Date.parse(shiftRow.end_time) : NaN;
       const nowMs = Date.now();
 
       // Whether (and how) the owner has already reviewed each worker for this shift.
       const reviewedMap = new Map<string, number>();
-      if (workerIds.length) {
-        const { data: revs } = await adminDb
-          .from('reviews')
-          .select('reviewee_id, rating')
-          .eq('shift_id', shift_id)
-          .eq('reviewer_id', req.userId)
-          .in('reviewee_id', workerIds);
-        for (const r of revs ?? []) reviewedMap.set(r.reviewee_id, Number(r.rating) || 0);
-      }
+      for (const r of (revsRes.data ?? []) as any[]) reviewedMap.set(r.reviewee_id, Number(r.rating) || 0);
 
       // Whether each worker has already been paid for this shift (prevents
       // the owner from paying — and being charged — twice for the same shift).
       const paidSet = new Set<string>();
-      if (workerIds.length) {
-        const { data: pays } = await adminDb
-          .from('payments')
-          .select('worker_id')
-          .eq('shift_id', shift_id)
-          .eq('status', 'completed')
-          .in('worker_id', workerIds);
-        for (const p of pays ?? []) paidSet.add(p.worker_id);
-      }
+      for (const p of (paysRes.data ?? []) as any[]) paidSet.add(p.worker_id);
 
       const merged = (apps ?? []).map((a) => {
         const u = userMap.get(a.worker_id);
@@ -282,6 +284,9 @@ router.get('/', requireAuth, async (req, res) => {
     const shiftMap = new Map((shifts ?? []).map((s) => [s.id, s]));
     const merged = (apps ?? []).map((a) => {
       const s = shiftMap.get(a.shift_id);
+      // The on-site contact is for people who are booked (or next in line),
+      // not for everyone who ever applied.
+      const canContact = a.status === 'accepted' || a.status === 'standby';
       return {
         ...a,
         title: s?.title ?? null,
@@ -296,8 +301,8 @@ router.get('/', requireAuth, async (req, res) => {
         pay_rate: s?.pay_rate ?? null,
         pay_period: s?.pay_period ?? null,
         company_name: s?.company_name ?? null,
-        point_of_contact: s?.point_of_contact ?? null,
-        contact_phone: s?.contact_phone ?? null,
+        point_of_contact: canContact ? (s?.point_of_contact ?? null) : null,
+        contact_phone: canContact ? (s?.contact_phone ?? null) : null,
         arrival_status: a.arrival_status ?? null,
         arrival_status_at: a.arrival_status_at ?? null,
       };
@@ -326,40 +331,49 @@ router.get('/status/:shiftId', requireAuth, async (req, res) => {
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
 
-    let swap: Record<string, unknown> | null = null;
-    if (data?.id) {
-      const { data: s } = await adminDb
+    // The outgoing swap (from my booking) and any incoming offer are
+    // independent lookups; the people behind both come from one users read.
+    const [mineRes, offerRes] = await Promise.all([
+      data?.id
+        ? adminDb
+          .from('shift_swaps')
+          .select('id, status, to_worker_id, note, created_at, responded_at, decided_at')
+          .eq('application_id', data.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        : Promise.resolve({ data: null }),
+      adminDb
         .from('shift_swaps')
-        .select('id, status, to_worker_id, note, created_at, responded_at, decided_at')
-        .eq('application_id', data.id)
+        .select('id, status, from_worker_id, note, created_at')
+        .eq('shift_id', shiftId)
+        .eq('to_worker_id', req.userId)
+        .eq('status', 'offered')
         .order('created_at', { ascending: false })
         .limit(1)
-        .maybeSingle();
-      if (s) {
-        const { data: u } = await adminDb.from('users').select('username').eq('id', s.to_worker_id).maybeSingle();
-        swap = { ...s, to_username: u?.username ?? null };
-      }
+        .maybeSingle(),
+    ]);
+    const s = mineRes.data as { to_worker_id: string } & Record<string, unknown> | null;
+    const offer = offerRes.data as { from_worker_id: string } & Record<string, unknown> | null;
+
+    const peopleIds = [...new Set([s?.to_worker_id, offer?.from_worker_id].filter((x): x is string => !!x))];
+    const people = new Map<string, { username: string | null; photo_url: string | null; rating: number | null }>();
+    if (peopleIds.length) {
+      const { data: us } = await adminDb.from('users').select('id, username, photo_url, rating').in('id', peopleIds);
+      for (const u of us ?? []) people.set(u.id, u);
     }
-    let incoming: Record<string, unknown> | null = null;
-    const { data: offer } = await adminDb
-      .from('shift_swaps')
-      .select('id, status, from_worker_id, note, created_at')
-      .eq('shift_id', shiftId)
-      .eq('to_worker_id', req.userId)
-      .eq('status', 'offered')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (offer) {
-      const { data: u } = await adminDb
-        .from('users').select('username, photo_url, rating').eq('id', offer.from_worker_id).maybeSingle();
-      incoming = {
+
+    const swap: Record<string, unknown> | null = s
+      ? { ...s, to_username: people.get(s.to_worker_id)?.username ?? null }
+      : null;
+    const incoming: Record<string, unknown> | null = offer
+      ? {
         ...offer,
-        from_username: u?.username ?? null,
-        from_photo_url: u?.photo_url ?? null,
-        from_rating: u?.rating ?? null,
-      };
-    }
+        from_username: people.get(offer.from_worker_id)?.username ?? null,
+        from_photo_url: people.get(offer.from_worker_id)?.photo_url ?? null,
+        from_rating: people.get(offer.from_worker_id)?.rating ?? null,
+      }
+      : null;
 
     return res.json({
       status: data?.status ?? null,
@@ -928,6 +942,11 @@ router.post('/:id/call-out', requireAuth, requireRole('worker'), async (req, res
     const startMs = shift.start_time ? Date.parse(shift.start_time) : NaN;
     if (Number.isFinite(startMs) && Date.now() >= startMs) {
       return res.status(409).json({ error: 'This shift has already started. Please message the poster directly.' });
+    }
+    // Clock-in opens an hour early; a worker who is already on the clock
+    // cannot call out (it would orphan their time entry).
+    if (await hasClockedIn(app.shift_id, req.userId!)) {
+      return res.status(409).json({ error: "You've already clocked in to this shift. Please message the poster directly." });
     }
 
     // 1. Release the spot (same semantics as /withdraw, plus the reason).

@@ -4,7 +4,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { broadcastToUser } from '../lib/sseManager.js';
 import { getRoleInfo } from '../lib/roleCache.js';
 import {
-  memberFilter, participantsOf, conversationForUser, ensureShiftGroupChat,
+  memberFilter, participantsOf, conversationForUser, ensureShiftGroupChat, unreadCounts, countableConversations,
   isBlockedEitherWay, blockedIdsFor, flushScheduledMessages, notifyConversationUpdate,
   type ConversationRow,
 } from '../lib/chat.js';
@@ -62,31 +62,6 @@ async function enrichConversations(convs: ConversationRow[], viewerId: string): 
   });
 }
 
-/** Unread counts per conversation, from each member's read position. */
-async function unreadCounts(convs: ConversationRow[], viewerId: string): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
-  if (!convs.length) return out;
-  const ids = convs.map((c) => c.id);
-  const { data: reads } = await adminDb
-    .from('conversation_reads').select('conversation_id, last_read_at').eq('user_id', viewerId).in('conversation_id', ids);
-  const readMap = new Map<string, string>((reads ?? []).map((r) => [r.conversation_id, r.last_read_at]));
-  // One query for all threads; count in JS (small volumes per user).
-  const { data: msgs } = await adminDb
-    .from('messages')
-    .select('conversation_id, created_at, kind')
-    .in('conversation_id', ids)
-    .neq('sender_id', viewerId)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .limit(2000);
-  for (const m of msgs ?? []) {
-    if (m.kind === 'system') continue;
-    const since = readMap.get(m.conversation_id);
-    if (!since || m.created_at > since) out.set(m.conversation_id, (out.get(m.conversation_id) ?? 0) + 1);
-  }
-  return out;
-}
-
 /** GET /api/conversations — my conversations (DMs + shift group chats). ?archived=1 for the archive. */
 router.get('/', requireAuth, async (req, res) => {
   try {
@@ -126,11 +101,8 @@ router.get('/', requireAuth, async (req, res) => {
 /** GET /api/conversations/unread-count — total unread across all threads (tab badge). */
 router.get('/unread-count', requireAuth, async (req, res) => {
   try {
-    const { data } = await adminDb.from('conversations').select('*').or(memberFilter(req.userId!));
     const me = req.userId!;
-    const convs = ((data ?? []) as ConversationRow[]).filter((c) =>
-      !(c.deleted_by ?? []).includes(me) && !(c.archived_by ?? []).includes(me) && !(c.muted_by ?? []).includes(me));
-    const unread = await unreadCounts(convs, me);
+    const unread = await unreadCounts(await countableConversations(me), me);
     let total = 0; for (const n of unread.values()) total += n;
     return res.json({ total, threads: unread.size });
   } catch (e) {

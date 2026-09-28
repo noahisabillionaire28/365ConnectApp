@@ -153,6 +153,7 @@ export function PostShiftStep5Screen() {
 
     // Day-of details only travel when set (templates and re-posts carry them).
     const extras = {
+      dress_code:           draft.dress_code || undefined,
       dress_code_items:     draft.dress_code_items.length ? draft.dress_code_items : undefined,
       point_of_contact:     draft.point_of_contact     || undefined,
       contact_phone:        draft.contact_phone        || undefined,
@@ -221,7 +222,7 @@ export function PostShiftStep5Screen() {
           <button
             type="button" aria-label="Back to pay and details"
             onClick={() => navigate('/post-shift/step4')}
-            className="w-9 h-9 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
+            className="w-10 h-10 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>

@@ -113,7 +113,7 @@ export function NotificationSettingsScreen() {
         <div className="flex items-center gap-3">
           <button type="button" aria-label="Back"
             onClick={() => navigate('/notifications')}
-            className="w-9 h-9 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
+            className="w-10 h-10 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
           <h1 className="text-[#111827] font-bold text-[20px] tracking-tight">Notification Settings</h1>
@@ -135,7 +135,7 @@ export function NotificationSettingsScreen() {
         {prefs && (
           <>
             <InstallBanner flush />
-            <p className="text-[#9CA3AF] text-[11px] font-bold uppercase tracking-[0.12em] px-1 mb-2">
+            <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.12em] px-1 mb-2">
               Choose how you hear from us
             </p>
             <div className="bg-white border border-[#EDEEF0] rounded-[18px] shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
@@ -151,7 +151,7 @@ export function NotificationSettingsScreen() {
                 divider
                 icon={(on) => <Mail size={17} aria-hidden className={on ? 'text-white' : 'text-[#0A1628]'} />}
                 title="Email notifications"
-                subtitle="Get the same alerts by email. (Email delivery is coming soon.)"
+                subtitle="Bookings, requests, reminders and payments by email too. Likes, comments and roster adds stay in-app."
                 on={prefs.email_notifications}
                 onToggle={() => update({ email_notifications: !prefs.email_notifications })}
                 saving={saving}
@@ -176,14 +176,14 @@ export function NotificationSettingsScreen() {
               <button type="button" onClick={() => void push.sendTest().then((e) => showToast(e ?? 'Test sent — check your notifications.', e ? 'error' : 'success'))}
                 className="mt-3 text-[#0A1628] text-[13px] font-bold px-1">Send a test notification</button>
             )}
-            <p className="text-[#9CA3AF] text-[12px] leading-relaxed px-1 mt-3">
+            <p className="text-[#737373] text-[12px] leading-relaxed px-1 mt-3">
               Turning a channel off stops new alerts on that channel. You can turn it
               back on anytime.
             </p>
 
             {isWorker && (
               <div className="mt-6">
-                <p className="text-[#9CA3AF] text-[11px] font-bold uppercase tracking-[0.12em] px-1 mb-2">
+                <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.12em] px-1 mb-2">
                   Saved search alerts
                 </p>
                 <div className="bg-white border border-[#EDEEF0] rounded-[18px] shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
@@ -205,7 +205,7 @@ export function NotificationSettingsScreen() {
                       <p className="flex-1 min-w-0 text-[#111827] text-[14px] font-medium truncate">{savedSearchLabel(s)}</p>
                       <button type="button" onClick={() => savedSearches.remove(s.id)}
                         aria-label={`Remove saved search: ${savedSearchLabel(s)}`}
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-[#9CA3AF] active:bg-[#F3F4F6] flex-shrink-0">
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-[#9CA3AF] active:bg-[#F3F4F6] flex-shrink-0">
                         <X size={15} aria-hidden />
                       </button>
                     </div>

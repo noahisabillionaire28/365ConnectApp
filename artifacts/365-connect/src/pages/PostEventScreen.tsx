@@ -99,7 +99,7 @@ export function PostEventScreen() {
       <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-4 border-b border-[#DBDBDB] flex items-center gap-3 flex-shrink-0">
         <button type="button" aria-label="Go back"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/home'); }}
-          className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} aria-hidden className="text-black" />
         </button>
         <h1 className="text-black font-bold text-[18px] leading-tight">Post an Event</h1>

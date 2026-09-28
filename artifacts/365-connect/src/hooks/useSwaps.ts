@@ -137,7 +137,6 @@ export function invalidateSwapCaches(qc: QueryClient, shiftId?: string | null): 
   void qc.invalidateQueries({ queryKey: ['my-applications'] });
   void qc.invalidateQueries({ queryKey: ['my-shift-ids'] });
   void qc.invalidateQueries({ queryKey: ['worker-home-shifts'] });
-  void qc.invalidateQueries({ queryKey: shiftId ? ['accepted-workers', shiftId] : ['accepted-workers'] });
   void qc.invalidateQueries({ queryKey: shiftId ? ['shift-applicants', shiftId] : ['shift-applicants'] });
   void qc.invalidateQueries({ queryKey: ['client-shifts'] });
 }

@@ -60,7 +60,7 @@ export function RatePromptCard({ role }: { role: 'worker' | 'poster' }) {
 
   return (
     <div className="mx-4 mb-3 rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3 flex items-center gap-3" role="status">
-      <div className="w-9 h-9 rounded-full bg-[#FFFBEB] border border-[#FDE68A] flex items-center justify-center flex-shrink-0">
+      <div className="w-10 h-10 rounded-full bg-[#FFFBEB] border border-[#FDE68A] flex items-center justify-center flex-shrink-0">
         <Star size={16} aria-hidden className="text-[#F59E0B] fill-[#F59E0B]" />
       </div>
       <button type="button" onClick={() => navigate(href)} className="flex-1 min-w-0 text-left">

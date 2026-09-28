@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { useLocation, useSearch, Redirect } from 'wouter';
-import { motion } from 'framer-motion';
 import {
   Bell, Search, PlusCircle, SlidersHorizontal,
   Briefcase, CalendarDays, Clock3, DollarSign, MapPin,
@@ -29,9 +28,10 @@ import { resetDraft } from '@/store/postShiftStore';
 import { ArrivalPills } from '@/components/ArrivalPills';
 import { RatePromptCard } from '@/components/home/RatePromptCard';
 import { WeekEarningsCard } from '@/components/home/WeekEarningsCard';
-import { AddToCalendarSheet } from '@/components/AddToCalendarSheet';
+// The calendar sheet (and its animation library) only loads when first opened.
+const AddToCalendarSheet = lazy(() => import('@/components/AddToCalendarSheet').then((m) => ({ default: m.AddToCalendarSheet })));
 import type { CalendarEvent } from '@/lib/calendar';
-import { isToday } from '@/hooks/useArrivalStatus';
+import { isDayOfWindow } from '@/hooks/useArrivalStatus';
 
 /* ─── Shared header ──────────────────────────────────────────────────────────── */
 function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => void }) {
@@ -46,18 +46,18 @@ function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => voi
       <div className="flex items-center gap-2">
         {onPost && (
           <button type="button" aria-label="Post a shift" onClick={onPost}
-            className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+            className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
             <PlusCircle size={16} aria-hidden className="text-black" />
           </button>
         )}
         <button type="button" aria-label="Search" onClick={() => navigate('/explore')}
-          className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
           <Search size={16} aria-hidden className="text-[#737373]" />
         </button>
         <button type="button"
           aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
           onClick={() => navigate('/notifications')}
-          className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center relative">
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center relative">
           <Bell size={16} aria-hidden className="text-[#737373]" />
           {unreadCount > 0 && (
             <span aria-hidden className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#0095F6] border-[1.5px] border-white" />
@@ -85,7 +85,7 @@ function SegmentControl({
           aria-selected={value === tab.value}
           type="button"
           onClick={() => onChange(tab.value)}
-          className={`flex-1 h-[34px] rounded-[8px] text-[13px] font-semibold transition-all duration-150 ${
+          className={`flex-1 h-10 rounded-[8px] text-[13px] font-semibold transition-all duration-150 ${
             value === tab.value
               ? 'bg-white text-[#111827] shadow-sm'
               : 'text-[#6B7280]'
@@ -121,7 +121,10 @@ function groupApplications(apps: MyApplication[]) {
     completed: live.filter((a) => a.status === 'accepted' && isOver(a)).sort(latest),
     // Applications that were never answered before the shift ended.
     expired:   live.filter((a) => (a.status === 'pending' || a.status === 'standby') && isOver(a)),
-    dropped:   live.filter((a) => a.status === 'withdrawn'),
+    // A spot handed to another worker through an approved swap is not a
+    // drop; it gets its own label so the worker is not told they bailed.
+    swapped:   live.filter((a) => a.status === 'withdrawn' && a.calloutReason === 'swap').sort(latest),
+    dropped:   live.filter((a) => a.status === 'withdrawn' && a.calloutReason !== 'swap'),
     notSelected: live.filter((a) => a.status === 'declined' || a.status === 'rejected'),
     // Shifts the organizer cancelled while this worker was booked, applied or waitlisted.
     cancelled: apps.filter((a) => isCancelled(a) && ['accepted', 'pending', 'standby'].includes(a.status)).sort(latest),
@@ -166,19 +169,21 @@ function MyShiftRow({ app, onTap, onCalendar }: {
   const endMs = app.endTime ? Date.parse(app.endTime) : NaN;
   const clockInNow = !cancelled && app.status === 'accepted' && Number.isFinite(startMs) &&
     now >= startMs - 3_600_000 && (!Number.isFinite(endMs) || now <= endMs);
-  // Day-of pills ("On my way" / "Running late") for today's booked shift.
-  const dayOf = !cancelled && app.status === 'accepted' && isToday(app.startTime) && (!Number.isFinite(endMs) || now <= endMs);
+  // Day-of pills ("On my way" / "Running late"): same window as the shift
+  // page (starts within 12 h or in progress, not ended), so a late-night
+  // shift shows them on Home too, whatever the device's calendar day says.
+  const dayOf = !cancelled && app.status === 'accepted' && isDayOfWindow(app.startTime, app.endTime, now);
 
   return (
     <div className="border-b border-[#E5E7EB] last:border-none">
     <div className="flex items-center">
-    <motion.button type="button" whileTap={{ scale: 0.98 }} onClick={onTap}
-      className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3.5 text-left">
+    <button type="button" onClick={onTap}
+      className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3.5 text-left active:scale-[0.98] transition-transform">
       <div className="w-10 h-10 rounded-[10px] bg-[#F3F4F6] flex items-center justify-center flex-shrink-0">
         <Briefcase size={16} aria-hidden className="text-[#6B7280]" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[#111827] font-semibold text-[14px] truncate">{app.shiftTitle}</p>
+        <p className="text-[#111827] font-semibold text-[14px] leading-snug line-clamp-2 break-words">{app.shiftTitle}</p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           {app.companyName && (
             <span className="text-[#6B7280] text-[12px] truncate">{app.companyName}</span>
@@ -207,7 +212,7 @@ function MyShiftRow({ app, onTap, onCalendar }: {
       ) : (
         <ChevronRight size={15} aria-hidden className="text-[#D1D5DB] flex-shrink-0" />
       )}
-    </motion.button>
+    </button>
     {onCalendar && (
       <button type="button" onClick={onCalendar} aria-label={`Add ${app.shiftTitle ?? 'this shift'} to your calendar`}
         className="w-11 h-11 mr-2 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#F3F4F6] flex-shrink-0">
@@ -264,7 +269,7 @@ function MyShiftSection({
 function WorkerMyShiftsView() {
   const [, navigate] = useLocation();
   const { applications, isLoading, error } = useMyApplications();
-  const { upcoming, applied, standby, completed, expired, dropped, notSelected, cancelled } = groupApplications(applications);
+  const { upcoming, applied, standby, completed, expired, swapped, dropped, notSelected, cancelled } = groupApplications(applications);
   const goToShift = (a: MyApplication) => navigate(`/shift/${a.shiftId}`);
   const [calendarEvent, setCalendarEvent] = useState<CalendarEvent | null>(null);
 
@@ -302,7 +307,11 @@ function WorkerMyShiftsView() {
     <div className="flex-1 overflow-y-auto pt-4 pb-4">
       <RatePromptCard role="worker" />
       <WeekEarningsCard />
-      <AddToCalendarSheet open={!!calendarEvent} event={calendarEvent} onClose={() => setCalendarEvent(null)} />
+      {calendarEvent && (
+        <Suspense fallback={null}>
+          <AddToCalendarSheet open={!!calendarEvent} event={calendarEvent} onClose={() => setCalendarEvent(null)} />
+        </Suspense>
+      )}
       <MyShiftSection label="Upcoming"     items={upcoming}     onTap={goToShift} dotColor="#10B981" emptyText="No confirmed upcoming shifts."
         onCalendar={(a) => setCalendarEvent(calendarEventFor(a))} />
       <MyShiftSection label="Standby"      items={standby}      onTap={goToShift} dotColor="#F59E0B" />
@@ -310,6 +319,7 @@ function WorkerMyShiftsView() {
       <MyShiftSection label="Cancelled"    items={cancelled}    onTap={goToShift} dotColor="#EF4444" />
       <MyShiftSection label="Completed"    items={completed}    onTap={goToShift} dotColor="#6B7280" />
       <MyShiftSection label="Expired"      items={expired}      onTap={goToShift} dotColor="#D1D5DB" />
+      <MyShiftSection label="Swapped"      items={swapped}      onTap={goToShift} dotColor="#D1D5DB" />
       <MyShiftSection label="Dropped"      items={dropped}      onTap={goToShift} dotColor="#D1D5DB" />
       <MyShiftSection label="Not Selected" items={notSelected}  onTap={goToShift} dotColor="#D1D5DB" />
     </div>
@@ -319,7 +329,7 @@ function WorkerMyShiftsView() {
 /* ─── Worker: Available shifts (open shifts near you) ────────────────────────── */
 function WorkerAvailableView() {
   const [, navigate] = useLocation();
-  const { shifts, isLoading, error } = useWorkerHomeShifts();
+  const { shifts, isLoading, error, hasLocation } = useWorkerHomeShifts();
   const { appliedShiftIds } = useApplications();
 
   return (
@@ -338,16 +348,16 @@ function WorkerAvailableView() {
         {!isLoading && !error && (
           <div className="flex flex-col gap-4" role="feed" aria-label="Available shifts near you">
             {shifts.map((shift, i) => (
-              <motion.div key={shift.id}
-                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05, duration: 0.3, ease: 'easeOut' }}>
+              <div key={shift.id} className="anim-rise-in" style={{ animationDelay: `${Math.min(i * 50, 300)}ms` }}>
                 <ShiftListCard shift={shift} applied={appliedShiftIds.has(shift.id)}
                   onTap={() => navigate(`/shift/${shift.id}`)} />
-              </motion.div>
+              </div>
             ))}
             {shifts.length === 0 && (
               <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-                <p className="text-[#737373] text-[14px]">No shifts match your job types within 25 miles right now.</p>
+                <p className="text-[#737373] text-[14px]">
+                  {hasLocation ? 'No shifts match your job types within 25 miles right now.' : 'No shifts match your job types right now.'}
+                </p>
                 <div className="flex gap-2 justify-center mt-4">
                   <button type="button" onClick={() => navigate('/jobs')}
                     className="h-[38px] px-4 rounded-[10px] bg-[#0A1628] text-white text-[13px] font-semibold">
@@ -587,23 +597,23 @@ function WorkerDiscoveryBody() {
         style={{ WebkitOverflowScrolling: 'touch' }}>
         <select aria-label="Filter by job type" value={jobType ?? ''}
           onChange={(e) => setJobType(e.target.value || null)}
-          className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
           <option value="">All job types</option>
           {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
         <select aria-label="Filter by rating" value={rating}
           onChange={(e) => setRating(e.target.value as typeof rating)}
-          className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
           {RATING_FILTERS.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
         <select aria-label="Filter by distance" value={distance}
           onChange={(e) => setDistance(e.target.value as typeof distance)}
-          className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
           {DISTANCE_FILTERS.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
         <button type="button" role="switch" aria-checked={availableOnly}
           onClick={() => setAvailableOnly((v) => !v)}
-          className={`h-[32px] px-3 rounded-full text-[12px] font-semibold border flex items-center gap-1.5 flex-shrink-0 ${
+          className={`h-10 px-3 rounded-full text-[12px] font-semibold border flex items-center gap-1.5 flex-shrink-0 ${
             availableOnly ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'
           }`}>
           <SlidersHorizontal size={12} aria-hidden />
@@ -648,7 +658,7 @@ function ClientShiftCard({
 
   return (
     <div className="mx-4 mb-3 bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden">
-      <motion.button type="button" whileTap={{ scale: 0.99 }} onClick={onTap} className="w-full text-left px-4 pt-4 pb-3">
+      <button type="button" onClick={onTap} className="w-full text-left px-4 pt-4 pb-3 active:scale-[0.99] transition-transform">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <span className="inline-block bg-[#0A1628] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide mb-1.5">
@@ -657,6 +667,12 @@ function ClientShiftCard({
             {shift.event_id && (
               <span className="inline-block ml-1.5 bg-[#F3F4F6] text-[#0A1628] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#E5E7EB] mb-1.5">
                 Event position
+              </span>
+            )}
+            {shift.seriesIndex != null && shift.seriesCount != null && (
+              <span className="inline-flex items-center gap-1 ml-1.5 bg-[#F3F4F6] text-[#0A1628] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#E5E7EB] mb-1.5"
+                aria-label={`Shift ${shift.seriesIndex} of ${shift.seriesCount} in a recurring series`}>
+                <Repeat2 size={10} aria-hidden />{shift.seriesIndex} of {shift.seriesCount}
               </span>
             )}
             <p className="text-[#111827] font-bold text-[17px] leading-snug truncate">
@@ -720,7 +736,7 @@ function ClientShiftCard({
             )}
           </div>
         </div>
-      </motion.button>
+      </button>
       {onApplicants && (
         <div className="border-t border-[#E5E7EB] px-4 py-2.5">
           <button type="button" onClick={onApplicants}
@@ -829,7 +845,7 @@ function ClientMyShiftsView() {
           <Briefcase size={28} aria-hidden className="text-[#D1D5DB] mx-auto mb-3" />
           <p className="text-[#6B7280] font-semibold text-[14px]">No shifts posted yet</p>
           <p className="text-[#9CA3AF] text-[12px] mt-1">Post a shift to start finding workers.</p>
-          <button type="button" onClick={() => navigate('/post-shift/name')}
+          <button type="button" onClick={() => { resetDraft(); navigate('/post-shift/name'); }}
             className="mt-4 h-[40px] px-5 bg-[#0A1628] text-white rounded-[10px] text-[13px] font-semibold">
             Post a Shift
           </button>
@@ -920,19 +936,16 @@ function StafferHomeFeed() {
       <div className="pt-3"><InstallBanner compact /></div>
       {tab === 'browse' ? <WorkerDiscoveryBody /> : <ClientMyShiftsView />}
 
-      <motion.button
+      <button
         type="button"
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 28, delay: 0.15 }}
-        whileTap={{ scale: 0.93 }}
         onClick={handlePostShift}
         aria-label="Post a shift"
-        className="fixed bottom-[80px] right-4 z-50 flex items-center gap-2 h-[44px] px-4 bg-[#0A1628] text-white rounded-full shadow-lg font-bold text-[13px]"
+        style={{ animationDelay: '150ms' }}
+        className="anim-pop-in fixed bottom-[80px] right-4 z-50 flex items-center gap-2 h-[44px] px-4 bg-[#0A1628] text-white rounded-full shadow-lg font-bold text-[13px] active:scale-[0.93] transition-transform"
       >
         <PlusCircle size={16} aria-hidden className="flex-shrink-0" />
         Post a Shift
-      </motion.button>
+      </button>
 
       <BottomTabNav />
     </div>
@@ -941,7 +954,7 @@ function StafferHomeFeed() {
 
 /* ─── HomeScreen — role router ────────────────────────────────────────────────── */
 export function HomeScreen() {
-  const { role, roleLoading, roleError } = useRole();
+  const { role, roleLoading, roleError, refetchRole } = useRole();
   const { user, loading: authLoading } = useAuth();
 
   if (roleLoading || authLoading) {
@@ -957,9 +970,24 @@ export function HomeScreen() {
 
   // Signed out → splash (which routes to login); signed in with no role yet
   // (onboarding never finished) → pick one. A failed profile read is not "no
-  // role", so it falls through to the default feed rather than bouncing.
+  // role": it gets a retry card, never a bounce to role select (where a tap
+  // would try to rewrite the account) and never a guessed feed.
   if (!user) return <Redirect to="/" />;
-  if (!role && !roleError) return <Redirect to="/role-select" />;
+  if (!role && roleError) {
+    return (
+      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-8 pb-[64px] gap-3 text-center">
+        <p className="text-[#111827] font-bold text-[17px]">Couldn't load your account</p>
+        <p className="text-[#6B7280] text-[14px] leading-relaxed max-w-[280px]">Check your connection and try again.</p>
+        <button type="button" onClick={() => { void refetchRole(); }}
+          className="mt-2 h-[48px] w-full max-w-[280px] rounded-[12px] bg-[#0A1628] text-white text-[15px] font-bold"
+          data-testid="btn-home-retry">
+          Try again
+        </button>
+        <BottomTabNav />
+      </div>
+    );
+  }
+  if (!role) return <Redirect to="/role-select" />;
 
   if (role === 'worker') return <WorkerHomeFeed />;
   if (role === 'staffer') return <StafferHomeFeed />;

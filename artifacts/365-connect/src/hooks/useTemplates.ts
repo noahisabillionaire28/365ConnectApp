@@ -73,8 +73,6 @@ export function shiftRowToTemplatePayload(raw: Record<string, unknown>): Templat
     job_type:         (raw.job_type as string) ?? jobTypes[0] ?? '',
     job_types:        jobTypes,
     location:         (raw.location as string | null) ?? null,
-    lat:              num(raw.lat),
-    lng:              num(raw.lng),
     unit_info:        (raw.unit_info as string | null) ?? null,
     pay_rate:         num(raw.pay_rate) ?? 0,
     pay_period:       payPeriod,
@@ -91,7 +89,6 @@ export function shiftRowToTemplatePayload(raw: Record<string, unknown>): Templat
     instant_claim:    !!raw.instant_claim,
     start_time:       start.time || '18:00',
     end_time:         end.time || '23:00',
-    timezone:         tz,
   };
 }
 

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { isNative, nativePushPermission, registerNativePush } from '@/lib/native';
+import { getNativeToken, setNativeToken, forgetPushSubscription } from '@/lib/pushSession';
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4);
@@ -31,9 +32,6 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
   }
 }
 
-/** The APNs token this device registered with (native only). */
-let nativeToken: string | null = null;
-
 export function usePush() {
   const { user } = useAuth();
   const native = isNative();
@@ -53,7 +51,7 @@ export function usePush() {
         setServerReady(!!status.native);
         const perm = await nativePushPermission();
         setPermission(perm === 'prompt' ? 'default' : perm);
-        setSubscribed(perm === 'granted' && !!nativeToken);
+        setSubscribed(perm === 'granted' && !!getNativeToken());
         return;
       }
       setServerReady(status.configured);
@@ -74,7 +72,7 @@ export function usePush() {
         const token = await registerNativePush({ promptIfNeeded: true });
         if (!token) { setPermission(await nativePushPermission() === 'denied' ? 'denied' : 'default'); return 'Notifications were not allowed.'; }
         await apiClient(user.id).post('/push/subscribe', { platform: 'ios', token });
-        nativeToken = token;
+        setNativeToken(token);
         setPermission('granted');
         setSubscribed(true);
         return null;
@@ -99,21 +97,10 @@ export function usePush() {
     if (!supported || !user?.id) return;
     setBusy(true);
     try {
-      if (native) {
-        if (nativeToken) await apiClient(user.id).post('/push/unsubscribe', { token: nativeToken }).catch(() => {});
-        nativeToken = null;
-        setSubscribed(false);
-        return;
-      }
-      const reg = await navigator.serviceWorker.getRegistration();
-      const sub = await reg?.pushManager.getSubscription();
-      if (sub) {
-        await apiClient(user.id).post('/push/unsubscribe', { endpoint: sub.endpoint }).catch(() => {});
-        await sub.unsubscribe();
-      }
+      await forgetPushSubscription(user.id);
       setSubscribed(false);
     } finally { setBusy(false); }
-  }, [supported, native, user?.id]);
+  }, [supported, user?.id]);
 
   const sendTest = useCallback(async (): Promise<string | null> => {
     if (!user?.id) return 'Not signed in.';
@@ -125,4 +112,4 @@ export function usePush() {
 }
 
 /** Called by the native bridge after a silent registration so the settings screen agrees. */
-export function rememberNativeToken(token: string | null): void { nativeToken = token; }
+export function rememberNativeToken(token: string | null): void { setNativeToken(token); }

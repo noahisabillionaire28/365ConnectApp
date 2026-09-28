@@ -11,11 +11,14 @@
  *   – Green #10B981, white bold text, checkmark icon
  *   – 3-second auto-dismiss; tappable to dismiss early
  *   – Only ONE toast visible at a time; extras are queued sequentially
+ *   – Identical messages within 3 seconds collapse into one
  *   – pointer-events: none on the overlay so buttons/nav are never blocked
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle2, XCircle } from 'lucide-react';
+
+/** How long the fade-out runs before the toast is removed (matches .anim-toast-out). */
+const EXIT_MS = 220;
 
 type ToastVariant = 'success' | 'error';
 type ToastItem = { id: string; message: string; variant: ToastVariant };
@@ -31,13 +34,23 @@ export function useToast() {
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [queue,   setQueue]   = useState<ToastItem[]>([]);
   const [current, setCurrent] = useState<ToastItem | null>(null);
+  /** True while the current toast plays its exit animation. */
+  const [leaving, setLeaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exitRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /** Dismiss the current toast (clears timer too). */
+  /** Dismiss the current toast: play the exit animation, then remove it. */
   const dismiss = useCallback(() => {
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
-    setCurrent(null);
+    if (exitRef.current) return; // already on its way out
+    setLeaving(true);
+    exitRef.current = setTimeout(() => {
+      exitRef.current = null;
+      setLeaving(false);
+      setCurrent(null);
+    }, EXIT_MS);
   }, []);
+  useEffect(() => () => { if (exitRef.current) clearTimeout(exitRef.current); }, []);
 
   /**
    * When the current toast is gone, pull the next one from the queue.
@@ -55,17 +68,28 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   /** Start/restart the 3-second auto-dismiss clock whenever a new id appears. */
   useEffect(() => {
     if (!current) return;
-    timerRef.current = setTimeout(() => setCurrent(null), 3000);
+    timerRef.current = setTimeout(dismiss, 3000);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
 
+  /**
+   * The same message within 3 s is shown once. A double-tap, a retry loop or
+   * two hooks reacting to one event used to stack identical toasts.
+   */
+  const lastShown = useRef<{ message: string; at: number } | null>(null);
+  const DEDUPE_MS = 3000;
+
   /** Add a message to the queue — called from any screen via useToast(). */
   const showToast = useCallback((message: string, variant: ToastVariant = 'success') => {
+    const now = Date.now();
+    const last = lastShown.current;
+    if (last && last.message === message && now - last.at < DEDUPE_MS) return;
+    lastShown.current = { message, at: now };
     const id = typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2);
-    setQueue((prev) => [...prev, { id, message, variant }]);
+    setQueue((prev) => (prev.some((t) => t.message === message) ? prev : [...prev, { id, message, variant }]));
   }, []);
 
   return (
@@ -87,31 +111,25 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         >
           {/* Matches the app column width */}
           <div className="w-full max-w-app px-4">
-            <AnimatePresence mode="wait">
-              {current && (
-                <motion.button
-                  key={current.id}
-                  type="button"
-                  onClick={dismiss}
-                  initial={{ y: -80, opacity: 1 }}
-                  animate={{ y: 0,   opacity: 1 }}
-                  exit={{ opacity: 0, y: -16, transition: { duration: 0.22, ease: 'easeIn' } }}
-                  transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                  className={`pointer-events-auto w-full flex items-center gap-3 rounded-[14px] px-4 py-3.5 shadow-lg ${
-                    current.variant === 'error' ? 'bg-[#EF4444]' : 'bg-[#10B981]'
-                  }`}
-                  style={{ WebkitTapHighlightColor: 'transparent' }}
-                  aria-label={`${current.message} — tap to dismiss`}
-                >
-                  {current.variant === 'error'
-                    ? <XCircle size={20} className="text-white flex-shrink-0" aria-hidden />
-                    : <CheckCircle2 size={20} className="text-white flex-shrink-0" aria-hidden />}
-                  <p className="text-white font-bold text-[14px] leading-snug text-left">
-                    {current.message}
-                  </p>
-                </motion.button>
-              )}
-            </AnimatePresence>
+            {current && (
+              <button
+                key={current.id}
+                type="button"
+                onClick={dismiss}
+                className={`${leaving ? 'anim-toast-out' : 'anim-toast-in'} pointer-events-auto w-full flex items-center gap-3 rounded-[14px] px-4 py-3.5 shadow-lg ${
+                  current.variant === 'error' ? 'bg-[#EF4444]' : 'bg-[#10B981]'
+                }`}
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+                aria-label={`${current.message} — tap to dismiss`}
+              >
+                {current.variant === 'error'
+                  ? <XCircle size={20} className="text-white flex-shrink-0" aria-hidden />
+                  : <CheckCircle2 size={20} className="text-white flex-shrink-0" aria-hidden />}
+                <p className="text-white font-bold text-[14px] leading-snug text-left">
+                  {current.message}
+                </p>
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -49,12 +49,15 @@ type ApiRow = Omit<WorkerPerson, 'photoUrl' | 'isPro' | 'primaryJobType' | 'dist
  */
 export function usePeopleFeed(role: string = 'worker') {
   const { user } = useAuth();
-  const { coords } = useMyLocation();
+  // Wait for the saved location: asking with the Miami default and again
+  // with the real coordinates was two requests for one list.
+  const { coords, loading: locLoading } = useMyLocation();
   const lat = Math.round(coords.lat * 100) / 100;
   const lng = Math.round(coords.lng * 100) / 100;
 
   const query = useQuery<WorkerPerson[], Error>({
     queryKey: ['people-feed', role, user?.id ?? 'anon', lat, lng],
+    enabled: !locLoading,
     placeholderData: keepPreviousData,
     queryFn: async () => {
       const params = new URLSearchParams({ role, lat: String(lat), lng: String(lng) });
@@ -79,7 +82,7 @@ export function usePeopleFeed(role: string = 'worker') {
 
   return {
     people:    query.data   ?? [],
-    isLoading: query.isLoading,
+    isLoading: locLoading || query.isLoading,
     isError:   query.isError,
     error:     query.error,
     data:      query.data   ?? [],

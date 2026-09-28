@@ -4,11 +4,14 @@
  * Logged-in users are sent to the app immediately:
  *  - profile exists  → resolveSetupRoute (usually /home)
  *  - no profile yet  → /role-select (one click to pick role, then /home)
+ *  - profile read failed (network) → retry card, never role select: picking a
+ *    role there would otherwise rewrite an existing account.
  */
 import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
+import { WifiOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiClient } from '@/lib/api';
+import { apiClient, isApiStatus } from '@/lib/api';
 import { resolveSetupRoute } from '@/lib/setupRoute';
 
 const NAVY   = '#0A1628';
@@ -17,11 +20,13 @@ const MUTED  = '#6B7280';
 
 export function SplashScreen() {
   const [, navigate] = useLocation();
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const [checking, setChecking] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (loading || !user || checking) return;
+    if (loading || !user || checking || failed) return;
     setChecking(true);
 
     apiClient(user.id)
@@ -29,13 +34,46 @@ export function SplashScreen() {
       .then(async (data) => {
         navigate(await resolveSetupRoute(user.id, data ?? null));
       })
-      .catch(() => {
-        // No profile yet — send to role selection (one step, then /home)
-        navigate('/role-select');
+      .catch((err) => {
+        // Only a definite "no profile row" goes to role selection.
+        if (isApiStatus(err, 404)) { navigate('/role-select'); return; }
+        setFailed(true);
+        setChecking(false);
       });
-  }, [user, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, loading, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Show spinner while Clerk is loading or while we're checking profile
+  if (user && failed) {
+    return (
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-white px-8 text-center gap-3">
+        <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: '#F3F4F6' }}>
+          <WifiOff size={22} style={{ color: NAVY }} aria-hidden />
+        </div>
+        <p className="font-bold text-[17px]" style={{ color: NAVY }}>Couldn't load your account</p>
+        <p className="text-[14px] leading-relaxed max-w-[280px]" style={{ color: MUTED }}>
+          Check your connection and try again. Your account is safe.
+        </p>
+        <button
+          type="button"
+          onClick={() => { setFailed(false); setAttempt((n) => n + 1); }}
+          className="mt-2 w-full max-w-[280px] text-white font-bold text-[15px] h-[48px] rounded-[12px] active:scale-[0.98] transition-transform"
+          style={{ background: NAVY }}
+          data-testid="btn-splash-retry"
+        >
+          Try again
+        </button>
+        <button
+          type="button"
+          onClick={() => { void signOut(); setFailed(false); }}
+          className="text-[13px] font-semibold mt-1"
+          style={{ color: MUTED }}
+        >
+          Sign out
+        </button>
+      </div>
+    );
+  }
+
+  // Show spinner while auth is loading or while we're checking profile
   if (loading || (user && checking)) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center bg-white">

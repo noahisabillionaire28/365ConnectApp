@@ -67,7 +67,7 @@ function RosterCard({ worker, onOpen, onMessage, onAssign, onRemove }: {
         </button>
 
         <button type="button" aria-label={`Remove ${worker.username ?? 'worker'} from roster`} onClick={onRemove}
-          className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
+          className="w-10 h-10 rounded-full border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
           <UserMinus size={16} aria-hidden className="text-[#6B7280]" />
         </button>
       </div>
@@ -163,7 +163,25 @@ export function RosterScreen() {
       (w.job_types ?? []).some((j) => j.toLowerCase().includes(q)));
   }, [workers, query]);
 
-  if (roleLoading || !hasRoster) return null;
+  // The role read gates the whole screen: show its frame while it resolves
+  // rather than a blank page. A non-poster is redirected by the effect above.
+  if (roleLoading) {
+    return (
+      <div className="min-h-[100dvh] bg-white flex flex-col" aria-busy="true" aria-label="Loading roster">
+        <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 border-b border-[#E5E7EB] flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#F3F4F6] animate-pulse flex-shrink-0" />
+            <div className="h-5 w-24 rounded bg-[#F3F4F6] animate-pulse" />
+          </div>
+          <div className="mt-3 h-[40px] rounded-[10px] bg-[#F3F4F6] animate-pulse" />
+        </div>
+        <div className="flex-1 px-5 pt-4 flex flex-col gap-3">
+          {[1, 2, 3].map((n) => <RosterCardSkeleton key={n} />)}
+        </div>
+      </div>
+    );
+  }
+  if (!hasRoster) return null;
 
   async function message(w: RosterWorker) {
     if (!user?.id) return;
@@ -178,7 +196,7 @@ export function RosterScreen() {
         <div className="flex items-center gap-3">
           <button type="button" aria-label="Go back"
             onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/home'); }}
-            className="w-9 h-9 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
+            className="w-10 h-10 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
             <ChevronLeft size={18} aria-hidden className="text-[#0A1628]" />
           </button>
           <div className="min-w-0 flex-1">

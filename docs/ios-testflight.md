@@ -33,9 +33,13 @@ build target that lives in `artifacts/365-connect/ios`.
 4. **Vercel (365-connect-api project)**: add environment variables
    `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_KEY` (the whole `.p8` file contents),
    `APNS_BUNDLE_ID=com.connect365.app`, then redeploy.
-5. **Supabase → Authentication → URL Configuration**: add
-   `connect365://auth/callback` to the redirect allow-list (needed for magic
-   links / social sign-in inside the app; email + password works without it).
+5. **Supabase → Authentication → URL Configuration**: add these two URLs to
+   the redirect allow-list (manual step; the app cannot do it):
+   - `connect365://auth/callback` — social sign-in / magic links inside the app
+   - `connect365://reset-password` — "Forgot password" emails sent from the app
+
+   Email + password sign-in works without either; without the second one a
+   reset link requested from the iOS app opens in Safari instead of the app.
 6. **Xcode Cloud** (App Store Connect → your app → Xcode Cloud → Get Started):
    connect the GitHub repo, pick the `main` branch, product "App", scheme
    "App", action *Archive* with *TestFlight (Internal Testing)* as the

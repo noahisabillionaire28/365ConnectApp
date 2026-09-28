@@ -84,10 +84,12 @@ router.get('/users', async (_req, res) => {
   try {
     const { data, error } = await adminDb
       .from('users')
-      .select('id, email, role, username, photo_url, is_pro, rating, status, created_at')
+      .select('id, email, role, username, photo_url, is_pro, rating, status, is_banned, created_at')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    res.json(data ?? []);
+    // A ban set through a dispute stores is_banned=true; surface it as the
+    // status so the panel never shows a banned account as "Active".
+    res.json((data ?? []).map((u) => ({ ...u, status: u.is_banned ? 'banned' : (u.status ?? 'active') })));
   } catch (err) {
     console.error('[admin/users]', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -99,12 +101,21 @@ router.patch('/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const allowed = ['role', 'is_pro', 'status'] as const;
+    const STATUSES = new Set(['active', 'suspended', 'flagged', 'banned']);
     const body = req.body as Record<string, unknown>;
     const updates: Record<string, unknown> = {};
     for (const k of allowed) {
       if (k in body) updates[k] = body[k];
     }
     if (!Object.keys(updates).length) { res.status(400).json({ error: 'No valid fields' }); return; }
+    if ('status' in updates) {
+      if (typeof updates.status !== 'string' || !STATUSES.has(updates.status)) {
+        res.status(400).json({ error: 'status must be active, suspended, flagged or banned' });
+        return;
+      }
+      // Keep the legacy flag in step so a restore really restores access.
+      updates.is_banned = updates.status === 'banned';
+    }
     const { error } = await adminDb.from('users').update(updates).eq('id', id);
     if (error) throw error;
     invalidateRole(String(id));
@@ -115,18 +126,41 @@ router.patch('/users/:id', async (req, res) => {
   }
 });
 
-/* ── DELETE /api/admin/users/:id ──────────────────────────────────────────── */
+/* ── DELETE /api/admin/users/:id ──────────────────────────────────────────────
+ * Deleting cascades through every table that references the user, which
+ * would silently erase other people's shifts, bookings and payment records.
+ * Refuse while any of those exist and point the admin at suspend / ban. */
 router.delete('/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    // Remove the profile row, then the auth account (best-effort).
-    const { error } = await adminDb.from('users').delete().eq('id', id);
-    if (error) throw error;
-    try { await adminDb.auth.admin.deleteUser(id); } catch { /* auth user may already be gone */ }
+    if (id === req.userId) { res.status(400).json({ error: "You can't delete your own account from here." }); return; }
+    const linked = await Promise.all([
+      adminDb.from('shifts').select('*', { count: 'exact', head: true }).eq('client_id', id),
+      adminDb.from('applications').select('*', { count: 'exact', head: true }).eq('worker_id', id),
+      adminDb.from('payments').select('*', { count: 'exact', head: true }).eq('worker_id', id),
+      adminDb.from('payments').select('*', { count: 'exact', head: true }).eq('client_id', id),
+    ]);
+    const labels = ['posted shifts', 'shift applications', 'payments received', 'payments made'];
+    const found = linked.map((r, i) => ((r.count ?? 0) > 0 ? `${r.count} ${labels[i]}` : null)).filter(Boolean);
+    if (found.length) {
+      res.status(409).json({
+        error: `This user has ${found.join(', ')}. Deleting would erase those records for everyone involved — suspend or ban the account instead.`,
+      });
+      return;
+    }
+    // The auth account owns the profile row (ON DELETE CASCADE), so removing
+    // it takes the profile, posts, messages and the rest with it.
+    const { error } = await adminDb.auth.admin.deleteUser(id);
+    if (error) {
+      // No auth account (seeded / legacy row): drop the profile directly.
+      const { error: pErr } = await adminDb.from('users').delete().eq('id', id);
+      if (pErr) throw pErr;
+    }
+    invalidateRole(String(id));
     res.json({ ok: true });
   } catch (err) {
     console.error('[admin/users DELETE]', err);
-    res.status(409).json({ error: 'Could not delete — this user has linked shifts/payments. Ban them instead.' });
+    res.status(500).json({ error: 'Could not delete this user right now.' });
   }
 });
 
@@ -243,7 +277,10 @@ router.get('/payments', async (_req, res) => {
   }
 });
 
-/* ── GET /api/admin/disputes ──────────────────────────────────────────────── */
+/* ── GET /api/admin/disputes ──────────────────────────────────────────────────
+ * Each case carries the reported user's and the reporter's handle + email so
+ * the panel can show who is involved (and link to their profile) instead of
+ * a truncated id. */
 router.get('/disputes', async (_req, res) => {
   try {
     const { data, error } = await adminDb
@@ -252,7 +289,15 @@ router.get('/disputes', async (_req, res) => {
       .order('created_at', { ascending: false });
     // disputes table may not exist — stay resilient and return an empty list.
     if (error) { res.json([]); return; }
-    res.json(data ?? []);
+    const rows = (data ?? []) as Array<Record<string, unknown>>;
+    const ids = [...new Set(rows.flatMap((d) => [d.reported_user_id, d.reported_by_user_id]).filter((v): v is string => typeof v === 'string'))];
+    const byId = new Map<string, { username: string | null; email: string | null; photo_url: string | null; role: string | null }>();
+    if (ids.length) {
+      const { data: users } = await adminDb.from('users').select('id, username, email, photo_url, role').in('id', ids);
+      for (const u of users ?? []) byId.set(u.id as string, { username: u.username ?? null, email: u.email ?? null, photo_url: u.photo_url ?? null, role: u.role ?? null });
+    }
+    const who = (id: unknown) => (typeof id === 'string' ? byId.get(id) ?? null : null);
+    res.json(rows.map((d) => ({ ...d, reported_user: who(d.reported_user_id), reported_by_user: who(d.reported_by_user_id) })));
   } catch (err) {
     console.error('[admin/disputes]', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -260,11 +305,20 @@ router.get('/disputes', async (_req, res) => {
 });
 
 /* ── PATCH /api/admin/disputes/:id ───────────────────────────────────────── */
+const DISPUTE_STATUSES = new Set(['open', 'resolved', 'warned', 'banned']);
 router.patch('/disputes/:id', async (req, res) => {
   try {
-    const { status, resolution_note } = req.body as { status: string; resolution_note?: string };
+    const { status, resolution_note } = req.body as { status?: unknown; resolution_note?: unknown };
+    if (typeof status !== 'string' || !DISPUTE_STATUSES.has(status)) {
+      res.status(400).json({ error: 'status must be open, resolved, warned or banned' });
+      return;
+    }
+    if (resolution_note !== undefined && resolution_note !== null && typeof resolution_note !== 'string') {
+      res.status(400).json({ error: 'resolution_note must be text' });
+      return;
+    }
     const updates: Record<string, unknown> = { status };
-    if (resolution_note !== undefined) updates.resolution_note = resolution_note;
+    if (resolution_note !== undefined) updates.resolution_note = resolution_note ? String(resolution_note).slice(0, 2000) : null;
     if (['resolved','warned','banned'].includes(status)) updates.resolved_at = new Date().toISOString();
 
     const { data: dispute, error } = await adminDb

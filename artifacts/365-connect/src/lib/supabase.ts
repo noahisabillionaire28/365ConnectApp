@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { GoTrueClient } from '@supabase/auth-js';
+import type { StorageClient } from '@supabase/storage-js';
 import { DEFAULT_SHIFT_TZ } from './timezone';
 
 // ─── Feed UI types (no mock data — all data comes from Supabase) ──────────────
@@ -73,10 +74,52 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient(
-  supabaseUrl     ?? 'https://placeholder.supabase.co',
-  supabaseAnonKey ?? 'placeholder-anon-key'
-);
+const baseUrl = (supabaseUrl ?? 'https://placeholder.supabase.co').replace(/\/$/, '');
+const anonKey = supabaseAnonKey ?? 'placeholder-anon-key';
+
+/** True when a real project URL is configured (typing indicators need Realtime). */
+export const isSupabaseConfigured = !!supabaseUrl && !!supabaseAnonKey;
+
+/** Project settings the lazily-loaded Storage and Realtime clients need. */
+export const supabaseConfig = {
+  url: baseUrl,
+  anonKey,
+  realtimeUrl: `${baseUrl.replace(/^http/, 'ws')}/realtime/v1`,
+};
+
+// The app talks to its own API for data; Supabase is only used directly for
+// auth (this client), file uploads (Storage, loaded on first upload) and the
+// typing indicator (Realtime, loaded when a chat opens). Building the auth
+// client alone keeps the PostgREST / Storage / Realtime code out of the
+// first-paint bundle. The storage key matches supabase-js's default
+// (`sb-<project-ref>-auth-token`) so sessions saved by earlier builds still
+// sign in.
+const projectRef = new URL(baseUrl).hostname.split('.')[0];
+
+export const supabase = {
+  auth: new GoTrueClient({
+    url:                `${baseUrl}/auth/v1`,
+    headers:            { Authorization: `Bearer ${anonKey}`, apikey: anonKey },
+    storageKey:         `sb-${projectRef}-auth-token`,
+    autoRefreshToken:   true,
+    persistSession:     true,
+    detectSessionInUrl: true,
+    flowType:           'implicit',
+  }),
+};
+
+let storagePromise: Promise<typeof import('@supabase/storage-js')> | null = null;
+
+/**
+ * A Storage client carrying the signed-in user's token (so bucket policies
+ * see `auth.uid()`), built on demand from a lazily-loaded chunk.
+ */
+export async function getStorageClient(): Promise<StorageClient> {
+  storagePromise ??= import('@supabase/storage-js');
+  const { StorageClient: Client } = await storagePromise;
+  const token = getCachedAccessToken() ?? (await supabase.auth.getSession()).data.session?.access_token ?? anonKey;
+  return new Client(`${baseUrl}/storage/v1`, { apikey: anonKey, Authorization: `Bearer ${token}` });
+}
 
 // ─── Access-token cache ───────────────────────────────────────────────────────
 // api.ts attaches the current access token to every /api request. Calling
@@ -577,21 +620,23 @@ export function hardenShift(s: MockShift): MockShift {
 export async function uploadAvatar(userId: string, file: File): Promise<string> {
   const ext  = file.name.split('.').pop() ?? 'jpg';
   const path = `${userId}/avatar.${ext}`;
-  const { error } = await supabase.storage
+  const storage = await getStorageClient();
+  const { error } = await storage
     .from('avatars')
     .upload(path, file, { upsert: true, contentType: file.type });
   if (error) throw new Error(`Avatar upload failed: ${error.message}`);
-  return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+  return storage.from('avatars').getPublicUrl(path).data.publicUrl;
 }
 
 export async function uploadPostPhoto(userId: string, file: File): Promise<string> {
   const ext  = file.name.split('.').pop() ?? 'jpg';
   const path = `${userId}/${Date.now()}.${ext}`;
-  const { error } = await supabase.storage
+  const storage = await getStorageClient();
+  const { error } = await storage
     .from('post-photos')
     .upload(path, file, { upsert: true, contentType: file.type });
   if (error) throw new Error(`Post photo upload failed: ${error.message}`);
-  return supabase.storage.from('post-photos').getPublicUrl(path).data.publicUrl;
+  return storage.from('post-photos').getPublicUrl(path).data.publicUrl;
 }
 
 /**
@@ -609,7 +654,8 @@ async function uploadChatMedia(
   conversationId: string, file: Blob, kind: 'images' | 'videos' | 'voice', ext: string, contentType: string,
 ): Promise<string | null> {
   const path = `${conversationId}/${kind}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const { error } = await supabase.storage
+  const storage = await getStorageClient();
+  const { error } = await storage
     .from('chat-media')
     .upload(path, file, { upsert: false, contentType });
   if (error) {
@@ -635,7 +681,8 @@ export async function uploadChatVoice(conversationId: string, blob: Blob): Promi
 
 /** Resolves a chat-media storage path to a short-lived viewable URL (1 hour). */
 export async function getSignedChatMediaUrl(path: string): Promise<string | null> {
-  const { data, error } = await supabase.storage.from('chat-media').createSignedUrl(path, 3600);
+  const storage = await getStorageClient();
+  const { data, error } = await storage.from('chat-media').createSignedUrl(path, 3600);
   if (error) {
     console.error('[Supabase Storage] Signed URL failed:', error.message);
     return null;

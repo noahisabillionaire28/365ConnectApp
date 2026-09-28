@@ -1,7 +1,7 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import type { ArrivalStatus } from './useArrivalStatus';
+import { SHIFT_APPLICANTS_KEY, shiftRosterQueryKey, fetchShiftRoster, type RawApplicant } from './useShiftApplicants';
 
 type RawAccepted = {
   id: string;
@@ -74,7 +74,37 @@ export type AcceptedWorker = RawAccepted & {
   dayOfStatus: DayOfStatus;
 };
 
-export const ACCEPTED_WORKERS_KEY = 'accepted-workers';
+/**
+ * The confirmed roster shares the applicants' query entry (one request for
+ * every status); invalidating either key refreshes both lists.
+ */
+export const ACCEPTED_WORKERS_KEY = SHIFT_APPLICANTS_KEY;
+
+const toAccepted = (rows: RawApplicant[]): AcceptedWorker[] => rows
+  .filter((r) => r.status === 'accepted')
+  .map((raw) => {
+    const r = raw as unknown as RawAccepted;
+    return {
+      ...r,
+      workerId:        r.worker_id,
+      photoUrl:        r.photo_url,
+      completed:       !!(r.clock_out),
+      attendance:      r.attendance ?? (r.clock_out ? 'done' : 'booked'),
+      totalHours:      r.total_hours ?? null,
+      totalPay:        r.total_pay ?? null,
+      alreadyReviewed: !!(r.already_reviewed),
+      myReviewRating:  r.my_review_rating ?? null,
+      workerAck:       r.worker_ack ?? null,
+      paid:            !!(r.paid),
+      approved:        !!(r.approved),
+      approvedPay:     (r.approved_pay as number | null) ?? null,
+      overtimeHours:   (r.overtime_hours as number | null) ?? null,
+      breakMinutes:    (r.break_minutes as number | null) ?? null,
+      arrivalStatus:   r.arrival_status ?? null,
+      arrivalStatusAt: r.arrival_status_at ?? null,
+      dayOfStatus:     r.clock_in ? 'clocked_in' : (r.arrival_status ?? null),
+    };
+  });
 
 export function useAcceptedWorkers(
   shiftId: string | undefined,
@@ -82,36 +112,13 @@ export function useAcceptedWorkers(
   _ownerId?: string,
 ) {
   const { user } = useAuth();
-  const q = useQuery<AcceptedWorker[], Error>({
-    queryKey: [ACCEPTED_WORKERS_KEY, shiftId, user?.id],
+  const q = useQuery<RawApplicant[], Error, AcceptedWorker[]>({
+    queryKey: shiftRosterQueryKey(shiftId, user?.id),
     enabled: !!shiftId && !!user?.id,
     staleTime: 15_000,
     placeholderData: keepPreviousData,
-    queryFn: async () => {
-      const rows = await apiClient(user!.id).get<RawAccepted[]>(
-        `/applications?shift_id=${shiftId}&status=accepted`,
-      );
-      return rows.map((r) => ({
-        ...r,
-        workerId:        r.worker_id,
-        photoUrl:        r.photo_url,
-        completed:       !!(r.clock_out),
-        attendance:      r.attendance ?? (r.clock_out ? 'done' : 'booked'),
-        totalHours:      r.total_hours ?? null,
-        totalPay:        r.total_pay ?? null,
-        alreadyReviewed: !!(r.already_reviewed),
-        myReviewRating:  r.my_review_rating ?? null,
-        workerAck:       r.worker_ack ?? null,
-        paid:            !!(r.paid),
-        approved:        !!(r.approved),
-        approvedPay:     (r.approved_pay as number | null) ?? null,
-        overtimeHours:   (r.overtime_hours as number | null) ?? null,
-        breakMinutes:    (r.break_minutes as number | null) ?? null,
-        arrivalStatus:   r.arrival_status ?? null,
-        arrivalStatusAt: r.arrival_status_at ?? null,
-        dayOfStatus:     r.clock_in ? 'clocked_in' : (r.arrival_status ?? null),
-      }));
-    },
+    queryFn: () => fetchShiftRoster(user!.id, shiftId!),
+    select: toAccepted,
   });
 
   return { workers: q.data ?? [], isLoading: q.isLoading, refetch: q.refetch };

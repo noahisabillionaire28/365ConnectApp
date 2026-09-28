@@ -4,7 +4,7 @@ import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 /** Raw DB shape returned by the applications list endpoint */
-type RawApplicant = {
+export type RawApplicant = {
   id: string;
   shift_id: string;
   worker_id: string;
@@ -20,6 +20,8 @@ type RawApplicant = {
   primary_job_type: string | null;
   certifications: string[];
   bio: string | null;
+  // Roster / timesheet fields (see useAcceptedWorkers)
+  [key: string]: unknown;
 };
 
 export type ApplicantCard = RawApplicant & {
@@ -36,36 +38,50 @@ export type ApplicantRow = ApplicantCard;
 
 export const SHIFT_APPLICANTS_KEY = 'shift-applicants';
 
+/**
+ * ONE request for a shift's whole roster (every status). The applicants
+ * list and the confirmed-workers list are both derived from this entry with
+ * react-query `select`, so the Applicants screen no longer fetches the same
+ * rows twice with different status filters.
+ */
+export const shiftRosterQueryKey = (shiftId: string | undefined, userId: string | undefined) =>
+  [SHIFT_APPLICANTS_KEY, shiftId, userId] as const;
+
+export async function fetchShiftRoster(userId: string, shiftId: string): Promise<RawApplicant[]> {
+  return apiClient(userId).get<RawApplicant[]>(`/applications?shift_id=${shiftId}`);
+}
+
+const toCards = (rows: RawApplicant[]): ApplicantCard[] => rows.map((r) => ({
+  ...r,
+  applicationId: r.id,
+  photoUrl:      r.photo_url,
+  matchScore:    r.match_score ?? null,
+  jobTypes:      r.job_types,
+  primaryJobType: r.primary_job_type,
+}));
+
 export function useShiftApplicants(shiftId: string | undefined) {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const key = [SHIFT_APPLICANTS_KEY, shiftId, user?.id];
+  const key = shiftRosterQueryKey(shiftId, user?.id);
 
-  const q = useQuery<ApplicantCard[], Error>({
+  const q = useQuery<RawApplicant[], Error, ApplicantCard[]>({
     queryKey: key,
     enabled: !!shiftId && !!user?.id,
     staleTime: 15_000,
     placeholderData: keepPreviousData,
-    queryFn: async () => {
-      const rows = await apiClient(user!.id).get<RawApplicant[]>(`/applications?shift_id=${shiftId}`);
-      return rows.map((r) => ({
-        ...r,
-        applicationId: r.id,
-        photoUrl:      r.photo_url,
-        matchScore:    r.match_score ?? null,
-        jobTypes:      r.job_types,
-        primaryJobType: r.primary_job_type,
-      }));
-    },
+    queryFn: () => fetchShiftRoster(user!.id, shiftId!),
+    select: toCards,
   });
 
   const updateStatus = useCallback(async (applicationId: string, status: string): Promise<void> => {
     try {
       await apiClient(user?.id).patch(`/applications/${applicationId}`, { status });
-      qc.setQueryData<ApplicantCard[]>(key, (prev) => (prev ?? []).map((a) =>
-        a.id === applicationId ? { ...a, status: status as ApplicantCard['status'] } : a));
-      // The confirmed roster and the shift's spots changed too.
-      void qc.invalidateQueries({ queryKey: ['accepted-workers', shiftId] });
+      // The status change alone moves the row between the derived lists
+      // (pending → confirmed); the refetch below fills in the roster fields.
+      qc.setQueryData<RawApplicant[]>(key, (prev) => (prev ?? []).map((a) =>
+        a.id === applicationId ? { ...a, status: status as RawApplicant['status'] } : a));
+      void qc.invalidateQueries({ queryKey: [SHIFT_APPLICANTS_KEY, shiftId] });
       void qc.invalidateQueries({ queryKey: ['shift', shiftId] });
       void qc.invalidateQueries({ queryKey: ['client-shifts'] });
     } catch (e) {
@@ -80,19 +96,15 @@ export function useShiftApplicants(shiftId: string | undefined) {
   const approve = useCallback(async (applicationId: string): Promise<string | null> => {
     try {
       await updateStatus(applicationId, 'accepted');
-      qc.setQueryData<ApplicantCard[]>(key, (prev) => (prev ?? []).filter((a) => a.id !== applicationId));
       return null;
     } catch (e) { return e instanceof Error ? e.message : 'Could not confirm this worker.'; }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateStatus]);
 
   const decline = useCallback(async (applicationId: string): Promise<string | null> => {
     try {
       await updateStatus(applicationId, 'declined');
-      qc.setQueryData<ApplicantCard[]>(key, (prev) => (prev ?? []).filter((a) => a.id !== applicationId));
       return null;
     } catch (e) { return e instanceof Error ? e.message : 'Could not decline this applicant.'; }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateStatus]);
 
   return { applicants: q.data ?? [], isLoading: q.isLoading, approve, decline, updateStatus, refetch: q.refetch };

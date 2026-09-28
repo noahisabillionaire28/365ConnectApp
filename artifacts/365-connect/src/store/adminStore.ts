@@ -25,13 +25,30 @@ export async function initAdminSession(): Promise<boolean> {
   }
 }
 
+export type AdminLoginResult =
+  | { ok: true }
+  | { ok: false; reason: 'credentials' | 'not_admin' | 'network' };
+
 /**
- * Admin users sign in via the standard Supabase flow (/login).
- * Kept for backwards compat with AdminLogin.tsx.
+ * Sign in with email + password on the admin login form, then confirm the
+ * account can use the panel. A valid login that is not an admin is signed
+ * out again so the session never lingers on the panel's origin.
  */
-export async function adminLogin(_email: string, _password: string): Promise<boolean> {
-  window.location.href = '/login';
-  return false;
+export async function adminLogin(email: string, password: string): Promise<AdminLoginResult> {
+  let signedIn = false;
+  try {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      return { ok: false, reason: /invalid login credentials|invalid_grant/i.test(error.message) ? 'credentials' : 'network' };
+    }
+    signedIn = true;
+  } catch {
+    return { ok: false, reason: 'network' };
+  }
+  const isAdmin = await initAdminSession();
+  if (isAdmin) return { ok: true };
+  if (signedIn) { try { await supabase.auth.signOut(); } catch { /* ignore */ } }
+  return { ok: false, reason: 'not_admin' };
 }
 
 /** Signs out via Supabase and clears local admin session state. */

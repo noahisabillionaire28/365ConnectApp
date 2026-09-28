@@ -39,11 +39,13 @@ let warming = false;
  * Load every registered screen in the background, priority screens first,
  * one at a time so it never competes with the screen the user is looking at.
  */
-export function warmRoutes(): void {
+export function warmRoutes(opts: { skip?: string[] } = {}): void {
   if (warming) return;
   warming = true;
 
-  const queue = [...PRIORITY.filter((n) => loaders.has(n)), ...[...loaders.keys()].filter((n) => !PRIORITY.includes(n))];
+  const skip = new Set(opts.skip ?? []);
+  const queue = [...PRIORITY.filter((n) => loaders.has(n)), ...[...loaders.keys()].filter((n) => !PRIORITY.includes(n))]
+    .filter((n) => !skip.has(n));
 
   const idle = (cb: () => void) => {
     if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(cb, { timeout: 1500 });

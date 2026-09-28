@@ -11,6 +11,7 @@ import type { ComponentType } from 'react';
 import { useRole } from '@/contexts/RoleContext';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { preloadScreen } from '@/lib/lazyRoutes';
+import { resetDraft } from '@/store/postShiftStore';
 
 /** Which lazy screen each tab opens, so a touch can warm it before the tap lands. */
 const SCREEN_FOR_PATH: Record<string, string> = {
@@ -91,6 +92,8 @@ export function BottomTabNav() {
               href={tab.path}
               className="flex-1 h-full flex flex-col items-center justify-center gap-[3px] select-none"
               onPointerDown={() => { const s = SCREEN_FOR_PATH[tab.path]; if (s) preloadScreen(s); }}
+              // "Post Shift" always starts a fresh draft — never an edit left half-done.
+              onClick={tab.path === '/post-shift/name' ? () => resetDraft() : undefined}
               aria-label={tab.name}
               aria-current={isActive ? 'page' : undefined}
             >

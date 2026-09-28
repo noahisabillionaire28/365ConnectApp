@@ -11,6 +11,7 @@ import { Briefcase, HardHat, Building2, AlertCircle } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/contexts/RoleContext';
+import { generateUsername, generateUsernameWithRandomSuffix, isHandleTakenError } from '@/lib/username';
 
 type Role = 'worker' | 'client' | 'staffer';
 
@@ -42,21 +43,6 @@ const CARDS: { role: Role; icon: React.ReactNode; title: string; subtitle: strin
   },
 ];
 
-/**
- * Derive a URL-safe username from the user's email address + a unique suffix
- * taken from their Clerk user ID. The COALESCE in the upsert means this will
- * never overwrite a username the user has already chosen during full setup.
- */
-function generateUsername(email: string | undefined, userId: string): string {
-  const prefix = (email ?? '').split('@')[0]
-    .toLowerCase()
-    .replace(/[^a-z0-9_.]/g, '')
-    .slice(0, 15) || 'user';
-  // Last 6 alphanumeric chars of the Clerk ID guarantee uniqueness
-  const suffix = userId.replace(/[^a-z0-9]/gi, '').slice(-6).toLowerCase();
-  return `${prefix}_${suffix}`;
-}
-
 export function RoleSelectScreen() {
   const [, navigate]    = useLocation();
   const { user }        = useAuth();
@@ -72,14 +58,24 @@ export function RoleSelectScreen() {
     setError(null);
     try {
       // Auto-generate a username so the user is immediately discoverable in the
-      // people feed (workers API requires username IS NOT NULL). The upsert uses
-      // COALESCE so this will never overwrite a username set during full setup.
-      const username = generateUsername(user.email, user.id);
-      await apiClient(user.id).post('/users', {
-        id: user.id, email: user.email ?? null, role: selected,
-        photo_url: user.imageUrl ?? null,
-        username,
-      });
+      // people feed (workers API requires username IS NOT NULL). The server
+      // never lets this replace a username chosen during full setup, and the
+      // email comes from the verified auth account, not from here.
+      let username = generateUsername(user.email, user.id);
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await apiClient(user.id).post('/users', {
+            id: user.id, role: selected,
+            photo_url: user.imageUrl ?? null,
+            username,
+          });
+          break;
+        } catch (err) {
+          // Handles are unique regardless of case; try a fresh suffix a few times.
+          if (!isHandleTakenError(err) || attempt >= 3) throw err;
+          username = generateUsernameWithRandomSuffix(user.email);
+        }
+      }
       // Sync role into context, then show the 3-screen walkthrough (which then
       // sends the user into the app; full profile setup is optional afterwards).
       await refetchRole();

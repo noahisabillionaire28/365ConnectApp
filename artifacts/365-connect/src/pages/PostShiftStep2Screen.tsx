@@ -156,7 +156,9 @@ export function PostShiftStep2Screen() {
 
   // The exact address string that `mapCoords` currently represents. Starts as the
   // draft's saved location so an unchanged (e.g. edited) shift keeps its coords.
-  const [resolvedFor, setResolvedFor] = useState(initial.location);
+  // A template carries the address but not its coordinates, so it is
+  // re-geocoded here before the shift is posted.
+  const [resolvedFor, setResolvedFor] = useState(initial.location_needs_geocode ? '' : initial.location);
 
   const handlePlacePicked = useCallback(
     (coords: { lat: number; lng: number }, address: string) => {
@@ -207,6 +209,7 @@ export function PostShiftStep2Screen() {
       lat:      coords.lat,
       lng:      coords.lng,
       unit_info: unitInfo.trim(),
+      location_needs_geocode: false,
     });
     navigate('/post-shift/step3');
   }
@@ -223,7 +226,7 @@ export function PostShiftStep2Screen() {
           <button
             type="button" aria-label="Back to job type"
             onClick={() => navigate('/post-shift/step1')}
-            className="w-9 h-9 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
+            className="w-10 h-10 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>

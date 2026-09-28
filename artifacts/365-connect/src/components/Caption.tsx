@@ -1,26 +1,44 @@
 import { useLocation } from 'wouter';
 
-/** Renders a caption with tappable #hashtags (→ /hashtag/:tag). */
+/**
+ * Renders a caption with tappable #hashtags (→ /hashtag/:tag) and @mentions
+ * (→ /worker/:username). Handles follow the same rules as usernames
+ * (a-z, 0-9, _ and .), so a trailing full stop is left out of the link.
+ */
+const TOKEN = /(#[A-Za-z0-9_]+|@[A-Za-z0-9_.]*[A-Za-z0-9_])/g;
+
 export function Caption({ text, author }: { text: string; author?: string | null }) {
   const [, navigate] = useLocation();
-  const parts = text.split(/(#[A-Za-z0-9_]+)/g);
+  const parts = text.split(TOKEN);
   return (
     <>
-      {author && <span className="font-semibold">@{author} </span>}
-      {parts.map((p, i) =>
-        p.startsWith('#') && p.length > 1 ? (
-          <button
-            key={i}
-            type="button"
-            onClick={(e) => { e.stopPropagation(); navigate(`/hashtag/${p.slice(1).toLowerCase()}`); }}
-            className="text-[#2563EB] font-medium"
-          >
-            {p}
-          </button>
-        ) : (
-          <span key={i}>{p}</span>
-        ),
+      {author && (
+        <button type="button" className="font-semibold"
+          onClick={(e) => { e.stopPropagation(); navigate(`/worker/${author}`); }}>
+          @{author}{' '}
+        </button>
       )}
+      {parts.map((p, i) => {
+        if (p.startsWith('#') && p.length > 1) {
+          return (
+            <button key={i} type="button"
+              onClick={(e) => { e.stopPropagation(); navigate(`/hashtag/${p.slice(1).toLowerCase()}`); }}
+              className="relative text-[#2563EB] font-medium after:absolute after:-inset-y-2.5 after:-inset-x-1 after:content-['']">
+              {p}
+            </button>
+          );
+        }
+        if (p.startsWith('@') && p.length > 1) {
+          return (
+            <button key={i} type="button"
+              onClick={(e) => { e.stopPropagation(); navigate(`/worker/${p.slice(1).toLowerCase()}`); }}
+              className="relative text-[#2563EB] font-medium after:absolute after:-inset-y-2.5 after:-inset-x-1 after:content-['']">
+              {p}
+            </button>
+          );
+        }
+        return <span key={i}>{p}</span>;
+      })}
     </>
   );
 }

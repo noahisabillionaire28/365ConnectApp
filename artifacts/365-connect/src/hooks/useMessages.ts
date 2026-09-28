@@ -20,6 +20,7 @@ export type SendPayload = {
 };
 
 const PAGE = 30;
+const POLL_MS = 15_000;
 const OUTBOX_KEY = '365connect:chat-outbox';
 
 type OutboxItem = { conversationId: string; clientKey: string; body: Record<string, unknown> };
@@ -88,7 +89,9 @@ export function useMessages(conversationId: string | null | undefined) {
 
   useEffect(() => { void load(); }, [load]);
 
-  // Polling fallback (SSE can drop on serverless hosts): refresh the latest page while visible.
+  // Polling fallback (SSE can drop on serverless hosts): refresh the latest
+  // page every 15 s while the tab is visible. Live updates arrive over SSE;
+  // this only catches what a dropped stream missed.
   useEffect(() => {
     if (!conversationId || !user?.id) return;
     const tick = async () => {
@@ -98,8 +101,11 @@ export function useMessages(conversationId: string | null | undefined) {
         setMessages((prev) => mergeById(prev.filter((m) => !(m._status && rows.some((r) => r.client_key === m.client_key))), rows));
       } catch { /* ignore */ }
     };
-    const t = setInterval(() => { void tick(); }, 5000);
-    return () => clearInterval(t);
+    const t = setInterval(() => { void tick(); }, POLL_MS);
+    // Coming back to the tab: catch up right away instead of waiting a tick.
+    const onVisible = () => { if (document.visibilityState === 'visible') void tick(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVisible); };
   }, [conversationId, user?.id]);
 
   // ── Live updates ────────────────────────────────────────────────────────────
@@ -157,16 +163,35 @@ export function useMessages(conversationId: string | null | undefined) {
     }
   }, [conversationId, user?.id]);
 
+  /**
+   * Ids already sent to PATCH /messages/read for this thread. The server only
+   * echoes the ids it actually stamped (a row read on another device, or
+   * deleted meanwhile, is not), so without this an id that stays `read_at:
+   * null` in the cache would be re-posted on every render.
+   */
+  const sentReadRef = useRef<Set<string>>(new Set());
+  useEffect(() => { sentReadRef.current = new Set(); }, [conversationId]);
+
   /** Mark the thread read up to now (sends DM receipts + records my read position). */
   const markRead = useCallback(async (messageIds: string[]) => {
     if (!user?.id || !conversationId) return;
+    const fresh = messageIds.filter((id) => !sentReadRef.current.has(id));
+    if (!fresh.length) return;
+    for (const id of fresh) sentReadRef.current.add(id);
     try {
       const r = await apiClient(user.id).patch<{ read_at: string; message_ids: string[] }>(
-        '/messages/read', { message_ids: messageIds, conversation_id: conversationId },
+        '/messages/read', { message_ids: fresh, conversation_id: conversationId },
       );
-      const ids = new Set(r.message_ids ?? messageIds);
-      setMessages((prev) => prev.map((m) => (ids.has(m.id) && !m.read_at ? { ...m, read_at: r.read_at } : m)));
+      const ids = new Set(r.message_ids ?? fresh);
+      setMessages((prev) => {
+        // Same array back when nothing changed, so a no-op reply never
+        // re-triggers effects that depend on `messages`.
+        if (!prev.some((m) => ids.has(m.id) && !m.read_at)) return prev;
+        return prev.map((m) => (ids.has(m.id) && !m.read_at ? { ...m, read_at: r.read_at } : m));
+      });
     } catch (e) {
+      // Let a later pass retry these ids (network blip).
+      for (const id of fresh) sentReadRef.current.delete(id);
       console.error('[useMessages] markRead failed:', e);
     }
   }, [user?.id, conversationId]);

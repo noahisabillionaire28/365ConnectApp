@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   Users, Briefcase, DollarSign, TrendingUp, AlertTriangle, FileText, ChevronRight,
@@ -55,10 +55,10 @@ function StatCard({
       transition={{ duration: 0.28, delay, ease: 'easeOut' }}
     >
       {to ? (
-        <a href={to} aria-label={`${label} — view details`}
+        <Link href={to} aria-label={`${label} — view details`}
           className={`${base} transition-colors hover:bg-[#FAFAFA] active:scale-[0.99] block`}>
           {inner}
-        </a>
+        </Link>
       ) : (
         <div className={base}>{inner}</div>
       )}
@@ -158,17 +158,17 @@ export function AdminDashboard() {
             { label: 'Revenue',        path: '/admin/revenue',  icon: DollarSign,    sub: 'All payments and platform fees' },
             { label: 'Disputes',       path: '/admin/disputes', icon: AlertTriangle, sub: 'Case management and moderation' },
           ].map(({ label, path, icon: Icon, sub }, i) => (
-            <a key={path} href={path}
+            <Link key={path} href={path}
               className="flex items-center gap-4 px-4 py-4 border-b border-[#DBDBDB] last:border-none transition-colors hover:bg-[#FAFAFA]"
             >
-              <div className="w-9 h-9 rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
                 <Icon size={16} aria-hidden className="text-black" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-black text-[14px] font-semibold">{label}</p>
                 <p className="text-[#737373] text-[12px]">{sub}</p>
               </div>
-            </a>
+            </Link>
           ))}
         </motion.div>
       </main>

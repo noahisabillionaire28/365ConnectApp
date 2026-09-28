@@ -16,6 +16,7 @@ import {
 } from '@/lib/recurrence';
 import { MultiDatePicker } from '@/components/MultiDatePicker';
 import { BottomTabNav } from '@/components/BottomTabNav';
+import { browserTimeZone, zonedTimeToUtc } from '@/lib/timezone';
 
 const REPEAT_OPTIONS: { value: RepeatType; label: string }[] = [
   { value: 'none',   label: "Doesn't repeat" },
@@ -70,7 +71,7 @@ function SpotsStepper({
           aria-label="Decrease spots"
           onClick={onDecrement}
           disabled={count <= 1}
-          className="w-9 h-9 rounded-[10px] bg-white border border-[#E5E7EB] flex items-center justify-center
+          className="w-10 h-10 rounded-[10px] bg-white border border-[#E5E7EB] flex items-center justify-center
             disabled:opacity-40 active:border-[#0A1628] transition-colors"
         >
           <Minus size={14} aria-hidden className="text-[#6B7280]" />
@@ -86,7 +87,7 @@ function SpotsStepper({
           aria-label="Increase spots"
           onClick={onIncrement}
           disabled={count >= 50}
-          className="w-9 h-9 rounded-[10px] bg-white border border-[#E5E7EB] flex items-center justify-center
+          className="w-10 h-10 rounded-[10px] bg-white border border-[#E5E7EB] flex items-center justify-center
             disabled:opacity-40 active:border-[#0A1628] transition-colors"
         >
           <Plus size={14} aria-hidden className="text-[#0A1628]" />
@@ -150,6 +151,19 @@ export function PostShiftStep3Screen() {
     if (!endTime)   e.endTime   = 'Please set an end time';
     if (durHrs < 0.5) e.endTime = 'Shift must be at least 30 minutes';
     if (durHrs > 24)  e.endTime = 'Shift cannot exceed 24 hours';
+    // The server refuses a start in the past; catch it here so "today" with
+    // an earlier time (or a series whose first date has gone) is explained
+    // on this step instead of failing at the end of the wizard.
+    if (date && startTime && !isEditing) {
+      const tz = initial.timezone || browserTimeZone();
+      const firstDate = [...occurrences].sort()[0] ?? date;
+      const firstStart = Date.parse(zonedTimeToUtc(firstDate, startTime, tz));
+      if (Number.isFinite(firstStart) && firstStart <= Date.now()) {
+        e.startTime = isSeries && firstDate !== date
+          ? 'The first shift in this series has already passed — pick a later start time or date.'
+          : 'This start time has already passed — pick a later time or date.';
+      }
+    }
     if (isSeries) {
       if (repeat.type === 'weekly' && !repeat.weekdays.length) e.repeat = 'Pick at least one weekday';
       if (repeat.ends === 'on' && repeat.type !== 'custom' && (!repeat.end_date || repeat.end_date < date)) e.repeat = 'Pick an end date after the shift date';
@@ -178,7 +192,7 @@ export function PostShiftStep3Screen() {
           <button
             type="button" aria-label="Back to location"
             onClick={() => navigate('/post-shift/step2')}
-            className="w-9 h-9 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
+            className="w-10 h-10 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
@@ -318,30 +332,30 @@ export function PostShiftStep3Screen() {
               <div className="mt-4">
                 <FieldLabel>Ends</FieldLabel>
                 <div className="flex flex-col gap-2">
-                  <label className="flex items-center gap-3">
+                  <label className="flex items-center gap-3 min-h-10 py-1 cursor-pointer">
                     <input type="radio" name="ends" checked={repeat.ends === 'after'}
                       onChange={() => patchRepeat({ ends: 'after' })} aria-label="Ends after a number of shifts"
-                      className="accent-[#0A1628] w-4 h-4" />
+                      className="accent-[#0A1628] w-5 h-5" />
                     <span className="text-[#111827] text-[14px] font-medium flex-1">After</span>
                     <div className="flex items-center gap-2">
                       <button type="button" aria-label="Fewer shifts" disabled={repeat.count <= 1}
                         onClick={() => patchRepeat({ ends: 'after', count: Math.max(1, repeat.count - 1) })}
-                        className="w-8 h-8 rounded-[8px] bg-white border border-[#E5E7EB] flex items-center justify-center disabled:opacity-40">
+                        className="w-10 h-10 rounded-[8px] bg-white border border-[#E5E7EB] flex items-center justify-center disabled:opacity-40">
                         <Minus size={13} aria-hidden className="text-[#6B7280]" />
                       </button>
                       <span className="text-[#0A1628] font-bold text-[15px] w-6 text-center tabular-nums">{repeat.count}</span>
                       <button type="button" aria-label="More shifts" disabled={repeat.count >= MAX_SERIES_OCCURRENCES}
                         onClick={() => patchRepeat({ ends: 'after', count: Math.min(MAX_SERIES_OCCURRENCES, repeat.count + 1) })}
-                        className="w-8 h-8 rounded-[8px] bg-white border border-[#E5E7EB] flex items-center justify-center disabled:opacity-40">
+                        className="w-10 h-10 rounded-[8px] bg-white border border-[#E5E7EB] flex items-center justify-center disabled:opacity-40">
                         <Plus size={13} aria-hidden className="text-[#0A1628]" />
                       </button>
                       <span className="text-[#6B7280] text-[13px] w-12">shifts</span>
                     </div>
                   </label>
-                  <label className="flex items-center gap-3">
+                  <label className="flex items-center gap-3 min-h-10 py-1 cursor-pointer">
                     <input type="radio" name="ends" checked={repeat.ends === 'on'}
                       onChange={() => patchRepeat({ ends: 'on' })} aria-label="Ends on a date"
-                      className="accent-[#0A1628] w-4 h-4" />
+                      className="accent-[#0A1628] w-5 h-5" />
                     <span className="text-[#111827] text-[14px] font-medium">On</span>
                     <input type="date" value={repeat.end_date} min={date || today}
                       onChange={(e) => patchRepeat({ ends: 'on', end_date: e.target.value })}

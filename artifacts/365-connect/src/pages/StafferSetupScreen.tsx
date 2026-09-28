@@ -14,10 +14,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation }                   from 'wouter';
 import { ChevronLeft, Camera, AlertCircle, CreditCard, Lock, CheckCircle2 } from 'lucide-react';
 import { uploadAvatar } from '@/lib/storage';
-import { apiClient } from '@/lib/api';
+import { apiClient, isApiStatus } from '@/lib/api';
 import { posterSetupDone } from '@/lib/setupRoute';
+import { saveHandleWithRetry } from '@/lib/username';
 import { useAuth }  from '@/contexts/AuthContext';
 import { ImageCropper } from '@/components/ImageCropper';
+import { SetupLoadError } from '@/components/SetupLoadError';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const NAVY   = '#0A1628';
@@ -145,12 +147,12 @@ function StepHeader({ step, total, onBack }: { step: number; total: number; onBa
       <div className="flex items-center px-5 pt-12 pb-4">
         {step > 1 ? (
           <button onClick={onBack}
-            className="w-9 h-9 flex items-center justify-center rounded-full mr-3 active:scale-95 transition-transform"
+            className="w-10 h-10 flex items-center justify-center rounded-full mr-3 active:scale-95 transition-transform"
             style={{ border: `1px solid ${BORDER}` }}>
             <ChevronLeft size={20} style={{ color: TEXT }} />
           </button>
         ) : (
-          <div className="w-9 h-9 mr-3" />
+          <div className="w-10 h-10 mr-3" />
         )}
         <span className="text-[13px] font-medium" style={{ color: MUTED }}>Step {step} of {total}</span>
       </div>
@@ -174,6 +176,8 @@ export function StafferSetupScreen() {
   const total = isEdit ? 3 : TOTAL;
 
   const [initialized, setInitialized] = useState(false);
+  const [loadFailed,  setLoadFailed]  = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [step,        setStep]        = useState(1);
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState<string | null>(null);
@@ -208,8 +212,14 @@ export function StafferSetupScreen() {
         const stored = loadStep(user.id);
         setStep(isEdit ? 1 : Math.min(3, Math.max(inferred, stored)));
         setInitialized(true);
+      })
+      .catch((err) => {
+        // No profile row yet → start the wizard fresh. Offline or a server
+        // hiccup → a retry card, not a skeleton forever.
+        if (!isApiStatus(err, 404)) setLoadFailed(true);
+        setInitialized(true);
       });
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, loadAttempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveAndAdvance(patch: Record<string, unknown>, next: number) {
     if (!user) return;
@@ -299,8 +309,10 @@ export function StafferSetupScreen() {
     if (!user) return;
     setSaving(true); setError(null);
     try {
+      // Handles are unique regardless of case: if the agency's slug is taken
+      // the server says so and a suffixed variant is tried.
       const autoUsername = slugify(agencyName || user.email?.split('@')[0] || 'agency');
-      await apiClient(user.id).patch('/users/me', { username: autoUsername });
+      await saveHandleWithRetry(autoUsername, (handle) => apiClient(user.id).patch('/users/me', { username: handle }));
       // Try storing the simulated billing ref (non-fatal)
       await apiClient(user.id).patch('/users/me', { billing_ref: ref }).catch(() => {});
       localStorage.removeItem(stepKey(user.id));
@@ -314,11 +326,20 @@ export function StafferSetupScreen() {
   }
 
   // ── Loading skeleton ──────────────────────────────────────────────────────────
+  if (loadFailed) {
+    return (
+      <SetupLoadError
+        onRetry={() => { setLoadFailed(false); setInitialized(false); setLoadAttempt((n) => n + 1); }}
+        onBack={() => navigate('/home')}
+      />
+    );
+  }
+
   if (!initialized) {
     return (
       <div className="min-h-[100dvh] bg-white flex flex-col">
         <div className="flex items-center px-5 pt-12 pb-4 gap-3">
-          <div className="w-9 h-9 rounded-full" style={{ background: BORDER }} />
+          <div className="w-10 h-10 rounded-full" style={{ background: BORDER }} />
           <div className="h-3 w-24 rounded-full" style={{ background: BORDER }} />
         </div>
         <div className="mx-5 h-[3px] rounded-full" style={{ background: BORDER }} />

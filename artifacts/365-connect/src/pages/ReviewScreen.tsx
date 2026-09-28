@@ -142,7 +142,7 @@ export function ReviewScreen() {
     <div className="min-h-[100dvh] bg-white flex flex-col">
       <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
         <button type="button" aria-label="Go back" onClick={goBack}
-          className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} aria-hidden className="text-black" />
         </button>
       </div>
@@ -229,12 +229,12 @@ export function ReviewScreen() {
           aria-label={rating === 0 ? 'Select a star rating to submit' : 'Submit review'}
           aria-disabled={rating === 0}
           className={`w-full h-[52px] rounded-[8px] font-bold text-[16px] transition-all duration-200 mt-auto ${
-            rating > 0 ? 'bg-[#0A1628] text-white' : 'bg-[#EFEFEF] text-[#AAAAAA] cursor-not-allowed border border-[#DBDBDB]'
+            rating > 0 ? 'bg-[#0A1628] text-white' : 'bg-[#F0F0F0] text-[#6B7280] cursor-not-allowed border border-[#DBDBDB]'
           }`}>
           {submitting ? 'Submitting…' : 'Submit Review'}
         </motion.button>
         {rating === 0 && (
-          <p className="text-center text-[#AAAAAA] text-[12px] mt-2">Select a rating to continue</p>
+          <p className="text-center text-[#6B7280] text-[12px] mt-2">Select a rating to continue</p>
         )}
       </div>
     </div>

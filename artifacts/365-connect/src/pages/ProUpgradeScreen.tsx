@@ -62,7 +62,7 @@ function BenefitRow({
 }) {
   return (
     <div className="flex items-start gap-3.5 py-3.5 border-b border-[#E5E7EB] last:border-0">
-      <div className="w-9 h-9 rounded-[10px] bg-[#FFD700]/15 border border-[#FFD700]/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+      <div className="w-10 h-10 rounded-[10px] bg-[#FFD700]/15 border border-[#FFD700]/30 flex items-center justify-center flex-shrink-0 mt-0.5">
         <Icon size={16} className="text-[#B8860B]" aria-hidden />
       </div>
       <div className="flex-1 min-w-0">
@@ -161,20 +161,11 @@ export function ProUpgradeScreen() {
     setError(null);
 
     try {
-      // 1. Write simulated subscription payment row
-      await apiClient(user.id).post('/payments', {
-        shift_id:     null,
-        payment_type: 'pro_subscription',
-        amount:       17.00,
-        fee:          0,
-        net_amount:   17.00,
-        status:       'simulated',
-      });
+      // 1. Record the (simulated) subscription; the server grants Pro against
+      //    it. Profiles cannot set is_pro themselves.
+      await apiClient(user.id).post('/payments', { payment_type: 'pro_subscription' });
 
-      // 2. Set is_pro = true on the user's profile
-      await apiClient(user.id).patch('/users/me', { is_pro: true });
-
-      // 3. Invalidate profile and payments queries so UI refreshes
+      // 2. Invalidate profile and payments queries so UI refreshes
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['profile', user.id] }),
         queryClient.invalidateQueries({ queryKey: [...PAYMENTS_QUERY_KEY] }),
@@ -201,7 +192,7 @@ export function ProUpgradeScreen() {
           <button
             type="button" aria-label="Go back"
             onClick={() => navigate('/profile')}
-            className="w-9 h-9 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
+            className="w-10 h-10 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
@@ -223,7 +214,7 @@ export function ProUpgradeScreen() {
           <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full bg-[#FFD700]/10 blur-2xl pointer-events-none" />
           <div className="relative">
             <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-9 h-9 rounded-[10px] bg-[#FFD700]/20 border border-[#FFD700]/30 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-[10px] bg-[#FFD700]/20 border border-[#FFD700]/30 flex items-center justify-center">
                 <Zap size={18} className="text-[#FFD700]" aria-hidden />
               </div>
               <span className="text-[#FFD700] font-bold text-[14px] uppercase tracking-wider">365 Connect Pro</span>

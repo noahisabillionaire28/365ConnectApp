@@ -10,6 +10,7 @@ import { rosterAllows, assertShiftOwner } from '../lib/shiftAccess.js';
 import { getRoleInfo } from '../lib/roleCache.js';
 import { sendError } from '../lib/httpError.js';
 import { formatShiftInstant, formatShiftWindow, formatUsd } from '../lib/shiftLabel.js';
+import { voidSwapsForCancelledShift } from '../lib/swaps.js';
 import {
   zonedTimeToUtc, utcToZonedParts, nextCalendarDay, isCalendarDate, formatCalendarDate,
 } from '../lib/shiftTime.js';
@@ -25,6 +26,21 @@ export const MAX_SERIES_OCCURRENCES = 12;
  * them.
  */
 const PRIVATE_SHIFT_FIELDS = ['contact_phone', 'point_of_contact', 'special_instructions', 'parking_notes'] as const;
+
+/**
+ * Every column the list endpoints return, spelled out so a column added to
+ * the table later is not sent to every signed-in user by accident. The
+ * private four are included only so the poster sees their own details; the
+ * list mapper strips them for everyone else.
+ */
+const SHIFT_LIST_COLUMNS = [
+  'id', 'client_id', 'title', 'description', 'location', 'event_type', 'job_type', 'job_types',
+  'pay_rate', 'pay_period', 'start_time', 'end_time', 'timezone', 'date',
+  'spots_available', 'spots_filled', 'instant_claim', 'visibility', 'status', 'created_at',
+  'lat', 'lng', 'cover_image', 'company_name', 'requirements', 'dress_code', 'dress_code_items',
+  'ai_match_pct', 'unit_info', 'repeat_type', 'event_id', 'series_id',
+  ...PRIVATE_SHIFT_FIELDS,
+].join(', ');
 
 /** Owner, admin, or a worker who is booked / on the waitlist for the shift. */
 async function canSeePrivateDetails(shift: { id: string; client_id: string | null }, viewerId: string): Promise<boolean> {
@@ -144,8 +160,8 @@ router.get('/', requireAuth, async (req, res) => {
   const off = Math.max(parseInt(offset) || 0, 0);
   // event_id lists all positions of one event, regardless of status.
   let q = event_id
-    ? adminDb.from('shifts').select('*').eq('event_id', event_id)
-    : adminDb.from('shifts').select('*').eq('status', status);
+    ? adminDb.from('shifts').select(SHIFT_LIST_COLUMNS).eq('event_id', event_id)
+    : adminDb.from('shifts').select(SHIFT_LIST_COLUMNS).eq('status', status);
   if (!event_id) {
     // Roster-only shifts are visible to the poster and to workers on their
     // roster, whatever status is asked for.
@@ -166,7 +182,7 @@ router.get('/', requireAuth, async (req, res) => {
 
   // The event_id branch skipped the visibility filter above: drop the
   // roster-only positions this viewer may not see.
-  let shifts = rawShifts ?? [];
+  let shifts: any[] = (rawShifts ?? []) as any[];
   if (event_id && shifts.some((s: any) => s.visibility === 'roster')) {
     const visible: any[] = [];
     for (const s of shifts) if (await canViewShift(s, req.userId)) visible.push(s);
@@ -184,14 +200,22 @@ router.get('/', requireAuth, async (req, res) => {
     for (const u of users ?? []) userMap.set(u.id, u);
   }
 
+  // Day-of details (phone, point of contact, parking, instructions) are for
+  // the poster and the people booked on the shift — the shift page hands them
+  // to booked workers; the list never does.
+  const viewerIsAdmin = (await getRoleInfo(req.userId!)).isAdmin;
   const rows = (shifts ?? []).map((s: any) => {
     const u = userMap.get(s.client_id);
-    return {
+    const row: Record<string, any> = {
       ...s,
       client_username: u?.username ?? null,
       client_company: u?.company_name ?? null,
       client_photo_url: u?.photo_url ?? null,
     };
+    if (s.client_id !== req.userId && !viewerIsAdmin) {
+      for (const f of PRIVATE_SHIFT_FIELDS) row[f] = null;
+    }
+    return row;
   });
   return res.json(rows);
 });
@@ -229,8 +253,26 @@ router.get('/my', requireAuth, async (req, res) => {
       .eq('status', 'accepted');
     for (const s of sw ?? []) swaps.set(s.shift_id, (swaps.get(s.shift_id) ?? 0) + 1);
   }
+  // Where each shift sits in its recurring series ("2 of 5"). A series
+  // belongs to one poster, so every sibling is already in this list.
+  const seriesPos = new Map<string, { index: number; count: number }>();
+  const bySeries = new Map<string, Array<{ id: string; start_time: string }>>();
+  for (const s of data ?? []) {
+    if (!s.series_id) continue;
+    const list = bySeries.get(s.series_id) ?? [];
+    list.push({ id: s.id, start_time: s.start_time });
+    bySeries.set(s.series_id, list);
+  }
+  for (const list of bySeries.values()) {
+    list.sort((a, b) => a.start_time.localeCompare(b.start_time));
+    list.forEach((s, i) => seriesPos.set(s.id, { index: i + 1, count: list.length }));
+  }
   return res.json((data ?? []).map((s) => ({
-    ...s, pending_count: pending.get(s.id) ?? 0, swap_count: swaps.get(s.id) ?? 0,
+    ...s,
+    pending_count: pending.get(s.id) ?? 0,
+    swap_count: swaps.get(s.id) ?? 0,
+    series_index: seriesPos.get(s.id)?.index ?? null,
+    series_count: seriesPos.get(s.id)?.count ?? null,
   })));
 });
 
@@ -482,8 +524,11 @@ router.get('/series/:id', requireAuth, requireRole('client', 'staffer'), async (
 
 /**
  * POST /api/shifts/:id/cancel-series-future — cancel this shift and every
- * later shift in its series that has not started. Each one is cancelled the
- * way a single cancel is (workers told, offers closed, chat line posted).
+ * later shift in its series that has not started. "This" shift is included
+ * even if it is already in progress (the button is offered until it ends,
+ * exactly like a single cancel); only later shifts must not have started.
+ * Each one is cancelled the way a single cancel is (workers told, offers
+ * closed, chat line posted).
  */
 router.post('/:id/cancel-series-future', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const id = String(req.params.id);
@@ -500,18 +545,19 @@ router.post('/:id/cancel-series-future', requireAuth, requireRole('client', 'sta
   if (!current.series_id) return res.status(400).json({ error: 'This shift is not part of a series' });
 
   const nowIso = new Date().toISOString();
-  const { data: targets, error: tErr } = await adminDb
+  const { data: siblings, error: tErr } = await adminDb
     .from('shifts')
     .select('id, client_id, title, timezone, start_time, end_time, spots_available, pay_rate, pay_period, location, status')
     .eq('series_id', current.series_id)
     .gte('start_time', current.start_time)
-    .gt('start_time', nowIso)
     .in('status', ['open', 'filled'])
     .order('start_time', { ascending: true });
   if (tErr) return res.status(500).json({ error: tErr.message });
+  const targets = (siblings ?? []).filter((s) =>
+    s.id === id ? s.end_time > nowIso : s.start_time > nowIso);
 
   const cancelled: string[] = [];
-  for (const shift of targets ?? []) {
+  for (const shift of targets) {
     const { data: updated } = await adminDb
       .from('shifts').update({ status: 'cancelled' })
       .eq('id', shift.id).in('status', ['open', 'filled'])
@@ -716,6 +762,8 @@ async function announceCancellation(shift: NotifyShift, actorId: string): Promis
   // workers' Requests tab and can no longer be accepted.
   await adminDb.from('shift_requests').update({ status: 'cancelled' })
     .eq('shift_id', shift.id).eq('status', 'pending');
+  // Likewise any swap still in flight: there is no spot left to hand over.
+  await voidSwapsForCancelledShift(shift.id, actorId);
   const workers = await liveWorkers(shift.id, ['accepted', 'pending', 'standby']);
   const when = formatShiftInstant(shift.start_time, shift.timezone);
   const label = shift.title ? `"${shift.title}"` : 'a shift';

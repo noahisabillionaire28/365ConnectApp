@@ -38,9 +38,9 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
     <article className="bg-white border-b border-[#EFEFEF]">
       <div className="flex items-center gap-2.5 px-4 py-3">
         <button type="button" onClick={goAuthor}
-          className="w-9 h-9 rounded-full overflow-hidden bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
+          className="w-10 h-10 rounded-full overflow-hidden bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
           {post.author_photo_url
-            ? <img src={post.author_photo_url} alt={post.author_username ?? 'Worker'} className="w-full h-full object-cover" />
+            ? <img src={post.author_photo_url} alt={post.author_username ?? 'Worker'} width={36} height={36} loading="lazy" decoding="async" className="w-full h-full object-cover" />
             : <span className="text-[12px] font-bold text-[#0A1628]">{initials}</span>}
         </button>
         <button type="button" onClick={goAuthor} className="min-w-0 text-left">
@@ -57,21 +57,23 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
         )}
       </div>
 
+      {/* A fixed square box reserves the space before the photo arrives, so
+          the feed never jumps; photos below the fold load lazily. */}
       {post.photo_url && (
-        <button type="button" onClick={() => onOpenComments(post.id)} className="block w-full" aria-label="Open post">
-          <img src={post.photo_url} alt={post.caption ?? 'Post'}
-            className="w-full max-h-[520px] object-cover bg-[#FAFAFA]" />
+        <button type="button" onClick={() => onOpenComments(post.id)} className="block w-full aspect-square max-h-[520px] bg-[#FAFAFA] overflow-hidden" aria-label="Open post">
+          <img src={post.photo_url} alt={post.caption ?? 'Post'} loading="lazy" decoding="async"
+            className="w-full h-full object-cover" />
         </button>
       )}
 
       <div className="flex items-center gap-5 px-4 pt-3">
         <button type="button" onClick={() => onLike(post.id)}
-          aria-label={post.liked_by_me ? 'Unlike' : 'Like'} className="flex items-center gap-1.5 active:scale-95 transition-transform">
+          aria-label={post.liked_by_me ? 'Unlike' : 'Like'} className="min-h-10 -my-2 px-1 -ml-1 flex items-center gap-1.5 active:scale-95 transition-transform">
           <Heart size={22} aria-hidden className={post.liked_by_me ? 'fill-[#EF4444] text-[#EF4444]' : 'text-[#111827]'} />
           <span className="text-[13px] font-semibold text-[#111827]">{post.like_count}</span>
         </button>
         <button type="button" onClick={() => onOpenComments(post.id)}
-          aria-label="Comments" className="flex items-center gap-1.5">
+          aria-label="Comments" className="min-h-10 -my-2 px-1 flex items-center gap-1.5">
           <MessageCircle size={22} aria-hidden className="text-[#111827]" />
           <span className="text-[13px] font-semibold text-[#111827]">{post.comment_count}</span>
         </button>
@@ -87,7 +89,7 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
 
       {/* Options action sheet (Instagram-style) */}
       {menuOpen && (
-        <div className="fixed inset-0 z-[80] flex items-end justify-center" role="dialog" aria-modal="true">
+        <div data-no-pull className="fixed inset-0 z-[80] flex items-end justify-center" role="dialog" aria-modal="true">
           <button type="button" aria-label="Close" onClick={() => setMenuOpen(false)}
             className="absolute inset-0 bg-black/40" />
           <div className="relative w-full max-w-app bg-white rounded-t-[18px] pb-6 pt-2 px-3">

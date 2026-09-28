@@ -20,7 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/contexts/RoleContext';
 import { useToast } from '@/contexts/ToastContext';
 import { useProfile } from '@/hooks/useProfile';
-import { apiClient } from '@/lib/api';
+import { apiClient, isApiStatus } from '@/lib/api';
 import { startShiftPayment } from '@/lib/checkout';
 import { formatTime } from '@/lib/supabase';
 import { utcToZonedParts, zonedTimeToUtc, zoneAbbrev, DEFAULT_SHIFT_TZ } from '@/lib/timezone';
@@ -132,7 +132,7 @@ function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onP
       <div className="flex items-center gap-3">
         <Avatar url={w.photoUrl} name={w.username} />
         <button type="button" aria-label={`Message ${w.username ? `@${w.username}` : 'worker'}`} onClick={onMessage}
-          className="order-last w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 text-[#0A1628]">
+          className="order-last w-10 h-10 rounded-full border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 text-[#0A1628]">
           <MessageCircle size={15} aria-hidden />
         </button>
         <div className="flex-1 min-w-0">
@@ -178,15 +178,18 @@ function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onP
       </div>
 
       <div className="flex gap-2">
-        {/* Approve once; after a dispute the manager can adjust and approve again. */}
-        {(w.attendance === 'done' || forgotClockOut) && (!w.approved || w.workerAck === 'disputed') && (
+        {/* Approve once; after a dispute the manager can adjust and approve
+            again — unless the worker has already been paid, when the hours
+            are final (the server refuses too). */}
+        {(w.attendance === 'done' || forgotClockOut) && (!w.approved || w.workerAck === 'disputed') && !w.paid && (
           <button type="button" disabled={busy} onClick={onApprove}
             className="flex-1 h-9 rounded-[8px] bg-[#0A1628] text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
             <Clock3 size={13} aria-hidden />
             {forgotClockOut ? 'Set clock-out & approve' : w.workerAck === 'disputed' ? 'Adjust & re-approve' : 'Review & Approve'}
           </button>
         )}
-        {w.attendance === 'done' && w.approved && !w.paid && stripeEnabled && (
+        {/* Paying is off the table while the worker disputes the hours: adjust and re-approve first. */}
+        {w.attendance === 'done' && w.approved && !w.paid && w.workerAck !== 'disputed' && stripeEnabled && (
           <button type="button" disabled={busy} onClick={onPay}
             className="flex-1 h-9 rounded-[8px] bg-emerald-600 text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
             <DollarSign size={13} aria-hidden />
@@ -194,7 +197,7 @@ function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onP
           </button>
         )}
         {/* Paid outside the app (cash, Venmo, payroll): records the shift as paid without Stripe. */}
-        {w.attendance === 'done' && w.approved && !w.paid && (
+        {w.attendance === 'done' && w.approved && !w.paid && w.workerAck !== 'disputed' && (
           <button type="button" disabled={busy} onClick={onMarkPaid}
             className={`flex-1 h-9 rounded-[8px] text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60 ${
               stripeEnabled ? 'border border-emerald-600 bg-white text-emerald-700' : 'bg-emerald-600 text-white'}`}>
@@ -339,6 +342,8 @@ export function ApplicantsScreen() {
   const { data: shift, isLoading: shiftLoading, error: shiftError, refetch: refetchShift } = useShiftById(id);
   // Only the poster (or an admin) manages a roster; anyone else gets a plain
   // "not yours" state instead of a management screen whose calls all 403.
+  // While the shift is still loading nothing is decided yet (skeleton below).
+  const shiftMissing = !shiftLoading && !shift && isApiStatus(shiftError, 404);
   const canManage = !shift || !user?.id || isAdmin || shift.clientId === user.id;
   const { applicants, isLoading: appsLoading, approve, decline, refetch: refetchApps } = useShiftApplicants(id);
   const { workers: confirmed, isLoading: confLoading, refetch: refetchConfirmed } = useAcceptedWorkers(id);
@@ -503,6 +508,24 @@ export function ApplicantsScreen() {
     finally { setBusyId(null); }
   }
 
+  if (shiftMissing) {
+    return (
+      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-8 gap-3 text-center">
+        <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
+          <Users size={26} aria-hidden className="text-[#9CA3AF]" />
+        </div>
+        <p className="text-[#111827] font-bold text-[17px]">This shift is no longer available</p>
+        <p className="text-[#6B7280] text-[13px] max-w-[260px]">
+          It may have been deleted, or the link is out of date.
+        </p>
+        <button type="button" onClick={() => navigate('/home')}
+          className="mt-2 h-[40px] px-5 rounded-full bg-[#0A1628] text-white text-[13px] font-bold">
+          Back to Home
+        </button>
+      </div>
+    );
+  }
+
   if (!canManage) {
     return (
       <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-8 gap-3 text-center">
@@ -527,7 +550,7 @@ export function ApplicantsScreen() {
       <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-4 border-b border-[#DBDBDB] flex items-center gap-3 flex-shrink-0">
         <button type="button" aria-label="Go back"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate(`/shift/${id ?? ''}`); }}
-          className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} aria-hidden className="text-black" />
         </button>
         <div className="min-w-0">
@@ -549,7 +572,17 @@ export function ApplicantsScreen() {
       />
 
       <div className="flex-1 overflow-y-auto px-5 pt-5 pb-10">
-        {/* Fill bar */}
+        {/* Fill bar — a skeleton until the shift and roster are in, never a
+            made-up "0 / 0 confirmed" */}
+        {loading || !shift ? (
+          <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[14px] px-4 py-4 mb-4" aria-busy="true" aria-label="Loading roster">
+            <div className="flex items-center justify-between mb-3">
+              <div className="h-4 w-36 rounded bg-[#E5E7EB] animate-pulse" />
+              <div className="h-3 w-14 rounded bg-[#E5E7EB] animate-pulse" />
+            </div>
+            <div className="w-full h-2 rounded-full bg-[#E5E7EB] animate-pulse" />
+          </div>
+        ) : (
         <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[14px] px-4 py-4 mb-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[#111827] font-bold text-[15px] flex items-center gap-1.5">
@@ -571,9 +604,10 @@ export function ApplicantsScreen() {
             </div>
           )}
         </div>
+        )}
 
-        {/* Actions — hidden once the shift is cancelled or over */}
-        {closed && (
+        {/* Actions — only once the shift is known; hidden once it is cancelled or over */}
+        {!loading && closed && (
           <div className="mb-3 rounded-[10px] bg-[#FAFAFA] border border-[#DBDBDB] px-4 py-3 text-center">
             <p className="text-[#737373] text-[13px] font-semibold">
               {shift?.status === 'cancelled' ? 'This shift was cancelled.' : 'This shift has ended.'}
@@ -581,12 +615,14 @@ export function ApplicantsScreen() {
           </div>
         )}
         {/* Shift chat — one thread with the manager and everyone confirmed */}
+        {!loading && shift && (
         <button type="button" onClick={() => void handleShiftChat()} disabled={openingChat}
           className="w-full h-[46px] mb-2 rounded-[8px] bg-[#0A1628] text-white font-bold text-[13px] flex items-center justify-center gap-2 disabled:opacity-60">
           <MessagesSquare size={15} aria-hidden />
           {openingChat ? 'Opening…' : `Shift chat${confirmed.length ? ` · ${confirmed.length + 1} people` : ''}`}
         </button>
-        {!closed && (
+        )}
+        {!loading && shift && !closed && (
         <div className="flex gap-2 mb-2">
           <button type="button" onClick={() => setConfirmBroadcast(true)} disabled={inviting}
             className="flex-1 h-[46px] rounded-[8px] bg-[#0095F6] text-white font-bold text-[13px] flex items-center justify-center gap-2 disabled:opacity-60">
@@ -613,8 +649,18 @@ export function ApplicantsScreen() {
         )}
 
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-8 h-8 rounded-full border-2 border-[#DBDBDB] border-t-[#0A1628] animate-spin" role="status" aria-label="Loading roster" />
+          <div className="flex flex-col gap-2" aria-hidden>
+            <div className="h-[46px] rounded-[8px] bg-[#F3F4F6] animate-pulse" />
+            <div className="h-[46px] rounded-[8px] bg-[#F3F4F6] animate-pulse mb-2" />
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-white border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#F3F4F6] animate-pulse flex-shrink-0" />
+                <div className="flex-1 flex flex-col gap-2">
+                  <div className="h-3.5 w-32 rounded bg-[#F3F4F6] animate-pulse" />
+                  <div className="h-3 w-48 rounded bg-[#F3F4F6] animate-pulse" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : shiftError && !shift ? (
           <div className="rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-5 py-8 text-center">
@@ -711,30 +757,35 @@ export function ApplicantsScreen() {
                       <Avatar url={a.photoUrl} name={a.username} />
                       <button type="button" aria-label={`Message ${a.username ? `@${a.username}` : 'applicant'}`}
                         onClick={() => void handleMessageWorker(a.worker_id)}
-                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 text-[#0A1628]">
+                        className="w-10 h-10 rounded-full border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 text-[#0A1628]">
                         <MessageCircle size={15} aria-hidden />
                       </button>
                       <div className="flex-1 min-w-0">
                         <p className="text-[#111827] font-semibold text-[14px] truncate">
                           {a.username ? `@${a.username}` : 'Applicant'}
-                          {score != null && (
-                            <span className={`ml-2 text-[11px] font-bold ${score >= 75 ? 'text-emerald-600' : score >= 50 ? 'text-[#0095F6]' : 'text-amber-600'}`}>
-                              {score} match
-                            </span>
-                          )}
                         </p>
+                        {/* The match score gets its own line so it stays
+                            visible whatever the handle length. */}
+                        {score != null && (
+                          <span className={`inline-flex items-center h-[18px] px-1.5 mt-0.5 rounded-full text-[11px] font-bold border ${
+                            score >= 75 ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                              : score >= 50 ? 'bg-blue-50 border-blue-200 text-[#0077C8]'
+                              : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                            {score} match
+                          </span>
+                        )}
                         {m?.reason && (
                           <p className="text-[#6B7280] text-[12px] leading-snug mt-0.5 line-clamp-2">{m.reason}</p>
                         )}
                       </div>
                       <button type="button" aria-label="Decline" disabled={!!busyId}
                         onClick={() => void handleDecide(a.applicationId, 'decline', 'Declined.')}
-                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center disabled:opacity-40">
+                        className="w-10 h-10 rounded-full border border-[#E5E7EB] flex items-center justify-center disabled:opacity-40">
                         <X size={16} aria-hidden className="text-[#6B7280]" />
                       </button>
                       <button type="button" aria-label="Approve" disabled={!!busyId}
                         onClick={() => void handleDecide(a.applicationId, 'approve', 'Worker confirmed!')}
-                        className="w-9 h-9 rounded-full bg-[#10B981] flex items-center justify-center disabled:opacity-40">
+                        className="w-10 h-10 rounded-full bg-[#10B981] flex items-center justify-center disabled:opacity-40">
                         {busyId === a.applicationId
                           ? <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" aria-hidden />
                           : <Check size={17} aria-hidden className="text-white" />}
@@ -767,7 +818,7 @@ export function ApplicantsScreen() {
                       <Avatar url={a.photoUrl} name={a.username} />
                       <button type="button" aria-label={`Message ${a.username ? `@${a.username}` : 'applicant'}`}
                         onClick={() => void handleMessageWorker(a.worker_id)}
-                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 text-[#0A1628]">
+                        className="w-10 h-10 rounded-full border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 text-[#0A1628]">
                         <MessageCircle size={15} aria-hidden />
                       </button>
                       <p className="flex-1 min-w-0 text-[#111827] font-semibold text-[14px] truncate">
@@ -775,7 +826,7 @@ export function ApplicantsScreen() {
                       </p>
                       <button type="button" aria-label="Remove from waitlist" disabled={!!busyId}
                         onClick={() => void handleDecide(a.applicationId, 'decline', 'Removed from waitlist.')}
-                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center disabled:opacity-40">
+                        className="w-10 h-10 rounded-full border border-[#E5E7EB] flex items-center justify-center disabled:opacity-40">
                         <X size={16} aria-hidden className="text-[#6B7280]" />
                       </button>
                       <button type="button"

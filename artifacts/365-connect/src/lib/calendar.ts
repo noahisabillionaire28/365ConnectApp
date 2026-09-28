@@ -36,12 +36,30 @@ function icsText(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
 }
 
-/** Fold a content line at 75 octets, as RFC 5545 requires. */
+/**
+ * Fold a content line at 75 octets, as RFC 5545 requires. The limit is in
+ * UTF-8 bytes, not characters: a venue name with accents or an emoji must
+ * never be cut in the middle of a code point (calendars then show garbage
+ * or reject the file), so the line is measured as it will be written.
+ */
 function fold(line: string): string {
+  const MAX = 75;
+  const enc = new TextEncoder();
   const out: string[] = [];
-  let rest = line;
-  while (rest.length > 75) { out.push(rest.slice(0, 75)); rest = ` ${rest.slice(75)}`; }
-  out.push(rest);
+  let current = '';
+  let bytes = 0;
+  // Iterating the string yields whole code points (never half a surrogate pair).
+  for (const ch of line) {
+    const n = enc.encode(ch).length;
+    if (bytes + n > MAX) {
+      out.push(current);
+      current = ' '; // continuation lines start with one space, which counts
+      bytes = 1;
+    }
+    current += ch;
+    bytes += n;
+  }
+  out.push(current);
   return out.join('\r\n');
 }
 

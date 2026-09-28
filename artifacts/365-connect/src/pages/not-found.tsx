@@ -1,5 +1,4 @@
 import { useLocation } from 'wouter';
-import { motion } from 'framer-motion';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 
 export default function NotFound() {
@@ -7,12 +6,7 @@ export default function NotFound() {
 
   return (
     <div className="min-h-[100dvh] w-full flex items-center justify-center bg-white px-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: 'easeOut' }}
-        className="text-center max-w-[300px]"
-      >
+      <div className="anim-rise-in text-center max-w-[300px]">
         <div className="w-16 h-16 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center mx-auto mb-6">
           <AlertCircle size={28} className="text-[#0A1628]" aria-hidden />
         </div>
@@ -35,7 +29,7 @@ export default function NotFound() {
           <ArrowLeft size={16} aria-hidden />
           Back to Home
         </button>
-      </motion.div>
+      </div>
     </div>
   );
 }

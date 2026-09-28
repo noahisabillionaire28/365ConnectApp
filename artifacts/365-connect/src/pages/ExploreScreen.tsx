@@ -1,11 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { Search, BadgeCheck, ImagePlus } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { PostCard } from '@/components/PostCard';
 import { StoryTray } from '@/components/StoryTray';
 import { usePeopleFeed, type WorkerPerson } from '@/hooks/usePeopleFeed';
-import { useFeed, useToggleLike, useCreatePost } from '@/hooks/useFeed';
+import { useFeed, useToggleLike, useCreatePost, MAX_CAPTION } from '@/hooks/useFeed';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { uploadPostPhoto } from '@/lib/storage';
@@ -58,7 +58,16 @@ export function ExploreScreen() {
   });
 
   // Feed tab
-  const { posts, isLoading: feedLoading } = useFeed();
+  const { posts, isLoading: feedLoading, hasMore, isLoadingMore, loadMore } = useFeed();
+  // Fetch the next page as the end of the list scrolls into view.
+  const moreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = moreRef.current;
+    if (!el || tab !== 'feed' || !hasMore) return;
+    const io = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) loadMore(); }, { rootMargin: '400px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [tab, hasMore, loadMore, posts.length]);
   const toggleLike = useToggleLike();
   const createPost = useCreatePost();
   const [posting, setPosting] = useState(false);
@@ -104,12 +113,12 @@ export function ExploreScreen() {
         <div className="flex items-center gap-2 px-4 pt-4 pb-3">
           <div className="flex bg-[#F3F4F6] rounded-full p-[3px] flex-1" role="tablist" aria-label="Explore view">
             <button type="button" role="tab" aria-selected={tab === 'feed'} onClick={() => setTab('feed')}
-              className={`flex-1 h-[34px] rounded-full text-[13px] font-bold transition-all ${
+              className={`flex-1 h-10 rounded-full text-[13px] font-bold transition-all ${
                 tab === 'feed' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280]'}`}>
               Feed
             </button>
             <button type="button" role="tab" aria-selected={tab === 'people'} onClick={() => setTab('people')}
-              className={`flex-1 h-[34px] rounded-full text-[13px] font-bold transition-all ${
+              className={`flex-1 h-10 rounded-full text-[13px] font-bold transition-all ${
                 tab === 'people' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280]'}`}>
               People
             </button>
@@ -124,20 +133,20 @@ export function ExploreScreen() {
                 <Search size={15} aria-hidden className="text-[#737373] flex-shrink-0" />
                 <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search workers" aria-label="Search workers"
-                  className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] outline-none" />
+                  className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#9CA3AF] outline-none" />
               </div>
             </div>
             <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none" role="radiogroup" aria-label="Filter by job type"
               style={{ WebkitOverflowScrolling: 'touch' }}>
               <button type="button" role="radio" aria-checked={jobType === null} onClick={() => setJobType(null)}
-                className={`flex-shrink-0 h-[30px] px-3.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
+                className={`flex-shrink-0 h-10 px-3.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
                   jobType === null ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'}`}>
                 All
               </button>
               {JOB_TYPES.map((t) => (
                 <button key={t} type="button" role="radio" aria-checked={jobType === t}
                   onClick={() => setJobType(t)}
-                  className={`flex-shrink-0 h-[30px] px-3.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
+                  className={`flex-shrink-0 h-10 px-3.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
                     jobType === t ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'}`}>
                   {t}
                 </button>
@@ -181,7 +190,7 @@ export function ExploreScreen() {
                 {[1, 2].map((n) => (
                   <div key={n} className="border-b border-[#EFEFEF] pb-4">
                     <div className="flex items-center gap-2.5 px-4 py-3">
-                      <div className="w-9 h-9 rounded-full bg-[#EFEFEF] animate-pulse" />
+                      <div className="w-10 h-10 rounded-full bg-[#EFEFEF] animate-pulse" />
                       <div className="w-24 h-3 rounded bg-[#EFEFEF] animate-pulse" />
                     </div>
                     <div className="w-full h-[320px] bg-[#EFEFEF] animate-pulse" />
@@ -200,6 +209,19 @@ export function ExploreScreen() {
                 onLike={(id) => toggleLike.mutate(id)}
                 onOpenComments={(id) => navigate(`/post/${id}`)} />
             ))}
+            {!feedLoading && posts.length > 0 && (
+              <div ref={moreRef} className="flex items-center justify-center py-5">
+                {hasMore ? (
+                  <button type="button" onClick={loadMore} disabled={isLoadingMore}
+                    className="h-[38px] px-5 rounded-full border border-[#E5E7EB] text-[#111827] text-[13px] font-semibold disabled:opacity-60"
+                    aria-label="Load more posts">
+                    {isLoadingMore ? 'Loading…' : 'Load more'}
+                  </button>
+                ) : (
+                  <p className="text-[#9CA3AF] text-[12px]">You're all caught up.</p>
+                )}
+              </div>
+            )}
           </>
         )}
       </main>
@@ -219,7 +241,7 @@ export function ExploreScreen() {
 
       {/* Compose sheet — photo preview + caption with #hashtags */}
       {composeFile && (
-        <div className="fixed inset-0 z-[80] flex flex-col bg-white max-w-app mx-auto" role="dialog" aria-label="New post">
+        <div data-no-pull className="fixed inset-0 z-[80] flex flex-col bg-white max-w-app mx-auto" role="dialog" aria-label="New post">
           <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 border-b border-[#EFEFEF]">
             <button type="button" onClick={closeCompose} disabled={posting}
               className="text-[#111827] text-[15px] font-medium disabled:opacity-50">Cancel</button>
@@ -239,10 +261,14 @@ export function ExploreScreen() {
               onChange={(e) => setComposeCaption(e.target.value)}
               placeholder="Write a caption… add #hashtags like #bartender #miami #wedding"
               rows={4}
+              maxLength={MAX_CAPTION}
               aria-label="Caption"
               className="w-full bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 text-[14px] text-[#111827] placeholder:text-[#9CA3AF] outline-none focus:border-[#0A1628]"
             />
-            <p className="text-[#9CA3AF] text-[12px] mt-2">Tip: #hashtags make your post discoverable by clients searching for talent.</p>
+            <div className="flex items-start justify-between gap-3 mt-2">
+              <p className="text-[#9CA3AF] text-[12px]">Tip: #hashtags make your post discoverable by clients searching for talent.</p>
+              <p className="text-[#9CA3AF] text-[11px] flex-shrink-0 tabular-nums" aria-live="polite">{composeCaption.length}/{MAX_CAPTION}</p>
+            </div>
           </div>
         </div>
       )}

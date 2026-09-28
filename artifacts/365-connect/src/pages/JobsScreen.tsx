@@ -61,19 +61,19 @@ function SavedSearchRow({ current, searches, canSaveMore, saving, onSave, onAppl
       {showSave && (
         <button type="button" onClick={onSave} disabled={saving || !canSaveMore}
           title={canSaveMore ? undefined : 'You can save up to 3 searches'}
-          className="flex-shrink-0 h-[30px] px-3 rounded-full text-[12px] font-bold flex items-center gap-1.5 bg-[#0A1628] text-white disabled:opacity-50">
+          className="flex-shrink-0 h-10 px-3 rounded-full text-[12px] font-bold flex items-center gap-1.5 bg-[#0A1628] text-white disabled:opacity-50">
           <BellPlus size={13} aria-hidden />
           {saving ? 'Saving…' : 'Save this search'}
         </button>
       )}
       {searches.map((s) => (
-        <span key={s.id} className="flex-shrink-0 h-[30px] pl-3 pr-1 rounded-full border border-[#E5E7EB] bg-[#FAFAFA] flex items-center gap-1">
+        <span key={s.id} className="flex-shrink-0 h-10 pl-3 pr-0.5 rounded-full border border-[#E5E7EB] bg-[#FAFAFA] flex items-center gap-1">
           <button type="button" onClick={() => onApply(s)} className="text-[#111827] text-[12px] font-semibold max-w-[200px] truncate"
             aria-label={`Apply saved search: ${savedSearchLabel(s)}`}>
             {savedSearchLabel(s)}
           </button>
           <button type="button" onClick={() => onRemove(s)} aria-label={`Remove saved search: ${savedSearchLabel(s)}`}
-            className="w-6 h-6 rounded-full flex items-center justify-center text-[#9CA3AF] active:bg-[#E5E7EB]">
+            className="w-10 h-10 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#E5E7EB]">
             <X size={13} aria-hidden />
           </button>
         </span>
@@ -209,7 +209,9 @@ function MapPane({ shifts, selectedId, userCoords, onPinClick, onOpenShift }: {
       : { lat: 25.7913, lng: -80.145 };
 
   return (
-    <div data-no-pull className="flex-1 relative bg-[#F2EFE9]">
+    // The bottom padding keeps the map (and the tile credit in its corner)
+    // above the fixed 56px tab bar.
+    <div data-no-pull className="flex-1 relative bg-[#F2EFE9] pb-[56px]">
       {/* Address bar */}
       <form
         onSubmit={(e) => { e.preventDefault(); void submitAddress(); }}
@@ -318,13 +320,13 @@ function ViewToggle({ view, onChange }: { view: 'list' | 'map'; onChange: (v: 'l
     <div className="flex flex-shrink-0 bg-[#F3F4F6] rounded-full p-[3px]" role="tablist" aria-label="Choose view">
       <button type="button" role="tab" aria-selected={view === 'list'} aria-label="List view"
         onClick={() => onChange('list')}
-        className={`flex items-center gap-1 h-[32px] px-3 rounded-full text-[12px] font-semibold transition-all ${
+        className={`flex items-center gap-1 h-10 px-3 rounded-full text-[12px] font-semibold transition-all ${
           view === 'list' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280]'}`}>
         <ListIcon size={14} aria-hidden /> List
       </button>
       <button type="button" role="tab" aria-selected={view === 'map'} aria-label="Map view"
         onClick={() => onChange('map')}
-        className={`flex items-center gap-1 h-[32px] px-3 rounded-full text-[12px] font-semibold transition-all ${
+        className={`flex items-center gap-1 h-10 px-3 rounded-full text-[12px] font-semibold transition-all ${
           view === 'map' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280]'}`}>
         <MapIcon size={14} aria-hidden /> Map
       </button>
@@ -421,7 +423,7 @@ export function JobsScreen() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Search shifts"
-              className="flex-1 min-w-0 w-full bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] outline-none font-medium"
+              className="flex-1 min-w-0 w-full bg-transparent text-black text-[14px] placeholder:text-[#9CA3AF] outline-none font-medium"
             />
             {query && (
               <button type="button" aria-label="Clear search" onClick={() => setQuery('')}
@@ -437,7 +439,7 @@ export function JobsScreen() {
             value={eventTypeFilter ?? ''}
             onChange={(e) => { setEventTypeFilter(e.target.value || null); setSelectedId(null); }}
             aria-label="Filter by event type"
-            className={`flex-shrink-0 h-[34px] px-3 rounded-full text-[12px] font-semibold outline-none whitespace-nowrap
+            className={`flex-shrink-0 h-10 px-3 rounded-full text-[12px] font-semibold outline-none whitespace-nowrap
               ${eventTypeFilter ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
             <option value="">Event: All</option>
             {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -446,7 +448,7 @@ export function JobsScreen() {
             value={jobTypeFilter ?? ''}
             onChange={(e) => { setJobTypeFilter(e.target.value || null); setSelectedId(null); }}
             aria-label="Filter by job type"
-            className={`flex-shrink-0 h-[34px] px-3 rounded-full text-[12px] font-semibold outline-none whitespace-nowrap
+            className={`flex-shrink-0 h-10 px-3 rounded-full text-[12px] font-semibold outline-none whitespace-nowrap
               ${jobTypeFilter ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
             <option value="">Job Type: All</option>
             {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -458,7 +460,7 @@ export function JobsScreen() {
             return (
               <button key={pill.key} type="button" role="radio" aria-checked={active}
                 onClick={() => { setActiveFilter(pill.key); setSelectedId(null); }}
-                className={`flex-shrink-0 h-[34px] px-4 rounded-full text-[12px] font-semibold transition-all duration-150 whitespace-nowrap
+                className={`flex-shrink-0 h-10 px-4 rounded-full text-[12px] font-semibold transition-all duration-150 whitespace-nowrap
                   ${active ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
                 {pill.label}
               </button>
@@ -496,7 +498,7 @@ export function JobsScreen() {
             {!isLoading && visibleShifts.length === 0 && (
               <div className="mt-6 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
                 <p className="text-[#737373] text-[14px] font-medium">No shifts match this filter.</p>
-                <p className="text-[#AAAAAA] text-[12px] mt-1">Try a different category or clear the search.</p>
+                <p className="text-[#6B7280] text-[12px] mt-1">Try a different category or clear the search.</p>
               </div>
             )}
 

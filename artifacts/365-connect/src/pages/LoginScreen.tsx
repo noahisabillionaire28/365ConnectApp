@@ -14,6 +14,8 @@ import { ChevronLeft, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 import { FaApple }  from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
+import { apiClient, isApiStatus } from '@/lib/api';
+import { authRedirectUrl } from '@/lib/native';
 import { resolveSetupRoute } from '@/lib/setupRoute';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
@@ -28,10 +30,7 @@ const RED    = '#EF4444';
 // providers are enabled in the Supabase dashboard.
 const SHOW_SOCIAL_AUTH = false;
 
-function callbackUrl() {
-  const base = import.meta.env.BASE_URL ?? '/';
-  return `${window.location.origin}${base.replace(/\/$/, '')}/auth/callback`;
-}
+const callbackUrl = () => authRedirectUrl('auth/callback');
 
 function friendlyProviderError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
@@ -129,19 +128,19 @@ export function LoginScreen() {
     });
     if (authErr) throw authErr;
 
-    const { data: profile, error: profileErr } = await supabase
-      .from('users')
-      .select('username, role, availability, bio, company_name')
-      .eq('id', data.user.id)
-      .maybeSingle();
-
-    const tableNotFound =
-      profileErr?.message?.toLowerCase().includes('relation') ||
-      profileErr?.message?.toLowerCase().includes('does not exist') ||
-      (profileErr as { code?: string } | null)?.code === '42P01';
-
-    if (profileErr && !tableNotFound)
-      throw new Error(`Could not load profile: ${profileErr.message}`);
+    // The own-row read goes through the API (a 404 means "no profile yet",
+    // which routes to role select).
+    let profile: {
+      username: string | null; role: string | null; availability: unknown;
+      bio: string | null; company_name: string | null;
+    } | null = null;
+    try {
+      profile = await apiClient(data.user.id).get<NonNullable<typeof profile>>('/users/me');
+    } catch (e) {
+      if (!isApiStatus(e, 404)) {
+        throw new Error(`Could not load profile: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
 
     navigate(await resolveSetupRoute(data.user.id, profile));
   }
@@ -171,7 +170,7 @@ export function LoginScreen() {
     setLoading(true); setError(null); setInfo(null);
     try {
       const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL ?? '/'}reset-password`,
+        redirectTo: authRedirectUrl('reset-password'),
       });
       if (resetErr) throw resetErr;
       setInfo('Check your inbox — we sent a password reset link.');

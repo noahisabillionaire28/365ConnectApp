@@ -17,9 +17,14 @@ export function AdminLogin() {
     setError('');
     if (!email.trim() || !password.trim()) { setError('Please enter your email and password.'); return; }
     setLoading(true);
-    const ok = await adminLogin(email.trim(), password);
-    if (ok) { navigate('/admin/dashboard'); }
-    else { setError('Invalid credentials, or this account does not have admin access.'); setLoading(false); }
+    const result = await adminLogin(email.trim(), password);
+    if (result.ok) { navigate('/admin/dashboard'); return; }
+    setError(
+      result.reason === 'credentials' ? 'That email and password do not match.'
+      : result.reason === 'not_admin' ? 'This account does not have admin access.'
+      : "Couldn't sign in right now. Check your connection and try again.",
+    );
+    setLoading(false);
   }
 
   return (
@@ -43,7 +48,7 @@ export function AdminLogin() {
             <input id="email" type="email" autoComplete="email" value={email}
               onChange={(e) => setEmail(e.target.value)} placeholder="admin@365connect.com"
               aria-required="true" aria-describedby={error ? 'login-error' : undefined}
-              className="h-[52px] rounded-[8px] bg-white border border-[#DBDBDB] px-4 text-black text-[15px] placeholder:text-[#AAAAAA] focus:outline-none focus:border-black transition-colors" />
+              className="h-[52px] rounded-[8px] bg-white border border-[#DBDBDB] px-4 text-black text-[15px] placeholder:text-[#9CA3AF] focus:outline-none focus:border-black transition-colors" />
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -52,7 +57,7 @@ export function AdminLogin() {
               <input id="password" type={showPw ? 'text' : 'password'} autoComplete="current-password"
                 value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••"
                 aria-required="true" aria-describedby={error ? 'login-error' : undefined}
-                className="w-full h-[52px] rounded-[8px] bg-white border border-[#DBDBDB] px-4 pr-12 text-black text-[15px] placeholder:text-[#AAAAAA] focus:outline-none focus:border-black transition-colors" />
+                className="w-full h-[52px] rounded-[8px] bg-white border border-[#DBDBDB] px-4 pr-12 text-black text-[15px] placeholder:text-[#9CA3AF] focus:outline-none focus:border-black transition-colors" />
               <button type="button" aria-label={showPw ? 'Hide password' : 'Show password'}
                 onClick={() => setShowPw((v) => !v)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-[#737373]">
@@ -80,7 +85,7 @@ export function AdminLogin() {
           </motion.button>
         </form>
 
-        <p className="text-center text-[#AAAAAA] text-[12px] mt-8">
+        <p className="text-center text-[#6B7280] text-[12px] mt-8">
           Restricted access — authorised personnel only
         </p>
       </motion.div>

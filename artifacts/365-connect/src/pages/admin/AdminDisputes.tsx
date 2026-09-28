@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useEffect } from 'react';
-import { useLocation } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle, CheckCircle2, ShieldAlert, Ban, Clock,
@@ -95,6 +95,25 @@ function SkeletonCard() {
   );
 }
 
+/** A person on a case: handle (linked to their public profile) + email. */
+function personLabel(user: AdminDisputeRow['reported_user'], id: string | null) {
+  if (user?.username) return `@${user.username}`;
+  if (user?.email) return user.email;
+  return id ? `Deleted user (${id.slice(0, 8)})` : 'Unknown user';
+}
+
+function PersonLink({ user, id, className }: { user: AdminDisputeRow['reported_user']; id: string | null; className?: string }) {
+  const label = personLabel(user, id);
+  if (user?.username) {
+    return (
+      <Link href={`/worker/${user.username}`} className={className} aria-label={`Open profile for ${user.username}`}>
+        {label}
+      </Link>
+    );
+  }
+  return <span className={className}>{label}</span>;
+}
+
 /* ── Dispute card ────────────────────────────────────────────────────────── */
 function DisputeCard({ dispute }: { dispute: AdminDisputeRow }) {
   const updateDispute = useUpdateDispute();
@@ -129,9 +148,7 @@ function DisputeCard({ dispute }: { dispute: AdminDisputeRow }) {
           <div className="flex-1 min-w-0 pr-2">
             <div className="flex items-center gap-2 mb-0.5 flex-wrap">
               <p className="text-black font-bold text-[15px]">
-                {dispute.reported_user_id
-                  ? `User #${dispute.reported_user_id.slice(0, 8)}…`
-                  : 'Unknown User'}
+                <PersonLink user={dispute.reported_user} id={dispute.reported_user_id} className="underline-offset-2 hover:underline" />
               </p>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${meta.cls}`}>
                 <Icon size={9} aria-hidden />
@@ -140,15 +157,20 @@ function DisputeCard({ dispute }: { dispute: AdminDisputeRow }) {
             </div>
             <p className="text-[#737373] text-[12px]">
               {typeLabel}
-              {dispute.reported_by_user_id && ` · Reported by #${dispute.reported_by_user_id.slice(0, 8)}…`}
+              {dispute.reported_by_user_id && (
+                <> · Reported by <PersonLink user={dispute.reported_by_user} id={dispute.reported_by_user_id} className="underline-offset-2 hover:underline" /></>
+              )}
             </p>
+            {dispute.reported_user?.email && (
+              <p className="text-[#6B7280] text-[11px] truncate">{dispute.reported_user.email}</p>
+            )}
           </div>
         </div>
 
         <div className={`rounded-[8px] px-3.5 py-2.5 mb-3 ${
           isOpen ? 'bg-red-50 border border-red-200' : 'bg-[#FAFAFA] border border-[#DBDBDB]'
         }`}>
-          <p className={`text-[13px] leading-relaxed ${isOpen ? 'text-[#737373]' : 'text-[#AAAAAA]'}`}>
+          <p className={`text-[13px] leading-relaxed ${isOpen ? 'text-[#737373]' : 'text-[#6B7280]'}`}>
             {dispute.reason}
           </p>
         </div>
@@ -161,8 +183,8 @@ function DisputeCard({ dispute }: { dispute: AdminDisputeRow }) {
         )}
 
         <div className="flex items-center gap-1.5 mb-3">
-          <Clock size={11} aria-hidden className="text-[#AAAAAA]" />
-          <p className="text-[#AAAAAA] text-[11px]">{reportedAt}</p>
+          <Clock size={11} aria-hidden className="text-[#6B7280]" />
+          <p className="text-[#6B7280] text-[11px]">{reportedAt}</p>
         </div>
 
         {isOpen && (
@@ -287,7 +309,7 @@ export function AdminDisputes() {
         {!isLoading && !isError && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 gap-2">
             <CheckCircle2 size={32} aria-hidden className="text-[#DBDBDB]" />
-            <p className="text-[#AAAAAA] text-[14px]">
+            <p className="text-[#6B7280] text-[14px]">
               {filter === 'open' ? 'No open disputes — all clear.' : 'No cases in this category.'}
             </p>
           </div>

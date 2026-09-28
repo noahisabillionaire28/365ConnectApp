@@ -51,6 +51,47 @@ export function memberFilter(userId: string): string {
   return `participant_a_id.eq.${userId},participant_b_id.eq.${userId},participant_ids.cs.{${userId}}`;
 }
 
+/**
+ * Unread counts per conversation, from each member's read position. Counted
+ * in SQL (`unread_counts_for`, migration 0035) — one round-trip, no message
+ * rows over the wire — then narrowed to the threads the caller passed.
+ */
+export async function unreadCounts(convs: ConversationRow[], viewerId: string): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (!convs.length) return out;
+  const wanted = new Set(convs.map((c) => c.id));
+  const { data, error } = await adminDb.rpc('unread_counts_for', { p_user: viewerId });
+  if (error) {
+    console.error('[chat] unread_counts_for failed:', error.message);
+    return out;
+  }
+  for (const r of (data ?? []) as Array<{ conversation_id: string; unread: number | string }>) {
+    if (wanted.has(r.conversation_id)) out.set(r.conversation_id, Number(r.unread) || 0);
+  }
+  return out;
+}
+
+/**
+ * The conversations a user counts unread messages in: the threads in their
+ * list (deleted, archived and muted threads do not count), exactly as the
+ * Messages tab badge shows it. Only the membership columns are read.
+ */
+export async function countableConversations(userId: string): Promise<ConversationRow[]> {
+  const { data } = await adminDb
+    .from('conversations')
+    .select('id, deleted_by, archived_by, muted_by')
+    .or(memberFilter(userId));
+  return ((data ?? []) as ConversationRow[]).filter((c) =>
+    !(c.deleted_by ?? []).includes(userId) && !(c.archived_by ?? []).includes(userId) && !(c.muted_by ?? []).includes(userId));
+}
+
+/** Total unread messages for a user (the Messages tab badge). */
+export async function unreadMessageTotal(userId: string): Promise<number> {
+  const unread = await unreadCounts(await countableConversations(userId), userId);
+  let total = 0; for (const n of unread.values()) total += n;
+  return total;
+}
+
 /** Every user id in a conversation (DM pair or group members). */
 export function participantsOf(conv: ConversationRow): string[] {
   if (conv.is_group) return [...new Set(conv.participant_ids ?? [])];

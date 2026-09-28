@@ -3,6 +3,24 @@ import { useLocation } from 'wouter';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
+/**
+ * An expired or already-used reset link lands here with the failure in the
+ * URL fragment (`#error=access_denied&error_code=otp_expired&…`) instead of
+ * a session. Read it once so the screen can explain instead of waiting forever.
+ */
+function linkErrorFromHash(): string | null {
+  const raw = window.location.hash.replace(/^#/, '');
+  if (!raw) return null;
+  const params = new URLSearchParams(raw);
+  const code = params.get('error_code') ?? '';
+  const err = params.get('error');
+  if (!err && !code) return null;
+  if (/expired/i.test(code)) return 'This reset link has expired. Links only work for a short while — send yourself a new one below.';
+  if (/invalid|otp/i.test(code) || /access_denied/i.test(err ?? '')) return 'This reset link is invalid or has already been used. Send yourself a new one below.';
+  const description = params.get('error_description');
+  return description ? description.replace(/\+/g, ' ') : 'This reset link could not be used. Send yourself a new one below.';
+}
+
 export function ResetPasswordScreen() {
   const [, navigate] = useLocation();
   const [password, setPassword] = useState('');
@@ -11,6 +29,7 @@ export function ResetPasswordScreen() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [hasSession, setHasSession] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(() => linkErrorFromHash());
 
   // Supabase sends the user here after clicking the reset link.
   // onAuthStateChange fires with event "PASSWORD_RECOVERY" and a live session.
@@ -18,11 +37,12 @@ export function ResetPasswordScreen() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
         setHasSession(true);
+        setLinkError(null);
       }
     });
     // Also check existing session (e.g. if page reloaded after redirect)
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setHasSession(true);
+      if (session) { setHasSession(true); setLinkError(null); }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -65,10 +85,32 @@ export function ResetPasswordScreen() {
       <p className="text-[14px] mb-8" style={{ color: MUTED }}>
         {hasSession
           ? 'Choose a new password for your account.'
-          : 'Waiting for your reset link… Open the link from your email first.'}
+          : linkError
+            ? 'This link is no longer usable.'
+            : 'Waiting for your reset link… Open the link from your email first.'}
       </p>
 
-      {done ? (
+      {linkError && !hasSession ? (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start gap-2 rounded-[12px] px-4 py-3"
+            style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
+            <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-[1px]" />
+            <p className="text-red-600 text-[13px] leading-snug" data-testid="reset-link-error">{linkError}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="w-full text-white font-bold py-[18px] rounded-[14px] active:scale-[0.98] transition-transform"
+            style={{ background: NAVY }}
+            data-testid="btn-reset-new-link"
+          >
+            Send a new link
+          </button>
+          <p className="text-[12px] text-center" style={{ color: MUTED }}>
+            Enter your email on the login screen and tap "Forgot password".
+          </p>
+        </div>
+      ) : done ? (
         <div className="flex items-start gap-2 rounded-[12px] px-4 py-4"
           style={{ background: '#ECFDF5', border: '1px solid #A7F3D0' }}>
           <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0 mt-[1px]" />
@@ -94,7 +136,7 @@ export function ResetPasswordScreen() {
               onChange={e => setPassword(e.target.value)}
               disabled={!hasSession}
               placeholder="Min. 6 characters"
-              className="w-full rounded-[14px] px-4 py-4 font-medium text-[15px] outline-none transition-colors placeholder:text-[#AAAAAA] disabled:opacity-40"
+              className="w-full rounded-[14px] px-4 py-4 font-medium text-[15px] outline-none transition-colors placeholder:text-[#9CA3AF] disabled:opacity-40"
               style={{ background: '#FFFFFF', border: `1px solid ${BORDER}`, color: TEXT }}
             />
           </div>
@@ -109,7 +151,7 @@ export function ResetPasswordScreen() {
               onChange={e => setConfirm(e.target.value)}
               disabled={!hasSession}
               placeholder="Repeat new password"
-              className="w-full rounded-[14px] px-4 py-4 font-medium text-[15px] outline-none transition-colors placeholder:text-[#AAAAAA] disabled:opacity-40"
+              className="w-full rounded-[14px] px-4 py-4 font-medium text-[15px] outline-none transition-colors placeholder:text-[#9CA3AF] disabled:opacity-40"
               style={{ background: '#FFFFFF', border: `1px solid ${BORDER}`, color: TEXT }}
             />
           </div>

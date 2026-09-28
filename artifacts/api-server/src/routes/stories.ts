@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
+import { requireUploadUrl, cleanCaption } from '../lib/media.js';
+import { sendError } from '../lib/httpError.js';
+import { blockedIdsFor } from '../lib/chat.js';
 
 const router = Router();
 
@@ -26,11 +29,14 @@ router.get('/', requireAuth, async (req, res) => {
   const me = req.userId!;
   const nowIso = new Date().toISOString();
 
-  // Who to show: everyone I follow + myself.
-  const { data: follows, error: fErr } = await adminDb
-    .from('follows').select('following_id').eq('follower_id', me);
+  // Who to show: everyone I follow + myself, minus anyone blocked either way.
+  const [{ data: follows, error: fErr }, blocked] = await Promise.all([
+    adminDb.from('follows').select('following_id').eq('follower_id', me),
+    blockedIdsFor(me),
+  ]);
   if (fErr) return res.status(500).json({ error: fErr.message });
-  const authorIds = [...new Set([me, ...(follows ?? []).map((f) => f.following_id)])];
+  const authorIds = [...new Set([me, ...(follows ?? []).map((f) => f.following_id)])]
+    .filter((id) => !blocked.has(id));
 
   const { data: stories, error: sErr } = await adminDb
     .from('stories')
@@ -95,11 +101,15 @@ router.get('/', requireAuth, async (req, res) => {
 
 /** POST /api/stories { photo_url, caption? } — post a story (expires in 24h). */
 router.post('/', requireAuth, async (req, res) => {
-  const { photo_url, caption } = req.body as { photo_url?: string; caption?: string };
-  if (!photo_url) return res.status(400).json({ error: 'photo_url is required' });
+  const { photo_url, caption } = req.body as { photo_url?: unknown; caption?: unknown };
+  let url: string; let text: string | null;
+  try {
+    url = requireUploadUrl(photo_url);
+    text = cleanCaption(caption);
+  } catch (e) { return sendError(res, e); }
   const { data, error } = await adminDb
     .from('stories')
-    .insert({ user_id: req.userId, photo_url, caption: caption?.trim() || null })
+    .insert({ user_id: req.userId, photo_url: url, caption: text })
     .select()
     .single();
   if (error) return res.status(500).json({ error: error.message });

@@ -18,10 +18,12 @@ import { useLocation }                  from 'wouter';
 import { ChevronLeft, Camera, Plus, X, Check, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { uploadAvatar, uploadPostPhoto } from '@/lib/storage';
-import { apiClient } from '@/lib/api';
+import { apiClient, isApiStatus } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { JOB_TYPES } from '@/lib/jobTypes';
+import { isAutoHandle } from '@/lib/username';
 import { ImageCropper } from '@/components/ImageCropper';
+import { SetupLoadError } from '@/components/SetupLoadError';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const NAVY   = '#0A1628';
@@ -64,13 +66,13 @@ function StepHeader({
         {step > 1 ? (
           <button
             onClick={onBack}
-            className="w-9 h-9 flex items-center justify-center rounded-full mr-3 transition-colors active:scale-95"
+            className="w-10 h-10 flex items-center justify-center rounded-full mr-3 transition-colors active:scale-95"
             style={{ border: `1px solid ${BORDER}` }}
           >
             <ChevronLeft size={20} style={{ color: TEXT }} />
           </button>
         ) : (
-          <div className="w-9 h-9 mr-3" />
+          <div className="w-10 h-10 mr-3" />
         )}
         <span className="text-[13px] font-medium" style={{ color: MUTED }}>
           Step {step} of {TOTAL_STEPS}
@@ -104,6 +106,8 @@ export function WorkerSetupScreen() {
 
   // Init
   const [initialized, setInitialized] = useState(false);
+  const [loadFailed,  setLoadFailed]  = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [step,        setStep]        = useState(1);
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState<string | null>(null);
@@ -177,20 +181,29 @@ export function WorkerSetupScreen() {
         if (isEdit) { setStep(1); setInitialized(true); return; }
 
         // Infer resume step: take the highest step we can confirm from DB,
-        // then also check localStorage in case this session progressed further
+        // then also check localStorage in case this session progressed further.
+        // The placeholder handle from role select and the empty arrays the
+        // row is created with do not count as "done" — a brand-new worker
+        // must start at step 1, not be dropped at step 7.
         let inferred = 1;
-        if (data.username)             inferred = Math.max(inferred, 2);
+        if (data.username && !isAutoHandle(data.username, user.email)) inferred = Math.max(inferred, 2);
         if (data.photo_url)            inferred = Math.max(inferred, 3);
         if (data.primary_job_type)     inferred = Math.max(inferred, 5);
-        if (data.secondary_job_types != null) inferred = Math.max(inferred, 6);
-        if (data.certifications != null)      inferred = Math.max(inferred, 7);
+        if ((data.secondary_job_types?.length ?? 0) > 0) inferred = Math.max(inferred, 6);
+        if ((data.certifications?.length ?? 0) > 0)      inferred = Math.max(inferred, 7);
         if (data.availability)         inferred = Math.max(inferred, 8);
 
         const stored = loadStep(user.id);
         setStep(Math.max(inferred, stored));
         setInitialized(true);
+      })
+      .catch((err) => {
+        // No profile row yet → start the wizard fresh. Offline or a server
+        // hiccup → a retry card, not a skeleton forever.
+        if (!isApiStatus(err, 404)) setLoadFailed(true);
+        setInitialized(true);
       });
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, loadAttempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Username debounce check ──────────────────────────────────────────────────
   useEffect(() => {
@@ -366,11 +379,20 @@ export function WorkerSetupScreen() {
   }
 
   // ── Loading skeleton ──────────────────────────────────────────────────────────
+  if (loadFailed) {
+    return (
+      <SetupLoadError
+        onRetry={() => { setLoadFailed(false); setInitialized(false); setLoadAttempt((n) => n + 1); }}
+        onBack={() => navigate('/home')}
+      />
+    );
+  }
+
   if (!initialized) {
     return (
       <div className="min-h-[100dvh] bg-white flex flex-col">
         <div className="flex items-center px-5 pt-12 pb-4">
-          <div className="w-9 h-9 rounded-full mr-3" style={{ background: BORDER }} />
+          <div className="w-10 h-10 rounded-full mr-3" style={{ background: BORDER }} />
           <div className="h-3 w-24 rounded-full" style={{ background: BORDER }} />
         </div>
         <div className="mx-5 h-[3px] rounded-full" style={{ background: BORDER }} />

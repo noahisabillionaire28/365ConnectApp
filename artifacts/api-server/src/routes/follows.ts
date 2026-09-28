@@ -50,7 +50,7 @@ router.get('/status/:userId', requireAuth, async (req, res) => {
  * GET /api/follows/followers/:userId — who follows this user. For a worker
  * these are the clients and agencies whose roster they are on.
  */
-router.get('/followers/:userId', async (req, res) => {
+router.get('/followers/:userId', requireAuth, async (req, res) => {
   const { data: follows, error } = await adminDb
     .from('follows')
     .select('follower_id, created_at')
@@ -88,8 +88,8 @@ router.delete('/followers/:followerId', requireAuth, async (req, res) => {
   return res.json({ ok: true });
 });
 
-/** GET /api/follows/counts/:userId — follower + following counts */
-router.get('/counts/:userId', async (req, res) => {
+/** GET /api/follows/counts/:userId — follower + following counts (signed-in only) */
+router.get('/counts/:userId', requireAuth, async (req, res) => {
   const id = req.params.userId;
   const [followers, following] = await Promise.all([
     adminDb.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', id),

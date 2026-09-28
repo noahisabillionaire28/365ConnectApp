@@ -110,7 +110,7 @@ export function PostShiftStep1Screen() {
           <button
             type="button" aria-label="Back to event type"
             onClick={() => navigate('/post-shift/event')}
-            className="w-9 h-9 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
+            className="w-10 h-10 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
@@ -127,7 +127,7 @@ export function PostShiftStep1Screen() {
         {/* Job type grid */}
         <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider mb-3">
           Job Types <span className="normal-case text-[#EF4444]">*</span>
-          <span className="normal-case text-[#9CA3AF] font-medium tracking-normal"> — pick all you need</span>
+          <span className="normal-case text-[#737373] font-medium tracking-normal"> — pick all you need</span>
         </p>
         <div
           className="grid grid-cols-2 gap-3 mb-6"
@@ -175,7 +175,7 @@ export function PostShiftStep1Screen() {
           className={`w-full h-[52px] rounded-[12px] font-bold text-[16px] transition-all duration-200 ${
             canContinue
               ? 'bg-[#0A1628] text-white'
-              : 'bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed'
+              : 'bg-[#E5E7EB] text-[#6B7280] cursor-not-allowed'
           }`}
         >
           Continue

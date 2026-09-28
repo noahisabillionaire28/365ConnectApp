@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import {
   MapPin, CheckCheck, XCircle, Bell, DollarSign, Star, UserPlus, Send, AlarmClock, Ban, Settings,
   Heart, MessageCircle, Clock3, FileClock, AlertTriangle, BellRing, UserMinus, Pencil, Repeat2,
@@ -86,11 +85,10 @@ function formatUsd(amount: number): string {
 function NotificationCard({ item, index, onOpen }: { item: NotificationRowType; index: number; onOpen: () => void }) {
   const isUnread = !item.read_at;
   return (
-    <motion.button
+    <button
       type="button" onClick={onOpen}
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, delay: index * 0.04, ease: 'easeOut' }}
-      className={`w-full flex items-start gap-3 px-4 py-3.5 border-b border-[#DBDBDB] text-left transition-colors ${
+      style={{ animationDelay: `${Math.min(index * 40, 300)}ms` }}
+      className={`anim-rise-in w-full flex items-start gap-3 px-4 py-3.5 border-b border-[#DBDBDB] text-left transition-colors ${
         isUnread ? 'bg-[#F0F4FA]' : 'bg-white'
       }`}
       role="listitem" aria-label={item.title}
@@ -100,14 +98,14 @@ function NotificationCard({ item, index, onOpen }: { item: NotificationRowType; 
       </div>
       <SystemAvatar type={item.type} />
       <div className="flex-1 min-w-0">
-        <p className="text-black font-semibold text-[14px] leading-[1.4]">{item.title}</p>
-        {item.body && <p className="text-[#737373] text-[13px] leading-[1.4] mt-0.5">{item.body}</p>}
+        <p className="text-black font-semibold text-[14px] leading-[1.4] break-words">{item.title}</p>
+        {item.body && <p className="text-[#737373] text-[13px] leading-[1.4] mt-0.5 break-words">{item.body}</p>}
         {item.type === 'payment_received' && item.amount != null && (
           <p className="text-emerald-600 font-bold text-[14px] mt-1">{formatUsd(item.amount)}</p>
         )}
-        <p className="text-[#AAAAAA] text-[12px] font-medium mt-1">{relativeTime(item.created_at)}</p>
+        <p className="text-[#6B7280] text-[12px] font-medium mt-1">{relativeTime(item.created_at)}</p>
       </div>
-    </motion.button>
+    </button>
   );
 }
 
@@ -119,7 +117,7 @@ function SectionHeader({ label, showMarkRead, onMarkRead }: {
       <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em]">{label}</p>
       {showMarkRead && (
         <button type="button" aria-label="Mark all notifications as read" onClick={onMarkRead}
-          className="text-[#0A1628] text-[12px] font-semibold active:opacity-60 transition-opacity">
+          className="min-h-10 px-2 -mr-2 -my-2 flex items-center text-[#0A1628] text-[12px] font-semibold active:opacity-60 transition-opacity">
           Mark all as read
         </button>
       )}
@@ -177,7 +175,7 @@ export function NotificationsScreen() {
           </div>
           <button type="button" aria-label="Notification settings"
             onClick={() => navigate('/notification-settings')}
-            className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center active:opacity-60 transition-opacity">
+            className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center active:opacity-60 transition-opacity">
             <Settings size={15} aria-hidden className="text-[#737373]" />
           </button>
         </div>

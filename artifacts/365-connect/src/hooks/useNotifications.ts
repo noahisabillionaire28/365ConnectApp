@@ -108,7 +108,6 @@ export function useNotifications() {
         void qc.invalidateQueries({ queryKey: ['application-status', shiftId] });
         void qc.invalidateQueries({ queryKey: ['shift', shiftId] });
         void qc.invalidateQueries({ queryKey: ['shift-applicants', shiftId] });
-        void qc.invalidateQueries({ queryKey: ['accepted-workers', shiftId] });
         void qc.invalidateQueries({ queryKey: ['time-entry', shiftId] });
         void qc.invalidateQueries({ queryKey: ['my-applications'] });
         void qc.invalidateQueries({ queryKey: ['my-shift-ids'] });

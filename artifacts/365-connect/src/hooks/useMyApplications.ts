@@ -14,6 +14,8 @@ type RawApplication = {
   /** Day-of status the worker reported (null until they tap a pill). */
   arrival_status?: ArrivalStatus | null;
   arrival_status_at?: string | null;
+  /** Why a withdrawn booking was released: 'swap' when it was handed to another worker. */
+  callout_reason?: string | null;
   // Joined shift fields
   title?: string | null;
   /** The shift's own lifecycle state (a cancelled shift is not "upcoming"). */
@@ -48,6 +50,7 @@ export type MyApplication = RawApplication & {
   coverImage: string | null;
   arrivalStatus: ArrivalStatus | null;
   arrivalStatusAt: string | null;
+  calloutReason: string | null;
   timezone: string | null;
   location: string | null;
   pointOfContact: string | null;
@@ -73,6 +76,7 @@ function toMyApplication(r: RawApplication): MyApplication {
     coverImage:    r.cover_image ?? null,
     arrivalStatus:   r.arrival_status ?? null,
     arrivalStatusAt: r.arrival_status_at ?? null,
+    calloutReason:   r.callout_reason ?? null,
     timezone:        r.timezone ?? null,
     location:        r.location ?? null,
     pointOfContact:  r.point_of_contact ?? null,

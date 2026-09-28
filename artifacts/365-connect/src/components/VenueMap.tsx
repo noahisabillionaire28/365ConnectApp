@@ -73,7 +73,7 @@ export function VenueMap({
           type="button"
           onClick={() => setHidden((h) => !h)}
           aria-label={hidden ? 'Show map' : 'Hide map'}
-          className="w-[26px] h-[26px] rounded-full bg-[#111827] text-white flex items-center justify-center flex-shrink-0 active:opacity-80"
+          className="relative w-[26px] h-[26px] rounded-full bg-[#111827] text-white flex items-center justify-center flex-shrink-0 active:opacity-80 after:absolute after:-inset-2 after:content-['']"
         >
           <X size={14} strokeWidth={3} aria-hidden />
         </button>

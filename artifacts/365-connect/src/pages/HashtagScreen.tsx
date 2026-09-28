@@ -16,7 +16,7 @@ export function HashtagScreen() {
       <div className="sticky top-0 z-20 bg-white border-b border-[#EFEFEF] px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
         <button type="button" aria-label="Back"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/explore'); }}
-          className="w-9 h-9 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
+          className="w-10 h-10 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} aria-hidden className="text-[#0A1628]" />
         </button>
         <div className="flex items-center gap-1.5 min-w-0">

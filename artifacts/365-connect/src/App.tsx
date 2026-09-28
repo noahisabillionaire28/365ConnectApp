@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { lazyNamed, warmRoutes } from '@/lib/lazyRoutes';
 
 /**
@@ -23,6 +23,7 @@ function RouteFallback() {
 }
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { isApiStatus } from '@/lib/api';
 import { restoreQueryCache, startQueryCachePersistence } from '@/lib/queryPersist';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -32,21 +33,22 @@ import { Route, Switch, Redirect, Router as WouterRouter, useLocation } from 'wo
 import { AuthProvider } from '@/contexts/AuthContext';
 import { RoleProvider, useRole, isLockedStatus } from '@/contexts/RoleContext';
 import { SuspendedGate } from '@/components/SuspendedGate';
-import { AdminFab } from '@/components/AdminFab';
+// Admin-only chrome (and its animation library) loads only for admin accounts.
+const AdminFab = lazy(() => import('@/components/AdminFab').then((m) => ({ default: m.AdminFab })));
 import { useSSE } from '@/hooks/useSSE';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { MobileContainer } from '@/components/MobileContainer';
 import { NativeBridge } from '@/components/NativeBridge';
+import { AppBadge } from '@/components/AppBadge';
 import { PullToRefresh } from '@/components/PullToRefresh';
-import { AdminNav } from '@/components/AdminNav';
+const AdminNav = lazy(() => import('@/components/AdminNav').then((m) => ({ default: m.AdminNav })));
 
 // ── Mobile screens ─────────────────────────────────────────────────────────────
 // Auth / onboarding
 import { SplashScreen }         from '@/pages/SplashScreen';
 import { LoginScreen }          from '@/pages/LoginScreen';
 const SignUpScreen = lazyNamed(() => import('@/pages/SignUpScreen'), 'SignUpScreen');
-const PhoneAuthScreen = lazyNamed(() => import('@/pages/PhoneAuthScreen'), 'PhoneAuthScreen');
 const ResetPasswordScreen = lazyNamed(() => import('@/pages/ResetPasswordScreen'), 'ResetPasswordScreen');
 const AuthCallbackScreen = lazyNamed(() => import('@/pages/AuthCallbackScreen'), 'AuthCallbackScreen');
 const RoleSelectScreen = lazyNamed(() => import('@/pages/RoleSelectScreen'), 'RoleSelectScreen');
@@ -110,7 +112,9 @@ const queryClient = new QueryClient({
       // Keep entries in memory for a day so navigating back is instant and the
       // on-device snapshot has something to persist even after long idle gaps.
       gcTime:               24 * 60 * 60_000,
-      retry:                2,
+      // A 404 is an answer ("no longer available"), not a blip: show it at
+      // once instead of spinning through two retries first.
+      retry:                (count, err) => !isApiStatus(err, 404) && count < 2,
       refetchOnWindowFocus: false,
     },
   },
@@ -127,6 +131,13 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 // ── SSE mount — opens a live event stream once the user is authenticated ──────
 function SSEMount() { useSSE(); return null; }
 
+// ── Admin FAB — fetched only once an admin account is known ──────────────────
+function AdminFabGate() {
+  const { isAdmin } = useRole();
+  if (!isAdmin) return null;
+  return <Suspense fallback={null}><AdminFab /></Suspense>;
+}
+
 // ── Suspended-account gate — blocks suspended/banned (non-admin) users ────────
 // The API refuses every request from such an account with 403 (except
 // GET /users/me, which is how this guard learns the status).
@@ -139,13 +150,19 @@ function SuspendedGuard() {
 // ── Mobile router — full-width on phones, centred column on larger screens ─────────────────────────────────────
 function MobileRouter() {
   const [location] = useLocation();
+  const { role, roleLoading } = useRole();
 
   // Screens swap instantly, like a native tab bar — no fade-out to white and
   // back in. Each new screen starts at the top.
   useEffect(() => { window.scrollTo(0, 0); }, [location]);
 
   // Fetch every screen's code in the background once the first screen is up.
-  useEffect(() => { warmRoutes(); }, []);
+  // The Jobs screen carries the map library (the heaviest chunk); only
+  // workers browse it, so posters get it on tap instead (see BottomTabNav).
+  useEffect(() => {
+    if (roleLoading) return;
+    warmRoutes({ skip: role === 'worker' ? [] : ['JobsScreen'] });
+  }, [roleLoading, role]);
 
   // Chat and clock-in manage their own gestures; every other screen gets
   // pull-to-refresh for free.
@@ -160,7 +177,6 @@ function MobileRouter() {
             {/* ── Auth (Supabase) ───────────────────────────────── */}
             <Route path="/login"          component={LoginScreen}         />
             <Route path="/signup"         component={SignUpScreen}        />
-            <Route path="/phone-auth"     component={PhoneAuthScreen}     />
             <Route path="/reset-password" component={ResetPasswordScreen} />
             <Route path="/auth/callback"  component={AuthCallbackScreen}  />
 
@@ -240,7 +256,7 @@ function AdminRouter() {
       className="min-h-[100dvh] bg-[#FAFAFA]"
       style={{ fontFamily: "'Space Grotesk', sans-serif" }}
     >
-      {showNav && <AdminNav />}
+      {showNav && <Suspense fallback={null}><AdminNav /></Suspense>}
 
       <Suspense fallback={<RouteFallback />}>
       <Switch>
@@ -278,12 +294,13 @@ function AppShell() {
     <AuthProvider>
       <SSEMount />
       <NativeBridge />
+      <AppBadge />
       <RoleProvider>
         <ToastProvider>
           <TooltipProvider>
             <ErrorBoundary>
               <AppRouter />
-              <AdminFab />
+              <AdminFabGate />
               <SuspendedGuard />
             </ErrorBoundary>
           </TooltipProvider>
