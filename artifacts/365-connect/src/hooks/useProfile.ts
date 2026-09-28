@@ -1,27 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api';
 import { useAuth, type SimpleUser } from '@/contexts/AuthContext';
 import { useRole } from '@/contexts/RoleContext';
-
-type UserProfileRow = {
-  username:            string | null;
-  photo_url:           string | null;
-  bio:                 string | null;
-  job_types:           string[];
-  certifications:      string[];
-  rating:              number;
-  created_at:          string;
-  role:                'worker' | 'client' | 'admin' | 'staffer';
-  is_admin?:           boolean | null;
-  primary_job_type:    string | null;
-  secondary_job_types: string[];
-  availability:        Record<string, boolean> | null;
-  lat:                 number | null;
-  lng:                 number | null;
-  is_pro:              boolean;
-  is_available:        boolean;
-  hourly_rate:         number | null;
-};
+import { profileQueryOptions, type UserProfileRow } from './profileQuery';
 
 function deriveDisplayName(authUser: SimpleUser, row: UserProfileRow | null): string {
   return (
@@ -44,7 +24,7 @@ export type ProfileResult = {
   memberSince:       string;
   email:             string | null;
   /** Effective role — for admins this follows the in-app "view as" switcher. */
-  role:              UserProfileRow['role'] | null;
+  role:              NonNullable<UserProfileRow['role']> | null;
   /** True for admin-capable accounts, regardless of the preview role. */
   isAdmin:           boolean;
   primaryJobType:    string | null;
@@ -61,18 +41,8 @@ export function useProfile(): ProfileResult {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin: ctxIsAdmin, previewRole } = useRole();
 
-  const { data: row, isLoading: rowLoading, isError } = useQuery<UserProfileRow | null>({
-    queryKey: ['profile', user?.id ?? 'anon'],
-    enabled:  !!user?.id,
-    staleTime: 30_000,
-    queryFn: async () => {
-      try {
-        return await apiClient(user?.id).get<UserProfileRow>('/users/me');
-      } catch {
-        return null;
-      }
-    },
-  });
+  // Same entry RoleContext and useMyLocation read: one request per session.
+  const { data: row, isLoading: rowLoading, isError } = useQuery(profileQueryOptions(user?.id));
 
   const isLoading = authLoading || (!!user && rowLoading);
 

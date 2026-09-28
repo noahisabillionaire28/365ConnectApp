@@ -1,13 +1,15 @@
 /**
  * Background clock — POST/GET /api/cron/tick
  *
- * Called on a schedule (Vercel cron daily, plus a Supabase pg_cron job every
- * 15 minutes via pg_net). Every task is idempotent: reminders dedupe against
- * the notifications table, and sweeps are conditional updates. So it is safe
- * to call as often as you like.
+ * Called on a schedule by the Supabase pg_cron job `365connect-tick` every
+ * 15 minutes via pg_net (migration 0032). The daily Vercel cron that used to
+ * hit this route as well was removed from vercel.json: it only duplicated the
+ * 11:00 UTC tick. Every task is idempotent: reminders dedupe against the
+ * notifications table, and sweeps are conditional updates. So it is safe to
+ * call as often as you like (and by hand).
  *
- * Auth: callers must send `Authorization: Bearer <CRON_SECRET>` (Vercel cron
- * does this automatically; the pg_cron job carries the same token). With no
+ * Auth: callers must send `Authorization: Bearer <CRON_SECRET>` (the pg_cron
+ * job carries the token; a Vercel cron would send it automatically). With no
  * CRON_SECRET configured the route is closed, never open — every tick sends
  * emails and pushes, so an unauthenticated caller must not be able to run it.
  * The windows below are wider than the 15-minute cadence so a late or missed

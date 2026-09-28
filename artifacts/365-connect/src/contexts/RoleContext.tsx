@@ -12,10 +12,11 @@
  * device); the backend treats admins as superusers so previewed actions work.
  */
 import {
-  createContext, useContext, useCallback, useEffect, useState, type ReactNode,
+  createContext, useContext, useCallback, useState, type ReactNode,
 } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiClient, isApiStatus } from '@/lib/api';
+import { profileQueryOptions } from '@/hooks/profileQuery';
 
 export type UserRole = 'worker' | 'client' | 'staffer' | 'admin' | null;
 export type UserStatus = 'active' | 'suspended' | 'banned' | 'flagged' | null;
@@ -70,15 +71,7 @@ const RoleContext = createContext<RoleContextType>({
 });
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  const { user }                      = useAuth();
-  const [realRole, setRealRole]       = useState<UserRole>(null);
-  const [status, setStatus]           = useState<UserStatus>(null);
-  const [isAdmin, setIsAdmin]         = useState(false);
-  const [fetching, setFetching]       = useState(true);
-  const [roleError, setRoleError]     = useState(false);
-  // Which user the current role/status values were read for. Until the read
-  // for the signed-in user has finished, the role is unknown — not "none".
-  const [loadedFor, setLoadedFor]     = useState<string | null | undefined>(undefined);
+  const { user } = useAuth();
   const [previewRole, setPreviewRoleState] = useState<PreviewRole>(readPreview);
 
   const setPreviewRole = useCallback((r: PreviewRole) => {
@@ -86,44 +79,30 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(PREVIEW_KEY, r); } catch { /* ignore */ }
   }, []);
 
+  // The same cached entry useProfile / useMyLocation read — one GET /users/me
+  // for the whole app. The key carries the user id, so a different account is
+  // "unknown" (pending) until its own read finishes, never the previous
+  // user's values. A 404 resolves to null (no role yet); a network / 5xx
+  // failure is an error, i.e. "unknown", not "none".
+  // Always re-read on app start (the on-device snapshot may be from an
+  // earlier session), and stay "loading" until this session's read for THIS
+  // user has finished — snapshot data is not treated as an answer. This
+  // observer alone treats the entry as stale (staleTime 0) so the read also
+  // runs when the key changes from "anon" to the signed-in user; the other
+  // consumers keep their 30 s staleTime and share the one response.
+  const query = useQuery({ ...profileQueryOptions(user?.id), staleTime: 0, refetchOnMount: 'always' });
+  const data = user ? query.data : null;
+
+  const realRole: UserRole   = (data?.role as UserRole) ?? null;
+  const status:   UserStatus = data ? ((data.status as UserStatus) ?? 'active') : null;
+  const isAdmin              = data?.is_admin === true || data?.role === 'admin';
+  const roleError            = !!user && query.isError;
+  const roleLoading          = !!user && (query.isPending || !query.isFetchedAfterMount);
+
   const fetchRole = useCallback(async () => {
-    if (!user) {
-      setRealRole(null);
-      setStatus(null);
-      setIsAdmin(false);
-      setRoleError(false);
-      setLoadedFor(null);
-      setFetching(false);
-      return;
-    }
-    setFetching(true);
-    try {
-      const data = await apiClient(user.id).get<{
-        role: string | null; status: string | null; is_admin?: boolean | null;
-      }>('/users/me');
-      setRealRole((data?.role as UserRole) ?? null);
-      setStatus((data?.status as UserStatus) ?? 'active');
-      setIsAdmin(data?.is_admin === true || data?.role === 'admin');
-      setRoleError(false);
-    } catch (e) {
-      setRealRole(null);
-      setStatus(null);
-      setIsAdmin(false);
-      // A definite "no profile row" is not an error: the account simply has
-      // no role yet. Anything else (offline, 5xx) is unknown, not "none".
-      setRoleError(!isApiStatus(e, 404));
-    }
-    setLoadedFor(user.id);
-    setFetching(false);
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fetch on mount + whenever auth user changes
-  useEffect(() => { fetchRole(); }, [fetchRole]);
-
-  // Loading until the read for THIS user has finished — covers the render
-  // between auth resolving and the refetch effect starting, when the stale
-  // signed-out values (no role, not loading) would otherwise show.
-  const roleLoading = fetching || (user ? loadedFor !== user.id : false);
+    if (!user) return;
+    await query.refetch();
+  }, [user?.id, query.refetch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Admins render the app as their chosen preview role; everyone else as-is.
   const role: UserRole = isAdmin ? previewRole : realRole;

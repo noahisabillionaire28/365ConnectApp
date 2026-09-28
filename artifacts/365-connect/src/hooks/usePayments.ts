@@ -293,7 +293,7 @@ export function useMarkPaid() {
     try {
       await apiClient(user.id).post('/payments/manual', { shift_id: shiftId, worker_id: workerId });
       void qc.invalidateQueries({ queryKey: PAYMENTS_QUERY_KEY });
-      void qc.invalidateQueries({ queryKey: ['accepted-workers', shiftId] });
+      void qc.invalidateQueries({ queryKey: ['shift-applicants', shiftId] });
       void qc.invalidateQueries({ queryKey: ['time-entry'] });
       return null;
     } catch (e) {

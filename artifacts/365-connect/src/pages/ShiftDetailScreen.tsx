@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,7 +12,9 @@ import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
 import { useToast } from '@/contexts/ToastContext';
 import { useApplicationStatus } from '@/hooks/useApplicationStatus';
-import { VenueMap } from '@/components/VenueMap';
+// The venue map carries the map library; it loads when a shift page renders,
+// not with every screen warmed in the background.
+const VenueMap = lazy(() => import('@/components/VenueMap').then((m) => ({ default: m.VenueMap })));
 import { geocodeAddress, type Coords } from '@/lib/geocode';
 import { useShiftById } from '@/hooks/useShifts';
 import { useProfile } from '@/hooks/useProfile';
@@ -934,16 +936,18 @@ export function ShiftDetailScreen() {
         {/* Map — Apple Maps style block: address bar, dark map, Hide Map, distance footer */}
         <div className="px-5 pb-6">
           <SectionHeading>Location</SectionHeading>
-          <VenueMap
-            address={shift.location}
-            coords={shiftCoords}
-            userCoords={myLocationIsDefault ? null : myCoords}
-            markerId={shift.id}
-            distanceMiles={myLocationIsDefault ? null : distanceFromShift}
-            status={lifecycle === 'in_progress' ? 'Happening now' : lifecycle === 'ended' ? 'Ended' : shift.date}
-            detail={shift.startTime}
-            onOpenDirections={() => setDirectionsOpen(true)}
-          />
+          <Suspense fallback={<div className="h-[52px] rounded-[12px] bg-[#F3F4F6] animate-pulse" aria-hidden />}>
+            <VenueMap
+              address={shift.location}
+              coords={shiftCoords}
+              userCoords={myLocationIsDefault ? null : myCoords}
+              markerId={shift.id}
+              distanceMiles={myLocationIsDefault ? null : distanceFromShift}
+              status={lifecycle === 'in_progress' ? 'Happening now' : lifecycle === 'ended' ? 'Ended' : shift.date}
+              detail={shift.startTime}
+              onOpenDirections={() => setDirectionsOpen(true)}
+            />
+          </Suspense>
           <button type="button" onClick={() => setDirectionsOpen(true)}
             className="mt-3 w-full h-[44px] rounded-[10px] bg-[#0A1628] text-white font-semibold text-[14px] flex items-center justify-center gap-2 active:scale-[0.99] transition-transform">
             <Navigation size={15} aria-hidden />

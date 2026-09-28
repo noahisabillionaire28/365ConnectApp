@@ -40,7 +40,7 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
         <button type="button" onClick={goAuthor}
           className="w-9 h-9 rounded-full overflow-hidden bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
           {post.author_photo_url
-            ? <img src={post.author_photo_url} alt={post.author_username ?? 'Worker'} className="w-full h-full object-cover" />
+            ? <img src={post.author_photo_url} alt={post.author_username ?? 'Worker'} width={36} height={36} loading="lazy" decoding="async" className="w-full h-full object-cover" />
             : <span className="text-[12px] font-bold text-[#0A1628]">{initials}</span>}
         </button>
         <button type="button" onClick={goAuthor} className="min-w-0 text-left">
@@ -57,10 +57,12 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
         )}
       </div>
 
+      {/* A fixed square box reserves the space before the photo arrives, so
+          the feed never jumps; photos below the fold load lazily. */}
       {post.photo_url && (
-        <button type="button" onClick={() => onOpenComments(post.id)} className="block w-full" aria-label="Open post">
-          <img src={post.photo_url} alt={post.caption ?? 'Post'}
-            className="w-full max-h-[520px] object-cover bg-[#FAFAFA]" />
+        <button type="button" onClick={() => onOpenComments(post.id)} className="block w-full aspect-square max-h-[520px] bg-[#FAFAFA] overflow-hidden" aria-label="Open post">
+          <img src={post.photo_url} alt={post.caption ?? 'Post'} loading="lazy" decoding="async"
+            className="w-full h-full object-cover" />
         </button>
       )}
 

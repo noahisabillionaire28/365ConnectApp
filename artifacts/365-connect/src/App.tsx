@@ -23,6 +23,7 @@ function RouteFallback() {
 }
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { isApiStatus } from '@/lib/api';
 import { restoreQueryCache, startQueryCachePersistence } from '@/lib/queryPersist';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -111,7 +112,9 @@ const queryClient = new QueryClient({
       // Keep entries in memory for a day so navigating back is instant and the
       // on-device snapshot has something to persist even after long idle gaps.
       gcTime:               24 * 60 * 60_000,
-      retry:                2,
+      // A 404 is an answer ("no longer available"), not a blip: show it at
+      // once instead of spinning through two retries first.
+      retry:                (count, err) => !isApiStatus(err, 404) && count < 2,
       refetchOnWindowFocus: false,
     },
   },
@@ -147,13 +150,19 @@ function SuspendedGuard() {
 // ── Mobile router — full-width on phones, centred column on larger screens ─────────────────────────────────────
 function MobileRouter() {
   const [location] = useLocation();
+  const { role, roleLoading } = useRole();
 
   // Screens swap instantly, like a native tab bar — no fade-out to white and
   // back in. Each new screen starts at the top.
   useEffect(() => { window.scrollTo(0, 0); }, [location]);
 
   // Fetch every screen's code in the background once the first screen is up.
-  useEffect(() => { warmRoutes(); }, []);
+  // The Jobs screen carries the map library (the heaviest chunk); only
+  // workers browse it, so posters get it on tap instead (see BottomTabNav).
+  useEffect(() => {
+    if (roleLoading) return;
+    warmRoutes({ skip: role === 'worker' ? [] : ['JobsScreen'] });
+  }, [roleLoading, role]);
 
   // Chat and clock-in manage their own gestures; every other screen gets
   // pull-to-refresh for free.

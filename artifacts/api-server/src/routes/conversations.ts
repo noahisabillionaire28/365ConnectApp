@@ -4,7 +4,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { broadcastToUser } from '../lib/sseManager.js';
 import { getRoleInfo } from '../lib/roleCache.js';
 import {
-  memberFilter, participantsOf, conversationForUser, ensureShiftGroupChat, unreadCounts,
+  memberFilter, participantsOf, conversationForUser, ensureShiftGroupChat, unreadCounts, countableConversations,
   isBlockedEitherWay, blockedIdsFor, flushScheduledMessages, notifyConversationUpdate,
   type ConversationRow,
 } from '../lib/chat.js';
@@ -101,11 +101,8 @@ router.get('/', requireAuth, async (req, res) => {
 /** GET /api/conversations/unread-count — total unread across all threads (tab badge). */
 router.get('/unread-count', requireAuth, async (req, res) => {
   try {
-    const { data } = await adminDb.from('conversations').select('*').or(memberFilter(req.userId!));
     const me = req.userId!;
-    const convs = ((data ?? []) as ConversationRow[]).filter((c) =>
-      !(c.deleted_by ?? []).includes(me) && !(c.archived_by ?? []).includes(me) && !(c.muted_by ?? []).includes(me));
-    const unread = await unreadCounts(convs, me);
+    const unread = await unreadCounts(await countableConversations(me), me);
     let total = 0; for (const n of unread.values()) total += n;
     return res.json({ total, threads: unread.size });
   } catch (e) {

@@ -70,7 +70,6 @@ export function useAssignWorkers(shiftId: string | undefined) {
     void qc.invalidateQueries({ queryKey: ['shift', shiftId] });
     void qc.invalidateQueries({ queryKey: ['shifts'] });
     void qc.invalidateQueries({ queryKey: ['client-shifts'] });
-    void qc.invalidateQueries({ queryKey: ['accepted-workers', shiftId] });
     void qc.invalidateQueries({ queryKey: ['shift-applicants', shiftId] });
   }
 

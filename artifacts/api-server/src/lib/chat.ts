@@ -51,41 +51,43 @@ export function memberFilter(userId: string): string {
   return `participant_a_id.eq.${userId},participant_b_id.eq.${userId},participant_ids.cs.{${userId}}`;
 }
 
-/** Unread counts per conversation, from each member's read position. */
+/**
+ * Unread counts per conversation, from each member's read position. Counted
+ * in SQL (`unread_counts_for`, migration 0035) — one round-trip, no message
+ * rows over the wire — then narrowed to the threads the caller passed.
+ */
 export async function unreadCounts(convs: ConversationRow[], viewerId: string): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   if (!convs.length) return out;
-  const ids = convs.map((c) => c.id);
-  const { data: reads } = await adminDb
-    .from('conversation_reads').select('conversation_id, last_read_at').eq('user_id', viewerId).in('conversation_id', ids);
-  const readMap = new Map<string, string>((reads ?? []).map((r) => [r.conversation_id, r.last_read_at]));
-  // One query for all threads; count in JS (small volumes per user).
-  const { data: msgs } = await adminDb
-    .from('messages')
-    .select('conversation_id, created_at, kind')
-    .in('conversation_id', ids)
-    .neq('sender_id', viewerId)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .limit(2000);
-  for (const m of msgs ?? []) {
-    if (m.kind === 'system') continue;
-    const since = readMap.get(m.conversation_id);
-    if (!since || m.created_at > since) out.set(m.conversation_id, (out.get(m.conversation_id) ?? 0) + 1);
+  const wanted = new Set(convs.map((c) => c.id));
+  const { data, error } = await adminDb.rpc('unread_counts_for', { p_user: viewerId });
+  if (error) {
+    console.error('[chat] unread_counts_for failed:', error.message);
+    return out;
+  }
+  for (const r of (data ?? []) as Array<{ conversation_id: string; unread: number | string }>) {
+    if (wanted.has(r.conversation_id)) out.set(r.conversation_id, Number(r.unread) || 0);
   }
   return out;
 }
 
 /**
- * Total unread messages for a user across the threads they keep in their
+ * The conversations a user counts unread messages in: the threads in their
  * list (deleted, archived and muted threads do not count), exactly as the
- * Messages tab badge shows it.
+ * Messages tab badge shows it. Only the membership columns are read.
  */
-export async function unreadMessageTotal(userId: string): Promise<number> {
-  const { data } = await adminDb.from('conversations').select('*').or(memberFilter(userId));
-  const convs = ((data ?? []) as ConversationRow[]).filter((c) =>
+export async function countableConversations(userId: string): Promise<ConversationRow[]> {
+  const { data } = await adminDb
+    .from('conversations')
+    .select('id, deleted_by, archived_by, muted_by')
+    .or(memberFilter(userId));
+  return ((data ?? []) as ConversationRow[]).filter((c) =>
     !(c.deleted_by ?? []).includes(userId) && !(c.archived_by ?? []).includes(userId) && !(c.muted_by ?? []).includes(userId));
-  const unread = await unreadCounts(convs, userId);
+}
+
+/** Total unread messages for a user (the Messages tab badge). */
+export async function unreadMessageTotal(userId: string): Promise<number> {
+  const unread = await unreadCounts(await countableConversations(userId), userId);
   let total = 0; for (const n of unread.values()) total += n;
   return total;
 }

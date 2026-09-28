@@ -20,6 +20,7 @@ export type SendPayload = {
 };
 
 const PAGE = 30;
+const POLL_MS = 15_000;
 const OUTBOX_KEY = '365connect:chat-outbox';
 
 type OutboxItem = { conversationId: string; clientKey: string; body: Record<string, unknown> };
@@ -88,7 +89,9 @@ export function useMessages(conversationId: string | null | undefined) {
 
   useEffect(() => { void load(); }, [load]);
 
-  // Polling fallback (SSE can drop on serverless hosts): refresh the latest page while visible.
+  // Polling fallback (SSE can drop on serverless hosts): refresh the latest
+  // page every 15 s while the tab is visible. Live updates arrive over SSE;
+  // this only catches what a dropped stream missed.
   useEffect(() => {
     if (!conversationId || !user?.id) return;
     const tick = async () => {
@@ -98,8 +101,11 @@ export function useMessages(conversationId: string | null | undefined) {
         setMessages((prev) => mergeById(prev.filter((m) => !(m._status && rows.some((r) => r.client_key === m.client_key))), rows));
       } catch { /* ignore */ }
     };
-    const t = setInterval(() => { void tick(); }, 5000);
-    return () => clearInterval(t);
+    const t = setInterval(() => { void tick(); }, POLL_MS);
+    // Coming back to the tab: catch up right away instead of waiting a tick.
+    const onVisible = () => { if (document.visibilityState === 'visible') void tick(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVisible); };
   }, [conversationId, user?.id]);
 
   // ── Live updates ────────────────────────────────────────────────────────────

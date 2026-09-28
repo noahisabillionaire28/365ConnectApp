@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { profileQueryOptions } from './profileQuery';
 
 const DEFAULT_LAT = 25.7617;
 const DEFAULT_LNG = -80.1918;
@@ -17,16 +18,8 @@ export function useMyLocation() {
   const { user } = useAuth();
   const [browserCoords, setBrowserCoords] = useState<Coords | null>(null);
 
-  // Same key + fetch as useProfile → one request, served from cache.
-  const { data: row, isLoading } = useQuery<{ lat: number | null; lng: number | null } | null>({
-    queryKey: ['profile', user?.id ?? 'anon'],
-    enabled:  !!user?.id,
-    staleTime: 30_000,
-    queryFn: async () => {
-      try { return await apiClient(user?.id).get<{ lat: number | null; lng: number | null }>('/users/me'); }
-      catch { return null; }
-    },
-  });
+  // The shared profile entry (same query as useProfile / RoleContext).
+  const { data: row, isLoading } = useQuery(profileQueryOptions(user?.id));
 
   const saved: Coords | null = row?.lat && row?.lng ? { lat: row.lat, lng: row.lng } : null;
 

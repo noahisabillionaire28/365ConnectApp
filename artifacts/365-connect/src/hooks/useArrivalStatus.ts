@@ -41,7 +41,7 @@ export function useArrivalStatus() {
   const invalidate = useCallback(() => {
     void qc.invalidateQueries({ queryKey: [MY_APPLICATIONS_KEY] });
     void qc.invalidateQueries({ queryKey: ['application-status'] });
-    void qc.invalidateQueries({ queryKey: ['accepted-workers'] });
+    void qc.invalidateQueries({ queryKey: ['shift-applicants'] });
   }, [qc]);
 
   /** Optimistically stamp the status on the worker's cached application rows. */

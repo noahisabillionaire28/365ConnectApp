@@ -13,7 +13,7 @@
  *     so a shift page never triggers a second call until something changes.
  */
 import { createHash } from 'node:crypto';
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
 import { adminDb } from './supabaseAdmin.js';
 import { logger } from './logger.js';
 
@@ -177,7 +177,15 @@ export function ruleReason(s: Signals): string {
 
 const apiKey = process.env['ANTHROPIC_API_KEY'] ?? '';
 export function aiConfigured(): boolean { return !!apiKey; }
-const client = apiKey ? new Anthropic({ apiKey }) : null;
+
+// The SDK is loaded the first time a ranking actually asks the model, not at
+// cold start: health checks and every non-matching route import this module.
+let clientPromise: Promise<Anthropic | null> | null = null;
+function getClient(): Promise<Anthropic | null> {
+  if (!apiKey) return Promise.resolve(null);
+  clientPromise ??= import('@anthropic-ai/sdk').then((m) => new m.default({ apiKey }));
+  return clientPromise;
+}
 
 const SYSTEM = `You rank candidate workers for an event-staffing shift. You are given the shift and, for each candidate, verified facts from the platform's records. Score each candidate 0-100 for how well they fit THIS shift, and write ONE short sentence (max 18 words) a busy event manager would find useful — lead with the strongest fact, mention a concern if there is one, never invent facts.
 
@@ -186,6 +194,7 @@ Weigh, in order: reliability (no-shows, on-time rate), history with this poster 
 Respond with JSON only, no prose: {"candidates":[{"worker_id":"...","score":0-100,"reason":"..."}]}`;
 
 async function askClaude(shift: Shift, signals: Signals[]): Promise<Map<string, { score: number; reason: string }> | null> {
+  const client = await getClient();
   if (!client) return null;
   const payload = {
     shift: {

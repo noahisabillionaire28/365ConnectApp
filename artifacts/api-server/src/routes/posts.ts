@@ -31,22 +31,24 @@ async function enrichPosts(
   const ids = rows.map((r) => r.id as string);
   const authorIds = [...new Set(rows.map((r) => r.user_id as string))];
 
-  const { data: users } = await adminDb
-    .from('users').select('id, username, photo_url').in('id', authorIds);
+  // Authors, likes and comments are independent lookups: one round-trip.
+  // (Per-post counts stay a single row scan — PostgREST aggregates are not
+  // enabled on this project, and one query beats one count() per post.)
+  const [{ data: users }, { data: likes }, { data: comments }] = await Promise.all([
+    adminDb.from('users').select('id, username, photo_url').in('id', authorIds),
+    adminDb.from('post_likes').select('post_id, user_id').in('post_id', ids),
+    adminDb.from('post_comments').select('post_id').in('post_id', ids),
+  ]);
   const userMap = new Map((users ?? []).map((u) => [u.id, u]));
 
   const likeCount = new Map<string, number>();
   const commentCount = new Map<string, number>();
   const likedByMe = new Set<string>();
 
-  const { data: likes } = await adminDb
-    .from('post_likes').select('post_id, user_id').in('post_id', ids);
   for (const l of likes ?? []) {
     likeCount.set(l.post_id, (likeCount.get(l.post_id) ?? 0) + 1);
     if (viewerId && l.user_id === viewerId) likedByMe.add(l.post_id);
   }
-  const { data: comments } = await adminDb
-    .from('post_comments').select('post_id').in('post_id', ids);
   for (const c of comments ?? []) {
     commentCount.set(c.post_id, (commentCount.get(c.post_id) ?? 0) + 1);
   }
