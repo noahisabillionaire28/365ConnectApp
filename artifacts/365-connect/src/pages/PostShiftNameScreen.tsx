@@ -53,7 +53,9 @@ export function PostShiftNameScreen() {
   const [title, setTitle] = useState(getDraft().title);
   const [err, setErr] = useState('');
   const isEditing = !!getEditShiftId();
-  const canContinue = title.trim().length >= 3;
+  // 3–80 characters, the same bounds the server enforces: a prefilled title
+  // (template, edit) that is too long is caught here, not at the last step.
+  const canContinue = title.trim().length >= 3 && title.trim().length <= 80;
   const { showToast } = useToast();
   // Saved templates: a fresh post can start from one and skip to the date step.
   const { templates, use: useTemplate, using } = useTemplates(!isEditing && !roleLoading && role !== 'worker');
@@ -91,7 +93,7 @@ export function PostShiftNameScreen() {
               if (editId) { setEditShiftId(null); resetDraft(); navigate(`/shift/${editId}`); }
               else navigate('/home');
             }}
-            className="w-9 h-9 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
+            className="w-10 h-10 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
@@ -123,7 +125,7 @@ export function PostShiftNameScreen() {
               err ? 'border-[#EF4444]' : 'border-[#E5E7EB]'}`}
           />
           {err && <p className="text-[#EF4444] text-[11px] mt-1.5">{err}</p>}
-          <p className="text-[#9CA3AF] text-[11px] mt-1.5">{title.length}/80</p>
+          <p className="text-[#737373] text-[11px] mt-1.5">{title.length}/80</p>
         </div>
 
         <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider mt-6 mb-2 flex items-center gap-1.5">

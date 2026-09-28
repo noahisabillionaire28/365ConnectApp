@@ -162,7 +162,7 @@ function DisputeCard({ dispute }: { dispute: AdminDisputeRow }) {
               )}
             </p>
             {dispute.reported_user?.email && (
-              <p className="text-[#AAAAAA] text-[11px] truncate">{dispute.reported_user.email}</p>
+              <p className="text-[#6B7280] text-[11px] truncate">{dispute.reported_user.email}</p>
             )}
           </div>
         </div>
@@ -170,7 +170,7 @@ function DisputeCard({ dispute }: { dispute: AdminDisputeRow }) {
         <div className={`rounded-[8px] px-3.5 py-2.5 mb-3 ${
           isOpen ? 'bg-red-50 border border-red-200' : 'bg-[#FAFAFA] border border-[#DBDBDB]'
         }`}>
-          <p className={`text-[13px] leading-relaxed ${isOpen ? 'text-[#737373]' : 'text-[#AAAAAA]'}`}>
+          <p className={`text-[13px] leading-relaxed ${isOpen ? 'text-[#737373]' : 'text-[#6B7280]'}`}>
             {dispute.reason}
           </p>
         </div>
@@ -183,8 +183,8 @@ function DisputeCard({ dispute }: { dispute: AdminDisputeRow }) {
         )}
 
         <div className="flex items-center gap-1.5 mb-3">
-          <Clock size={11} aria-hidden className="text-[#AAAAAA]" />
-          <p className="text-[#AAAAAA] text-[11px]">{reportedAt}</p>
+          <Clock size={11} aria-hidden className="text-[#6B7280]" />
+          <p className="text-[#6B7280] text-[11px]">{reportedAt}</p>
         </div>
 
         {isOpen && (
@@ -309,7 +309,7 @@ export function AdminDisputes() {
         {!isLoading && !isError && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 gap-2">
             <CheckCircle2 size={32} aria-hidden className="text-[#DBDBDB]" />
-            <p className="text-[#AAAAAA] text-[14px]">
+            <p className="text-[#6B7280] text-[14px]">
               {filter === 'open' ? 'No open disputes — all clear.' : 'No cases in this category.'}
             </p>
           </div>

@@ -251,7 +251,7 @@ export function ShiftDetailScreen() {
           <span className="text-[#737373] text-[24px]">⚠</span>
         </div>
         <p className="text-[#737373] text-[15px] font-medium">Couldn't load this shift</p>
-        <p className="text-[#AAAAAA] text-[12px]">Check your connection and try again.</p>
+        <p className="text-[#6B7280] text-[12px]">Check your connection and try again.</p>
         <button type="button" onClick={() => window.location.reload()}
           className="mt-2 text-[#0095F6] font-semibold text-[14px]">Retry</button>
         <button type="button"
@@ -698,13 +698,13 @@ export function ShiftDetailScreen() {
 
           <button type="button" aria-label="Go back"
             onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/jobs'); }}
-            className="absolute top-5 left-4 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 flex items-center justify-center">
+            className="absolute top-5 left-4 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 flex items-center justify-center">
             <ChevronLeft size={20} aria-hidden className="text-white" />
           </button>
 
           <button type="button" aria-label={saved ? 'Remove from saved' : 'Save this shift'}
             aria-pressed={saved} onClick={() => { if (!saved) showToast('Shift saved to your list.'); toggleSaved(shiftId); }}
-            className="absolute top-5 right-4 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 flex items-center justify-center">
+            className="absolute top-5 right-4 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 flex items-center justify-center">
             <AnimatePresence mode="wait">
               <motion.span key={saved ? 'on' : 'off'}
                 initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
@@ -799,7 +799,7 @@ export function ShiftDetailScreen() {
                 </div>
                 <div className="flex items-center gap-1.5 mt-1">
                   <MapPin size={12} aria-hidden className="text-[#737373] flex-shrink-0" />
-                  <p className="text-[#737373] text-[13px] truncate">
+                  <p className="text-[#737373] text-[13px] leading-snug line-clamp-2 break-words">
                     {shift.location}{!myLocationIsDefault ? ` · ${distanceMilesLabel} mi away` : ''}
                   </p>
                 </div>
@@ -850,8 +850,8 @@ export function ShiftDetailScreen() {
             {isOwner && dressCodeDraft === null && (
               <button type="button" aria-label="Edit dress code"
                 onClick={() => setDressCodeDraft(shift.dressCode ?? '')}
-                className="w-7 h-7 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
-                <Pencil size={12} aria-hidden className="text-[#737373]" />
+                className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+                <Pencil size={13} aria-hidden className="text-[#737373]" />
               </button>
             )}
           </div>
@@ -925,7 +925,7 @@ export function ShiftDetailScreen() {
               </div>
               {shift.contactPhone && (
                 <a href={`tel:${shift.contactPhone}`} aria-label={`Call ${shift.pointOfContact}`}
-                  className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+                  className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
                   <Phone size={15} aria-hidden className="text-black" />
                 </a>
               )}
@@ -979,7 +979,7 @@ export function ShiftDetailScreen() {
                       <X size={18} className="text-[#737373]" />
                     </button>
                   </div>
-                  <p className="text-[#737373] text-[13px] mb-4 truncate">{shift.location}</p>
+                  <p className="text-[#737373] text-[13px] mb-4 break-words">{shift.location}</p>
                   {opts.map((o) => (
                     <a key={o.label} href={o.href} target="_blank" rel="noreferrer"
                       onClick={() => setDirectionsOpen(false)}
@@ -1226,7 +1226,7 @@ export function ShiftDetailScreen() {
                     <p className="text-black font-bold text-[14px]">Total Estimate</p>
                     <p className="text-black font-bold text-[18px]">{fmtUsd(total)}</p>
                   </div>
-                  <p className="text-[#AAAAAA] text-[11px] mt-3 leading-relaxed">
+                  <p className="text-[#6B7280] text-[11px] mt-3 leading-relaxed">
                     {hourly
                       ? 'Estimated total based on listed hours and all spots filled. Final cost depends on actual clock-out times.'
                       : 'Flat rate per worker with all spots filled. Final cost depends on who works the shift.'}
@@ -1465,7 +1465,7 @@ export function ShiftDetailScreen() {
           <div className="mb-2.5 rounded-[12px] border border-[#0A1628] bg-white px-3.5 py-3" role="status"
             aria-label="Shift swap offer">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center overflow-hidden flex-shrink-0" aria-hidden>
+              <div className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center overflow-hidden flex-shrink-0" aria-hidden>
                 {incomingSwap.from_photo_url
                   ? <img src={incomingSwap.from_photo_url} alt="" className="w-full h-full object-cover" />
                   : <span className="text-black font-bold text-[12px]">{(incomingSwap.from_username ?? 'W').slice(0, 2).toUpperCase()}</span>}
@@ -1582,7 +1582,7 @@ export function ShiftDetailScreen() {
             aria-label={canClockIn ? 'Clock in to your shift'
               : !clockOpen ? `Clock in opens at ${clockOpensLabel}` : 'Clock in unavailable — you must be within 1 mile'}
             className={`w-full h-[52px] rounded-[8px] font-bold text-[16px] tracking-wide flex items-center justify-center gap-2.5 ${
-              canClockIn ? 'bg-[#FFD700] text-black' : 'bg-[#F0F0F0] text-[#AAAAAA] cursor-not-allowed'
+              canClockIn ? 'bg-[#FFD700] text-black' : 'bg-[#F0F0F0] text-[#6B7280] cursor-not-allowed'
             }`}>
             <motion.div animate={canClockIn ? { scale: [1, 1.2, 1] } : {}} transition={{ repeat: Infinity, duration: 1.6 }}>
               <AlarmClock size={20} aria-hidden />

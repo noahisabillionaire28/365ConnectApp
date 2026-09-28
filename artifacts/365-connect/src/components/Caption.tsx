@@ -23,7 +23,7 @@ export function Caption({ text, author }: { text: string; author?: string | null
           return (
             <button key={i} type="button"
               onClick={(e) => { e.stopPropagation(); navigate(`/hashtag/${p.slice(1).toLowerCase()}`); }}
-              className="text-[#2563EB] font-medium">
+              className="relative text-[#2563EB] font-medium after:absolute after:-inset-y-2.5 after:-inset-x-1 after:content-['']">
               {p}
             </button>
           );
@@ -32,7 +32,7 @@ export function Caption({ text, author }: { text: string; author?: string | null
           return (
             <button key={i} type="button"
               onClick={(e) => { e.stopPropagation(); navigate(`/worker/${p.slice(1).toLowerCase()}`); }}
-              className="text-[#2563EB] font-medium">
+              className="relative text-[#2563EB] font-medium after:absolute after:-inset-y-2.5 after:-inset-x-1 after:content-['']">
               {p}
             </button>
           );

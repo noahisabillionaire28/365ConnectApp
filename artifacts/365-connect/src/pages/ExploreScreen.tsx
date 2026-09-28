@@ -113,12 +113,12 @@ export function ExploreScreen() {
         <div className="flex items-center gap-2 px-4 pt-4 pb-3">
           <div className="flex bg-[#F3F4F6] rounded-full p-[3px] flex-1" role="tablist" aria-label="Explore view">
             <button type="button" role="tab" aria-selected={tab === 'feed'} onClick={() => setTab('feed')}
-              className={`flex-1 h-[34px] rounded-full text-[13px] font-bold transition-all ${
+              className={`flex-1 h-10 rounded-full text-[13px] font-bold transition-all ${
                 tab === 'feed' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280]'}`}>
               Feed
             </button>
             <button type="button" role="tab" aria-selected={tab === 'people'} onClick={() => setTab('people')}
-              className={`flex-1 h-[34px] rounded-full text-[13px] font-bold transition-all ${
+              className={`flex-1 h-10 rounded-full text-[13px] font-bold transition-all ${
                 tab === 'people' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280]'}`}>
               People
             </button>
@@ -133,20 +133,20 @@ export function ExploreScreen() {
                 <Search size={15} aria-hidden className="text-[#737373] flex-shrink-0" />
                 <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search workers" aria-label="Search workers"
-                  className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] outline-none" />
+                  className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#9CA3AF] outline-none" />
               </div>
             </div>
             <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none" role="radiogroup" aria-label="Filter by job type"
               style={{ WebkitOverflowScrolling: 'touch' }}>
               <button type="button" role="radio" aria-checked={jobType === null} onClick={() => setJobType(null)}
-                className={`flex-shrink-0 h-[30px] px-3.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
+                className={`flex-shrink-0 h-10 px-3.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
                   jobType === null ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'}`}>
                 All
               </button>
               {JOB_TYPES.map((t) => (
                 <button key={t} type="button" role="radio" aria-checked={jobType === t}
                   onClick={() => setJobType(t)}
-                  className={`flex-shrink-0 h-[30px] px-3.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
+                  className={`flex-shrink-0 h-10 px-3.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
                     jobType === t ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'}`}>
                   {t}
                 </button>
@@ -190,7 +190,7 @@ export function ExploreScreen() {
                 {[1, 2].map((n) => (
                   <div key={n} className="border-b border-[#EFEFEF] pb-4">
                     <div className="flex items-center gap-2.5 px-4 py-3">
-                      <div className="w-9 h-9 rounded-full bg-[#EFEFEF] animate-pulse" />
+                      <div className="w-10 h-10 rounded-full bg-[#EFEFEF] animate-pulse" />
                       <div className="w-24 h-3 rounded bg-[#EFEFEF] animate-pulse" />
                     </div>
                     <div className="w-full h-[320px] bg-[#EFEFEF] animate-pulse" />

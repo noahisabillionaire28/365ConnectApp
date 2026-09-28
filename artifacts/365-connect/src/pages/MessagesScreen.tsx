@@ -82,7 +82,7 @@ function ConversationRow({ conv, onTap, onMore }: { conv: ConversationWithOther;
           </div>
         </div>
       </button>
-      <button type="button" aria-label="More options" onClick={onMore} className="w-8 h-8 flex items-center justify-center text-[#9CA3AF] flex-shrink-0">
+      <button type="button" aria-label="More options" onClick={onMore} className="w-10 h-10 flex items-center justify-center text-[#9CA3AF] flex-shrink-0">
         <MoreHorizontal size={18} />
       </button>
     </motion.div>
@@ -175,12 +175,12 @@ export function MessagesScreen() {
           <Search size={14} aria-hidden className="text-[#737373] flex-shrink-0" />
           <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Search messages…" aria-label="Search conversations"
-            className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] focus:outline-none" />
+            className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#9CA3AF] focus:outline-none" />
         </div>
         <div className="flex gap-2" role="tablist" aria-label="Filter conversations">
           {([['all', 'All'], ['groups', 'Shift chats'], ['archived', 'Archived']] as [Filter, string][]).map(([k, label]) => (
             <button key={k} type="button" role="tab" aria-selected={filter === k} onClick={() => setFilter(k)}
-              className={`h-8 px-3.5 rounded-full text-[12px] font-bold border ${filter === k ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'}`}>
+              className={`h-10 px-3.5 rounded-full text-[12px] font-bold border ${filter === k ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'}`}>
               {label}
             </button>
           ))}

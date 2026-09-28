@@ -104,7 +104,7 @@ export function AuthCallbackScreen() {
       ) : (
         <>
           <div
-            className="w-9 h-9 rounded-full border-[2.5px] border-t-transparent animate-spin"
+            className="w-10 h-10 rounded-full border-[2.5px] border-t-transparent animate-spin"
             style={{ borderColor: `${NAVY} transparent ${NAVY} ${NAVY}` }}
           />
           <p className="text-[13px] mt-5 font-medium" style={{ color: '#6B7280' }}>Signing you in…</p>

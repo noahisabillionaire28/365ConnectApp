@@ -34,7 +34,7 @@ export function StepHeader({
     <div className="px-5 pt-5 pb-4 border-b border-[#DBDBDB] bg-white">
       <div className="flex items-center gap-3 mb-4">
         <button type="button" aria-label="Go back" onClick={onBack}
-          className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} aria-hidden className="text-black" />
         </button>
         <div className="flex-1"><StepBar current={current} total={total} /></div>
@@ -62,7 +62,7 @@ export function CTABar({
           loading
             ? 'bg-black/40 text-white/60 cursor-not-allowed'
             : disabled
-            ? 'bg-[#EFEFEF] text-[#AAAAAA] cursor-not-allowed border border-[#DBDBDB]'
+            ? 'bg-[#F0F0F0] text-[#6B7280] cursor-not-allowed border border-[#DBDBDB]'
             : 'bg-black text-white'
         }`}>
         {loading
@@ -122,12 +122,12 @@ export function SectionRow({ icon, label, value, sub }: {
 /* ── Shared input / textarea CSS strings ──────────────────────────────────── */
 export const INPUT_CLS =
   'w-full bg-white border border-[#DBDBDB] rounded-[8px] px-3 h-[44px] ' +
-  'text-black text-[14px] font-medium placeholder:text-[#AAAAAA] ' +
+  'text-black text-[14px] font-medium placeholder:text-[#9CA3AF] ' +
   'focus:outline-none focus:border-black transition-colors';
 
 export const TEXTAREA_CLS =
   'w-full bg-white border border-[#DBDBDB] rounded-[8px] px-3 py-3 ' +
-  'text-black text-[14px] font-medium placeholder:text-[#AAAAAA] ' +
+  'text-black text-[14px] font-medium placeholder:text-[#9CA3AF] ' +
   'focus:outline-none focus:border-black transition-colors resize-none leading-relaxed';
 
 /* ── Job-type tile (multi-select) ─────────────────────────────────────────── */

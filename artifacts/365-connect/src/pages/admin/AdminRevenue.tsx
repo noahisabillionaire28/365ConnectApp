@@ -38,7 +38,7 @@ function StatusChip({ status }: { status: string }) {
 function SkeletonRow() {
   return (
     <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#DBDBDB] animate-pulse">
-      <div className="w-9 h-9 rounded-full bg-[#E5E7EB] flex-shrink-0" />
+      <div className="w-10 h-10 rounded-full bg-[#E5E7EB] flex-shrink-0" />
       <div className="flex-1 flex flex-col gap-1.5">
         <div className="h-3 w-28 bg-[#E5E7EB] rounded-full" />
         <div className="h-2.5 w-20 bg-[#E5E7EB] rounded-full" />
@@ -65,7 +65,7 @@ function PaymentRow({ payment }: { payment: AdminPaymentRow }) {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
       className="flex items-center gap-3 px-4 py-3.5 border-b border-[#DBDBDB] last:border-none"
     >
-      <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
         isSubscription ? 'bg-[#FFD700]/15 border border-[#FFD700]/30' : 'bg-emerald-50 border border-emerald-200'
       }`}>
         {isSubscription
@@ -170,7 +170,7 @@ export function AdminRevenue() {
         {FILTERS.map(({ key, label }) => (
           <button key={key} type="button" aria-pressed={filter === key}
             onClick={() => setFilter(key)}
-            className={`flex-shrink-0 h-[32px] px-3.5 rounded-full text-[12px] font-semibold border transition-all ${
+            className={`flex-shrink-0 h-10 px-3.5 rounded-full text-[12px] font-semibold border transition-all ${
               filter === key ? 'bg-black text-white border-black' : 'bg-white border-[#DBDBDB] text-[#737373]'
             }`}>
             {label}
@@ -203,7 +203,7 @@ export function AdminRevenue() {
         {!isLoading && !isError && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 gap-2">
             <DollarSign size={32} aria-hidden className="text-[#DBDBDB]" />
-            <p className="text-[#AAAAAA] text-[14px]">No payments recorded yet.</p>
+            <p className="text-[#6B7280] text-[14px]">No payments recorded yet.</p>
           </div>
         )}
         <div className="h-10" />

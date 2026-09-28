@@ -8,7 +8,7 @@ export function ProfileSkeleton() {
       {/* Hero / avatar area */}
       <div className="w-full aspect-square bg-[#EFEFEF] animate-pulse relative">
         {/* Back button placeholder */}
-        <div className="absolute top-12 left-4 w-9 h-9 rounded-full bg-[#DBDBDB] animate-pulse" />
+        <div className="absolute top-12 left-4 w-10 h-10 rounded-full bg-[#DBDBDB] animate-pulse" />
       </div>
 
       {/* Profile info */}

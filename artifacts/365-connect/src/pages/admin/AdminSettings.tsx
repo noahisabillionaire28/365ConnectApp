@@ -84,7 +84,7 @@ export function AdminSettings() {
             <input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)}
               placeholder="Send to… (blank = your account email)"
               aria-label="Test recipient email"
-              className="flex-1 h-[38px] rounded-[8px] border border-[#DBDBDB] bg-[#FAFAFA] px-3 text-[13px] text-black placeholder:text-[#AAAAAA] outline-none focus:border-black" />
+              className="flex-1 h-[38px] rounded-[8px] border border-[#DBDBDB] bg-[#FAFAFA] px-3 text-[13px] text-black placeholder:text-[#9CA3AF] outline-none focus:border-black" />
             <button type="button" onClick={() => void handleTestEmail()} disabled={emailBusy}
               className="px-3.5 h-[38px] rounded-[8px] bg-[#0A1628] text-white text-[13px] font-bold disabled:opacity-60 flex-shrink-0">
               {emailBusy ? 'Sending…' : 'Send test'}
@@ -98,7 +98,7 @@ export function AdminSettings() {
         )}
       </div>
 
-      <p className="text-center text-[#AAAAAA] text-[12px] px-8 leading-relaxed">
+      <p className="text-center text-[#6B7280] text-[12px] px-8 leading-relaxed">
         Additional settings (rate limits, feature flags) will be available in a future release.
       </p>
     </div>

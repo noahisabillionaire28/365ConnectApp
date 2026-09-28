@@ -194,12 +194,12 @@ function StepHeader({ step, total, onBack }: { step: number; total: number; onBa
       <div className="flex items-center px-5 pt-12 pb-4">
         {step > 1 ? (
           <button onClick={onBack}
-            className="w-9 h-9 flex items-center justify-center rounded-full mr-3 active:scale-95 transition-transform"
+            className="w-10 h-10 flex items-center justify-center rounded-full mr-3 active:scale-95 transition-transform"
             style={{ border: `1px solid ${BORDER}` }}>
             <ChevronLeft size={20} style={{ color: TEXT }} />
           </button>
         ) : (
-          <div className="w-9 h-9 mr-3" />
+          <div className="w-10 h-10 mr-3" />
         )}
         <span className="text-[13px] font-medium" style={{ color: MUTED }}>Step {step} of {total}</span>
       </div>
@@ -385,7 +385,7 @@ export function ClientSetupScreen() {
     return (
       <div className="min-h-[100dvh] bg-white flex flex-col">
         <div className="flex items-center px-5 pt-12 pb-4 gap-3">
-          <div className="w-9 h-9 rounded-full" style={{ background: BORDER }} />
+          <div className="w-10 h-10 rounded-full" style={{ background: BORDER }} />
           <div className="h-3 w-24 rounded-full" style={{ background: BORDER }} />
         </div>
         <div className="mx-5 h-[3px] rounded-full" style={{ background: BORDER }} />

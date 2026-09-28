@@ -46,18 +46,18 @@ function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => voi
       <div className="flex items-center gap-2">
         {onPost && (
           <button type="button" aria-label="Post a shift" onClick={onPost}
-            className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+            className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
             <PlusCircle size={16} aria-hidden className="text-black" />
           </button>
         )}
         <button type="button" aria-label="Search" onClick={() => navigate('/explore')}
-          className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
           <Search size={16} aria-hidden className="text-[#737373]" />
         </button>
         <button type="button"
           aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
           onClick={() => navigate('/notifications')}
-          className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center relative">
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center relative">
           <Bell size={16} aria-hidden className="text-[#737373]" />
           {unreadCount > 0 && (
             <span aria-hidden className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#0095F6] border-[1.5px] border-white" />
@@ -85,7 +85,7 @@ function SegmentControl({
           aria-selected={value === tab.value}
           type="button"
           onClick={() => onChange(tab.value)}
-          className={`flex-1 h-[34px] rounded-[8px] text-[13px] font-semibold transition-all duration-150 ${
+          className={`flex-1 h-10 rounded-[8px] text-[13px] font-semibold transition-all duration-150 ${
             value === tab.value
               ? 'bg-white text-[#111827] shadow-sm'
               : 'text-[#6B7280]'
@@ -183,7 +183,7 @@ function MyShiftRow({ app, onTap, onCalendar }: {
         <Briefcase size={16} aria-hidden className="text-[#6B7280]" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[#111827] font-semibold text-[14px] truncate">{app.shiftTitle}</p>
+        <p className="text-[#111827] font-semibold text-[14px] leading-snug line-clamp-2 break-words">{app.shiftTitle}</p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           {app.companyName && (
             <span className="text-[#6B7280] text-[12px] truncate">{app.companyName}</span>
@@ -329,7 +329,7 @@ function WorkerMyShiftsView() {
 /* ─── Worker: Available shifts (open shifts near you) ────────────────────────── */
 function WorkerAvailableView() {
   const [, navigate] = useLocation();
-  const { shifts, isLoading, error } = useWorkerHomeShifts();
+  const { shifts, isLoading, error, hasLocation } = useWorkerHomeShifts();
   const { appliedShiftIds } = useApplications();
 
   return (
@@ -355,7 +355,9 @@ function WorkerAvailableView() {
             ))}
             {shifts.length === 0 && (
               <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-                <p className="text-[#737373] text-[14px]">No shifts match your job types within 25 miles right now.</p>
+                <p className="text-[#737373] text-[14px]">
+                  {hasLocation ? 'No shifts match your job types within 25 miles right now.' : 'No shifts match your job types right now.'}
+                </p>
                 <div className="flex gap-2 justify-center mt-4">
                   <button type="button" onClick={() => navigate('/jobs')}
                     className="h-[38px] px-4 rounded-[10px] bg-[#0A1628] text-white text-[13px] font-semibold">
@@ -595,23 +597,23 @@ function WorkerDiscoveryBody() {
         style={{ WebkitOverflowScrolling: 'touch' }}>
         <select aria-label="Filter by job type" value={jobType ?? ''}
           onChange={(e) => setJobType(e.target.value || null)}
-          className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
           <option value="">All job types</option>
           {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
         <select aria-label="Filter by rating" value={rating}
           onChange={(e) => setRating(e.target.value as typeof rating)}
-          className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
           {RATING_FILTERS.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
         <select aria-label="Filter by distance" value={distance}
           onChange={(e) => setDistance(e.target.value as typeof distance)}
-          className="h-[32px] px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
           {DISTANCE_FILTERS.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
         <button type="button" role="switch" aria-checked={availableOnly}
           onClick={() => setAvailableOnly((v) => !v)}
-          className={`h-[32px] px-3 rounded-full text-[12px] font-semibold border flex items-center gap-1.5 flex-shrink-0 ${
+          className={`h-10 px-3 rounded-full text-[12px] font-semibold border flex items-center gap-1.5 flex-shrink-0 ${
             availableOnly ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'
           }`}>
           <SlidersHorizontal size={12} aria-hidden />

@@ -161,7 +161,7 @@ export function AdminDashboard() {
             <Link key={path} href={path}
               className="flex items-center gap-4 px-4 py-4 border-b border-[#DBDBDB] last:border-none transition-colors hover:bg-[#FAFAFA]"
             >
-              <div className="w-9 h-9 rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
                 <Icon size={16} aria-hidden className="text-black" />
               </div>
               <div className="flex-1 min-w-0">

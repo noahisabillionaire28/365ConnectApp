@@ -63,7 +63,7 @@ export function PostShiftEventTypeScreen() {
           <button
             type="button" aria-label="Back to shift name"
             onClick={() => navigate('/post-shift/name?keep=1')}
-            className="w-9 h-9 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
+            className="w-10 h-10 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0"
           >
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>

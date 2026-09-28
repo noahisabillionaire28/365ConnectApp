@@ -65,7 +65,7 @@ export function WeekEarningsCard() {
     <button type="button" onClick={() => navigate('/earnings')}
       aria-label={`This week: ${usd(total)} across ${shifts} shift${shifts === 1 ? '' : 's'}. ${breakdown}. Open earnings`}
       className="mx-4 mb-3 w-[calc(100%-32px)] rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3 flex items-center gap-3 text-left active:bg-[#FAFAFA]">
-      <div className="w-9 h-9 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center flex-shrink-0">
+      <div className="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center flex-shrink-0">
         <Wallet size={16} aria-hidden className="text-emerald-600" />
       </div>
       <div className="flex-1 min-w-0">

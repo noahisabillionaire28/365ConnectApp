@@ -66,13 +66,13 @@ function StepHeader({
         {step > 1 ? (
           <button
             onClick={onBack}
-            className="w-9 h-9 flex items-center justify-center rounded-full mr-3 transition-colors active:scale-95"
+            className="w-10 h-10 flex items-center justify-center rounded-full mr-3 transition-colors active:scale-95"
             style={{ border: `1px solid ${BORDER}` }}
           >
             <ChevronLeft size={20} style={{ color: TEXT }} />
           </button>
         ) : (
-          <div className="w-9 h-9 mr-3" />
+          <div className="w-10 h-10 mr-3" />
         )}
         <span className="text-[13px] font-medium" style={{ color: MUTED }}>
           Step {step} of {TOTAL_STEPS}
@@ -392,7 +392,7 @@ export function WorkerSetupScreen() {
     return (
       <div className="min-h-[100dvh] bg-white flex flex-col">
         <div className="flex items-center px-5 pt-12 pb-4">
-          <div className="w-9 h-9 rounded-full mr-3" style={{ background: BORDER }} />
+          <div className="w-10 h-10 rounded-full mr-3" style={{ background: BORDER }} />
           <div className="h-3 w-24 rounded-full" style={{ background: BORDER }} />
         </div>
         <div className="mx-5 h-[3px] rounded-full" style={{ background: BORDER }} />

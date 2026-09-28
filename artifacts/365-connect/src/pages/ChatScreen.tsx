@@ -341,7 +341,7 @@ function Bubble({ msg, isMine, isGroup, senderName, senderPhoto, receipt, myId, 
             <a href={msg.file_url} target="_blank" rel="noreferrer" download={msg.file_name ?? undefined}
               onClick={(e) => e.stopPropagation()}
               className={`mt-1 flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 border ${isMine ? 'border-white/25 bg-white/10' : 'border-[#E5E7EB] bg-white'}`}>
-              <div className={`w-9 h-9 rounded-[8px] flex items-center justify-center flex-shrink-0 ${isMine ? 'bg-white/20' : 'bg-[#F3F4F6]'}`}>
+              <div className={`w-10 h-10 rounded-[8px] flex items-center justify-center flex-shrink-0 ${isMine ? 'bg-white/20' : 'bg-[#F3F4F6]'}`}>
                 <FileText size={17} className={isMine ? 'text-white' : 'text-[#0A1628]'} />
               </div>
               <div className="min-w-0 flex-1">
@@ -361,7 +361,7 @@ function Bubble({ msg, isMine, isGroup, senderName, senderPhoto, receipt, myId, 
               return (
                 <button key={emoji} type="button" onClick={() => onReact(emoji)}
                   aria-label={`${emoji} ${ids.length}`}
-                  className={`h-6 px-2 rounded-full border text-[12px] flex items-center gap-1 bg-white ${mineToo ? 'border-[#0A1628]' : 'border-[#E5E7EB]'}`}>
+                  className={`relative h-6 px-2 rounded-full border text-[12px] flex items-center gap-1 bg-white after:absolute after:-inset-2 after:content-[''] ${mineToo ? 'border-[#0A1628]' : 'border-[#E5E7EB]'}`}>
                   <span>{emoji}</span>{ids.length > 1 && <span className="text-[11px] font-bold text-[#111827]">{ids.length}</span>}
                 </button>
               );
@@ -370,7 +370,7 @@ function Bubble({ msg, isMine, isGroup, senderName, senderPhoto, receipt, myId, 
         )}
 
         <div className="flex items-center gap-1 mt-1 px-1">
-          <span className="text-[10.5px] text-[#AAAAAA] font-medium">{timeLabel(msg.created_at)}</span>
+          <span className="text-[10.5px] text-[#6B7280] font-medium">{timeLabel(msg.created_at)}</span>
         </div>
         {isMine && msg._status === 'sending' && <p className="text-[11px] text-[#9CA3AF] font-semibold px-1">Sending…</p>}
         {isMine && failed && (
@@ -382,7 +382,7 @@ function Bubble({ msg, isMine, isGroup, senderName, senderPhoto, receipt, myId, 
         )}
         {isMine && !msg._status && receipt && (
           <button type="button" onClick={() => receipt.kind === 'group' && setShowReaders((v) => !v)}
-            className="text-[11px] font-semibold mt-0.5 px-1 text-[#6B7280] text-right" aria-live="polite">
+            className="relative text-[11px] font-semibold mt-0.5 px-1 text-[#6B7280] text-right after:absolute after:-inset-x-1 after:-inset-y-3 after:content-['']" aria-live="polite">
             {receipt.kind === 'read' ? `Read ${receiptTime(receipt.at)}`
               : receipt.kind === 'delivered' ? 'Delivered'
               : receipt.readBy.length === 0 ? 'Delivered'
@@ -465,7 +465,7 @@ function ForwardSheet({ excludeId, onPick, onClose }: { excludeId: string; onPic
         <button key={c.id} type="button" onClick={() => onPick(c.id)}
           className="w-full flex items-center gap-3 py-2.5 border-b border-[#F3F4F6] text-left">
           {c.isGroup
-            ? <div className="w-9 h-9 rounded-full bg-[#0A1628] flex items-center justify-center"><Users size={16} className="text-white" /></div>
+            ? <div className="w-10 h-10 rounded-full bg-[#0A1628] flex items-center justify-center"><Users size={16} className="text-white" /></div>
             : <Avatar url={c.other?.photo_url} name={c.other?.username} size={36} />}
           <div className="min-w-0 flex-1">
             <p className="text-[#111827] font-semibold text-[14px] truncate">{c.displayName}</p>
@@ -490,7 +490,7 @@ function ShareShiftSheet({ onPick, onClose }: { onPick: (shiftId: string) => voi
       {upcoming.map((s) => (
         <button key={s.id} type="button" onClick={() => onPick(s.id)}
           className="w-full flex items-center gap-3 py-2.5 border-b border-[#F3F4F6] text-left">
-          <div className="w-9 h-9 rounded-[8px] bg-[#F3F4F6] flex items-center justify-center flex-shrink-0"><Briefcase size={16} className="text-[#0A1628]" /></div>
+          <div className="w-10 h-10 rounded-[8px] bg-[#F3F4F6] flex items-center justify-center flex-shrink-0"><Briefcase size={16} className="text-[#0A1628]" /></div>
           <div className="min-w-0 flex-1">
             <p className="text-[#111827] font-semibold text-[14px] truncate">{s.jobType} · {s.companyName}</p>
             <p className="text-[#9CA3AF] text-[11px] truncate">{s.date} · {s.startTime} · ${s.payRate}/{s.payPeriod} · {s.spotsAvailable} left</p>
@@ -1063,7 +1063,7 @@ export function ChatScreen() {
       {/* Header */}
       <div className="flex items-center gap-2 px-2 pt-[calc(env(safe-area-inset-top)+12px)] pb-2.5 border-b border-[#DBDBDB] bg-white flex-shrink-0">
         <button type="button" aria-label="Back to messages" onClick={() => navigate('/messages')}
-          className="w-9 h-9 flex items-center justify-center active:opacity-60 transition-opacity flex-shrink-0">
+          className="w-10 h-10 flex items-center justify-center active:opacity-60 transition-opacity flex-shrink-0">
           <ChevronLeft size={22} className="text-black" />
         </button>
         {searching ? (
@@ -1076,24 +1076,37 @@ export function ChatScreen() {
         ) : (
           <>
             <button type="button" onClick={() => conv && setInfo(true)} className="flex items-center gap-2.5 min-w-0 flex-1 text-left" aria-label="Conversation info">
+              {!conv ? (
+                // Who this thread is with is still loading: a pulse, not a "?"
+                <>
+                  <div className="w-9 h-9 rounded-full bg-[#F3F4F6] animate-pulse flex-shrink-0" aria-hidden />
+                  <div className="min-w-0 flex flex-col gap-1.5" aria-busy="true" aria-label="Loading conversation">
+                    <div className="h-3.5 w-32 rounded bg-[#F3F4F6] animate-pulse" />
+                    <div className="h-2.5 w-20 rounded bg-[#F3F4F6] animate-pulse" />
+                  </div>
+                </>
+              ) : (
+              <>
               {isGroup
-                ? <div className="w-9 h-9 rounded-full bg-[#0A1628] flex items-center justify-center flex-shrink-0"><Users size={16} className="text-white" /></div>
-                : <Avatar url={conv?.other?.photo_url} name={conv?.other?.username} size={36} />}
+                ? <div className="w-10 h-10 rounded-full bg-[#0A1628] flex items-center justify-center flex-shrink-0"><Users size={16} className="text-white" /></div>
+                : <Avatar url={conv.other?.photo_url} name={conv.other?.username} size={36} />}
               <div className="min-w-0">
                 <p className="text-black font-bold text-[15px] truncate flex items-center gap-1.5">
-                  {conv?.displayName ?? 'Conversation'}
-                  {conv?.is_muted && <BellOff size={12} className="text-[#9CA3AF]" aria-label="Muted" />}
-                  {conv?.is_pinned && <Pin size={12} className="text-[#9CA3AF]" aria-label="Pinned" />}
+                  {conv.displayName ?? 'Conversation'}
+                  {conv.is_muted && <BellOff size={12} className="text-[#9CA3AF]" aria-label="Muted" />}
+                  {conv.is_pinned && <Pin size={12} className="text-[#9CA3AF]" aria-label="Pinned" />}
                 </p>
                 <p className="text-[#737373] text-[11px] font-medium truncate">
-                  {typingLabel ?? (isGroup ? `${conv?.members.length ?? 0} members · Shift chat` : conv?.shiftTitle ? `📌 ${conv.shiftTitle}` : blocked ? 'Blocked' : 'Tap for info')}
+                  {typingLabel ?? (isGroup ? `${conv.members.length ?? 0} members · Shift chat` : conv.shiftTitle ? `📌 ${conv.shiftTitle}` : blocked ? 'Blocked' : 'Tap for info')}
                 </p>
               </div>
+              </>
+              )}
             </button>
             <button type="button" aria-label="Search in conversation" onClick={() => setSearching(true)}
-              className="w-9 h-9 flex items-center justify-center text-[#0A1628]"><Search size={19} /></button>
+              className="w-10 h-10 flex items-center justify-center text-[#0A1628]"><Search size={19} /></button>
             <button type="button" aria-label="Conversation info" onClick={() => conv && setInfo(true)}
-              className="w-9 h-9 flex items-center justify-center text-[#0A1628]"><Info size={19} /></button>
+              className="w-10 h-10 flex items-center justify-center text-[#0A1628]"><Info size={19} /></button>
           </>
         )}
       </div>
@@ -1127,7 +1140,7 @@ export function ChatScreen() {
             </div>
           ) : (
             <>
-              {hasMore && <p className="text-center text-[#AAAAAA] text-[11px] py-2">Scroll up for earlier messages</p>}
+              {hasMore && <p className="text-center text-[#6B7280] text-[11px] py-2">Scroll up for earlier messages</p>}
               {messages.map((m, i) => {
                 const isMine = m.sender_id === user?.id;
                 const prev = messages[i - 1];
@@ -1251,7 +1264,7 @@ export function ChatScreen() {
                   <input ref={docInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,application/pdf" className="hidden" onChange={(e) => void handleFileChange('file', e)} />
                   <button type="button" aria-label="Attach" aria-expanded={showAttach} disabled={composerDisabled}
                     onClick={() => { setShowAttach((v) => !v); setShowEmoji(false); }}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-transform disabled:opacity-40 ${showAttach ? 'rotate-45 bg-[#F3F4F6]' : ''}`}>
+                    className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-transform disabled:opacity-40 ${showAttach ? 'rotate-45 bg-[#F3F4F6]' : ''}`}>
                     <Plus size={20} className="text-[#0A1628]" />
                   </button>
                   <div className="flex-1 flex items-end bg-[#F3F4F6] border border-[#DBDBDB] rounded-[20px] px-3 min-h-[38px]">
@@ -1260,19 +1273,19 @@ export function ChatScreen() {
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleSendText(); } }}
                       onBlur={stopTyping}
                       placeholder={editing ? 'Edit message…' : isGroup ? 'Message the shift chat…' : 'Message…'} aria-label="Message text" disabled={composerDisabled}
-                      className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] focus:outline-none py-2 resize-none max-h-[120px] leading-[1.4]" />
+                      className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#9CA3AF] focus:outline-none py-2 resize-none max-h-[120px] leading-[1.4]" />
                     <button type="button" aria-label="Emoji" onClick={() => { setShowEmoji((v) => !v); setShowAttach(false); }}
                       className="w-8 h-9 flex items-center justify-center text-[#6B7280] flex-shrink-0"><Smile size={18} /></button>
                   </div>
                   {text.trim() ? (
                     <button type="button" aria-label={editing ? 'Save edit' : 'Send message'} disabled={composerDisabled} onClick={() => void handleSendText()}
-                      className="w-9 h-9 rounded-full bg-[#0A1628] flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform disabled:opacity-50">
+                      className="w-10 h-10 rounded-full bg-[#0A1628] flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform disabled:opacity-50">
                       {editing ? <Check size={16} className="text-white" /> : <Send size={15} className="text-white" />}
                     </button>
                   ) : (
                     <button type="button" aria-label="Hold to record voice message" disabled={composerDisabled}
                       onPointerDown={() => void startRecording()} onPointerUp={stopRecording} onPointerLeave={() => { if (isRecording) stopRecording(); }}
-                      className="w-9 h-9 rounded-full bg-[#0A1628] flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform disabled:opacity-40">
+                      className="w-10 h-10 rounded-full bg-[#0A1628] flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform disabled:opacity-40">
                       <Mic size={15} className="text-white" />
                     </button>
                   )}

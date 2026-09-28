@@ -78,11 +78,11 @@ function AssignCard({ worker, shiftFull, shiftStarted, shiftJobTypes, isAssignin
 
       <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
         {alreadyAssigned ? (
-          <span className="h-[34px] px-3.5 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 bg-[#10B981]/10 text-[#10B981]">
+          <span className="h-10 px-3.5 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 bg-[#10B981]/10 text-[#10B981]">
             <CheckCircle2 size={14} /> Assigned
           </span>
         ) : onStandby ? (
-          <span className="h-[34px] px-3.5 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200">
+          <span className="h-10 px-3.5 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200">
             On standby
           </span>
         ) : (
@@ -90,7 +90,7 @@ function AssignCard({ worker, shiftFull, shiftStarted, shiftJobTypes, isAssignin
             <button type="button" disabled={disabled} aria-disabled={disabled}
               onClick={() => onAssign(worker.id)}
               aria-label={`Assign ${worker.username ? `@${worker.username}` : 'worker'} — books them immediately`}
-              className="h-[34px] px-3.5 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 text-white disabled:opacity-50"
+              className="h-10 px-3.5 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 text-white disabled:opacity-50"
               style={{ background: '#0A1628' }}>
               {isAssigning ? 'Assigning…' : (<><UserPlus size={14} /> Assign</>)}
             </button>
@@ -101,7 +101,7 @@ function AssignCard({ worker, shiftFull, shiftStarted, shiftJobTypes, isAssignin
             ) : (
               <button type="button" disabled={busy || shiftFull || shiftStarted} onClick={() => onOffer(worker.id)}
                 aria-label={`Send ${worker.username ? `@${worker.username}` : 'worker'} an offer they can accept or decline`}
-                className="h-[30px] px-3 rounded-[8px] text-[11px] font-bold flex items-center gap-1 border border-[#E5E7EB] text-[#0A1628] disabled:opacity-50">
+                className="h-10 px-3 rounded-[8px] text-[11px] font-bold flex items-center gap-1 border border-[#E5E7EB] text-[#0A1628] disabled:opacity-50">
                 <Send size={12} aria-hidden /> {isOffering ? 'Sending…' : offerDeclined ? 'Offer again' : 'Send offer'}
               </button>
             )}
@@ -166,7 +166,7 @@ export function AssignWorkersScreen() {
       <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-4 border-b border-[#E5E7EB] flex items-center gap-3 flex-shrink-0">
         <button type="button" aria-label="Go back"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate(`/shift/${id}`); }}
-          className="w-9 h-9 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
+          className="w-10 h-10 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} aria-hidden className="text-[#0A1628]" />
         </button>
         <div className="min-w-0">

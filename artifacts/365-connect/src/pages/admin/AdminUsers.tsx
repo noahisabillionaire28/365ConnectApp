@@ -333,7 +333,7 @@ function UserListRow({ user, onOpen }: { user: AdminUserRow; onOpen: (u: AdminUs
             </span>
           )}
         </div>
-        <p className="text-[#AAAAAA] text-[11px] mt-0.5">
+        <p className="text-[#6B7280] text-[11px] mt-0.5">
           Joined {new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         </p>
       </div>
@@ -388,7 +388,7 @@ export function AdminUsers() {
           <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by username or email…"
             aria-label="Search users"
-            className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#AAAAAA] focus:outline-none" />
+            className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#9CA3AF] focus:outline-none" />
           {search && (
             <button type="button" aria-label="Clear search" onClick={() => setSearch('')}>
               <X size={13} aria-hidden className="text-[#737373]" />
@@ -432,7 +432,7 @@ export function AdminUsers() {
 
         {!isLoading && !isError && filtered.length === 0 && (
           <div className="flex items-center justify-center py-20">
-            <p className="text-[#AAAAAA] text-[14px]">No users match this filter.</p>
+            <p className="text-[#6B7280] text-[14px]">No users match this filter.</p>
           </div>
         )}
         <div className="h-10" />

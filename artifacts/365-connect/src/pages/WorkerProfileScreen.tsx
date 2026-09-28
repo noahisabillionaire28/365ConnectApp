@@ -162,7 +162,7 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
                 Keep it under {NOTE_MAX} characters.
               </p>
             ) : <span />}
-            <p className={`text-[11px] font-medium ${noteTooLong ? 'text-[#EF4444]' : 'text-[#AAAAAA]'}`}>
+            <p className={`text-[11px] font-medium ${noteTooLong ? 'text-[#EF4444]' : 'text-[#6B7280]'}`}>
               {note.length}/{NOTE_MAX}
             </p>
           </div>
@@ -303,7 +303,7 @@ function ReportSheet({
         <div className="flex flex-wrap gap-2 mb-4">
           {REPORT_TYPES.map((t) => (
             <button key={t.key} type="button" onClick={() => setType(t.key)}
-              className={`px-3 h-[34px] rounded-full text-[13px] font-semibold border ${
+              className={`px-3 h-10 rounded-full text-[13px] font-semibold border ${
                 type === t.key ? 'bg-black text-white border-black' : 'bg-white text-[#737373] border-[#DBDBDB]'
               }`}>
               {t.label}
@@ -418,7 +418,7 @@ export function WorkerProfileScreen() {
     return (
       <div className="flex flex-col h-full bg-white text-black items-center justify-center px-6">
         <button type="button" aria-label="Go back" onClick={goBack}
-          className="absolute top-12 left-4 w-9 h-9 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+          className="absolute top-12 left-4 w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
           <ChevronLeft size={20} className="text-black" />
         </button>
         <p className="text-[18px] font-bold mb-2">User not found</p>
@@ -441,13 +441,13 @@ export function WorkerProfileScreen() {
       {/* Hero / Profile photo */}
       <div className="relative">
         <button type="button" aria-label="Go back" onClick={goBack}
-          className="absolute top-12 left-4 z-10 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform">
+          className="absolute top-12 left-4 z-10 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform">
           <ChevronLeft size={20} className="text-white" />
         </button>
 
         {authUser && authUser.id !== profile.id && (
           <button type="button" aria-label={`Report @${profile.username}`} onClick={() => setShowReport(true)}
-            className="absolute top-12 right-4 z-10 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform">
+            className="absolute top-12 right-4 z-10 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform">
             <Flag size={17} className="text-white" />
           </button>
         )}
@@ -468,8 +468,8 @@ export function WorkerProfileScreen() {
       <div className="px-5 pt-2 pb-6">
 
         {/* Handle + verified */}
-        <div className="flex items-center gap-2 mb-[2px]">
-          <h1 className="text-[22px] font-bold text-black">@{profile.username}</h1>
+        <div className="flex items-center gap-2 mb-[2px] min-w-0">
+          <h1 className="text-[22px] font-bold text-black min-w-0 break-words [overflow-wrap:anywhere]">@{profile.username}</h1>
           {isVerified && (
             <BadgeCheck size={20} className="text-[#0095F6] fill-[#0095F6] flex-shrink-0" />
           )}
@@ -492,7 +492,7 @@ export function WorkerProfileScreen() {
           className="mt-2" />
 
         {profile.bio && (
-          <p className="text-[14px] text-black leading-relaxed mt-3 mb-5">{profile.bio}</p>
+          <p className="text-[14px] text-black leading-relaxed mt-3 mb-5 break-words [overflow-wrap:anywhere]">{profile.bio}</p>
         )}
 
         {/* Job type tags */}
@@ -517,7 +517,7 @@ export function WorkerProfileScreen() {
                 return (
                   <span key={key}
                     className={`px-2.5 py-1 rounded-full text-[12px] font-semibold border ${
-                      on ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-[#FAFAFA] border-[#DBDBDB] text-[#C7C7C7]'
+                      on ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-[#FAFAFA] border-[#DBDBDB] text-[#9CA3AF]'
                     }`}>
                     {label}
                   </span>
@@ -645,7 +645,7 @@ export function WorkerProfileScreen() {
         ) : (
           <div className="text-center py-8">
             <p className="text-[#737373] text-[14px]">{isWorkerProfile ? 'No rated shifts yet.' : 'No reviews from workers yet.'}</p>
-            <p className="text-[#AAAAAA] text-[12px] mt-1">
+            <p className="text-[#6B7280] text-[12px] mt-1">
               {isWorkerProfile ? "Shifts appear here after they're reviewed." : 'Workers can rate them after a shift.'}
             </p>
           </div>
