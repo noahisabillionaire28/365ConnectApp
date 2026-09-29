@@ -68,8 +68,8 @@ const NotificationSettingsScreen = lazyNamed(() => import('@/pages/NotificationS
 const PostScreen = lazyNamed(() => import('@/pages/PostScreen'), 'PostScreen');
 const HashtagScreen = lazyNamed(() => import('@/pages/HashtagScreen'), 'HashtagScreen');
 const SavedWorkersScreen = lazyNamed(() => import('@/pages/SavedWorkersScreen'), 'SavedWorkersScreen');
-const AvailabilityScreen = lazyNamed(() => import('@/pages/AvailabilityScreen'), 'AvailabilityScreen');
 const ProfileScreen = lazyNamed(() => import('@/pages/ProfileScreen'), 'ProfileScreen');
+const EditProfileScreen = lazyNamed(() => import('@/pages/EditProfileScreen'), 'EditProfileScreen');
 
 // Detail screens
 const ShiftDetailScreen = lazyNamed(() => import('@/pages/ShiftDetailScreen'), 'ShiftDetailScreen');
@@ -204,6 +204,7 @@ function MobileRouter() {
             <Route path="/notifications" component={NotificationsScreen} />
             <Route path="/notification-settings" component={NotificationSettingsScreen} />
             <Route path="/profile"       component={ProfileScreen}       />
+            <Route path="/profile/edit"  component={EditProfileScreen}   />
 
             {/* ── Detail & misc ─────────────────────────────────── */}
             <Route path="/shift/:id"        component={ShiftDetailScreen}   />
@@ -215,7 +216,8 @@ function MobileRouter() {
             <Route path="/post/:id"      component={PostScreen}          />
             <Route path="/hashtag/:tag"  component={HashtagScreen}        />
             <Route path="/saved"         component={SavedWorkersScreen}   />
-            <Route path="/availability"  component={AvailabilityScreen}   />
+            {/* Legacy: availability is edited on the profile itself and in Edit Profile */}
+            <Route path="/availability">{() => <Redirect to="/profile/edit#availability" replace />}</Route>
             <Route path="/clock/:id"        component={ClockInScreen}        />
             <Route path="/review/:shiftId/:toUserId" component={ReviewScreen} />
             <Route path="/pro-upgrade"              component={ProUpgradeScreen} />

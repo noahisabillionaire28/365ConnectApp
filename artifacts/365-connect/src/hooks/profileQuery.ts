@@ -24,6 +24,7 @@ export type UserProfileRow = {
   is_pro:              boolean;
   is_available:        boolean;
   hourly_rate:         number | null;
+  company_name?:       string | null;
 };
 
 export const profileQueryKey = (userId: string | null | undefined) => ['profile', userId ?? 'anon'] as const;

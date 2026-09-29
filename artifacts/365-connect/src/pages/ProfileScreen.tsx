@@ -11,7 +11,8 @@ import { BottomTabNav } from '@/components/BottomTabNav';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import { useProfile } from '@/hooks/useProfile';
+import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
+import { AvailabilityEditor, normalizeAvailability } from '@/components/AvailabilityEditor';
 import { useMyApplications, type MyApplication } from '@/hooks/useMyApplications';
 import { useMyPostedShifts } from '@/hooks/useMyPostedShifts';
 import { usePayments } from '@/hooks/usePayments';
@@ -295,6 +296,46 @@ function RostersOnSection() {
   );
 }
 
+/* ── Availability card (worker) ──────────────────────────────────────────── */
+/**
+ * The worker's week and "available for work" switch, right on the profile.
+ * Every tap saves at once (optimistically, through the shared profile
+ * mutation) so changing availability never needs a Save button or another
+ * screen; a failed save flips the chip back and shows a toast.
+ */
+function AvailabilityCard() {
+  const [, navigate] = useLocation();
+  const profile = useProfile();
+  const update = useUpdateProfile();
+  const { showToast } = useToast();
+  const week = normalizeAvailability(profile.availability);
+
+  return (
+    <div className="px-4 mb-5">
+      <div className="bg-white border border-[#DBDBDB] rounded-[12px] px-4 py-4" data-testid="profile-availability">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em]">Availability</p>
+          <button type="button" onClick={() => navigate('/profile/edit#availability')}
+            className="min-h-10 -my-2 px-2 -mr-2 text-[#0A1628] text-[12px] font-bold">Edit</button>
+        </div>
+        <AvailabilityEditor
+          availability={week}
+          isAvailable={profile.isAvailable}
+          busy={update.isPending}
+          onChange={(next) => {
+            const patch = next.is_available !== profile.isAvailable
+              ? { is_available: next.is_available }
+              : { availability: next.availability };
+            update.mutate(patch, {
+              onError: () => showToast("Couldn't update your availability. Try again.", 'error'),
+            });
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 /* ── ProfileScreen ───────────────────────────────────────────────────────── */
 export function ProfileScreen() {
   const { signOut, user } = useAuth();
@@ -341,24 +382,8 @@ export function ProfileScreen() {
     .filter((p) => p.direction === 'out' && p.status === 'completed')
     .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
-  const [available, setAvailable]     = useState(true);
   const [comingSoonLabel, setComingSoon] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-
-  // Seed the toggle from the saved value once the profile loads.
-  useEffect(() => {
-    if (!profile.isLoading) setAvailable(profile.isAvailable);
-  }, [profile.isLoading, profile.isAvailable]);
-
-  async function toggleAvailable() {
-    const next = !available;
-    setAvailable(next); // optimistic
-    try {
-      await apiClient(user?.id).patch('/users/me', { is_available: next });
-    } catch {
-      setAvailable(!next); // revert on failure
-    }
-  }
 
   async function handleSignOut() {
     await signOut();
@@ -420,18 +445,19 @@ export function ProfileScreen() {
 
   const {
     displayName, username, photoUrl, bio,
-    jobTypes, certifications, rating, memberSince,
+    certifications, rating, memberSince,
   } = profile;
+  // Specialties: the primary + other roles the worker picked (the legacy
+  // job_types column is the fallback for older rows).
+  const jobTypes = [profile.primaryJobType, ...profile.secondaryJobTypes]
+    .filter((j, i, a): j is string => !!j && a.indexOf(j) === i);
+  const specialties = jobTypes.length ? jobTypes : profile.jobTypes;
 
   const ratingDisplay  = rating > 0 ? rating.toFixed(1) : '—';
   const ratingSubLabel = rating > 0 ? 'avg rating' : 'no reviews';
 
-  // Editing routes to the role's own setup — a staffing agency edits agency
-  // details (name/logo/events), not worker job types.
-  const editProfilePath =
-    profile.role === 'staffer' ? '/staffer-setup?edit=1'
-    : profile.role === 'client' ? '/client-setup?edit=1'
-    : '/profile-setup?edit=1';
+  // One edit screen for every role; the setup wizards are onboarding-only.
+  const editProfilePath = '/profile/edit';
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px] overflow-y-auto">
@@ -461,18 +487,16 @@ export function ProfileScreen() {
           <ProfileAvatar photoUrl={photoUrl} displayName={displayName} size={82} />
         </div>
 
-        {/* Available toggle — workers only (it gates offers and broadcasts) */}
+        {/* Availability status — workers only (the card below changes it) */}
         {isWorker && (
         <div className="flex justify-end px-5 pt-3">
-          <button type="button" aria-pressed={available}
-            aria-label={available ? 'Set yourself as unavailable' : 'Set yourself as available'}
-            onClick={() => void toggleAvailable()}
-            className={`flex items-center gap-1.5 h-10 px-3.5 rounded-full text-[11px] font-bold border transition-all ${
-              available ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]'
+          <span aria-label={profile.isAvailable ? 'You are available for work' : 'You are not taking new offers'}
+            className={`flex items-center gap-1.5 h-10 px-3.5 rounded-full text-[11px] font-bold border ${
+              profile.isAvailable ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]'
             }`}>
-            <span aria-hidden className={`w-[6px] h-[6px] rounded-full ${available ? 'bg-emerald-500' : 'bg-[#DBDBDB]'}`} />
-            {available ? 'Available' : 'Unavailable'}
-          </button>
+            <span aria-hidden className={`w-[6px] h-[6px] rounded-full ${profile.isAvailable ? 'bg-emerald-500' : 'bg-[#DBDBDB]'}`} />
+            {profile.isAvailable ? 'Available' : 'Unavailable'}
+          </span>
         </div>
         )}
       </div>
@@ -502,7 +526,10 @@ export function ProfileScreen() {
         {bio ? (
           <p className="text-[#737373] text-[14px] leading-relaxed mb-3">{bio}</p>
         ) : (
-          <p className="text-[#6B7280] text-[14px] italic mb-3">No bio yet — tap Edit to add one</p>
+          <button type="button" onClick={() => navigate('/profile/edit#basics')}
+            className="text-[#6B7280] text-[14px] italic mb-3 min-h-10 -my-2 text-left">
+            No bio yet — tap to add one
+          </button>
         )}
 
         {memberSince && (
@@ -557,15 +584,18 @@ export function ProfileScreen() {
         </button>
       </div>
 
+      {/* Availability — worker only; saves on every tap */}
+      {isWorker && <AvailabilityCard />}
+
       {/* Specialties — worker only */}
       {!isPoster && (
       <div className="px-5 mb-5">
         <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-2.5" id="job-types-label">
           Specialties
         </p>
-        {jobTypes.length > 0 ? (
+        {specialties.length > 0 ? (
           <div className="flex flex-wrap gap-2" role="list" aria-labelledby="job-types-label">
-            {jobTypes.map((jt) => (
+            {specialties.map((jt) => (
               <span key={jt} role="listitem"
                 className="h-[30px] px-3 bg-[#FAFAFA] border border-[#DBDBDB] rounded-full text-[#737373] text-[12px] font-medium flex items-center">
                 {jt}
@@ -573,9 +603,10 @@ export function ProfileScreen() {
             ))}
           </div>
         ) : (
-          <p className="text-[#6B7280] text-[13px] italic">
-            No specialties added yet — tap Edit to set them.
-          </p>
+          <button type="button" onClick={() => navigate('/profile/edit#work')}
+            className="text-[#6B7280] text-[13px] italic min-h-10 -my-2 text-left">
+            No specialties added yet — tap to set them.
+          </button>
         )}
       </div>
       )}
@@ -596,9 +627,10 @@ export function ProfileScreen() {
             ))}
           </div>
         ) : (
-          <p className="text-[#6B7280] text-[13px] italic">
-            No certifications added yet — tap Edit to add them.
-          </p>
+          <button type="button" onClick={() => navigate('/profile/edit#work')}
+            className="text-[#6B7280] text-[13px] italic min-h-10 -my-2 text-left">
+            No certifications added yet — tap to add them.
+          </button>
         )}
       </div>
       )}
@@ -749,7 +781,7 @@ export function ProfileScreen() {
                   )}
                   <SettingRow icon={CreditCard} label="Payments & Earnings" onTap={() => go('/earnings')} />
                   {profile.role === 'worker' && (
-                    <SettingRow icon={CalendarCheck} label="Availability" onTap={() => go('/availability')} />
+                    <SettingRow icon={CalendarCheck} label="Availability" onTap={() => go('/profile/edit#availability')} />
                   )}
                   <SettingRow icon={Bell} label="Notifications" onTap={() => go('/notification-settings')} />
                 </div>

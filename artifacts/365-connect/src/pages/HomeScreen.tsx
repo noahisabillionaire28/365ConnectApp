@@ -363,7 +363,7 @@ function WorkerAvailableView() {
                     className="h-[38px] px-4 rounded-[10px] bg-[#0A1628] text-white text-[13px] font-semibold">
                     Browse all jobs
                   </button>
-                  <button type="button" onClick={() => navigate('/worker-setup?edit=1')}
+                  <button type="button" onClick={() => navigate('/profile/edit#work')}
                     className="h-[38px] px-4 rounded-[10px] border border-[#DBDBDB] text-[#111827] text-[13px] font-semibold">
                     Update job types
                   </button>
@@ -516,7 +516,7 @@ function WorkerRolesNudge() {
         <p className="text-amber-800 font-bold text-[14px]">Add your roles to get matched</p>
         <p className="text-amber-700 text-[12px] mt-0.5">Shifts, offers and reminders are matched on the roles you can work.</p>
       </div>
-      <button type="button" onClick={() => navigate('/worker-setup?edit=1')}
+      <button type="button" onClick={() => navigate('/profile/edit#work')}
         className="h-9 px-3.5 rounded-[8px] bg-[#0A1628] text-white text-[12px] font-bold flex-shrink-0">
         Add roles
       </button>

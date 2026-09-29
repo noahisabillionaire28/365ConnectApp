@@ -6,6 +6,24 @@
 
 export const USERNAME_RE = /^[a-z0-9_.]{2,30}$/;
 
+/** Handles the server refuses outright (mirrors the API's reserved list). */
+export const RESERVED_HANDLES = new Set([
+  'admin', 'administrator', 'support', 'help', '365connect', '365_connect', 'connect365',
+  'root', 'system', 'null', 'undefined', 'me', 'api', 'staff', 'moderator', 'official',
+]);
+
+/**
+ * The message the server would answer with for this handle, or null when it
+ * passes the format and reserved-name rules (uniqueness is checked separately).
+ */
+export function handleFormatError(raw: string): string | null {
+  const handle = raw.trim().toLowerCase();
+  if (!handle) return 'Choose a handle to continue.';
+  if (!USERNAME_RE.test(handle)) return 'Handles are 2–30 characters: letters, numbers, _ and . only.';
+  if (RESERVED_HANDLES.has(handle)) return 'That handle is reserved. Try another.';
+  return null;
+}
+
 /** The part of an email before "@", reduced to handle characters. */
 function emailPrefix(email: string | undefined): string {
   return (email ?? '').split('@')[0].toLowerCase().replace(/[^a-z0-9_.]/g, '').slice(0, 15) || 'user';
