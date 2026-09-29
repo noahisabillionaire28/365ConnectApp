@@ -14,6 +14,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation }                   from 'wouter';
 import { ChevronLeft, Camera, AlertCircle, CreditCard, Lock, CheckCircle2 } from 'lucide-react';
 import { uploadAvatar } from '@/lib/storage';
+import { EVENT_TYPES } from '@/lib/jobTypes';
 import { apiClient, isApiStatus } from '@/lib/api';
 import { posterSetupDone } from '@/lib/setupRoute';
 import { saveHandleWithRetry } from '@/lib/username';
@@ -30,13 +31,6 @@ const GREEN  = '#10B981';
 const RED    = '#EF4444';
 
 const TOTAL = 3; // billing card step removed — payments are set up when a shift is paid
-
-const EVENT_TYPES = [
-  'Nightclub', 'Rooftop Event', 'Corporate Event', 'Private Party',
-  'Wedding', 'Festival', 'Pool Party', 'Gala',
-  'Concert', 'Pop-up', 'Sports Event', 'Brand Activation',
-  'Birthday Party', 'Product Launch',
-];
 
 function slugify(s: string) {
   return s.trim().toLowerCase()
@@ -169,11 +163,8 @@ export function StafferSetupScreen() {
   const [, navigate] = useLocation();
   const { user }     = useAuth();
 
-  // Edit mode (from Profile → Edit): skip the one-time billing step and let an
-  // already-set-up agency change its name / logo / events.
-  const isEdit = typeof window !== 'undefined'
-    && new URLSearchParams(window.location.search).get('edit') === '1';
-  const total = isEdit ? 3 : TOTAL;
+  // One-time onboarding only: an already-set-up agency edits on /profile/edit.
+  const total = TOTAL;
 
   const [initialized, setInitialized] = useState(false);
   const [loadFailed,  setLoadFailed]  = useState(false);
@@ -197,7 +188,7 @@ export function StafferSetupScreen() {
       .then((data) => {
         // Setup is done once the agency has a name; the username is
         // auto-generated at role select so it cannot be the marker.
-        if (posterSetupDone(data) && !isEdit) { navigate('/home'); return; }
+        if (posterSetupDone(data)) { navigate('/home'); return; }
         if (data?.company_name || data?.bio) setAgencyName(data.company_name || data.bio || '');
         if (data?.photo_url) setLogoPreview(data.photo_url);
         if (Array.isArray(data?.secondary_job_types)) setEventTypes(data.secondary_job_types);
@@ -210,7 +201,7 @@ export function StafferSetupScreen() {
         if (Array.isArray(data?.secondary_job_types)) inferred = Math.max(inferred, 4);
 
         const stored = loadStep(user.id);
-        setStep(isEdit ? 1 : Math.min(3, Math.max(inferred, stored)));
+        setStep(Math.min(3, Math.max(inferred, stored)));
         setInitialized(true);
       })
       .catch((err) => {
@@ -280,18 +271,6 @@ export function StafferSetupScreen() {
   }
 
   async function continueStep3() {
-    if (isEdit) {
-      // Editing an existing agency — save and return; no billing step.
-      if (!user) return;
-      setSaving(true); setError(null);
-      try {
-        await apiClient(user.id).patch('/users/me', { secondary_job_types: eventTypes });
-        navigate('/home');
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not save. Please try again.');
-      } finally { setSaving(false); }
-      return;
-    }
     // Last step — no billing card at signup (payments are set up when a
     // shift is actually paid). Save and go straight into the app.
     if (!user) return;
@@ -489,7 +468,7 @@ export function StafferSetupScreen() {
             style={{ background: NAVY }}
             data-testid="btn-staffer-continue"
           >
-            {saving ? 'Saving…' : (isEdit && step === 3 ? 'Save changes' : 'Continue')}
+            {saving ? 'Saving…' : 'Continue'}
           </button>
           {step === 2 && (
             <button onClick={continueStep2} className="w-full text-center py-2 text-[14px] font-medium" style={{ color: MUTED }}>

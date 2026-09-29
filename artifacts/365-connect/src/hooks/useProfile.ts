@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth, type SimpleUser } from '@/contexts/AuthContext';
 import { useRole } from '@/contexts/RoleContext';
-import { profileQueryOptions, type UserProfileRow } from './profileQuery';
+import { apiClient } from '@/lib/api';
+import { profileQueryKey, profileQueryOptions, type UserProfileRow } from './profileQuery';
 
 function deriveDisplayName(authUser: SimpleUser, row: UserProfileRow | null): string {
   return (
@@ -35,6 +36,7 @@ export type ProfileResult = {
   isPro:             boolean;
   isAvailable:       boolean;
   hourlyRate:        number | null;
+  companyName:       string | null;
 };
 
 export function useProfile(): ProfileResult {
@@ -87,5 +89,45 @@ export function useProfile(): ProfileResult {
     isPro:             row?.is_pro            ?? false,
     isAvailable:       row?.is_available      ?? true,
     hourlyRate:        row?.hourly_rate       ?? null,
+    companyName:       row?.company_name      ?? null,
   };
+}
+
+/** The columns PATCH /users/me accepts from the profile editors. */
+export type ProfilePatch = Partial<Pick<UserProfileRow,
+  'username' | 'photo_url' | 'bio' | 'job_types' | 'certifications' |
+  'primary_job_type' | 'secondary_job_types' | 'availability' |
+  'lat' | 'lng' | 'company_name' | 'is_available' | 'hourly_rate'
+>>;
+
+/**
+ * One PATCH /users/me for everything that edits the signed-in user's row.
+ * The cached profile is updated optimistically (so a tapped availability
+ * chip flips at once), rolled back if the server refuses, and replaced by
+ * the server's row on success. Screens that show the user's name or photo
+ * elsewhere (people feed, posts, conversations, worker lists) are refreshed.
+ */
+export function useUpdateProfile() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const key = profileQueryKey(user?.id);
+
+  return useMutation<UserProfileRow, Error, ProfilePatch, { previous: UserProfileRow | null | undefined }>({
+    mutationFn: (patch) => apiClient(user?.id).patch<UserProfileRow>('/users/me', patch),
+    onMutate: async (patch) => {
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<UserProfileRow | null>(key);
+      if (previous) qc.setQueryData<UserProfileRow>(key, { ...previous, ...patch });
+      return { previous };
+    },
+    onError: (_err, _patch, ctx) => {
+      if (ctx?.previous !== undefined) qc.setQueryData(key, ctx.previous);
+    },
+    onSuccess: (row) => {
+      qc.setQueryData<UserProfileRow>(key, (prev) => ({ ...(prev ?? {}), ...row } as UserProfileRow));
+      for (const k of ['people-feed', 'posts', 'feed', 'conversations', 'workers', 'roster']) {
+        void qc.invalidateQueries({ queryKey: [k] });
+      }
+    },
+  });
 }

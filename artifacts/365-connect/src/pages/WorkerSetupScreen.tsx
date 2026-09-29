@@ -158,9 +158,8 @@ export function WorkerSetupScreen() {
       .then(async (data) => {
         if (!data) { setInitialized(true); return; }
 
-        // If setup is already complete, go home — unless we're editing the profile.
-        const isEdit = new URLSearchParams(window.location.search).get('edit') === '1';
-        if (!isEdit && data.username && data.availability) {
+        // Setup is one-time: once complete, edits happen on /profile/edit.
+        if (data.username && data.availability) {
           navigate('/home'); return;
         }
 
@@ -175,10 +174,6 @@ export function WorkerSetupScreen() {
         if (data.availability && typeof data.availability === 'object') {
           setAvailability(data.availability as Availability);
         }
-
-        // Edit mode: fields are pre-filled above; start at step 1 so the user
-        // can change any of them (each step saves as they advance).
-        if (isEdit) { setStep(1); setInitialized(true); return; }
 
         // Infer resume step: take the highest step we can confirm from DB,
         // then also check localStorage in case this session progressed further.
