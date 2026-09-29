@@ -179,9 +179,11 @@ export function JobTypeGrid({
 /* ── Address autocomplete (free OpenStreetMap / Nominatim type-ahead) ──────── */
 type NomSuggestion = { display_name: string; lat: string; lon: string };
 
-export function LocationAutocomplete({ value, onChange, onPlacePicked, error }: {
+export function LocationAutocomplete({ value, onChange, onPlacePicked, error, label = 'Shift location address' }: {
   value: string; onChange: (v: string) => void;
   onPlacePicked: (coords: { lat: number; lng: number }) => void; error?: string;
+  /** Accessible name for the input (defaults to the post-shift wording). */
+  label?: string;
 }) {
   const [suggestions, setSuggestions] = useState<NomSuggestion[]>([]);
   const [open, setOpen]     = useState(false);
@@ -226,7 +228,7 @@ export function LocationAutocomplete({ value, onChange, onPlacePicked, error }: 
         onChange={(e) => handleInput(e.target.value)}
         onFocus={() => { if (suggestions.length) setOpen(true); }}
         placeholder="Start typing an address or venue…"
-        aria-label="Shift location address" aria-invalid={!!error} aria-autocomplete="list"
+        aria-label={label} aria-invalid={!!error} aria-autocomplete="list"
         autoComplete="off"
         className={INPUT_CLS + (error ? ' border-red-400' : '')} />
       {open && suggestions.length > 0 && (

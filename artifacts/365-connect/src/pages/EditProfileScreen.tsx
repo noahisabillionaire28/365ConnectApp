@@ -180,13 +180,17 @@ export function EditProfileScreen() {
   const set = <K extends keyof Form>(key: K, value: Form[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
 
-  // Deep link to a section (/profile/edit#work) once the form is on screen.
+  // Deep link to a section (/profile/edit#work) once the form is on screen,
+  // and again if only the hash changes while the screen is already mounted.
   useEffect(() => {
     if (!form) return;
-    const id = window.location.hash.replace(/^#/, '');
-    if (!id) return;
-    const t = window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }), 50);
-    return () => window.clearTimeout(t);
+    const jump = () => {
+      const id = window.location.hash.replace(/^#/, '');
+      if (id) document.getElementById(id)?.scrollIntoView({ block: 'start' });
+    };
+    const t = window.setTimeout(jump, 50);
+    window.addEventListener('hashchange', jump);
+    return () => { window.clearTimeout(t); window.removeEventListener('hashchange', jump); };
   }, [!!form]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Photo (same cropper + upload path as the setup wizards) ─────────────────
@@ -530,7 +534,7 @@ export function EditProfileScreen() {
               hint={form.lat != null && form.lng != null
                 ? `Saved: ${form.lat.toFixed(3)}, ${form.lng.toFixed(3)} — pick an address to change it.`
                 : 'Used to show your shifts to nearby workers.'}>
-              <LocationAutocomplete value={locationQuery} onChange={setLocationQuery}
+              <LocationAutocomplete value={locationQuery} onChange={setLocationQuery} label="Your location"
                 onPlacePicked={({ lat, lng }) => { set('lat', lat); set('lng', lng); }} />
               <button type="button" onClick={useCurrentLocation} disabled={locating}
                 className="h-11 px-3 -mt-1 self-start rounded-[10px] text-[#0A1628] text-[13px] font-semibold flex items-center gap-1.5 disabled:opacity-50">
