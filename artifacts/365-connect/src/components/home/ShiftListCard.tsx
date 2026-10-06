@@ -1,5 +1,5 @@
 import { MapPin, Users, CheckCircle2 } from 'lucide-react';
-import type { MockShift } from '@/lib/supabase';
+import { shiftHeadline, type MockShift } from '@/lib/supabase';
 
 const NAVY = '#0A1628';
 
@@ -17,7 +17,7 @@ export function ShiftListCard({ shift, applied, onTap }: {
   return (
     <div role="article" tabIndex={0} onClick={onTap}
       onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onTap())}
-      aria-label={`${shift.jobType} at ${shift.companyName}, $${shift.payRate}/${shift.payPeriod}${applied ? ' — already applied' : ''}`}
+      aria-label={`${shiftHeadline(shift)} at ${shift.companyName}, $${shift.payRate}/${shift.payPeriod}${applied ? ' — already applied' : ''}`}
       className="mx-4 rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-4 flex flex-col gap-3 cursor-pointer
         transition-colors active:bg-[#FAFAFA] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A1628]">
 
@@ -42,7 +42,8 @@ export function ShiftListCard({ shift, applied, onTap }: {
       </div>
 
       <div>
-        <p className="text-[#111827] font-bold text-[16px] leading-tight truncate">{shift.companyName}</p>
+        <p className="text-[#111827] font-bold text-[16px] leading-tight line-clamp-2 break-words">{shiftHeadline(shift)}</p>
+        <p className="text-[#374151] text-[13px] font-medium truncate mt-0.5">{shift.companyName}</p>
         <div className="flex items-center gap-1 mt-1">
           <MapPin size={12} aria-hidden className="text-[#6B7280] flex-shrink-0" />
           <p className="text-[#6B7280] text-[12px] truncate">{shift.location}</p>

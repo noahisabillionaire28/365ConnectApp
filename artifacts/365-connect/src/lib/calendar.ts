@@ -10,7 +10,9 @@ export const APP_ORIGIN = 'https://365-connect-app.vercel.app';
 
 export type CalendarEvent = {
   shiftId: string;
-  /** "Bartender" — the role; becomes "<job type> · <company>". */
+  /** The poster's name for the shift; when set it is the event title. */
+  title?: string | null;
+  /** "Bartender" — the role; the fallback title is "<job type> · <company>". */
   jobType: string;
   companyName: string;
   startTimeISO: string;
@@ -74,6 +76,8 @@ function callTime(ev: CalendarEvent): string {
 }
 
 export function eventTitle(ev: CalendarEvent): string {
+  const name = ev.title?.trim();
+  if (name) return [name, ev.companyName].filter(Boolean).join(' · ');
   return [ev.jobType, ev.companyName].filter(Boolean).join(' · ');
 }
 
