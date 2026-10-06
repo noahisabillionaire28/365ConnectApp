@@ -136,7 +136,8 @@ function calendarEventFor(app: MyApplication): CalendarEvent | null {
   if (!app.startTime || !app.endTime) return null;
   return {
     shiftId: app.shiftId,
-    jobType: app.jobType || app.shiftTitle || 'Shift',
+    title: app.shiftTitle ?? null,
+    jobType: app.jobType || 'Shift',
     companyName: app.companyName ?? '',
     startTimeISO: app.startTime,
     endTimeISO: app.endTime,

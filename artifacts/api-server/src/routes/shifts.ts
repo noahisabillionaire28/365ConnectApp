@@ -312,7 +312,7 @@ router.get('/:id', requireAuth, async (req, res) => {
   if (shift.client_id) {
     const { data: user, error: uErr } = await adminDb
       .from('users')
-      .select('id, username, company_name, bio, photo_url, rating')
+      .select('id, username, company_name, photo_url, rating')
       .eq('id', shift.client_id)
       .maybeSingle();
     if (uErr) return res.status(500).json({ error: uErr.message });
@@ -333,7 +333,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     ...shift,
     series_index,
     series_count,
-    company_name: shift.company_name || u?.company_name || u?.bio || (u?.username ? `@${u.username}` : null),
+    company_name: shift.company_name || u?.company_name || (u?.username ? `@${u.username}` : null),
     client_username: u?.username ?? null,
     client_company: u?.company_name ?? null,
     client_photo_url: u?.photo_url ?? null,
@@ -341,11 +341,11 @@ router.get('/:id', requireAuth, async (req, res) => {
   });
 });
 
-/** The poster's display name for a shift: their company, else their name, else their @username. */
+/** The poster's display name for a shift: their company, else their @username (never the bio). */
 async function posterCompanyName(userId: string): Promise<string | null> {
   const { data } = await adminDb
-    .from('users').select('company_name, bio, username').eq('id', userId).maybeSingle();
-  return data?.company_name || data?.bio || (data?.username ? `@${data.username}` : null);
+    .from('users').select('company_name, username').eq('id', userId).maybeSingle();
+  return data?.company_name || (data?.username ? `@${data.username}` : null);
 }
 
 type ShiftFields = z.infer<typeof shiftFields>;

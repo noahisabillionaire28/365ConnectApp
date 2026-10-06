@@ -14,6 +14,8 @@ export type StoryWorker = {
 
 export type MockShift = {
   id: string;
+  /** The poster's name for this shift ("Saturday Wedding Reception"); null on legacy shifts. */
+  title: string | null;
   /** Event this shift is for (Wedding, Corporate, …); null on legacy shifts. */
   eventType: string | null;
   jobType: string;
@@ -509,6 +511,14 @@ export function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: n
 
 // ─── Adapter: ShiftRow (DB) → MockShift (UI) ─────────────────────────────────
 
+/**
+ * What a worker sees as the shift's headline: the poster's own name for the
+ * shift, else "<job type> shift". Never the company name — that is a subline.
+ */
+export function shiftHeadline(s: Pick<MockShift, 'title' | 'jobType'>): string {
+  return s.title?.trim() || `${s.jobType} shift`;
+}
+
 export function shiftRowToMockShift(
   row: ShiftRow,
   refCoords: { lat: number; lng: number } = MIAMI_BEACH,
@@ -524,6 +534,7 @@ export function shiftRowToMockShift(
 
   return {
     id:             row.id,
+    title:          row.title?.trim() || null,
     eventType:      row.event_type ?? null,
     jobType:        primaryType,
     jobTypes:       row.job_types?.length ? row.job_types : [primaryType],
@@ -576,6 +587,7 @@ export function hardenShift(s: MockShift): MockShift {
   return {
     ...raw,
     id:             raw.id,
+    title:          typeof raw.title === 'string' && raw.title.trim() ? raw.title : null,
     eventType:      raw.eventType ?? null,
     jobType:        primaryType,
     jobTypes:       strArr(raw.jobTypes).length ? strArr(raw.jobTypes) : [primaryType],

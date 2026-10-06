@@ -20,7 +20,7 @@ import { useShiftById } from '@/hooks/useShifts';
 import { useProfile } from '@/hooks/useProfile';
 import { useMyLocation } from '@/hooks/useMyLocation';
 import { computeMatchScore } from '@/lib/matchScore';
-import { haversineMiles, formatTime, friendlyDate } from '@/lib/supabase';
+import { haversineMiles, formatTime, friendlyDate, shiftHeadline } from '@/lib/supabase';
 import { apiClient } from '@/lib/api';
 import { resetDraft, setDraft, setEditShiftId, type TemplatePayload } from '@/store/postShiftStore';
 import { utcToZonedParts, DEFAULT_SHIFT_TZ } from '@/lib/timezone';
@@ -692,7 +692,7 @@ export function ShiftDetailScreen() {
 
         {/* Hero photo */}
         <div className="relative w-full h-[300px] flex-shrink-0 overflow-hidden">
-          <img src={shift.coverImage} alt={`${shift.jobType} at ${shift.companyName}`}
+          <img src={shift.coverImage} alt={`${shiftHeadline(shift)} at ${shift.companyName}`}
             loading="eager" decoding="async" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/10 to-black/80" />
 
@@ -741,8 +741,13 @@ export function ShiftDetailScreen() {
           </div>
         )}
 
+        {/* Shift name — the poster's own title for this shift */}
+        <div className="px-5 pt-5">
+          <h1 className="text-black font-bold text-[24px] leading-tight break-words">{shiftHeadline(shift)}</h1>
+        </div>
+
         {/* Job type + pay */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#DBDBDB]">
+        <div className="flex items-center justify-between px-5 pt-3 pb-4 border-b border-[#DBDBDB]">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="bg-black text-white text-[12px] font-bold px-4 py-1.5 rounded-full uppercase tracking-wide">
               {shift.jobType}
@@ -1337,7 +1342,7 @@ export function ShiftDetailScreen() {
           open={calendarOpen}
           onClose={() => setCalendarOpen(false)}
           event={{
-            shiftId, jobType: shift.jobType, companyName: shift.companyName,
+            shiftId, title: shift.title, jobType: shift.jobType, companyName: shift.companyName,
             startTimeISO: shift.startTimeISO, endTimeISO: shift.endTimeISO, timezone: shift.timezone,
             location: shift.location, payRate: shift.payRate, payPeriod: shift.payPeriod,
             pointOfContact: shift.pointOfContact, contactPhone: shift.contactPhone,

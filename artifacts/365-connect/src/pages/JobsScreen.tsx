@@ -10,7 +10,7 @@ import { useSavedSearches, savedSearchLabel, sameSearch, type SavedSearch, type 
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { AppMap } from '@/components/AppMap';
 import { geocodeAddress, type Coords } from '@/lib/geocode';
-import { type MockShift } from '@/lib/supabase';
+import { shiftHeadline, type MockShift } from '@/lib/supabase';
 import { useShifts } from '@/hooks/useShifts';
 import { useMyLocation } from '@/hooks/useMyLocation';
 import { useMyPostedShifts } from '@/hooks/useMyPostedShifts';
@@ -93,7 +93,7 @@ function ShiftRow({ shift, applied, showDistance, onTap }: {
   return (
     <div role="article" tabIndex={0} onClick={onTap}
       onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onTap())}
-      aria-label={`${shift.jobType} at ${shift.companyName}, $${shift.payRate}/${shift.payPeriod}${applied ? ' — already applied' : ''}`}
+      aria-label={`${shiftHeadline(shift)} at ${shift.companyName}, $${shift.payRate}/${shift.payPeriod}${applied ? ' — already applied' : ''}`}
       className="rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-4 flex flex-col gap-3 cursor-pointer
         transition-colors active:bg-[#FAFAFA] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A1628]">
 
@@ -128,7 +128,8 @@ function ShiftRow({ shift, applied, showDistance, onTap }: {
       </div>
 
       <div>
-        <p className="text-[#111827] font-bold text-[16px] leading-tight truncate">{shift.companyName}</p>
+        <p className="text-[#111827] font-bold text-[16px] leading-tight line-clamp-2 break-words">{shiftHeadline(shift)}</p>
+        <p className="text-[#374151] text-[13px] font-medium truncate mt-0.5">{shift.companyName}</p>
         <div className="flex items-center gap-1 mt-1">
           <MapPin size={12} aria-hidden className="text-[#6B7280] flex-shrink-0" />
           <p className="text-[#6B7280] text-[12px] truncate">{shift.location}{showDistance ? ` · ${shift.distanceMiles} mi` : ''}</p>
@@ -291,7 +292,8 @@ function MapPane({ shifts, selectedId, userCoords, onPinClick, onOpenShift }: {
                         </span>
                       )}
                     </div>
-                    <p className="text-[#111827] font-bold text-[15px] truncate">{shift.companyName}</p>
+                    <p className="text-[#111827] font-bold text-[15px] truncate">{shiftHeadline(shift)}</p>
+                    <p className="text-[#374151] text-[12px] font-medium truncate">{shift.companyName}</p>
                     <p className="text-[#6B7280] text-[11px] truncate flex items-center gap-1">
                       <MapPin size={10} aria-hidden />{shift.location}{userCoords ? ` · ${shift.distanceMiles} mi` : ''}
                     </p>
@@ -521,7 +523,7 @@ export function JobsScreen() {
       <div className="sr-only" aria-label="Shifts">
         {visibleShifts.map((shift) => (
           <button key={shift.id} type="button"
-            aria-label={`Open ${shift.jobType} at ${shift.companyName}`}
+            aria-label={`Open ${shiftHeadline(shift)} at ${shift.companyName}`}
             onClick={() => handleSelectShift(shift)} />
         ))}
       </div>
