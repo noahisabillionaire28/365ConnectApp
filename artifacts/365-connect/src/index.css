@@ -209,3 +209,13 @@
 @media (prefers-reduced-motion: reduce) {
   .anim-rise-in, .anim-pop-in, .anim-toast-in, .anim-toast-out { animation-duration: 0.01ms; animation-delay: 0ms !important; }
 }
+
+/* ── Legal documents: print-friendly ────────────────────────────────────────
+   /terms and /privacy hide their chrome when printed so the page is just the
+   document; links print as plain text. */
+@media print {
+  .print-hidden { display: none !important; }
+  body { background: #fff !important; }
+  .legal-body a { color: inherit; text-decoration: none; }
+  .legal-body h2, .legal-body h3 { break-after: avoid; }
+}

@@ -56,6 +56,8 @@ const OnboardingScreen = lazyNamed(() => import('@/pages/OnboardingScreen'), 'On
 const WorkerSetupScreen = lazyNamed(() => import('@/pages/WorkerSetupScreen'), 'WorkerSetupScreen');
 const ClientSetupScreen = lazyNamed(() => import('@/pages/ClientSetupScreen'), 'ClientSetupScreen');
 const StafferSetupScreen = lazyNamed(() => import('@/pages/StafferSetupScreen'), 'StafferSetupScreen');
+// Legal documents (public, no sign-in needed)
+const LegalScreen = lazyNamed(() => import('@/pages/LegalScreen'), 'LegalScreen');
 
 // Main app tabs
 import { HomeScreen }            from '@/pages/HomeScreen';
@@ -183,6 +185,11 @@ function MobileRouter() {
             {/* Legacy aliases so old Clerk links still resolve */}
             <Route path="/sign-in/*?"  component={LoginScreen}  />
             <Route path="/sign-up/*?"  component={SignUpScreen} />
+
+            {/* ── Legal (public) ────────────────────────────────── */}
+            <Route path="/terms">{() => <LegalScreen doc="terms" />}</Route>
+            <Route path="/privacy">{() => <LegalScreen doc="privacy" />}</Route>
+            <Route path="/legal">{() => <Redirect to="/terms" replace />}</Route>
 
             {/* ── Auth / onboarding ─────────────────────────────── */}
             <Route path="/"              component={SplashScreen}       />

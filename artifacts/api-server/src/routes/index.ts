@@ -30,6 +30,7 @@ import linkPreviewRouter from './link-preview.js';
 import cronRouter        from './cron.js';
 import matchRouter       from './match.js';
 import mapsRouter        from './maps.js';
+import legalRouter       from './legal.js';
 
 const router: IRouter = Router();
 
@@ -44,6 +45,9 @@ router.use(storageRouter);
 
 // Auth (public — server-side account creation)
 router.use('/auth', authRouter);
+
+// Legal documents: versions (public), acceptance status + accept (session)
+router.use('/legal', legalRouter);
 
 // Health + admin
 router.use(healthRouter);
