@@ -34,6 +34,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { RoleProvider, useRole, isLockedStatus } from '@/contexts/RoleContext';
 import { SuspendedGate } from '@/components/SuspendedGate';
 import { LegalGate } from '@/components/LegalGate';
+import { StorageNotice } from '@/components/StorageNotice';
 // Admin-only chrome (and its animation library) loads only for admin accounts.
 const AdminFab = lazy(() => import('@/components/AdminFab').then((m) => ({ default: m.AdminFab })));
 import { useSSE } from '@/hooks/useSSE';
@@ -173,8 +174,10 @@ function MobileRouter() {
 
   return (
     <MobileContainer>
+      {/* Keyboard users jump straight past any fixed chrome into the screen. */}
+      <a href="#main-content" className="skip-link" data-testid="skip-link">Skip to content</a>
       <PullToRefresh disabled={noPull}>
-      <div style={{ width: '100%' }}>
+      <div id="main-content" tabIndex={-1} style={{ width: '100%', outline: 'none' }}>
           <Suspense fallback={<RouteFallback />}>
           <Switch>
             {/* ── Auth (Supabase) ───────────────────────────────── */}
@@ -190,6 +193,8 @@ function MobileRouter() {
             {/* ── Legal (public) ────────────────────────────────── */}
             <Route path="/terms">{() => <LegalScreen doc="terms" />}</Route>
             <Route path="/privacy">{() => <LegalScreen doc="privacy" />}</Route>
+            <Route path="/refunds">{() => <LegalScreen doc="refunds" />}</Route>
+            <Route path="/cookies">{() => <LegalScreen doc="cookies" />}</Route>
             <Route path="/legal">{() => <Redirect to="/terms" replace />}</Route>
 
             {/* ── Auth / onboarding ─────────────────────────────── */}
@@ -314,6 +319,8 @@ function AppShell() {
               {/* Terms + Privacy acceptance (below the suspended screen, above the app) */}
               <LegalGate />
               <SuspendedGuard />
+              {/* Essential-storage notice (web only, once) */}
+              <StorageNotice />
             </ErrorBoundary>
           </TooltipProvider>
         </ToastProvider>

@@ -42,7 +42,7 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <p className="text-[#111827] font-bold text-[15px] truncate">@{person.username}</p>
-          {person.isPro && <BadgeCheck size={15} aria-label="Pro verified" style={{ color: GOLD }} className="flex-shrink-0" />}
+          {person.isPro && <BadgeCheck size={15} aria-label="Pro member" style={{ color: GOLD }} className="flex-shrink-0" />}
         </div>
         {person.primaryJobType && (
           <p className="text-[#6B7280] text-[13px] mt-0.5 truncate">{person.primaryJobType}</p>

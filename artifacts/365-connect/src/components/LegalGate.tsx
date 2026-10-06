@@ -11,13 +11,14 @@ import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { FileText, ShieldCheck, Check, AlertCircle, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDialog } from '@/hooks/useDialog';
 import { useAcceptLegal, useLegalStatus } from '@/hooks/useLegal';
 import { LEGAL_REQUIRED_EVENT } from '@/lib/api';
 import { LegalSheet } from '@/components/LegalDocument';
 import { formatLegalDate, type LegalDocumentId } from '@/legal/config';
 
 /** Screens where the gate stays out of the way (auth flow and the documents themselves). */
-const UNGATED = /^\/(terms|privacy|legal|login|signup|sign-in|sign-up|reset-password|auth\/callback)(\/|$)|^\/$/;
+const UNGATED = /^\/(terms|privacy|refunds|cookies|legal|login|signup|sign-in|sign-up|reset-password|auth\/callback)(\/|$)|^\/$/;
 
 export function LegalGate() {
   const { user } = useAuth();
@@ -37,14 +38,17 @@ export function LegalGate() {
     return () => window.removeEventListener(LEGAL_REQUIRED_EVENT, onRequired);
   }, [qc]);
 
-  if (!user || UNGATED.test(location)) return null;
-  if (!status.data?.needsAcceptance) return null;
+  const show = !!user && !UNGATED.test(location) && !!status.data?.needsAcceptance;
+  // Non-dismissable: focus is trapped inside (no Escape) until the user agrees or logs out.
+  const dialogRef = useDialog<HTMLDivElement>(show && !sheet, null, { initialFocus: 'container' });
+
+  if (!show || !status.data) return null;
 
   const { outdated, current } = status.data;
   const busy = accept.isPending;
 
   return (
-    <div className="fixed inset-0 z-[150] bg-white flex justify-center" role="dialog" aria-modal="true"
+    <div ref={dialogRef} className="fixed inset-0 z-[150] bg-white flex justify-center outline-none" role="dialog" aria-modal="true"
       aria-labelledby="legal-gate-title" data-testid="legal-gate">
       <div className="w-full max-w-app h-full flex flex-col px-6 pt-[calc(env(safe-area-inset-top)+40px)] pb-[calc(env(safe-area-inset-bottom)+24px)] overflow-y-auto">
         <div className="w-14 h-14 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center mb-5">
@@ -85,8 +89,8 @@ export function LegalGate() {
             agreed ? 'bg-[#0A1628] border-[#0A1628]' : 'bg-white border-[#D1D5DB]'}`}>
             {agreed && <Check size={15} className="text-white" strokeWidth={3} />}
           </span>
-          <span className="text-[#111827] text-[14px] leading-relaxed">
-            I have read and agree to the Terms of Service and Privacy Policy, including the Independent Contractor Acknowledgment and the arbitration agreement.
+          <span className="text-[#111827] text-[14px] leading-relaxed" data-testid="legal-gate-checkbox-text">
+            I am at least 18 years old and I have read and agree to the Terms of Service and Privacy Policy, including the Independent Contractor Acknowledgment and the arbitration agreement.
           </span>
         </label>
 

@@ -52,7 +52,7 @@ function RosterCard({ worker, onOpen, onMessage, onAssign, onRemove }: {
               {worker.username ? `@${worker.username}` : 'Worker'}
             </p>
             {worker.isPro && (
-              <BadgeCheck size={15} aria-label="Verified worker" style={{ color: GOLD }} fill={GOLD} className="flex-shrink-0 text-white" />
+              <BadgeCheck size={15} aria-label="Pro member" style={{ color: GOLD }} fill={GOLD} className="flex-shrink-0 text-white" />
             )}
           </div>
           {jobs.length > 0 && (

@@ -18,23 +18,44 @@ export const LEGAL = {
   mailingAddress: 'TODO: mailing address for legal notices',
   termsVersion: '2026-10-06',
   privacyVersion: '2026-10-06',
+  /** Informational policies: shown and linked, never part of the acceptance set. */
+  refundsVersion: '2026-10-06',
+  cookiesVersion: '2026-10-06',
 } as const;
 
+/** The two documents a user must accept (sign-up checkbox, LegalGate, server gate). */
 export type LegalDocumentId = 'terms' | 'privacy';
+/** Every public legal page, including the informational policies. */
+export type LegalPageId = LegalDocumentId | 'refunds' | 'cookies';
+
+export const LEGAL_PAGE_IDS: readonly LegalPageId[] = ['terms', 'privacy', 'refunds', 'cookies'] as const;
+
+/** A cross-reference rendered under a section ("See also: Refund & Cancellation Policy"). */
+export type LegalLink = { label: string; page: LegalPageId };
 
 export type LegalSection = {
   id: string;
   heading: string;
   paragraphs: string[];
   bullets?: string[];
+  /** Optional trailing paragraphs rendered after the bullets. */
+  after?: string[];
+  links?: LegalLink[];
 };
 
 export type LegalDocument = {
   title: string;
+  /** Short name for footers and settings rows. */
+  shortTitle: string;
   effectiveDate: string;
   intro: string[];
   sections: LegalSection[];
 };
+
+/** A config value that still needs the owner's input (see docs/legal.md). */
+export function isLegalPlaceholder(value: string): boolean {
+  return /^TODO\b/i.test(value.trim());
+}
 
 /** "2026-10-06" → "October 6, 2026" for the effective-date line. */
 export function formatLegalDate(iso: string): string {

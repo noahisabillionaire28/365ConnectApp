@@ -15,7 +15,7 @@
     /* Brand palette */
     --app-navy:        #0A1628;   /* sidebar bg, primary button */
     --app-navy-active: #1E3A5F;   /* sidebar active item */
-    --app-gold:        #FFD700;   /* verified badge, star ratings ONLY */
+    --app-gold:        #FFD700;   /* Pro badge, star ratings ONLY */
     --app-green:       #10B981;   /* applied checkmark, success */
     --app-red:         #EF4444;   /* errors, negative tags, urgent */
     --app-card-border: #E5E7EB;   /* 1px card border */
@@ -145,6 +145,35 @@
     background-color: #ffffff;
     color: #111827;
   }
+}
+
+/* ── Keyboard accessibility ──────────────────────────────────────────────────
+   A visible focus ring for keyboard users on every interactive element (mouse
+   and touch focus stays clean via :focus-visible), and the "Skip to content"
+   link that is invisible until it receives focus. */
+:where(a, button, [role="button"], [role="tab"], [role="switch"], [role="option"], [role="radio"], [role="article"], input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid #0A1628;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translate(-50%, -200%);
+  z-index: 300;
+  background: #0A1628;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  transition: transform 0.15s ease-out;
+}
+.skip-link:focus-visible {
+  transform: translate(-50%, 0);
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 
 /* iOS safe areas (viewport-fit=cover is set in index.html) */

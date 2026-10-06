@@ -27,7 +27,7 @@ function ExploreTile({ person, onTap }: { person: WorkerPerson; onTap: () => voi
       )}
       {person.isPro && (
         <div className="absolute top-1.5 right-1.5 bg-black/60 rounded-full p-0.5">
-          <BadgeCheck size={13} aria-label="Pro verified" style={{ color: GOLD }} />
+          <BadgeCheck size={13} aria-label="Pro member" style={{ color: GOLD }} />
         </div>
       )}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 py-1">

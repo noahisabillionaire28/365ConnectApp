@@ -98,7 +98,7 @@ export function SignUpScreen() {
     const address = email.trim().toLowerCase();
     if (!address) { setError('Enter your email address.'); return; }
     if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
-    if (!agreed) { setError('Please agree to the Terms of Service and Privacy Policy.'); return; }
+    if (!agreed) { setError('Please confirm you are 18 or older and agree to the Terms of Service and Privacy Policy.'); return; }
     setLoading(true); setError(null);
     try {
       // The server either creates an already-confirmed account (today's
@@ -196,10 +196,10 @@ export function SignUpScreen() {
 
       {/* Header */}
       <div className="flex flex-col">
-        <button onClick={() => navigate('/')}
+        <button type="button" onClick={() => navigate('/')} aria-label="Back"
           className="w-10 h-10 flex items-center justify-center -ml-2 mb-4"
           data-testid="btn-back">
-          <ChevronLeft className="w-6 h-6" style={{ color: TEXT }} />
+          <ChevronLeft className="w-6 h-6" aria-hidden style={{ color: TEXT }} />
         </button>
         <h2 className="font-extrabold text-[28px] leading-none tracking-[-1px]" style={{ color: NAVY }}>
           365 CONNECT
@@ -293,10 +293,10 @@ export function SignUpScreen() {
               placeholder="Min. 6 characters"
               data-testid="input-password"
             />
-            <button type="button" onClick={() => setShowPw(v => !v)}
+            <button type="button" onClick={() => setShowPw(v => !v)} aria-label={showPw ? 'Hide password' : 'Show password'} aria-pressed={showPw}
               className="absolute right-4 top-1/2 -translate-y-1/2 transition-colors"
               style={{ color: MUTED }}>
-              {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+              {showPw ? <EyeOff size={18} aria-hidden /> : <Eye size={18} aria-hidden />}
             </button>
           </div>
         </div>
@@ -309,8 +309,8 @@ export function SignUpScreen() {
             style={{ background: agreed ? NAVY : '#FFFFFF', borderColor: agreed ? NAVY : '#D1D5DB' }}>
             {agreed && <Check size={15} className="text-white" strokeWidth={3} />}
           </span>
-          <span className="text-[13px] leading-relaxed" style={{ color: TEXT }}>
-            I have read and agree to the{' '}
+          <span className="text-[13px] leading-relaxed" style={{ color: TEXT }} data-testid="checkbox-legal-text">
+            I am at least 18 years old and I agree to the{' '}
             <LegalLink doc="terms" onOpenSheet={setSheet}>Terms of Service</LegalLink>
             {' '}and{' '}
             <LegalLink doc="privacy" onOpenSheet={setSheet}>Privacy Policy</LegalLink>.

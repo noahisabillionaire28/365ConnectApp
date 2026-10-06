@@ -6,7 +6,10 @@ import {
   CreditCard, Bell, Shield, HelpCircle, LogOut,
   Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
   BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck, LayoutTemplate, Trash2, FileText, ShieldCheck,
+  Receipt, Cookie, Download,
 } from 'lucide-react';
+import { LEGAL } from '@/legal/config';
+import { downloadMyData } from '@/lib/dataExport';
 import { useLegalStatus } from '@/hooks/useLegal';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
@@ -38,13 +41,13 @@ function StarRow({ rating, size = 12 }: { rating: number; size?: number }) {
   );
 }
 
-function SettingRow({ icon: Icon, label, onTap, danger = false }: {
+function SettingRow({ icon: Icon, label, onTap, danger = false, testId }: {
   icon: React.ComponentType<{ size?: number; className?: string }>;
-  label: string; onTap: () => void; danger?: boolean;
+  label: string; onTap: () => void; danger?: boolean; testId?: string;
 }) {
   return (
     <motion.button type="button" whileTap={{ backgroundColor: '#FAFAFA' }} onClick={onTap}
-      aria-label={label}
+      aria-label={label} data-testid={testId}
       className="w-full flex items-center gap-4 px-5 py-4 border-b border-[#DBDBDB] text-left transition-colors last:border-none">
       <div className={`w-10 h-10 rounded-[10px] flex items-center justify-center flex-shrink-0 ${
         danger ? 'bg-red-50' : 'bg-[#FAFAFA]'
@@ -342,7 +345,7 @@ function LegalAcceptedLine() {
   const { data } = useLegalStatus();
   const when = data?.acceptedAt;
   return (
-    <p className="text-[#9CA3AF] text-[11px] leading-relaxed px-1 mt-2 mb-4" data-testid="legal-accepted-line">
+    <p className="text-[#6B7280] text-[11px] leading-relaxed px-1 mt-2 mb-4" data-testid="legal-accepted-line">
       {when
         ? `You accepted on ${new Date(when).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`
         : 'You will be asked to accept the current versions the next time they change.'}
@@ -412,6 +415,20 @@ export function ProfileScreen() {
   const [deleteWord, setDeleteWord] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Data portability: one tap downloads everything we hold as a JSON file.
+  const [exporting, setExporting] = useState(false);
+  async function handleDownloadData() {
+    setExporting(true);
+    try {
+      await downloadMyData(user?.id);
+      toast('Your data file is ready.');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't prepare your data. Please try again.", 'error');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   async function handleDeleteAccount() {
     if (deleteWord.trim() !== 'DELETE' || deleting) return;
@@ -520,7 +537,7 @@ export function ProfileScreen() {
         <div className="flex items-center gap-2 mb-0.5">
           <h1 className="text-black font-bold text-[22px] tracking-tight">{displayName}</h1>
           {profile.isPro && (
-            <BadgeCheck size={20} aria-label="Pro verified" className="text-[#FFD700] flex-shrink-0" />
+            <BadgeCheck size={20} aria-label="Pro member" className="text-[#FFD700] flex-shrink-0" />
           )}
         </div>
 
@@ -745,16 +762,16 @@ export function ProfileScreen() {
           <motion.button
             type="button" whileTap={{ scale: 0.98 }}
             onClick={() => navigate('/pro-upgrade')}
-            aria-label="Upgrade to Pro plan"
+            aria-label="About 365 Connect Pro (coming soon)"
             className="w-full bg-gradient-to-r from-[#0A1628] to-[#1E3A5F] rounded-[14px] px-5 py-4 flex items-center gap-4"
           >
             <div className="w-10 h-10 rounded-[10px] bg-[#FFD700]/20 border border-[#FFD700]/30 flex items-center justify-center flex-shrink-0">
               <Zap size={18} aria-hidden className="text-[#FFD700]" />
             </div>
             <div className="flex-1 text-left">
-              <p className="text-white font-bold text-[15px]">Upgrade to Pro</p>
-              <p className="text-white/60 text-[12px]">
-                {isPoster ? '$17/mo · Pro badge on your shifts + priority support' : '$17/mo · Priority applications + Pro badge'}
+              <p className="text-white font-bold text-[15px]">365 Connect Pro · coming soon</p>
+              <p className="text-white/70 text-[12px]">
+                {isPoster ? '$17/mo when it launches · Pro badge + priority support' : '$17/mo when it launches · Priority applications + Pro badge'}
               </p>
             </div>
             <ChevronRight size={16} aria-hidden className="text-white/40" />
@@ -813,24 +830,34 @@ export function ProfileScreen() {
 
                 {!profile.isPro && !isIOS() && (
                   <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-4">
-                    <SettingRow icon={Zap} label="Upgrade to Pro" onTap={() => go('/pro-upgrade')} />
+                    <SettingRow icon={Zap} label="365 Connect Pro (coming soon)" onTap={() => go('/pro-upgrade')} />
                   </div>
                 )}
 
-                <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Legal</p>
+                <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Legal &amp; your data</p>
                 <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden" data-testid="settings-legal">
                   <SettingRow icon={FileText} label="Terms of Service" onTap={() => go('/terms')} />
                   <SettingRow icon={ShieldCheck} label="Privacy Policy" onTap={() => go('/privacy')} />
+                  <SettingRow icon={Receipt} label="Refund & Cancellation Policy" onTap={() => go('/refunds')} />
+                  <SettingRow icon={Cookie} label="Cookie & Storage Policy" onTap={() => go('/cookies')} />
+                  <SettingRow icon={Download} label={exporting ? 'Preparing your data…' : 'Download my data'} testId="settings-download-data"
+                    onTap={() => { if (!exporting) void handleDownloadData(); }} />
                 </div>
                 <LegalAcceptedLine />
+                <p className="text-[#6B7280] text-[11px] leading-relaxed px-1 -mt-2 mb-4">
+                  Privacy request or correction?{' '}
+                  <a href={`mailto:${LEGAL.contactEmail}?subject=Privacy%20request`} className="text-[#0A1628] font-semibold underline underline-offset-2">
+                    {LEGAL.contactEmail}
+                  </a>
+                </p>
 
                 <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
                   <SettingRow icon={LogOut} label="Log Out" onTap={handleSignOut} danger />
                   {/* The sheet sits below this panel's z-index, so the panel closes first. */}
                   <SettingRow icon={Trash2} label="Delete account" onTap={() => { setSettingsOpen(false); setDeleteWord(''); setDeleteError(null); setDeleteOpen(true); }} danger />
                 </div>
-                <p className="text-[#9CA3AF] text-[11px] leading-relaxed px-1 mt-2">
-                  Deleting removes your profile, posts, messages and history for good.
+                <p className="text-[#6B7280] text-[11px] leading-relaxed px-1 mt-2">
+                  Deleting removes your profile, posts, messages and history for good. Download your data first if you want a copy.
                 </p>
               </div>
             </motion.div>

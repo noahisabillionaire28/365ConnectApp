@@ -62,7 +62,7 @@ function AssignCard({ worker, shiftFull, shiftStarted, shiftJobTypes, isAssignin
             {worker.username ? `@${worker.username}` : 'Worker'}
           </p>
           {worker.isPro && (
-            <BadgeCheck size={15} aria-label="Verified worker" style={{ color: GOLD }} fill={GOLD}
+            <BadgeCheck size={15} aria-label="Pro member" style={{ color: GOLD }} fill={GOLD}
               className="flex-shrink-0 text-white" />
           )}
         </div>

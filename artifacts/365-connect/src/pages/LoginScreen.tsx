@@ -212,10 +212,10 @@ export function LoginScreen() {
 
       {/* Header */}
       <div className="flex flex-col">
-        <button onClick={() => navigate('/')}
+        <button type="button" onClick={() => navigate('/')} aria-label="Back"
           className="w-10 h-10 flex items-center justify-center -ml-2 mb-4"
           data-testid="btn-back">
-          <ChevronLeft className="w-6 h-6" style={{ color: TEXT }} />
+          <ChevronLeft className="w-6 h-6" aria-hidden style={{ color: TEXT }} />
         </button>
         <h2 className="font-extrabold text-[28px] leading-none tracking-[-1px]" style={{ color: NAVY }}>
           365 CONNECT
@@ -312,10 +312,10 @@ export function LoginScreen() {
               placeholder="Enter your password"
               data-testid="input-password"
             />
-            <button type="button" onClick={() => setShowPw(v => !v)}
+            <button type="button" onClick={() => setShowPw(v => !v)} aria-label={showPw ? 'Hide password' : 'Show password'} aria-pressed={showPw}
               className="absolute right-4 top-1/2 -translate-y-1/2 transition-colors"
               style={{ color: MUTED }}>
-              {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+              {showPw ? <EyeOff size={18} aria-hidden /> : <Eye size={18} aria-hidden />}
             </button>
           </div>
         </div>

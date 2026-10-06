@@ -1,29 +1,33 @@
 /**
- * LegalScreen — /terms and /privacy
+ * LegalScreen — /terms, /privacy, /refunds, /cookies
  *
- * Public, readable without signing in. One component renders either document
+ * Public, readable without signing in. One component renders any legal page
  * from its structured data: a sticky collapsible "On this page" list, the
- * effective date, the prose, and a footer linking the other document and the
- * contact mailbox. Print-friendly (chrome is hidden under @media print).
+ * effective date, the prose, and a footer with the other documents, the
+ * About & Contact block and credits. Print-friendly (chrome is hidden under
+ * @media print).
  */
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ChevronLeft, ChevronDown, Printer, Mail } from 'lucide-react';
-import { LegalDocumentBody, LEGAL_DOCS } from '@/components/LegalDocument';
-import { LEGAL, formatLegalDate, type LegalDocumentId } from '@/legal/config';
+import { ChevronLeft, ChevronDown, Printer } from 'lucide-react';
+import { LegalDocumentBody, LegalContactBlock, LegalCreditsLine, LEGAL_DOCS } from '@/components/LegalDocument';
+import { LEGAL, LEGAL_PAGE_IDS, formatLegalDate, type LegalPageId } from '@/legal/config';
 import { useLegalVersions } from '@/hooks/useLegal';
 
-export function LegalScreen({ doc }: { doc: LegalDocumentId }) {
+export function LegalScreen({ doc }: { doc: LegalPageId }) {
   const [, navigate] = useLocation();
   const d = LEGAL_DOCS[doc];
-  const other: LegalDocumentId = doc === 'terms' ? 'privacy' : 'terms';
+  const others = LEGAL_PAGE_IDS.filter((id) => id !== doc);
   const [tocOpen, setTocOpen] = useState(false);
   const versions = useLegalVersions();
-  // The server is the source of truth for the effective date; the bundled
-  // constant is the fallback when the API cannot be reached.
-  const effective = versions.data?.[doc]?.effectiveDate ?? d.effectiveDate;
+  // The server is the source of truth for the effective date of the two
+  // accepted documents; the bundled constant is the fallback (and the only
+  // source for the informational policies).
+  const effective = (doc === 'terms' || doc === 'privacy' ? versions.data?.[doc]?.effectiveDate : undefined) ?? d.effectiveDate;
 
   useEffect(() => { document.title = `${d.title} · 365 Connect`; return () => { document.title = '365 Connect'; }; }, [d.title]);
+  // Switching between documents via the footer must start at the top.
+  useEffect(() => { window.scrollTo(0, 0); setTocOpen(false); }, [doc]);
 
   function goBack() {
     if (window.history.length > 1) window.history.back();
@@ -86,18 +90,22 @@ export function LegalScreen({ doc }: { doc: LegalDocumentId }) {
 
       {/* Footer */}
       <footer className="print-hidden px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-6 border-t border-[#E5E7EB]">
-        <p className="text-[#6B7280] text-[13px] mb-3">
-          Read our{' '}
-          <Link href={`/${other}`} className="text-[#0A1628] font-semibold underline underline-offset-2" data-testid={`legal-link-${other}`}>
-            {LEGAL_DOCS[other].title}
-          </Link>
-          .
-        </p>
-        <a href={`mailto:${LEGAL.contactEmail}`}
-          className="inline-flex items-center gap-2 min-h-[44px] text-[#0A1628] text-[14px] font-semibold">
-          <Mail size={16} aria-hidden /> {LEGAL.contactEmail}
-        </a>
-        <p className="text-[#9CA3AF] text-[12px] mt-3">
+        <p className="text-[#6B7280] text-[13px] font-semibold uppercase tracking-[0.12em] mb-2">Also read</p>
+        <ul className="flex flex-col" data-testid="legal-footer-links">
+          {others.map((id) => (
+            <li key={id}>
+              <Link href={`/${id}`} className="inline-flex items-center min-h-[44px] text-[#0A1628] text-[15px] font-semibold underline underline-offset-2"
+                data-testid={`legal-link-${id}`}>
+                {LEGAL_DOCS[id].title}
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        <LegalContactBlock />
+
+        <LegalCreditsLine className="mt-5" />
+        <p className="text-[#6B7280] text-[12px] mt-3">
           © {new Date().getFullYear()} {LEGAL.entityName}. {LEGAL.governingLaw}, United States.
         </p>
       </footer>

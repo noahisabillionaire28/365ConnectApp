@@ -1,15 +1,20 @@
 /**
  * Pro Upgrade Screen — /pro-upgrade
- * Shows the $17/mo Pro plan, lists benefits, and simulates a subscription
- * by writing a row to the payments table and setting users.is_pro = true.
+ *
+ * Shows the planned $17/mo Pro plan and its benefits. Pro cannot be bought
+ * yet: the primary action says so plainly, and the price, renewal and
+ * cancellation terms are shown up front so nothing is hidden when it goes
+ * live. In development builds (VITE_APP_ENV=development) a clearly labelled
+ * "simulate" button writes a status:'simulated' payment row so the Pro state
+ * can be exercised; it never charges anyone.
  */
 import { useState, useEffect } from 'react';
-import { useLocation } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { isIOS } from '@/lib/native';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Zap, CheckCircle2, BadgeCheck,
-  TrendingUp, MessageSquare, Star, Compass, Shield,
+  TrendingUp, MessageSquare, Star, Compass, Shield, Info,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
@@ -18,37 +23,42 @@ import { useProfile } from '@/hooks/useProfile';
 import { PAYMENTS_QUERY_KEY } from '@/hooks/usePayments';
 import { BottomTabNav } from '@/components/BottomTabNav';
 
+/** Purchasing is not wired up (no Stripe subscription, no App Store product). */
+export const PRO_PURCHASE_LIVE = false;
+export const PRO_PRICE_LABEL = '$17/month';
+const SIMULATE_ALLOWED = import.meta.env.VITE_APP_ENV === 'development';
+
 // ─── Pro benefits list ────────────────────────────────────────────────────────
 const PRO_BENEFITS = [
   {
     icon: TrendingUp,
     title: 'Priority applications',
-    body: "Your applications surface at the top of every client's review queue.",
+    body: "Your applications are listed first in a poster's review queue. Posters still choose whom to book.",
   },
   {
     icon: BadgeCheck,
     title: 'Pro badge on your profile',
-    body: 'A gold verified checkmark signals credibility to every client.',
+    body: 'A gold Pro badge shows you subscribe to Pro. It is not an identity, licence or background check.',
   },
   {
     icon: Star,
     title: 'Featured in Explore',
-    body: 'Get discovered first when clients search for workers in your area.',
+    body: 'Pro profiles are sorted first when posters browse workers in their area.',
   },
   {
     icon: MessageSquare,
-    title: 'Direct message boost',
-    body: 'Send first-contact messages to clients before applying to shifts.',
+    title: 'Message first',
+    body: 'Send a first message to a poster before applying to one of their shifts.',
   },
   {
     icon: Compass,
-    title: 'Advanced shift analytics',
-    body: 'See match score breakdowns and earn trend data across your shifts.',
+    title: 'Shift analytics',
+    body: 'See how your match insights are built and your earnings trend across shifts.',
   },
   {
     icon: Shield,
     title: 'Priority support',
-    body: 'Skip the queue — get responses from our team within 4 hours.',
+    body: 'Your questions go to the front of our support queue.',
   },
 ];
 
@@ -84,17 +94,12 @@ function PlanCard({
     <div className={`flex-1 rounded-[12px] border-2 px-4 py-4 flex flex-col gap-1 relative ${
       highlight ? 'border-[#FFD700] bg-[#FFFBEB]' : 'border-[#E5E7EB] bg-white'
     }`}>
-      {highlight && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#FFD700] text-[#111827] text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap">
-          Recommended
-        </div>
-      )}
-      <p className={`text-[11px] font-bold uppercase tracking-wider ${highlight ? 'text-[#B8860B]' : 'text-[#9CA3AF]'}`}>
+      <p className={`text-[11px] font-bold uppercase tracking-wider ${highlight ? 'text-[#B8860B]' : 'text-[#6B7280]'}`}>
         {label}
       </p>
       <div className="flex items-baseline gap-1">
         <span className={`font-bold text-[28px] ${highlight ? 'text-[#111827]' : 'text-[#6B7280]'}`}>{price}</span>
-        {period && <span className="text-[#9CA3AF] text-[12px]">{period}</span>}
+        {period && <span className="text-[#6B7280] text-[12px]">{period}</span>}
       </div>
       {current && (
         <span className="text-[#6B7280] text-[11px] font-medium">Current plan</span>
@@ -103,12 +108,13 @@ function PlanCard({
   );
 }
 
-// ─── Success overlay ──────────────────────────────────────────────────────────
+// ─── Success overlay (simulated activation, development only) ─────────────────
 function SuccessOverlay({ onDone }: { onDone: () => void }) {
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
       className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center px-8 text-center"
+      role="dialog" aria-modal="true" aria-labelledby="pro-success-title"
     >
       <motion.div
         initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }}
@@ -118,12 +124,9 @@ function SuccessOverlay({ onDone }: { onDone: () => void }) {
         <BadgeCheck size={40} className="text-[#B8860B]" aria-hidden />
       </motion.div>
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-        <h2 className="text-[#111827] font-bold text-[26px] tracking-tight mb-2">You're Pro!</h2>
+        <h2 id="pro-success-title" className="text-[#111827] font-bold text-[26px] tracking-tight mb-2">Pro is on (simulated)</h2>
         <p className="text-[#6B7280] text-[15px] leading-relaxed mb-8">
-          Your Pro badge is live. Priority applications and all features are now active.
-        </p>
-        <p className="text-[#9CA3AF] text-[11px] mb-6">
-          This is a simulated subscription — no real charge was made.
+          Your Pro badge is live for testing. No charge was made and nothing will renew.
         </p>
         <motion.button
           type="button" whileTap={{ scale: 0.97 }}
@@ -152,25 +155,20 @@ export function ProUpgradeScreen() {
   const [success,  setSuccess]  = useState(false);
   const [error,    setError]    = useState<string | null>(null);
 
-  // Already Pro — reflect that gracefully
   const alreadyPro = profile.isPro && !loading && !success;
 
-  async function handleUpgrade() {
+  async function handleSimulate() {
     if (!user) { setError('You must be signed in to upgrade.'); return; }
     setLoading(true);
     setError(null);
-
     try {
-      // 1. Record the (simulated) subscription; the server grants Pro against
-      //    it. Profiles cannot set is_pro themselves.
+      // Records a status:'simulated' subscription; the server grants Pro
+      // against it. Profiles cannot set is_pro themselves.
       await apiClient(user.id).post('/payments', { payment_type: 'pro_subscription' });
-
-      // 2. Invalidate profile and payments queries so UI refreshes
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['profile', user.id] }),
         queryClient.invalidateQueries({ queryKey: [...PAYMENTS_QUERY_KEY] }),
       ]);
-
       setSuccess(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
@@ -197,14 +195,14 @@ export function ProUpgradeScreen() {
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
           <div>
-            <h1 className="text-[#111827] font-bold text-[20px] tracking-tight">Upgrade to Pro</h1>
-            <p className="text-[#6B7280] text-[12px]">Simulated payment — no real charge</p>
+            <h1 className="text-[#111827] font-bold text-[20px] tracking-tight">365 Connect Pro</h1>
+            <p className="text-[#6B7280] text-[12px]">{PRO_PURCHASE_LIVE ? PRO_PRICE_LABEL : 'Coming soon · not available to buy yet'}</p>
           </div>
         </div>
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto px-4 pt-5 pb-36">
+      <div className="flex-1 overflow-y-auto px-4 pt-5 pb-40">
 
         {/* Hero */}
         <motion.div
@@ -220,10 +218,10 @@ export function ProUpgradeScreen() {
               <span className="text-[#FFD700] font-bold text-[14px] uppercase tracking-wider">365 Connect Pro</span>
             </div>
             <p className="text-white font-bold text-[28px] tracking-tight mb-1">
-              Unlock your full potential
+              Stand out to posters
             </p>
-            <p className="text-white/60 text-[14px] leading-relaxed">
-              Get hired faster, earn more, and stand out from the competition.
+            <p className="text-white/70 text-[14px] leading-relaxed">
+              Priority placement and a Pro badge. Pro does not guarantee bookings or earnings.
             </p>
           </div>
         </motion.div>
@@ -236,7 +234,7 @@ export function ProUpgradeScreen() {
             role="status"
           >
             <CheckCircle2 size={18} aria-hidden className="text-[#10B981] flex-shrink-0" />
-            <p className="text-[#065F46] text-[13px] font-medium">You're already on the Pro plan — all features are active!</p>
+            <p className="text-[#065F46] text-[13px] font-medium">You're on the Pro plan. All Pro features are active.</p>
           </motion.div>
         )}
 
@@ -247,6 +245,9 @@ export function ProUpgradeScreen() {
             <PlanCard label="Free" price="$0" period="/mo" current={!profile.isPro} />
             <PlanCard label="Pro" price="$17" period="/mo" highlight current={profile.isPro} />
           </div>
+          <p className="text-[#6B7280] text-[12px] mt-2 leading-relaxed">
+            Everything you can do today stays free. 365 Connect charges no fees on shifts or pay, with or without Pro.
+          </p>
         </div>
 
         {/* Benefits */}
@@ -259,13 +260,28 @@ export function ProUpgradeScreen() {
           ))}
         </div>
 
-        {/* Disclaimer */}
-        <div className="bg-[#FFF7ED] border border-[#FED7AA] rounded-[12px] px-4 py-3 mb-4">
-          <p className="text-[#92400E] text-[12px] leading-relaxed font-medium">
-            ⚠️ <strong>Demo mode:</strong> This simulates a real subscription. No credit card is charged.
-            A row is written to the payments table with <code className="text-[11px] bg-[#FEF3C7] rounded px-1">status: 'simulated'</code>.
-          </p>
-        </div>
+        {/* Price, renewal and cancellation terms — always visible */}
+        <section aria-labelledby="pro-terms-heading" className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-4 mb-4" data-testid="pro-terms">
+          <h2 id="pro-terms-heading" className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider mb-2">Price and terms</h2>
+          <ul className="flex flex-col gap-1.5 text-[13px] text-[#374151] leading-relaxed list-disc pl-4">
+            <li><span className="font-semibold text-[#111827]">{PRO_PRICE_LABEL}</span>, shown and confirmed before you pay. No extra fees.</li>
+            <li>Renews monthly until you cancel. Cancel anytime here in Settings or, for an App Store purchase, in your Apple ID subscriptions. You keep Pro until the end of the paid period.</li>
+            <li>Full refund of your first purchase if you ask within 14 days. No partial-period refunds after that, except where the law requires.</li>
+          </ul>
+          <Link href="/refunds" className="inline-flex items-center gap-1.5 min-h-[44px] text-[#0A1628] text-[13px] font-semibold underline underline-offset-2" data-testid="pro-refunds-link">
+            Refund &amp; Cancellation Policy
+          </Link>
+        </section>
+
+        {/* Availability notice */}
+        {!PRO_PURCHASE_LIVE && !alreadyPro && (
+          <div className="bg-[#F0F7FF] border border-[#BFDBFE] rounded-[12px] px-4 py-3 mb-4 flex items-start gap-2.5" role="status" data-testid="pro-not-live">
+            <Info size={16} aria-hidden className="text-[#1D4ED8] flex-shrink-0 mt-0.5" />
+            <p className="text-[#1E3A8A] text-[13px] leading-relaxed">
+              Pro is not available to buy yet. Nothing on this screen charges you. We will announce it in the app when it opens; you decide then.
+            </p>
+          </div>
+        )}
 
         {error && (
           <motion.div
@@ -280,36 +296,45 @@ export function ProUpgradeScreen() {
       {/* Fixed CTA */}
       <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-4 pt-4
         bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
-        <motion.button
-          type="button" whileTap={{ scale: 0.97 }}
-          onClick={alreadyPro ? () => navigate('/profile') : handleUpgrade}
-          disabled={loading}
-          aria-disabled={loading}
-          aria-busy={loading}
-          aria-label={alreadyPro ? 'Go to profile' : 'Upgrade to Pro for $17 per month (simulated)'}
-          className={`w-full h-[52px] rounded-[12px] font-bold text-[16px] flex items-center justify-center gap-2.5 transition-all ${
-            alreadyPro
-              ? 'bg-[#0A1628] text-white'
-              : 'bg-[#FFD700] text-[#111827]'
-          } disabled:opacity-60 disabled:cursor-not-allowed`}
-        >
-          {loading ? (
-            <>
-              <div className="w-4 h-4 rounded-full border-2 border-[#111827]/20 border-t-[#111827] animate-spin" aria-hidden />
-              Activating Pro…
-            </>
-          ) : alreadyPro ? (
-            'View Profile'
-          ) : (
-            <>
-              <Zap size={18} aria-hidden />
-              Upgrade for $17/mo
-            </>
-          )}
-        </motion.button>
-        <p className="text-center text-[#9CA3AF] text-[11px] mt-2">
-          Simulated • No real payment processed • Cancel anytime
-        </p>
+        {alreadyPro ? (
+          <motion.button
+            type="button" whileTap={{ scale: 0.97 }}
+            onClick={() => navigate('/profile')}
+            className="w-full h-[52px] rounded-[12px] font-bold text-[16px] flex items-center justify-center gap-2.5 bg-[#0A1628] text-white"
+          >
+            View Profile
+          </motion.button>
+        ) : SIMULATE_ALLOWED ? (
+          <>
+            <motion.button
+              type="button" whileTap={{ scale: 0.97 }}
+              onClick={handleSimulate}
+              disabled={loading}
+              aria-busy={loading}
+              className="w-full h-[52px] rounded-[12px] font-bold text-[16px] flex items-center justify-center gap-2.5 bg-[#FFD700] text-[#111827] disabled:opacity-60 disabled:cursor-not-allowed"
+              data-testid="pro-simulate"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 rounded-full border-2 border-[#111827]/20 border-t-[#111827] animate-spin" aria-hidden />
+                  Activating…
+                </>
+              ) : (
+                <><Zap size={18} aria-hidden /> Simulate Pro (dev only, no charge)</>
+              )}
+            </motion.button>
+            <p className="text-center text-[#6B7280] text-[11px] mt-2">Development build · writes a simulated payment row · never charges a card</p>
+          </>
+        ) : (
+          <>
+            <button type="button" disabled aria-disabled="true"
+              className="w-full h-[52px] rounded-[12px] font-bold text-[16px] flex items-center justify-center gap-2.5 bg-[#E5E7EB] text-[#6B7280] cursor-not-allowed"
+              data-testid="pro-cta-disabled">
+              Not available yet
+            </button>
+            <p className="text-center text-[#6B7280] text-[11px] mt-2">{PRO_PRICE_LABEL} when it launches · cancel anytime · no fees today</p>
+          </>
+        )}
       </div>
 
       <BottomTabNav />
