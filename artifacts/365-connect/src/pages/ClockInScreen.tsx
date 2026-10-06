@@ -9,7 +9,7 @@ import type { MockShift } from '@/lib/supabase';
 import { markClockedIn } from '@/store/feedStore';
 import { useShiftById } from '@/hooks/useShifts';
 import { useAuth } from '@/contexts/AuthContext';
-import { haversineMiles } from '@/lib/supabase';
+import { haversineMiles, shiftHeadline } from '@/lib/supabase';
 import { useTimeEntry } from '@/hooks/useTimeEntry';
 import { useToast } from '@/contexts/ToastContext';
 import { getOrCreateDirectConversation } from '@/hooks/useConversations';
@@ -178,7 +178,8 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
         <p className="text-[#737373] text-[12px] font-semibold uppercase tracking-widest mb-1">
           {shift.jobType}
         </p>
-        <p className="text-black font-bold text-[20px] leading-tight">{shift.companyName}</p>
+        <p className="text-black font-bold text-[20px] leading-tight">{shiftHeadline(shift)}</p>
+        <p className="text-[#374151] text-[13px] font-medium mt-0.5">{shift.companyName}</p>
         <p className="text-[#6B7280] text-[12px] mt-0.5">{shift.location}</p>
       </div>
 

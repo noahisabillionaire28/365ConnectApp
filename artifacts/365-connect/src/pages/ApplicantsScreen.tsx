@@ -22,7 +22,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { useProfile } from '@/hooks/useProfile';
 import { apiClient, isApiStatus } from '@/lib/api';
 import { startShiftPayment } from '@/lib/checkout';
-import { formatTime } from '@/lib/supabase';
+import { formatTime, shiftHeadline } from '@/lib/supabase';
 import { utcToZonedParts, zonedTimeToUtc, zoneAbbrev, DEFAULT_SHIFT_TZ } from '@/lib/timezone';
 
 /** Hourly pay periods; anything else is a flat total. Mirrors the server's computePay. */
@@ -554,9 +554,9 @@ export function ApplicantsScreen() {
           <ChevronLeft size={18} aria-hidden className="text-black" />
         </button>
         <div className="min-w-0">
-          <h1 className="text-black font-bold text-[18px] leading-tight truncate">Roster</h1>
+          <h1 className="text-black font-bold text-[18px] leading-tight truncate">{shift ? shiftHeadline(shift) : 'Roster'}</h1>
           <p className="text-[#737373] text-[12px] truncate">
-            {[shift?.jobType, shift?.companyName].filter(Boolean).join(' · ') || 'Shift'}
+            {shift ? ['Roster', shift.jobType, shift.companyName].filter(Boolean).join(' · ') : 'Loading…'}
           </p>
         </div>
       </div>
