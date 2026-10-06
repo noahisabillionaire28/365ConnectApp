@@ -5,8 +5,20 @@ import { requireAuth, requireSession } from '../middleware/auth.js';
 import { HttpError, sendError } from '../lib/httpError.js';
 import { normalizeUsername, isUniqueViolation, HANDLE_TAKEN } from '../lib/username.js';
 import { isBlockedEitherWay } from '../lib/chat.js';
+import { rateLimit } from '../lib/rateLimit.js';
+import { LEGAL_VERSIONS } from '../lib/legal.js';
 
 const router = Router();
+
+// Data portability is cheap to serve but reads a dozen tables: a handful of
+// downloads per hour per account is plenty for a person, and stops a script
+// from using it as a bulk reader.
+const exportLimiter = rateLimit({
+  windowMs: 60 * 60_000,
+  max: 6,
+  keys: (req) => [req.userId ? `user:${req.userId}` : null],
+  message: 'You can download your data a few times an hour. Please try again later.',
+});
 
 /** The verified email on the Supabase auth account (never taken from the body). */
 async function authEmail(userId: string): Promise<string | null> {
@@ -59,6 +71,94 @@ router.get('/me', requireSession, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(404).json({ error: 'User not found' });
   return res.json(data);
+});
+
+/**
+ * GET /api/users/me/export — everything we hold about the caller, as one JSON
+ * bundle (profile, applications, time entries, payments, reviews given and
+ * received, posts, comments, messages they sent, notifications, saved
+ * searches, follows, legal acceptances). requireSession on purpose: a
+ * suspended account keeps its right to a copy of its data. Served as an
+ * attachment so a browser saves it as a file.
+ */
+router.get('/me/export', requireSession, exportLimiter, async (req, res) => {
+  const me = req.userId!;
+  const q = <T = Record<string, unknown>>(p: PromiseLike<{ data: T[] | null; error: { message: string } | null }>) =>
+    Promise.resolve(p).then(({ data, error }) => { if (error) throw new HttpError(500, error.message); return data ?? []; });
+  try {
+    const [
+      profileRows, authUser, applications, timeEntries, payments, reviewsGiven, reviewsReceived, posts, comments,
+      messagesSent, notifications, savedSearches, following, followers, savedWorkers, legal, pushSubs, blocks,
+    ] = await Promise.all([
+      q(adminDb.from('users').select('*').eq('id', me).limit(1)),
+      adminDb.auth.admin.getUserById(me).then((r) => r.data.user ?? null).catch(() => null),
+      q(adminDb.from('applications').select('*').eq('worker_id', me).order('created_at', { ascending: false })),
+      q(adminDb.from('time_entries').select('*').eq('worker_id', me).order('created_at', { ascending: false })),
+      q(adminDb.from('payments').select('*').or(`worker_id.eq.${me},client_id.eq.${me}`).order('created_at', { ascending: false })),
+      q(adminDb.from('reviews').select('*').eq('reviewer_id', me).order('created_at', { ascending: false })),
+      q(adminDb.from('reviews').select('*').eq('reviewee_id', me).order('created_at', { ascending: false })),
+      q(adminDb.from('posts').select('*').eq('user_id', me).order('created_at', { ascending: false })),
+      q(adminDb.from('post_comments').select('*').eq('user_id', me).order('created_at', { ascending: false })),
+      q(adminDb.from('messages').select('id, conversation_id, recipient_id, kind, text, image_url, video_url, voice_url, file_url, file_name, reply_to_id, shift_card_id, created_at, edited_at, deleted_at, read_at')
+        .eq('sender_id', me).is('deleted_at', null).order('created_at', { ascending: false }).limit(5000)),
+      q(adminDb.from('notifications').select('id, type, title, body, shift_id, post_id, from_user_id, amount, read, read_at, created_at')
+        .eq('user_id', me).eq('hidden', false).order('created_at', { ascending: false }).limit(2000)),
+      q(adminDb.from('saved_searches').select('*').eq('user_id', me)),
+      q(adminDb.from('follows').select('following_id, created_at').eq('follower_id', me)),
+      q(adminDb.from('follows').select('follower_id, created_at').eq('following_id', me)),
+      q(adminDb.from('saved_workers').select('worker_id, created_at').eq('owner_id', me)),
+      q(adminDb.from('legal_acceptances').select('document, version, accepted_at, ip, user_agent').eq('user_id', me).order('accepted_at', { ascending: true })),
+      q(adminDb.from('push_subscriptions').select('id, platform, user_agent, created_at').eq('user_id', me)),
+      q(adminDb.from('user_blocks').select('blocked_id, created_at').eq('blocker_id', me)),
+    ]);
+
+    // Shifts the user posted (as a poster) or worked (as a worker), so the
+    // ids elsewhere in the bundle mean something without another lookup.
+    const workedIds = [...new Set([...applications, ...timeEntries, ...payments].map((r) => r.shift_id as string | null).filter((v): v is string => !!v))];
+    const [postedShifts, workedShifts] = await Promise.all([
+      q(adminDb.from('shifts').select('*').eq('client_id', me).order('start_time', { ascending: false })),
+      workedIds.length
+        ? q(adminDb.from('shifts').select('id, title, company_name, job_type, location, start_time, end_time, timezone, pay_rate, pay_period, status').in('id', workedIds))
+        : Promise.resolve([] as Record<string, unknown>[]),
+    ]);
+
+    const profile = profileRows[0] ?? null;
+    const bundle = {
+      export_version: 1,
+      generated_at: new Date().toISOString(),
+      user_id: me,
+      about: {
+        description: 'A copy of the personal data 365 Connect holds for your account, in JSON. Ids refer to rows in the other sections or to other users.',
+        legal_versions_current: LEGAL_VERSIONS,
+      },
+      account: authUser
+        ? { email: authUser.email ?? null, created_at: authUser.created_at ?? null, last_sign_in_at: authUser.last_sign_in_at ?? null, providers: authUser.app_metadata?.providers ?? null }
+        : null,
+      profile,
+      applications,
+      time_entries: timeEntries,
+      payments,
+      reviews: { given: reviewsGiven, received: reviewsReceived },
+      posts,
+      post_comments: comments,
+      messages_sent: messagesSent,
+      notifications,
+      saved_searches: savedSearches,
+      follows: { following, followers },
+      saved_workers: savedWorkers,
+      blocked_users: blocks,
+      push_subscriptions: pushSubs,
+      legal_acceptances: legal,
+      shifts: { posted: postedShifts, worked_or_applied: workedShifts },
+    };
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Disposition', `attachment; filename="365connect-my-data-${stamp}.json"`);
+    return res.json(bundle);
+  } catch (e) {
+    return sendError(res, e);
+  }
 });
 
 /** POST /api/users — upsert user (called after sign-up / profile setup) */

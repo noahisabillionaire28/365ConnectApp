@@ -7,6 +7,7 @@ import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { invalidateRole } from '../lib/roleCache.js';
 import { sendEmail, renderNotificationEmail, appUrl } from '../lib/email.js';
+import { unsubscribeUrl } from '../lib/unsubscribe.js';
 import type { Request, Response, NextFunction } from 'express';
 
 const router = Router();
@@ -220,13 +221,16 @@ router.post('/test-email', async (req, res) => {
     }
     if (!to) { res.status(400).json({ error: 'No recipient email available' }); return; }
 
+    // The admin's own one-click link, so the footer and headers can be checked end to end.
+    const unsub = req.userId ? unsubscribeUrl(req.userId) : null;
     const { html, text } = renderNotificationEmail({
       title: 'Test email from 365 Connect',
       body: 'If you can read this, transactional email is working. Bookings, requests, and alerts will now reach your users’ inboxes.',
       ctaLabel: 'Open 365 Connect',
       ctaHref: appUrl(),
+      unsubscribeUrl: unsub,
     });
-    const sent = await sendEmail({ to, subject: 'Test email from 365 Connect', html, text });
+    const sent = await sendEmail({ to, subject: 'Test email from 365 Connect', html, text, unsubscribeUrl: unsub });
     res.json({ sent, to, configured: !!process.env['RESEND_API_KEY'] });
   } catch (err) {
     console.error('[admin/test-email]', err);
