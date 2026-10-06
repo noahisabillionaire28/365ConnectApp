@@ -347,6 +347,11 @@ export function LoginScreen() {
             Sign Up
           </Link>
         </p>
+        <p className="text-[12px] mt-4 flex items-center justify-center gap-1" style={{ color: MUTED }}>
+          <Link href="/terms" className="inline-flex items-center min-h-[44px] px-1" style={{ color: MUTED }} data-testid="link-terms">Terms</Link>
+          <span aria-hidden>·</span>
+          <Link href="/privacy" className="inline-flex items-center min-h-[44px] px-1" style={{ color: MUTED }} data-testid="link-privacy">Privacy</Link>
+        </p>
       </div>
 
       {/* Dev-only quick login — only visible when VITE_APP_ENV === 'development' */}

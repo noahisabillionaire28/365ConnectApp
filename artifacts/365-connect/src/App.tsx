@@ -33,6 +33,7 @@ import { Route, Switch, Redirect, Router as WouterRouter, useLocation } from 'wo
 import { AuthProvider } from '@/contexts/AuthContext';
 import { RoleProvider, useRole, isLockedStatus } from '@/contexts/RoleContext';
 import { SuspendedGate } from '@/components/SuspendedGate';
+import { LegalGate } from '@/components/LegalGate';
 // Admin-only chrome (and its animation library) loads only for admin accounts.
 const AdminFab = lazy(() => import('@/components/AdminFab').then((m) => ({ default: m.AdminFab })));
 import { useSSE } from '@/hooks/useSSE';
@@ -310,6 +311,8 @@ function AppShell() {
             <ErrorBoundary>
               <AppRouter />
               <AdminFabGate />
+              {/* Terms + Privacy acceptance (below the suspended screen, above the app) */}
+              <LegalGate />
               <SuspendedGuard />
             </ErrorBoundary>
           </TooltipProvider>
