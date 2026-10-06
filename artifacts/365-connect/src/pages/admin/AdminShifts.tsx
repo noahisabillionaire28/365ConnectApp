@@ -80,10 +80,10 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
       <div className="flex items-start justify-between mb-2.5">
         <div className="flex-1 min-w-0 pr-2">
           <p className="text-black font-bold text-[15px] leading-tight truncate">
-            {shift.job_type || shift.title}
+            {shift.title || shift.job_type}
           </p>
           <p className="text-[#737373] text-[13px] mt-0.5 truncate">
-            {shift.company_name ?? 'Private Client'}
+            {[shift.job_type, shift.company_name].filter(Boolean).join(' · ') || 'Private Client'}
           </p>
         </div>
         <StatusBadge status={shift.status} />

@@ -1,3 +1,4 @@
+import { shiftHeadline } from '@/lib/supabase';
 import { useState } from 'react';
 import { useParams, useLocation } from 'wouter';
 import { ChevronLeft, Megaphone, MessageSquareText, Send } from 'lucide-react';
@@ -70,7 +71,7 @@ export function ShiftUpdatesScreen() {
         </button>
         <div className="min-w-0">
           <h1 className="text-black font-bold text-[18px] leading-tight truncate">Updates</h1>
-          <p className="text-[#737373] text-[12px] truncate">{shift?.companyName ?? 'Shift'}</p>
+          <p className="text-[#737373] text-[12px] truncate">{shift ? `${shiftHeadline(shift)} · ${shift.companyName}` : 'Shift'}</p>
         </div>
       </div>
 

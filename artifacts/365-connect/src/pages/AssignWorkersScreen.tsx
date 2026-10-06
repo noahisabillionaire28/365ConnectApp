@@ -1,3 +1,4 @@
+import { shiftHeadline } from '@/lib/supabase';
 import { useEffect } from 'react';
 import { useParams, useLocation, useSearch } from 'wouter';
 import { ChevronLeft, Star, BadgeCheck, UserPlus, CheckCircle2, Users, Send } from 'lucide-react';
@@ -171,7 +172,7 @@ export function AssignWorkersScreen() {
         </button>
         <div className="min-w-0">
           <h1 className="text-[#0A1628] font-bold text-[18px] leading-tight truncate">Assign Workers</h1>
-          <p className="text-[#6B7280] text-[12px] truncate">{shift?.jobType ?? 'Loading…'}</p>
+          <p className="text-[#6B7280] text-[12px] truncate">{shift ? `${shiftHeadline(shift)} · ${shift.jobType}` : 'Loading…'}</p>
         </div>
       </div>
 

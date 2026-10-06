@@ -677,13 +677,11 @@ function ClientShiftCard({
               </span>
             )}
             <p className="text-[#111827] font-bold text-[17px] leading-snug truncate">
-              {shift.title || shift.eventType || shift.companyName || shift.jobType || 'Shift'}
+              {shift.title || `${shift.jobType || 'Event Staff'} shift`}
             </p>
-            {shift.companyName && shift.companyName !== (shift.eventType || '') && (
-              <p className="text-[#6B7280] text-[13px] font-medium leading-snug truncate">
-                {shift.companyName}
-              </p>
-            )}
+            <p className="text-[#6B7280] text-[13px] font-medium leading-snug truncate">
+              {[shift.jobType, shift.eventType].filter(Boolean).join(' · ')}
+            </p>
             <div className="flex flex-wrap items-center gap-3 mt-1">
               {dateStr && (
                 <span className="text-[#6B7280] text-[12px] flex items-center gap-1">
