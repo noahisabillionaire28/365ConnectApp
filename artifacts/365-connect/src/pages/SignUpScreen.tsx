@@ -5,14 +5,17 @@
  * OAuth providers show an inline error message if not configured in Supabase,
  * rather than crashing the app.
  */
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ChevronLeft, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, Eye, EyeOff, AlertCircle, CheckCircle2, Check } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 import { FaApple }  from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
-import { authRedirectUrl } from '@/lib/native';
+import { authRedirectUrl, isNative } from '@/lib/native';
 import { apiClient } from '@/lib/api';
+import { recordLegalAcceptance } from '@/hooks/useLegal';
+import { LegalSheet, legalHref } from '@/components/LegalDocument';
+import type { LegalDocumentId } from '@/legal/config';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const NAVY   = '#0A1628';
@@ -36,6 +39,27 @@ function friendlyProviderError(err: unknown): string {
   return msg;
 }
 
+/** A document link: a sheet inside the native app, a new tab on the web. */
+function LegalLink({ doc, onOpenSheet, children }: {
+  doc: LegalDocumentId; onOpenSheet: (d: LegalDocumentId) => void; children: React.ReactNode;
+}) {
+  const cls = 'font-semibold underline underline-offset-2';
+  if (isNative()) {
+    return (
+      <button type="button" className={cls} style={{ color: NAVY }}
+        onClick={(e) => { e.preventDefault(); onOpenSheet(doc); }} data-testid={`link-legal-${doc}`}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <a href={legalHref(doc)} target="_blank" rel="noopener noreferrer" className={cls} style={{ color: NAVY }}
+      onClick={(e) => e.stopPropagation()} data-testid={`link-legal-${doc}`}>
+      {children}
+    </a>
+  );
+}
+
 export function SignUpScreen() {
   const [, navigate] = useLocation();
 
@@ -45,6 +69,13 @@ export function SignUpScreen() {
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState<string | null>(null);
   const [signupState, setSignupState] = useState<'idle' | 'confirm' | 'done'>('idle');
+
+  // Terms + Privacy must be agreed to before the account can be created. The
+  // documents open in a sheet in the native app (no tabs there) and in a new
+  // tab on the web, so the half-filled form is never lost.
+  const [agreed, setAgreed] = useState(false);
+  const [sheet, setSheet] = useState<LegalDocumentId | null>(null);
+  const closeSheet = useCallback(() => setSheet(null), []);
 
   // Per-provider errors (shown inline below each button)
   const [googleError, setGoogleError] = useState<string | null>(null);
@@ -56,6 +87,9 @@ export function SignUpScreen() {
     // sending 'worker' would pre-set/reset their role. The email is taken
     // from the verified auth account server-side.
     await apiClient(userId).post('/users', { id: userId }).catch(() => {}); // ignore if already exists
+    // The checkbox above was ticked: record the acceptance now that the row
+    // exists. If this fails the in-app gate asks again on first launch.
+    await recordLegalAcceptance(userId).catch(() => {});
     setSignupState('done');
     setTimeout(() => navigate('/role-select'), 600);
   }
@@ -64,6 +98,7 @@ export function SignUpScreen() {
     const address = email.trim().toLowerCase();
     if (!address) { setError('Enter your email address.'); return; }
     if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (!agreed) { setError('Please agree to the Terms of Service and Privacy Policy.'); return; }
     setLoading(true); setError(null);
     try {
       // The server either creates an already-confirmed account (today's
@@ -266,9 +301,25 @@ export function SignUpScreen() {
           </div>
         </div>
 
+        {/* Terms + Privacy agreement (required) */}
+        <label className="flex items-start gap-3 cursor-pointer select-none min-h-[44px] mt-1">
+          <input type="checkbox" className="sr-only" checked={agreed} onChange={e => { setAgreed(e.target.checked); setError(null); }}
+            data-testid="checkbox-legal" />
+          <span aria-hidden className="mt-0.5 w-6 h-6 rounded-[6px] border flex items-center justify-center flex-shrink-0 transition-colors"
+            style={{ background: agreed ? NAVY : '#FFFFFF', borderColor: agreed ? NAVY : '#D1D5DB' }}>
+            {agreed && <Check size={15} className="text-white" strokeWidth={3} />}
+          </span>
+          <span className="text-[13px] leading-relaxed" style={{ color: TEXT }}>
+            I have read and agree to the{' '}
+            <LegalLink doc="terms" onOpenSheet={setSheet}>Terms of Service</LegalLink>
+            {' '}and{' '}
+            <LegalLink doc="privacy" onOpenSheet={setSheet}>Privacy Policy</LegalLink>.
+          </span>
+        </label>
+
         <button
           onClick={handleSignUp}
-          disabled={loading || !email || !password}
+          disabled={loading || !email || !password || !agreed}
           className="w-full text-white font-bold text-[16px] h-[52px] rounded-[12px] mt-2 active:scale-[0.98] transition-transform disabled:opacity-40"
           style={{ background: NAVY }}
           data-testid="btn-signup-submit"
@@ -276,6 +327,8 @@ export function SignUpScreen() {
           {loading ? 'Creating account…' : 'Sign Up'}
         </button>
       </div>
+
+      <LegalSheet doc={sheet} onClose={closeSheet} />
 
       <div className="mt-8 text-center">
         <p className="text-[14px]" style={{ color: MUTED }}>

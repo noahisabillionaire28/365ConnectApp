@@ -49,12 +49,22 @@ async function makeHeaders(
 /** An API reply the server refused; `status` lets callers tell 404 from a network failure. */
 export class ApiError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  /** Machine-readable reason when the server supplies one (e.g. 'legal_required'). */
+  readonly code: string | undefined;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.code = code;
   }
 }
+
+/**
+ * Fired on `window` when the server answers 428 legal_required: the signed-in
+ * user has not accepted the current Terms / Privacy Policy. The LegalGate
+ * listens and re-checks, so a stale tab re-prompts instead of failing quietly.
+ */
+export const LEGAL_REQUIRED_EVENT = 'legal:required';
 
 /** True when the request reached the server and it answered `status`. */
 export function isApiStatus(err: unknown, status: number): boolean {
@@ -74,8 +84,11 @@ async function request<T>(
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
-    throw new ApiError(res.status, err.error ?? `API ${method} ${path} → ${res.status}`);
+    const err = await res.json().catch(() => ({ error: res.statusText })) as { error?: string; code?: string };
+    if (res.status === 428 && err.code === 'legal_required') {
+      window.dispatchEvent(new CustomEvent(LEGAL_REQUIRED_EVENT));
+    }
+    throw new ApiError(res.status, err.error ?? `API ${method} ${path} → ${res.status}`, err.code);
   }
   return res.json() as Promise<T>;
 }

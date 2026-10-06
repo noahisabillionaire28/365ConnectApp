@@ -33,6 +33,7 @@ import { Route, Switch, Redirect, Router as WouterRouter, useLocation } from 'wo
 import { AuthProvider } from '@/contexts/AuthContext';
 import { RoleProvider, useRole, isLockedStatus } from '@/contexts/RoleContext';
 import { SuspendedGate } from '@/components/SuspendedGate';
+import { LegalGate } from '@/components/LegalGate';
 // Admin-only chrome (and its animation library) loads only for admin accounts.
 const AdminFab = lazy(() => import('@/components/AdminFab').then((m) => ({ default: m.AdminFab })));
 import { useSSE } from '@/hooks/useSSE';
@@ -56,6 +57,8 @@ const OnboardingScreen = lazyNamed(() => import('@/pages/OnboardingScreen'), 'On
 const WorkerSetupScreen = lazyNamed(() => import('@/pages/WorkerSetupScreen'), 'WorkerSetupScreen');
 const ClientSetupScreen = lazyNamed(() => import('@/pages/ClientSetupScreen'), 'ClientSetupScreen');
 const StafferSetupScreen = lazyNamed(() => import('@/pages/StafferSetupScreen'), 'StafferSetupScreen');
+// Legal documents (public, no sign-in needed)
+const LegalScreen = lazyNamed(() => import('@/pages/LegalScreen'), 'LegalScreen');
 
 // Main app tabs
 import { HomeScreen }            from '@/pages/HomeScreen';
@@ -184,6 +187,11 @@ function MobileRouter() {
             <Route path="/sign-in/*?"  component={LoginScreen}  />
             <Route path="/sign-up/*?"  component={SignUpScreen} />
 
+            {/* ── Legal (public) ────────────────────────────────── */}
+            <Route path="/terms">{() => <LegalScreen doc="terms" />}</Route>
+            <Route path="/privacy">{() => <LegalScreen doc="privacy" />}</Route>
+            <Route path="/legal">{() => <Redirect to="/terms" replace />}</Route>
+
             {/* ── Auth / onboarding ─────────────────────────────── */}
             <Route path="/"              component={SplashScreen}       />
             <Route path="/role-select"   component={RoleSelectScreen}    />
@@ -303,6 +311,8 @@ function AppShell() {
             <ErrorBoundary>
               <AppRouter />
               <AdminFabGate />
+              {/* Terms + Privacy acceptance (below the suspended screen, above the app) */}
+              <LegalGate />
               <SuspendedGuard />
             </ErrorBoundary>
           </TooltipProvider>

@@ -1,5 +1,6 @@
 import { Router, type IRouter } from 'express';
 import { attachUserId } from '../middleware/auth.js';
+import { requireLegal } from '../middleware/legal.js';
 import authRouter        from './auth.js';
 import sseRouter         from './sse.js';
 import storageRouter     from './storage.js';
@@ -30,11 +31,16 @@ import linkPreviewRouter from './link-preview.js';
 import cronRouter        from './cron.js';
 import matchRouter       from './match.js';
 import mapsRouter        from './maps.js';
+import legalRouter       from './legal.js';
 
 const router: IRouter = Router();
 
 // Attach user ID from x-user-id header on every request
 router.use(attachUserId);
+
+// Signed-in writes require the current Terms + Privacy Policy to be accepted
+// (428 legal_required otherwise). Reads and onboarding routes pass through.
+router.use(requireLegal);
 
 // SSE stream (must be before body parsers touch the route)
 router.use(sseRouter);
@@ -44,6 +50,9 @@ router.use(storageRouter);
 
 // Auth (public — server-side account creation)
 router.use('/auth', authRouter);
+
+// Legal documents: versions (public), acceptance status + accept (session)
+router.use('/legal', legalRouter);
 
 // Health + admin
 router.use(healthRouter);

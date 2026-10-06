@@ -5,8 +5,9 @@ import {
   Star, ChevronRight, Settings,
   CreditCard, Bell, Shield, HelpCircle, LogOut,
   Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
-  BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck, LayoutTemplate, Trash2,
+  BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck, LayoutTemplate, Trash2, FileText, ShieldCheck,
 } from 'lucide-react';
+import { useLegalStatus } from '@/hooks/useLegal';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { useAuth } from '@/contexts/AuthContext';
@@ -333,6 +334,19 @@ function AvailabilityCard() {
         />
       </div>
     </div>
+  );
+}
+
+/* ── "You accepted on …" under the Legal settings group ──────────────────── */
+function LegalAcceptedLine() {
+  const { data } = useLegalStatus();
+  const when = data?.acceptedAt;
+  return (
+    <p className="text-[#9CA3AF] text-[11px] leading-relaxed px-1 mt-2 mb-4" data-testid="legal-accepted-line">
+      {when
+        ? `You accepted on ${new Date(when).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`
+        : 'You will be asked to accept the current versions the next time they change.'}
+    </p>
   );
 }
 
@@ -802,6 +816,13 @@ export function ProfileScreen() {
                     <SettingRow icon={Zap} label="Upgrade to Pro" onTap={() => go('/pro-upgrade')} />
                   </div>
                 )}
+
+                <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Legal</p>
+                <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden" data-testid="settings-legal">
+                  <SettingRow icon={FileText} label="Terms of Service" onTap={() => go('/terms')} />
+                  <SettingRow icon={ShieldCheck} label="Privacy Policy" onTap={() => go('/privacy')} />
+                </div>
+                <LegalAcceptedLine />
 
                 <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
                   <SettingRow icon={LogOut} label="Log Out" onTap={handleSignOut} danger />
