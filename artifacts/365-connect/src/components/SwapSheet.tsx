@@ -3,11 +3,12 @@
  * worker: find them by name, add an optional note, send. Nothing changes on
  * the roster until the other worker accepts and the poster approves.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Search, Star, Check, Info, X } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDialog } from '@/hooks/useDialog';
 
 export type SwapCandidate = {
   id: string;
@@ -66,18 +67,21 @@ export function SwapSheet({ open, shiftLabel, busy, onSend, onCancel }: {
     onCancel();
   }
 
+  const titleId = useId();
+  const ref = useDialog<HTMLDivElement>(open, busy ? null : close);
+
   if (!open) return null;
 
   return (
     <div data-no-pull className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40"
-      role="dialog" aria-modal="true" aria-label="Swap shift"
       onClick={close}>
-      <div className="w-full max-w-app max-h-[88dvh] overflow-y-auto bg-white rounded-t-[20px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+20px)]"
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId}
+        className="w-full max-w-app max-h-[88dvh] overflow-y-auto bg-white rounded-t-[20px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+20px)]"
         onClick={(e) => e.stopPropagation()}>
         <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-4" />
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[#111827] font-bold text-[17px]">Swap shift</p>
+            <p id={titleId} className="text-[#111827] font-bold text-[17px]">Swap shift</p>
             <p className="text-[#6B7280] text-[13px] mt-1 leading-relaxed">
               Offer your spot{shiftLabel ? ` on ${shiftLabel}` : ''} to another worker. They accept, then the poster approves.
             </p>

@@ -3,10 +3,12 @@
  * an .ics file (Apple Calendar, Outlook, anything) and a Google Calendar link.
  * Same shape as the directions chooser on the shift screen.
  */
+import { useId } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CalendarPlus, X } from 'lucide-react';
 import { googleCalendarUrl, openIcs, type CalendarEvent } from '@/lib/calendar';
 import { useToast } from '@/contexts/ToastContext';
+import { useDialog } from '@/hooks/useDialog';
 
 export function AddToCalendarSheet({ open, event, onClose }: {
   open: boolean;
@@ -14,6 +16,8 @@ export function AddToCalendarSheet({ open, event, onClose }: {
   onClose: () => void;
 }) {
   const { showToast } = useToast();
+  const titleId = useId();
+  const ref = useDialog<HTMLDivElement>(open && !!event, onClose);
 
   async function handleIcs() {
     if (!event) return;
@@ -33,12 +37,12 @@ export function AddToCalendarSheet({ open, event, onClose }: {
             onClick={onClose} data-no-pull className="fixed inset-0 bg-black/40 z-[60]" />
           <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 400, damping: 38 }}
-            data-no-pull role="dialog" aria-modal="true" aria-label="Add to calendar"
+            ref={ref} data-no-pull role="dialog" aria-modal="true" aria-labelledby={titleId}
             className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app z-[61] bg-white rounded-t-[20px] px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-2xl">
             <div className="flex items-center justify-between mb-1">
-              <p className="font-bold text-[16px] text-[#111827]">Add to calendar</p>
-              <button type="button" onClick={onClose} aria-label="Close">
-                <X size={18} className="text-[#737373]" />
+              <p id={titleId} className="font-bold text-[16px] text-[#111827]">Add to calendar</p>
+              <button type="button" onClick={onClose} aria-label="Close" className="w-11 h-11 -mr-3 flex items-center justify-center">
+                <X size={18} aria-hidden className="text-[#737373]" />
               </button>
             </div>
             <p className="text-[#737373] text-[13px] mb-4 truncate">

@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import { useLocation } from 'wouter';
+import { useDialog } from '@/hooks/useDialog';
 import { Search, BadgeCheck, ImagePlus } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { PostCard } from '@/components/PostCard';
@@ -83,6 +84,9 @@ export function ExploreScreen() {
     setComposeCaption('');
     if (fileRef.current) fileRef.current.value = '';
   }
+
+  const composeTitleId = useId();
+  const composeRef = useDialog<HTMLDivElement>(!!composeFile, posting ? null : closeCompose);
 
   function closeCompose() {
     if (composePreview) URL.revokeObjectURL(composePreview);
@@ -241,11 +245,12 @@ export function ExploreScreen() {
 
       {/* Compose sheet — photo preview + caption with #hashtags */}
       {composeFile && (
-        <div data-no-pull className="fixed inset-0 z-[80] flex flex-col bg-white max-w-app mx-auto" role="dialog" aria-label="New post">
+        <div ref={composeRef} data-no-pull className="fixed inset-0 z-[80] flex flex-col bg-white max-w-app mx-auto"
+          role="dialog" aria-modal="true" aria-labelledby={composeTitleId}>
           <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 border-b border-[#EFEFEF]">
             <button type="button" onClick={closeCompose} disabled={posting}
               className="text-[#111827] text-[15px] font-medium disabled:opacity-50">Cancel</button>
-            <h1 className="text-[#111827] font-bold text-[16px]">New post</h1>
+            <h1 id={composeTitleId} className="text-[#111827] font-bold text-[16px]">New post</h1>
             <button type="button" onClick={() => void handlePost()} disabled={posting}
               className="text-[#2563EB] text-[15px] font-bold disabled:opacity-50">
               {posting ? 'Posting…' : 'Share'}

@@ -1,4 +1,5 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useId, lazy, Suspense } from 'react';
+import { useDialog } from '@/hooks/useDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -218,6 +219,15 @@ export function ShiftDetailScreen() {
   const [venueCoords, setVenueCoords] = useState<Coords | null>(null);
   const [dropping, setDropping] = useState(false);
   const [confirmDrop, setConfirmDrop] = useState(false);
+
+  // Keyboard behaviour for the three inline sheets (the shared sheet
+  // components bring their own).
+  const cancelTitleId = useId();
+  const directionsTitleId = useId();
+  const dropTitleId = useId();
+  const cancelRef = useDialog<HTMLDivElement>(showCancelConfirm, () => setShowCancelConfirm(false));
+  const directionsRef = useDialog<HTMLDivElement>(directionsOpen, () => setDirectionsOpen(false));
+  const dropRef = useDialog<HTMLDivElement>(confirmDrop, dropping ? null : () => setConfirmDrop(false));
   const [confirmCallOut, setConfirmCallOut] = useState(false);
   const [confirmBroadcast, setConfirmBroadcast] = useState(false);
   const [openingChat, setOpeningChat] = useState(false);
@@ -653,10 +663,10 @@ export function ShiftDetailScreen() {
     />
     {/* Cancel confirm overlay */}
     {showCancelConfirm && (
-      <div data-no-pull className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 backdrop-blur-sm px-4 pb-8"
-        role="dialog" aria-modal="true" aria-label="Confirm shift cancellation">
-        <div className="w-full max-w-app bg-white rounded-[20px] p-5 shadow-xl">
-          <h2 className="text-[#111827] font-bold text-[18px] mb-2">Cancel this shift?</h2>
+      <div data-no-pull className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 backdrop-blur-sm px-4 pb-8">
+        <div ref={cancelRef} role="dialog" aria-modal="true" aria-labelledby={cancelTitleId}
+          className="w-full max-w-app bg-white rounded-[20px] p-5 shadow-xl">
+          <h2 id={cancelTitleId} className="text-[#111827] font-bold text-[18px] mb-2">Cancel this shift?</h2>
           <p className="text-[#6B7280] text-[14px] leading-relaxed mb-5">
             Workers who applied will be notified. This cannot be undone.
             {shift.seriesId && ' This shift is part of a recurring series.'}
@@ -976,12 +986,12 @@ export function ShiftDetailScreen() {
                   data-no-pull className="fixed inset-0 bg-black/40 z-[60]" />
                 <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
                   transition={{ type: 'spring', stiffness: 400, damping: 38 }}
-                  data-no-pull
+                  ref={directionsRef} data-no-pull role="dialog" aria-modal="true" aria-labelledby={directionsTitleId}
                   className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app z-[61] bg-white rounded-t-[20px] px-5 pt-4 pb-9 shadow-2xl">
                   <div className="flex items-center justify-between mb-1">
-                    <p className="font-bold text-[16px] text-[#111827]">Get directions</p>
-                    <button type="button" onClick={() => setDirectionsOpen(false)} aria-label="Close">
-                      <X size={18} className="text-[#737373]" />
+                    <p id={directionsTitleId} className="font-bold text-[16px] text-[#111827]">Get directions</p>
+                    <button type="button" onClick={() => setDirectionsOpen(false)} aria-label="Close" className="w-11 h-11 -mr-3 flex items-center justify-center">
+                      <X size={18} aria-hidden className="text-[#737373]" />
                     </button>
                   </div>
                   <p className="text-[#737373] text-[13px] mb-4 break-words">{shift.location}</p>
@@ -1694,12 +1704,12 @@ export function ShiftDetailScreen() {
       {/* Withdraw / leave-waitlist confirmation sheet (pending + standby) */}
       {confirmDrop && (
         <div data-no-pull className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40"
-          role="dialog" aria-modal="true" aria-label="Confirm dropping this shift"
           onClick={() => { if (!dropping) setConfirmDrop(false); }}>
-          <div className="w-full max-w-app bg-white rounded-t-[20px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+20px)]"
+          <div ref={dropRef} role="dialog" aria-modal="true" aria-labelledby={dropTitleId}
+            className="w-full max-w-app bg-white rounded-t-[20px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+20px)]"
             onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-4" />
-            <p className="text-[#111827] font-bold text-[17px]">
+            <p id={dropTitleId} className="text-[#111827] font-bold text-[17px]">
               {applicationStatus === 'standby' ? 'Leave the waitlist?'
                 : applicationStatus === 'pending' ? 'Withdraw your application?'
                 : 'Drop this shift?'}
