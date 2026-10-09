@@ -530,10 +530,10 @@ export function EditProfileScreen() {
               </div>
             </Field>
 
-            <Field label="Location" htmlFor="location"
+            <Field label="Location (optional)" htmlFor="location"
               hint={form.lat != null && form.lng != null
-                ? `Saved: ${form.lat.toFixed(3)}, ${form.lng.toFixed(3)} — pick an address to change it.`
-                : 'Used to show your shifts to nearby workers.'}>
+                ? `Saved: ${form.lat.toFixed(3)}, ${form.lng.toFixed(3)} — pick an address to change it. Others only ever see a rounded location.`
+                : 'Optional. Used to show distances to shifts. Others only ever see a rounded location.'}>
               <LocationAutocomplete value={locationQuery} onChange={setLocationQuery} label="Your location"
                 onPlacePicked={({ lat, lng }) => { set('lat', lat); set('lng', lng); }} />
               <button type="button" onClick={useCurrentLocation} disabled={locating}
