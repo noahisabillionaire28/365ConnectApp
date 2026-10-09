@@ -33,7 +33,7 @@ const CARDS: { role: Role; icon: React.ReactNode; title: string; subtitle: strin
     role:     'client',
     icon:     <Briefcase size={22} />,
     title:    "I'm Hiring",
-    subtitle: 'Post shifts and find vetted event staff fast.',
+    subtitle: 'Post shifts and find event staff fast.',
   },
   {
     role:     'staffer',

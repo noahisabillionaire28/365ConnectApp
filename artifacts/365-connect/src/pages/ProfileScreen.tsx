@@ -646,7 +646,7 @@ export function ProfileScreen() {
       {!isPoster && (
       <div className="px-5 mb-6">
         <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-2.5" id="certs-label">
-          Certifications
+          Certifications <span className="normal-case tracking-normal font-normal">(self-reported)</span>
         </p>
         {certifications.length > 0 ? (
           <div className="flex flex-col gap-2" role="list" aria-labelledby="certs-label">

@@ -1169,7 +1169,7 @@ export function ShiftDetailScreen() {
                     </span>
                     {myMatch.insight?.source === 'claude' && (
                       <span className="inline-flex items-center gap-1 bg-[#0095F6]/10 text-[#0095F6] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border border-[#0095F6]/20">
-                        <Sparkles size={10} aria-hidden /> AI
+                        <Sparkles size={10} aria-hidden /> Automated
                       </span>
                     )}
                   </div>
