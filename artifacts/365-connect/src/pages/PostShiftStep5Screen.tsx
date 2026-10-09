@@ -347,7 +347,7 @@ export function PostShiftStep5Screen() {
               {hourly
                 ? 'Estimated total based on listed hours. Final cost may vary if shift hours change.'
                 : 'Flat rate per worker. Final cost depends on how many spots are filled.'}
-              {' '}Workers are paid after successful clock-out confirmation.
+              {' '}Workers are paid after successful clock-out confirmation. You pay workers the listed rate; 365 Connect adds no fee.
             </p>
           </div>
         )}

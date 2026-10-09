@@ -123,6 +123,9 @@ function SummaryCard({ payments }: { payments: PaymentRow[] }) {
           <p className="text-white font-bold text-[18px]">{fmtAmount(pending)}</p>
         </div>
       </div>
+      <p className="text-white/70 text-[11px] mt-3 leading-snug" data-testid="earnings-fee-note">
+        The poster pays your approved pay. 365 Connect adds no fee today, so the amounts shown are what you receive.
+      </p>
     </div>
   );
 }

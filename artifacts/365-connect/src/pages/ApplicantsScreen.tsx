@@ -177,6 +177,13 @@ function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onP
           : <AttendanceChip a={w.attendance} />}
       </div>
 
+      {/* Who pays what: the approved pay goes to the worker in full; there is
+          no platform fee, by card (Stripe) or outside the app. */}
+      {w.attendance === 'done' && w.approved && !w.paid && w.workerAck !== 'disputed' && (
+        <p className="text-[#6B7280] text-[11px] mb-2 leading-snug" data-testid="pay-note">
+          You pay the approved amount{stripeEnabled ? ' by card, or record a payment made outside the app' : ' outside the app and record it here'}. 365 Connect adds no fee.
+        </p>
+      )}
       <div className="flex gap-2">
         {/* Approve once; after a dispute the manager can adjust and approve
             again — unless the worker has already been paid, when the hours
@@ -564,7 +571,7 @@ export function ApplicantsScreen() {
       <ConfirmSheet
         open={!!markPaidFor}
         title="Mark as paid?"
-        body={<>Confirm you paid <b>{markPaidFor?.username ? `@${markPaidFor.username}` : 'this worker'}</b> <b>${(markPaidFor?.approvedPay ?? 0).toFixed(2)}</b> outside the app (cash, Venmo, payroll). This records the shift as paid and tells them.</>}
+        body={<>Confirm you paid <b>{markPaidFor?.username ? `@${markPaidFor.username}` : 'this worker'}</b> <b>${(markPaidFor?.approvedPay ?? 0).toFixed(2)}</b> outside the app (cash, Venmo, payroll). This records the shift as paid and tells them. 365 Connect adds no fee.</>}
         confirmLabel="Yes, mark as paid"
         busy={markingPaid}
         onConfirm={() => void handleMarkPaid()}

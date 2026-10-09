@@ -1235,6 +1235,7 @@ export function ShiftDetailScreen() {
                     {hourly
                       ? 'Estimated total based on listed hours and all spots filled. Final cost depends on actual clock-out times.'
                       : 'Flat rate per worker with all spots filled. Final cost depends on who works the shift.'}
+                    {' '}You pay workers the listed rate; 365 Connect adds no fee.
                   </p>
                 </div>
               );

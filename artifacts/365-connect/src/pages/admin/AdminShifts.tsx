@@ -64,8 +64,6 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
       });
 
   const spotsLeft = Math.max(0, shift.spots_available - shift.spots_filled);
-  const gross     = (shift.pay_rate ?? 0) * shift.spots_available;
-  const fee       = Math.round(gross * 0.08 * 100) / 100;
 
   function handleCancel() {
     cancelShift.mutate(shift.id);
@@ -105,13 +103,6 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
           {spotsLeft} of {shift.spots_available} open
         </span>
       </div>
-
-      {fee > 0 && (
-        <div className="flex items-center justify-between mb-3.5 pb-3.5 border-b border-[#DBDBDB]">
-          <p className="text-[#737373] text-[12px]">Est. platform fee (8%)</p>
-          <p className="text-black font-bold text-[13px]">${fee.toFixed(2)}</p>
-        </div>
-      )}
 
       {canCancel && (
         confirm ? (
