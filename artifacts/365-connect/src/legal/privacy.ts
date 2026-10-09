@@ -79,7 +79,7 @@ export const PRIVACY: LegalDocument = {
       id: 'automated',
       heading: '5. Automated matching',
       paragraphs: [
-        `The Platform may show a "match" score or insight suggesting how well a shift fits a Worker, or how well a Worker fits a shift. These are produced in two ways. First, by rules we run ourselves, such as whether your skills, distance, availability, and pay expectations fit the posting. Second, by an automated processor operated by Anthropic, to which we send non-identifying signals about the shift (role, event type, date and time, general area, requirements) and about the Worker's work history on the Platform (skills, past event types, ratings bands, reliability indicators). We do not send names, email addresses, phone numbers, photos, messages, or precise locations to that processor, and the processor is contractually prohibited from using the signals to train its models or for its own purposes.`,
+        `The Platform may show a "match" score or insight suggesting how well a shift fits a Worker, or how well a Worker fits a shift. These are produced in two ways. First, by rules we run ourselves, such as whether your skills, distance, availability, and pay expectations fit the posting. Second, by an automated processor operated by Anthropic, to which we send non-identifying signals about the shift (title, role, event type, date and time, requirements, description) and about each candidate Worker (a random account identifier, skills, certifications, rating and review count, distance to the worksite in miles, shifts worked, shifts with this Poster, no-shows and on-time rate, availability that day). We do not send names, usernames, bios, email addresses, phone numbers, photos, messages, or precise locations to that processor, and the processor is contractually prohibited from using the signals to train its models or for its own purposes.`,
         `Match insights are informational. No booking, payment, suspension, or other decision with legal or similarly significant effects is made solely by an automated system: Posters decide whom to book, Workers decide which shifts to take, and any account action is taken by a person on our team. You may ask us how a match insight about you was produced, and you may ask a person to review any decision you believe was influenced by it, by contacting ${EMAIL}.`,
       ],
     },
@@ -104,10 +104,11 @@ export const PRIVACY: LegalDocument = {
         `Resend: transactional email delivery.`,
         `Stripe: payment processing and subscription billing, where enabled.`,
         `Anthropic: automated-matching processor, receiving the non-identifying signals described in Section 5.`,
-        `Apple: push notifications to iOS devices and Apple Maps map rendering and geocoding; Apple may receive device tokens and the map areas requested.`,
-        `Google: web fonts served from Google Fonts, which receive your IP address when fonts load.`,
+        `Apple: push notifications to iOS devices and Safari, and Apple Maps map rendering; Apple may receive device tokens and the map areas requested.`,
+        `Google: web fonts served from Google Fonts, which receive your IP address when fonts load; and, if you enable web push in Chrome or Edge, delivery of those notifications through Google's push service, which receives your push endpoint and an encrypted payload it cannot read.`,
+        `Mozilla: delivery of web push notifications you enable in Firefox, on the same terms.`,
         `OpenStreetMap contributors and CARTO: map tiles, which receive the map areas requested and your IP address.`,
-        `Nominatim (OpenStreetMap Foundation): address search when a Poster types a venue or profile address; it receives the address text and your IP address.`,
+        `Nominatim (OpenStreetMap Foundation): address search when you type a venue or profile address; it receives the address text and your IP address.`,
         `Unsplash: the default cover photo on a shift that has no photo of its own; it receives the image request and your IP address.`,
       ],
       after: [
@@ -121,7 +122,7 @@ export const PRIVACY: LegalDocument = {
       paragraphs: [
         `Legal requests and safety. We may disclose information if we believe in good faith that doing so is required by law, subpoena, court order, or government request; to enforce our Terms; to detect, prevent, or address fraud, security, or technical issues; or to protect the rights, property, or safety of ${C}, our users, or the public. Where permitted, we will try to notify you of a legal request for your information.`,
         `Business transfers. If ${C} is involved in a merger, acquisition, financing, reorganization, bankruptcy, or sale of all or part of its assets, your information may be transferred as part of that transaction, subject to this Policy, and we will notify you of any change in ownership or in how your information is used.`,
-        `With your direction. We share information when you ask us to, for example when you export a shift to your calendar (Google Calendar or an .ics file), open directions in Apple Maps, Google Maps or Waze, share a post, or connect a third-party service.`,
+        `With your direction. We share information when you ask us to, for example when you export a shift to your calendar (Google Calendar or an .ics file), open directions in Apple Maps, Google Maps or Waze, share a post, or connect a third-party service. When you paste a link in chat, our server (not your device) fetches that page once to show its title and preview image, so the linked site sees our server's address rather than yours.`,
         `Aggregate or de-identified data. We may share statistics that do not identify you, such as the number of shifts filled in a city.`,
         `We do not sell your personal information, and we do not share it for cross-context behavioral advertising.`,
       ],
