@@ -133,3 +133,13 @@ alongside the `legal_acceptances` rows: `accepted_at` of the user's first
 pre-arbitration dispute notices (30-day informal period), DMCA notices and
 counter-notices, and privacy / CCPA requests, which have statutory response
 deadlines (45 days for California).
+
+## Pending database step
+
+Migration `0037_data_minimisation_rating_delete.sql` (drops the unused
+`users.followers_count` / `following_count` columns and makes the rating trigger
+also fire on review deletion) could not be applied through the tooling on
+2026-10-09: the table-level statements kept waiting on `public.reviews` /
+`public.users`. The trigger function itself is already updated live. Re-run the
+migration from the Supabase SQL editor when the database is quiet; it is
+idempotent and fails fast after 5 seconds if the lock is still unavailable.
