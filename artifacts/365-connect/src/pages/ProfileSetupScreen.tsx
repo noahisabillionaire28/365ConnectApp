@@ -174,7 +174,7 @@ export function ProfileSetupScreen() {
       {/* Header */}
       <div className="flex items-center px-5 pt-12 pb-4">
         {step > 1 ? (
-          <button onClick={handleBack}
+          <button type="button" onClick={handleBack} aria-label="Back"
             className="w-10 h-10 flex items-center justify-center rounded-full bg-[#FAFAFA] border border-[#DBDBDB] mr-3 active:scale-95 transition-transform">
             <ChevronLeft size={20} className="text-black" />
           </button>

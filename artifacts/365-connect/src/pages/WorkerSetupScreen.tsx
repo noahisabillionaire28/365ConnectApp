@@ -65,6 +65,7 @@ function StepHeader({
       <div className="flex items-center px-5 pt-12 pb-4">
         {step > 1 ? (
           <button
+            type="button" aria-label="Back"
             onClick={onBack}
             className="w-10 h-10 flex items-center justify-center rounded-full mr-3 transition-colors active:scale-95"
             style={{ border: `1px solid ${BORDER}` }}
