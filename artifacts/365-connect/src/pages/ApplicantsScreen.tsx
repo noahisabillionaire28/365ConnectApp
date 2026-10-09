@@ -108,7 +108,7 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
   return (
     <div className="flex items-center gap-2 mb-2.5 mt-6 first:mt-0">
       <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.16em]">{label}</p>
-      <span className="text-[#9CA3AF] text-[12px] font-semibold">{count}</span>
+      <span className="text-[#6B7280] text-[12px] font-semibold">{count}</span>
     </div>
   );
 }
@@ -177,6 +177,13 @@ function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onP
           : <AttendanceChip a={w.attendance} />}
       </div>
 
+      {/* Who pays what: the approved pay goes to the worker in full; there is
+          no platform fee, by card (Stripe) or outside the app. */}
+      {w.attendance === 'done' && w.approved && !w.paid && w.workerAck !== 'disputed' && (
+        <p className="text-[#6B7280] text-[11px] mb-2 leading-snug" data-testid="pay-note">
+          You pay the approved amount{stripeEnabled ? ' by card, or record a payment made outside the app' : ' outside the app and record it here'}. 365 Connect adds no fee.
+        </p>
+      )}
       <div className="flex gap-2">
         {/* Approve once; after a dispute the manager can adjust and approve
             again — unless the worker has already been paid, when the hours
@@ -313,7 +320,7 @@ function ReviewSheet({ w, payRate, payPeriod, timezone, shiftEndISO, busy, onApp
             <div className="flex justify-between text-[14px]"><span className="text-amber-600">Overtime (1.5×)</span><span className="text-amber-600 font-semibold">{fmt(overtime)}</span></div>
           )}
           {!hourly && (
-            <p className="text-[11px] text-[#9CA3AF]">Flat {payPeriod} rate — the hours are recorded but do not change the pay.</p>
+            <p className="text-[11px] text-[#6B7280]">Flat {payPeriod} rate — the hours are recorded but do not change the pay.</p>
           )}
           <div className="flex justify-between text-[15px] pt-1"><span className="text-[#111827] font-bold">Approved pay</span><span className="text-[#111827] font-bold">${pay.toFixed(2)}</span></div>
         </div>
@@ -564,7 +571,7 @@ export function ApplicantsScreen() {
       <ConfirmSheet
         open={!!markPaidFor}
         title="Mark as paid?"
-        body={<>Confirm you paid <b>{markPaidFor?.username ? `@${markPaidFor.username}` : 'this worker'}</b> <b>${(markPaidFor?.approvedPay ?? 0).toFixed(2)}</b> outside the app (cash, Venmo, payroll). This records the shift as paid and tells them.</>}
+        body={<>Confirm you paid <b>{markPaidFor?.username ? `@${markPaidFor.username}` : 'this worker'}</b> <b>${(markPaidFor?.approvedPay ?? 0).toFixed(2)}</b> outside the app (cash, Venmo, payroll). This records the shift as paid and tells them. 365 Connect adds no fee.</>}
         confirmLabel="Yes, mark as paid"
         busy={markingPaid}
         onConfirm={() => void handleMarkPaid()}
@@ -726,7 +733,7 @@ export function ApplicantsScreen() {
               </p>
             )}
             {confirmed.length === 0 ? (
-              <p className="text-[#9CA3AF] text-[13px] px-1">No one confirmed yet.</p>
+              <p className="text-[#6B7280] text-[13px] px-1">No one confirmed yet.</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {confirmed.map((w) => (
@@ -809,7 +816,7 @@ export function ApplicantsScreen() {
             {standby.length > 0 && (
               <>
                 <SectionHeader label="Standby — waitlist" count={standby.length} />
-                <p className="text-[#9CA3AF] text-[12px] px-1 -mt-1 mb-2">
+                <p className="text-[#6B7280] text-[12px] px-1 -mt-1 mb-2">
                   Accepted while the shift was full. Confirm one when a spot opens up.
                 </p>
                 <div className="flex flex-col gap-2">
@@ -873,7 +880,7 @@ export function ApplicantsScreen() {
                       <p className="flex-1 min-w-0 text-[#6B7280] font-semibold text-[14px] truncate">
                         {inv.worker_username ? `@${inv.worker_username}` : 'Worker'}
                       </p>
-                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-white border-[#E5E7EB] text-[#9CA3AF]">
+                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-white border-[#E5E7EB] text-[#6B7280]">
                         Declined
                       </span>
                     </div>

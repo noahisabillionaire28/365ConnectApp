@@ -373,7 +373,7 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
           <div className="flex items-center justify-between mt-1 pt-4 border-t border-[#DBDBDB]">
             <div>
               <p className="text-black font-bold text-[16px]">Estimated pay</p>
-              <p className="text-[#6B7280] text-[11px]">Final after manager approval</p>
+              <p className="text-[#6B7280] text-[11px]">Final after manager approval · 365 Connect deducts no fee</p>
             </div>
             <p className="text-black font-bold" style={{ fontSize: 28 }}>{fmtMoney(netPay)}</p>
           </div>

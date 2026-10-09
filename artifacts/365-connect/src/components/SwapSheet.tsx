@@ -3,11 +3,12 @@
  * worker: find them by name, add an optional note, send. Nothing changes on
  * the roster until the other worker accepts and the poster approves.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Search, Star, Check, Info, X } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDialog } from '@/hooks/useDialog';
 
 export type SwapCandidate = {
   id: string;
@@ -66,18 +67,21 @@ export function SwapSheet({ open, shiftLabel, busy, onSend, onCancel }: {
     onCancel();
   }
 
+  const titleId = useId();
+  const ref = useDialog<HTMLDivElement>(open, busy ? null : close);
+
   if (!open) return null;
 
   return (
     <div data-no-pull className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40"
-      role="dialog" aria-modal="true" aria-label="Swap shift"
       onClick={close}>
-      <div className="w-full max-w-app max-h-[88dvh] overflow-y-auto bg-white rounded-t-[20px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+20px)]"
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId}
+        className="w-full max-w-app max-h-[88dvh] overflow-y-auto bg-white rounded-t-[20px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+20px)]"
         onClick={(e) => e.stopPropagation()}>
         <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-4" />
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[#111827] font-bold text-[17px]">Swap shift</p>
+            <p id={titleId} className="text-[#111827] font-bold text-[17px]">Swap shift</p>
             <p className="text-[#6B7280] text-[13px] mt-1 leading-relaxed">
               Offer your spot{shiftLabel ? ` on ${shiftLabel}` : ''} to another worker. They accept, then the poster approves.
             </p>
@@ -107,17 +111,17 @@ export function SwapSheet({ open, shiftLabel, busy, onSend, onCancel }: {
               <Search size={15} aria-hidden className="text-[#9CA3AF] flex-shrink-0" />
               <input value={query} onChange={(e) => setQuery(e.target.value)} disabled={busy}
                 placeholder="Search a worker by name" aria-label="Search a worker by name" autoFocus
-                className="flex-1 min-w-0 bg-transparent text-[14px] text-[#111827] outline-none placeholder:text-[#9CA3AF]" />
+                className="flex-1 min-w-0 bg-transparent text-[14px] text-[#111827] outline-none placeholder:text-[#6B7280]" />
             </label>
             <div className="mt-2 flex flex-col gap-1.5 min-h-[56px]" role="listbox" aria-label="Matching workers">
               {term.length === 0 && (
-                <p className="text-[#9CA3AF] text-[12px] px-1 py-2">Type a name or @username to find a worker.</p>
+                <p className="text-[#6B7280] text-[12px] px-1 py-2">Type a name or @username to find a worker.</p>
               )}
               {term.length > 0 && search.isLoading && (
-                <p className="text-[#9CA3AF] text-[12px] px-1 py-2">Searching…</p>
+                <p className="text-[#6B7280] text-[12px] px-1 py-2">Searching…</p>
               )}
               {term.length > 0 && !search.isLoading && results.length === 0 && (
-                <p className="text-[#9CA3AF] text-[12px] px-1 py-2">No workers match “{term}”.</p>
+                <p className="text-[#6B7280] text-[12px] px-1 py-2">No workers match “{term}”.</p>
               )}
               {results.map((w) => (
                 <button key={w.id} type="button" role="option" aria-selected={false} disabled={busy}
@@ -142,7 +146,7 @@ export function SwapSheet({ open, shiftLabel, busy, onSend, onCancel }: {
 
         <textarea value={note} onChange={(e) => setNote(e.target.value.slice(0, 300))} rows={2} disabled={busy}
           placeholder="Add a note for them (optional)" aria-label="Optional note"
-          className="mt-3 w-full border border-[#E5E7EB] rounded-[12px] px-3 py-2.5 text-[14px] text-[#111827] resize-none outline-none focus:border-[#0A1628] placeholder:text-[#9CA3AF]" />
+          className="mt-3 w-full border border-[#E5E7EB] rounded-[12px] px-3 py-2.5 text-[14px] text-[#111827] resize-none outline-none focus:border-[#0A1628] placeholder:text-[#6B7280]" />
 
         <div className="mt-3 flex items-start gap-2 rounded-[12px] bg-[#F0F7FF] border border-[#DBDBDB] px-3 py-2.5">
           <Info size={15} aria-hidden className="text-[#0095F6] flex-shrink-0 mt-0.5" />

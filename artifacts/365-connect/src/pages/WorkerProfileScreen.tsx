@@ -1,5 +1,5 @@
 import { useParams, useLocation } from 'wouter';
-import { BadgeCheck, Star, ChevronLeft, Heart, CalendarPlus, X, CheckCircle2, Flag, Bookmark } from 'lucide-react';
+import { Award, Star, ChevronLeft, Heart, CalendarPlus, X, CheckCircle2, Flag, Bookmark } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api';
 import { friendlyDate } from '@/lib/supabase';
@@ -433,7 +433,6 @@ export function WorkerProfileScreen() {
   }
 
   const initials  = (profile.username ?? '??').slice(0, 2).toUpperCase();
-  const isVerified = false;
 
   return (
     <div className="flex flex-col h-full bg-white text-black overflow-y-auto">
@@ -467,12 +466,9 @@ export function WorkerProfileScreen() {
       {/* Profile info */}
       <div className="px-5 pt-2 pb-6">
 
-        {/* Handle + verified */}
+        {/* Handle. There is no identity verification, so no "verified" tick. */}
         <div className="flex items-center gap-2 mb-[2px] min-w-0">
           <h1 className="text-[22px] font-bold text-black min-w-0 break-words [overflow-wrap:anywhere]">@{profile.username}</h1>
-          {isVerified && (
-            <BadgeCheck size={20} className="text-[#0095F6] fill-[#0095F6] flex-shrink-0" />
-          )}
         </div>
 
         <p className="text-[#737373] text-[13px] font-medium mb-1">
@@ -517,7 +513,7 @@ export function WorkerProfileScreen() {
                 return (
                   <span key={key}
                     className={`px-2.5 py-1 rounded-full text-[12px] font-semibold border ${
-                      on ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-[#FAFAFA] border-[#DBDBDB] text-[#9CA3AF]'
+                      on ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-[#FAFAFA] border-[#DBDBDB] text-[#6B7280]'
                     }`}>
                     {label}
                   </span>
@@ -601,13 +597,13 @@ export function WorkerProfileScreen() {
         {profile.certifications.length > 0 && (
           <div className="mb-8">
             <h2 className="text-[13px] font-semibold text-[#737373] uppercase tracking-widest mb-3">
-              Certifications
+              Certifications <span className="normal-case tracking-normal font-normal">(self-reported)</span>
             </h2>
             <div className="flex flex-wrap gap-2">
               {profile.certifications.map((cert) => (
                 <span key={cert}
                   className="inline-flex items-center gap-[6px] px-3 py-[7px] rounded-full bg-[#FAFAFA] border border-[#DBDBDB] text-[#737373] text-[12px] font-semibold">
-                  <BadgeCheck size={12} className="text-[#737373]" />
+                  <Award size={12} aria-hidden className="text-[#737373]" />
                   {cert}
                 </span>
               ))}

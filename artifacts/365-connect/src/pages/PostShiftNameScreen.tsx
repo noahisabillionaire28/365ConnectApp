@@ -121,7 +121,7 @@ export function PostShiftNameScreen() {
             aria-label="Shift name"
             aria-invalid={!!err}
             maxLength={80}
-            className={`w-full bg-white border rounded-[10px] px-3 h-[50px] text-[#111827] text-[16px] font-semibold placeholder:text-[#9CA3AF] placeholder:font-medium focus:outline-none focus:border-[#0A1628] transition-colors ${
+            className={`w-full bg-white border rounded-[10px] px-3 h-[50px] text-[#111827] text-[16px] font-semibold placeholder:text-[#6B7280] placeholder:font-medium focus:outline-none focus:border-[#0A1628] transition-colors ${
               err ? 'border-[#EF4444]' : 'border-[#E5E7EB]'}`}
           />
           {err && <p className="text-[#EF4444] text-[11px] mt-1.5">{err}</p>}
@@ -156,7 +156,7 @@ export function PostShiftNameScreen() {
                   <div className="flex-1 min-w-0">
                     <p className="text-[#111827] text-[14px] font-semibold truncate">{t.name}</p>
                     <p className="text-[#6B7280] text-[12px] truncate">{templateSummary(t.payload)}</p>
-                    <p className="text-[#9CA3AF] text-[11px]">{templateUsage(t)}</p>
+                    <p className="text-[#6B7280] text-[11px]">{templateUsage(t)}</p>
                   </div>
                   {usingId === t.id
                     ? <div className="w-4 h-4 rounded-full border-2 border-[#E5E7EB] border-t-[#0A1628] animate-spin" aria-hidden />
@@ -164,7 +164,7 @@ export function PostShiftNameScreen() {
                 </button>
               ))}
             </div>
-            <p className="text-[#9CA3AF] text-[11px] mt-1.5 px-1">Loads the details; you only pick the date and time.</p>
+            <p className="text-[#6B7280] text-[11px] mt-1.5 px-1">Loads the details; you only pick the date and time.</p>
           </section>
         )}
       </div>

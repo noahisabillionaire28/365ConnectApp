@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Heart, MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react';
+import { useDialog } from '@/hooks/useDialog';
 import { useLocation } from 'wouter';
 import { relativeTime } from '@/hooks/useNotifications';
 import { useDeletePost, type FeedPost } from '@/hooks/useFeed';
@@ -22,6 +23,8 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
   const { showToast } = useToast();
   const deletePost = useDeletePost();
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuTitleId = useId();
+  const menuRef = useDialog<HTMLDivElement>(menuOpen, () => setMenuOpen(false));
 
   const goAuthor = () => { if (post.author_username) navigate(`/worker/${post.author_username}`); };
   const initials = (post.author_username ?? 'W').slice(0, 2).toUpperCase();
@@ -48,7 +51,7 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
             {post.author_username ? `@${post.author_username}` : 'Worker'}
           </p>
         </button>
-        <span className="ml-auto text-[#9CA3AF] text-[11px] flex-shrink-0">{relativeTime(post.created_at)}</span>
+        <span className="ml-auto text-[#6B7280] text-[11px] flex-shrink-0">{relativeTime(post.created_at)}</span>
         {canDelete && (
           <button type="button" aria-label="Post options" onClick={() => setMenuOpen(true)}
             className="w-8 h-8 -mr-1.5 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#F3F4F6]">
@@ -89,11 +92,13 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
 
       {/* Options action sheet (Instagram-style) */}
       {menuOpen && (
-        <div data-no-pull className="fixed inset-0 z-[80] flex items-end justify-center" role="dialog" aria-modal="true">
-          <button type="button" aria-label="Close" onClick={() => setMenuOpen(false)}
+        <div data-no-pull className="fixed inset-0 z-[80] flex items-end justify-center">
+          <button type="button" aria-label="Close" tabIndex={-1} onClick={() => setMenuOpen(false)}
             className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-app bg-white rounded-t-[18px] pb-6 pt-2 px-3">
+          <div ref={menuRef} role="dialog" aria-modal="true" aria-labelledby={menuTitleId}
+            className="relative w-full max-w-app bg-white rounded-t-[18px] pb-6 pt-2 px-3">
             <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto my-2" aria-hidden />
+            <p id={menuTitleId} className="sr-only">Post options</p>
             <button type="button" onClick={handleDelete} disabled={deletePost.isPending}
               className="w-full flex items-center justify-center gap-2 h-[52px] rounded-[12px] text-[#EF4444] font-bold text-[15px] active:bg-[#FEF2F2] disabled:opacity-60">
               <Trash2 size={18} aria-hidden />

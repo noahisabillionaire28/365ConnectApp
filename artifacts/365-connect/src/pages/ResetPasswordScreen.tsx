@@ -136,7 +136,7 @@ export function ResetPasswordScreen() {
               onChange={e => setPassword(e.target.value)}
               disabled={!hasSession}
               placeholder="Min. 6 characters"
-              className="w-full rounded-[14px] px-4 py-4 font-medium text-[15px] outline-none transition-colors placeholder:text-[#9CA3AF] disabled:opacity-40"
+              className="w-full rounded-[14px] px-4 py-4 font-medium text-[15px] outline-none transition-colors placeholder:text-[#6B7280] disabled:opacity-40"
               style={{ background: '#FFFFFF', border: `1px solid ${BORDER}`, color: TEXT }}
             />
           </div>
@@ -151,7 +151,7 @@ export function ResetPasswordScreen() {
               onChange={e => setConfirm(e.target.value)}
               disabled={!hasSession}
               placeholder="Repeat new password"
-              className="w-full rounded-[14px] px-4 py-4 font-medium text-[15px] outline-none transition-colors placeholder:text-[#9CA3AF] disabled:opacity-40"
+              className="w-full rounded-[14px] px-4 py-4 font-medium text-[15px] outline-none transition-colors placeholder:text-[#6B7280] disabled:opacity-40"
               style={{ background: '#FFFFFF', border: `1px solid ${BORDER}`, color: TEXT }}
             />
           </div>

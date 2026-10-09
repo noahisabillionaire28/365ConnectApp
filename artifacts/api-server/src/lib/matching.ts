@@ -207,7 +207,9 @@ async function askClaude(shift: Shift, signals: Signals[]): Promise<Map<string, 
       rating: s.rating, review_count: s.reviewCount, distance_miles: s.distanceMiles,
       shifts_worked: s.shiftsWorked, shifts_with_this_poster: s.shiftsWithThisPoster, poster_rating: s.posterRating,
       no_shows: s.noShows, on_time_rate: s.onTimeRate, certifications: s.certifications.slice(0, 8),
-      bio: (s.bio ?? '').slice(0, 200),
+      // The bio is free text that often carries a name, so it stays on our
+      // side: the Privacy Policy promises the processor only non-identifying
+      // signals.
     })),
   };
   try {

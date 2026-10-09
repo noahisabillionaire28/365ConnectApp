@@ -1,9 +1,12 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { broadcastToUser } from '../lib/sseManager.js';
-import { sendEmail, renderNotificationEmail, appUrl } from '../lib/email.js';
+import { sendEmail, renderNotificationEmail, renderUnsubscribePage, appUrl } from '../lib/email.js';
 import { pushToUser } from '../lib/push.js';
+import { unsubscribeUrl, verifyUnsubscribeToken } from '../lib/unsubscribe.js';
+import { rateLimit, clientIp } from '../lib/rateLimit.js';
+import { logger } from '../lib/logger.js';
 
 /** Notification types that should NOT trigger an email (too high-frequency). */
 const EMAIL_SKIP_TYPES = new Set(['post_like', 'post_comment', 'new_follower']);
@@ -18,6 +21,60 @@ function emailCta(type: string, shiftId?: string | null, postId?: string | null)
 }
 
 const router = Router();
+
+// ── One-click email unsubscribe (no login) ──────────────────────────────────
+// The link in every email footer and in the List-Unsubscribe header. GET is
+// what a person clicks; POST is what a mail client sends for RFC 8058
+// one-click unsubscribe. Both turn users.email_notifications off for the
+// user the token was issued to, and nothing else.
+const unsubscribeLimiter = rateLimit({
+  windowMs: 10 * 60_000,
+  max: 30,
+  keys: (req) => [`ip:${clientIp(req)}`],
+  message: 'Too many requests. Please try the link again in a few minutes.',
+});
+
+async function handleUnsubscribe(token: unknown, res: Response, wantsHtml: boolean) {
+  const userId = verifyUnsubscribeToken(token);
+  const page = (status: number, ok: boolean, message: string) => {
+    res.status(status);
+    if (wantsHtml) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.type('html').send(renderUnsubscribePage({ ok, message }));
+    }
+    return res.json(ok ? { ok: true } : { error: message });
+  };
+  if (!userId) {
+    return page(400, false, 'The unsubscribe link is invalid or has expired. Open the app and turn off email in Settings → Notifications instead.');
+  }
+  const { data, error } = await adminDb
+    .from('users')
+    .update({ email_notifications: false })
+    .eq('id', userId)
+    .select('id')
+    .maybeSingle();
+  if (error) {
+    logger.warn({ err: error.message }, '[unsubscribe] update failed');
+    return page(500, false, 'Something went wrong on our side. Please try again later.');
+  }
+  if (!data) {
+    // The account is gone: there is nothing left to email, so this is a success.
+    return page(200, true, 'This account no longer exists, so no more email will be sent to it.');
+  }
+  return page(200, true, 'You will no longer receive notification emails from 365 Connect. In-app and push notifications are unchanged; you can turn email back on any time in the app.');
+}
+
+router.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
+  await handleUnsubscribe(req.query.token, res, true);
+});
+
+router.post('/unsubscribe', unsubscribeLimiter, async (req, res) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  // RFC 8058: the token stays in the URL; the body is "List-Unsubscribe=One-Click".
+  const token = req.query.token ?? body.token;
+  const wantsHtml = (req.get('accept') ?? '').includes('text/html');
+  await handleUnsubscribe(token, res, wantsHtml);
+});
 
 /** GET /api/notifications — my notifications */
 router.get('/', requireAuth, async (req, res) => {
@@ -156,10 +213,12 @@ export async function createNotification(params: {
       !EMAIL_SKIP_TYPES.has(type)
     ) {
       const cta = emailCta(type, shiftId, postId);
+      const unsub = unsubscribeUrl(userId);
       const { html, text } = renderNotificationEmail({
         title, body, ctaLabel: cta.label, ctaHref: url ? `${appUrl()}${url}` : cta.href, preheader: body,
+        unsubscribeUrl: unsub,
       });
-      await sendEmail({ to: pref.email as string, subject: title, html, text });
+      await sendEmail({ to: pref.email as string, subject: title, html, text, unsubscribeUrl: unsub });
     }
   } catch (e) {
     // Notifications are non-critical — log but don't throw

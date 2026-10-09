@@ -139,7 +139,7 @@ function LinkPreview({ url, mine }: { url: string; mine: boolean }) {
       <div className="px-3 py-2">
         <p className={`text-[12px] font-bold truncate ${mine ? 'text-white' : 'text-[#111827]'}`}>{p.title ?? p.site}</p>
         {p.description && <p className={`text-[11px] line-clamp-2 ${mine ? 'text-white/80' : 'text-[#6B7280]'}`}>{p.description}</p>}
-        <p className={`text-[10px] mt-0.5 flex items-center gap-1 ${mine ? 'text-white/60' : 'text-[#9CA3AF]'}`}><ExternalLink size={10} aria-hidden />{p.site}</p>
+        <p className={`text-[10px] mt-0.5 flex items-center gap-1 ${mine ? 'text-white/60' : 'text-[#6B7280]'}`}><ExternalLink size={10} aria-hidden />{p.site}</p>
       </div>
     </a>
   );
@@ -205,8 +205,8 @@ function ShiftCard({ card, mine, onOpen }: { card: NonNullable<MessageRow['shift
           {card.job_type ?? 'Shift'}
         </span>
         {ended
-          ? <span className={`text-[10px] font-bold ${mine ? 'text-white/70' : 'text-[#9CA3AF]'}`}>Ended</span>
-          : <span className={`text-[10px] font-bold ${left === 0 ? (mine ? 'text-white/70' : 'text-[#9CA3AF]') : 'text-emerald-500'}`}>{left === 0 ? 'Full' : `${left} spot${left === 1 ? '' : 's'} left`}</span>}
+          ? <span className={`text-[10px] font-bold ${mine ? 'text-white/70' : 'text-[#6B7280]'}`}>Ended</span>
+          : <span className={`text-[10px] font-bold ${left === 0 ? (mine ? 'text-white/70' : 'text-[#6B7280]') : 'text-emerald-500'}`}>{left === 0 ? 'Full' : `${left} spot${left === 1 ? '' : 's'} left`}</span>}
       </div>
       <p className={`font-bold text-[14px] leading-tight ${mine ? 'text-white' : 'text-[#111827]'}`}>{card.title ?? 'Shift'}</p>
       <p className={`text-[12px] mt-1 flex items-center gap-1 ${mine ? 'text-white/85' : 'text-[#6B7280]'}`}>
@@ -278,7 +278,7 @@ function Bubble({ msg, isMine, isGroup, senderName, senderPhoto, receipt, myId, 
 
   if (msg.kind === 'system') {
     return (
-      <p className="text-center text-[#9CA3AF] text-[11.5px] px-6 py-1.5 select-none">{msg.text}</p>
+      <p className="text-center text-[#6B7280] text-[11.5px] px-6 py-1.5 select-none">{msg.text}</p>
     );
   }
 
@@ -286,7 +286,7 @@ function Bubble({ msg, isMine, isGroup, senderName, senderPhoto, receipt, myId, 
     return (
       <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} px-4 mb-1.5`}>
         <div className="max-w-[78%] px-3.5 py-2 rounded-[16px] border border-dashed border-[#D1D5DB] bg-white">
-          <p className="text-[13px] italic text-[#9CA3AF] flex items-center gap-1.5">
+          <p className="text-[13px] italic text-[#6B7280] flex items-center gap-1.5">
             <Trash2 size={12} aria-hidden />
             {isMine ? 'You deleted this message' : `${senderName} deleted this message`}
           </p>
@@ -322,7 +322,7 @@ function Bubble({ msg, isMine, isGroup, senderName, senderPhoto, receipt, myId, 
           {msg.text && (
             <p className="text-[14.5px] leading-[1.4] whitespace-pre-wrap break-words [overflow-wrap:anywhere] select-text">
               <RichText text={msg.text} mine={isMine} />
-              {msg.edited_at && <span className={`text-[10px] ml-1.5 ${isMine ? 'text-white/60' : 'text-[#9CA3AF]'}`}>(edited)</span>}
+              {msg.edited_at && <span className={`text-[10px] ml-1.5 ${isMine ? 'text-white/60' : 'text-[#6B7280]'}`}>(edited)</span>}
             </p>
           )}
           {url && !msg.image_url && <LinkPreview url={url} mine={isMine} />}
@@ -346,7 +346,7 @@ function Bubble({ msg, isMine, isGroup, senderName, senderPhoto, receipt, myId, 
               </div>
               <div className="min-w-0 flex-1">
                 <p className={`text-[13px] font-semibold truncate ${isMine ? 'text-white' : 'text-[#111827]'}`}>{msg.file_name ?? 'File'}</p>
-                <p className={`text-[11px] ${isMine ? 'text-white/70' : 'text-[#9CA3AF]'}`}>{fmtBytes(msg.file_size)}{msg.file_size ? ' · ' : ''}Tap to open</p>
+                <p className={`text-[11px] ${isMine ? 'text-white/70' : 'text-[#6B7280]'}`}>{fmtBytes(msg.file_size)}{msg.file_size ? ' · ' : ''}Tap to open</p>
               </div>
               <Download size={15} className={isMine ? 'text-white/80' : 'text-[#6B7280]'} />
             </a>
@@ -372,12 +372,12 @@ function Bubble({ msg, isMine, isGroup, senderName, senderPhoto, receipt, myId, 
         <div className="flex items-center gap-1 mt-1 px-1">
           <span className="text-[10.5px] text-[#6B7280] font-medium">{timeLabel(msg.created_at)}</span>
         </div>
-        {isMine && msg._status === 'sending' && <p className="text-[11px] text-[#9CA3AF] font-semibold px-1">Sending…</p>}
+        {isMine && msg._status === 'sending' && <p className="text-[11px] text-[#6B7280] font-semibold px-1">Sending…</p>}
         {isMine && failed && (
           <p className="text-[11px] font-semibold px-1 text-[#EF4444] flex items-center gap-2">
             Not delivered
             <button type="button" className="underline" onClick={onRetry}>Retry</button>
-            <button type="button" className="underline text-[#9CA3AF]" onClick={onDiscard}>Delete</button>
+            <button type="button" className="underline text-[#6B7280]" onClick={onDiscard}>Delete</button>
           </p>
         )}
         {isMine && !msg._status && receipt && (
@@ -389,7 +389,7 @@ function Bubble({ msg, isMine, isGroup, senderName, senderPhoto, receipt, myId, 
               : receipt.readBy.length >= receipt.total ? `Read by everyone`
               : `Read by ${receipt.readBy.length} of ${receipt.total}`}
             {receipt.kind === 'group' && showReaders && receipt.readBy.length > 0 && (
-              <span className="block text-[10.5px] font-medium text-[#9CA3AF]">{receipt.readBy.join(', ')}</span>
+              <span className="block text-[10.5px] font-medium text-[#6B7280]">{receipt.readBy.join(', ')}</span>
             )}
           </button>
         )}
@@ -459,8 +459,8 @@ function ForwardSheet({ excludeId, onPick, onClose }: { excludeId: string; onPic
   return (
     <Sheet onClose={onClose} label="Forward to">
       <p className="text-[#111827] font-bold text-[16px] mb-3">Forward to…</p>
-      {isLoading && <p className="text-[#9CA3AF] text-[13px] py-6 text-center">Loading…</p>}
-      {!isLoading && list.length === 0 && <p className="text-[#9CA3AF] text-[13px] py-6 text-center">No other conversations yet.</p>}
+      {isLoading && <p className="text-[#6B7280] text-[13px] py-6 text-center">Loading…</p>}
+      {!isLoading && list.length === 0 && <p className="text-[#6B7280] text-[13px] py-6 text-center">No other conversations yet.</p>}
       {list.map((c) => (
         <button key={c.id} type="button" onClick={() => onPick(c.id)}
           className="w-full flex items-center gap-3 py-2.5 border-b border-[#F3F4F6] text-left">
@@ -469,7 +469,7 @@ function ForwardSheet({ excludeId, onPick, onClose }: { excludeId: string; onPic
             : <Avatar url={c.other?.photo_url} name={c.other?.username} size={36} />}
           <div className="min-w-0 flex-1">
             <p className="text-[#111827] font-semibold text-[14px] truncate">{c.displayName}</p>
-            {c.isGroup && <p className="text-[#9CA3AF] text-[11px]">{c.members.length} members</p>}
+            {c.isGroup && <p className="text-[#6B7280] text-[11px]">{c.members.length} members</p>}
           </div>
           <Forward size={15} className="text-[#9CA3AF]" />
         </button>
@@ -485,15 +485,15 @@ function ShareShiftSheet({ onPick, onClose }: { onPick: (shiftId: string) => voi
     <Sheet onClose={onClose} label="Share a shift">
       <p className="text-[#111827] font-bold text-[16px] mb-1">Share a shift</p>
       <p className="text-[#6B7280] text-[12px] mb-3">Sends a card they can tap to view and apply.</p>
-      {isLoading && <p className="text-[#9CA3AF] text-[13px] py-6 text-center">Loading…</p>}
-      {!isLoading && upcoming.length === 0 && <p className="text-[#9CA3AF] text-[13px] py-6 text-center">No upcoming shifts to share. Post one first.</p>}
+      {isLoading && <p className="text-[#6B7280] text-[13px] py-6 text-center">Loading…</p>}
+      {!isLoading && upcoming.length === 0 && <p className="text-[#6B7280] text-[13px] py-6 text-center">No upcoming shifts to share. Post one first.</p>}
       {upcoming.map((s) => (
         <button key={s.id} type="button" onClick={() => onPick(s.id)}
           className="w-full flex items-center gap-3 py-2.5 border-b border-[#F3F4F6] text-left">
           <div className="w-10 h-10 rounded-[8px] bg-[#F3F4F6] flex items-center justify-center flex-shrink-0"><Briefcase size={16} className="text-[#0A1628]" /></div>
           <div className="min-w-0 flex-1">
             <p className="text-[#111827] font-semibold text-[14px] truncate">{s.jobType} · {s.companyName}</p>
-            <p className="text-[#9CA3AF] text-[11px] truncate">{s.date} · {s.startTime} · ${s.payRate}/{s.payPeriod} · {s.spotsAvailable} left</p>
+            <p className="text-[#6B7280] text-[11px] truncate">{s.date} · {s.startTime} · ${s.payRate}/{s.payPeriod} · {s.spotsAvailable} left</p>
           </div>
         </button>
       ))}
@@ -553,7 +553,7 @@ function ScheduleSheet({ conversationId, draft, onClose, onScheduled }: { conver
             <div key={p.id} className="flex items-start gap-2 py-2 border-t border-[#F3F4F6]">
               <div className="min-w-0 flex-1">
                 <p className="text-[#111827] text-[13px] truncate">{p.text}</p>
-                <p className="text-[#9CA3AF] text-[11px]">{new Date(p.send_at).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
+                <p className="text-[#6B7280] text-[11px]">{new Date(p.send_at).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
               </div>
               <button type="button" onClick={() => void cancel(p.id)} className="text-[#EF4444] text-[12px] font-bold">Cancel</button>
             </div>
@@ -577,8 +577,8 @@ function GallerySheet({ conversationId, onClose }: { conversationId: string; onC
   return (
     <Sheet onClose={onClose} label="Shared media">
       <p className="text-[#111827] font-bold text-[16px] mb-3">Photos, videos &amp; files</p>
-      {items === null && <p className="text-[#9CA3AF] text-[13px] py-6 text-center">Loading…</p>}
-      {items && items.length === 0 && <p className="text-[#9CA3AF] text-[13px] py-6 text-center">Nothing shared yet.</p>}
+      {items === null && <p className="text-[#6B7280] text-[13px] py-6 text-center">Loading…</p>}
+      {items && items.length === 0 && <p className="text-[#6B7280] text-[13px] py-6 text-center">Nothing shared yet.</p>}
       {media.length > 0 && (
         <div className="grid grid-cols-3 gap-1 mb-4">
           {media.map((m) => (
@@ -593,7 +593,7 @@ function GallerySheet({ conversationId, onClose }: { conversationId: string; onC
         <a key={f.id} href={f.file_url ?? '#'} target="_blank" rel="noreferrer" className="flex items-center gap-3 py-2.5 border-t border-[#F3F4F6]">
           <FileText size={18} className="text-[#0A1628]" />
           <div className="min-w-0 flex-1"><p className="text-[#111827] text-[13px] font-semibold truncate">{f.file_name ?? 'File'}</p>
-            <p className="text-[#9CA3AF] text-[11px]">{new Date(f.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p></div>
+            <p className="text-[#6B7280] text-[11px]">{new Date(f.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p></div>
           <Download size={15} className="text-[#6B7280]" />
         </a>
       ))}
@@ -1114,9 +1114,9 @@ export function ChatScreen() {
       {/* Search results */}
       {searching && (
         <div className="flex-1 overflow-y-auto">
-          {!query.trim() && <p className="text-center text-[#9CA3AF] text-[13px] py-10">Type to search messages in this thread.</p>}
-          {query.trim() && results === null && <p className="text-center text-[#9CA3AF] text-[13px] py-10">Searching…</p>}
-          {results && results.length === 0 && <p className="text-center text-[#9CA3AF] text-[13px] py-10">No matches.</p>}
+          {!query.trim() && <p className="text-center text-[#6B7280] text-[13px] py-10">Type to search messages in this thread.</p>}
+          {query.trim() && results === null && <p className="text-center text-[#6B7280] text-[13px] py-10">Searching…</p>}
+          {results && results.length === 0 && <p className="text-center text-[#6B7280] text-[13px] py-10">No matches.</p>}
           {results?.map((m) => (
             <button key={m.id} type="button" onClick={() => { setSearching(false); setQuery(''); setTimeout(() => scrollToMessage(m.id), 150); }}
               className="w-full text-left px-4 py-3 border-b border-[#F3F4F6]">
@@ -1148,7 +1148,7 @@ export function ChatScreen() {
                 const s = senderOf(m);
                 return (
                   <div key={m.id} className="transition-colors duration-500">
-                    {newDay && <p className="text-center text-[#9CA3AF] text-[11px] font-semibold py-2 select-none">{dayLabel(m.created_at)}</p>}
+                    {newDay && <p className="text-center text-[#6B7280] text-[11px] font-semibold py-2 select-none">{dayLabel(m.created_at)}</p>}
                     <Bubble msg={m} isMine={isMine} isGroup={isGroup} senderName={isMine ? 'You' : s.name} senderPhoto={s.photo}
                       receipt={receiptFor(m)} myId={user?.id}
                       onLongPress={!m.deleted_at && m.kind !== 'system' && !m._status ? () => setActionMsg(m) : undefined}
@@ -1273,7 +1273,7 @@ export function ChatScreen() {
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleSendText(); } }}
                       onBlur={stopTyping}
                       placeholder={editing ? 'Edit message…' : isGroup ? 'Message the shift chat…' : 'Message…'} aria-label="Message text" disabled={composerDisabled}
-                      className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#9CA3AF] focus:outline-none py-2 resize-none max-h-[120px] leading-[1.4]" />
+                      className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#6B7280] focus:outline-none py-2 resize-none max-h-[120px] leading-[1.4]" />
                     <button type="button" aria-label="Emoji" onClick={() => { setShowEmoji((v) => !v); setShowAttach(false); }}
                       className="w-8 h-9 flex items-center justify-center text-[#6B7280] flex-shrink-0"><Smile size={18} /></button>
                   </div>

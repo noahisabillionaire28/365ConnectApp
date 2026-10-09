@@ -99,7 +99,7 @@ function Field({ label, htmlFor, error, hint, children }: {
   );
 }
 
-const INPUT = 'w-full h-[44px] rounded-[10px] border bg-white px-3 text-[14px] text-[#111827] font-medium placeholder:text-[#9CA3AF] outline-none transition-colors focus:border-[#0A1628]';
+const INPUT = 'w-full h-[44px] rounded-[10px] border bg-white px-3 text-[14px] text-[#111827] font-medium placeholder:text-[#6B7280] outline-none transition-colors focus:border-[#0A1628]';
 const inputBorder = (error?: string | null) => (error ? 'border-[#EF4444]' : 'border-[#E5E7EB]');
 
 function Chip({ selected, onClick, children, disabled = false, testId }: {
@@ -406,7 +406,7 @@ export function EditProfileScreen() {
                 autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 onChange={(e) => set('username', e.target.value.replace(/[^a-zA-Z0-9_.]/g, '').toLowerCase())}
                 aria-invalid={!!handleError} aria-describedby={handleError ? 'handle-error' : undefined}
-                className="flex-1 min-w-0 bg-transparent outline-none text-[14px] text-[#111827] font-medium placeholder:text-[#9CA3AF]"
+                className="flex-1 min-w-0 bg-transparent outline-none text-[14px] text-[#111827] font-medium placeholder:text-[#6B7280]"
                 placeholder="yourhandle" />
               {handleChanged && !handleChecking && !handleError && <CheckCircle2 size={16} aria-hidden className="text-[#10B981] flex-shrink-0" />}
               {handleError && <AlertCircle size={16} aria-hidden className="text-[#EF4444] flex-shrink-0" />}
@@ -419,7 +419,7 @@ export function EditProfileScreen() {
                 <textarea id="bio" value={form.bio} maxLength={BIO_MAX} rows={4} data-testid="input-bio"
                   onChange={(e) => set('bio', e.target.value.slice(0, BIO_MAX))}
                   placeholder="Tell clients what makes you great. Keep it concise."
-                  className="w-full bg-transparent outline-none text-[14px] text-[#111827] leading-relaxed resize-none px-3 pt-3 pb-7 placeholder:text-[#9CA3AF]" />
+                  className="w-full bg-transparent outline-none text-[14px] text-[#111827] leading-relaxed resize-none px-3 pt-3 pb-7 placeholder:text-[#6B7280]" />
                 <span className="absolute bottom-2 right-3 text-[11px] text-[#6B7280]" aria-live="polite">{form.bio.length}/{BIO_MAX}</span>
               </div>
             </Field>
@@ -464,7 +464,7 @@ export function EditProfileScreen() {
                 <input id="hourly-rate" type="number" inputMode="decimal" min="0" step="1" value={form.hourlyRate} data-testid="input-rate"
                   onChange={(e) => set('hourlyRate', e.target.value)} placeholder="25"
                   aria-invalid={!!rateError} aria-describedby={rateError ? 'hourly-rate-error' : undefined}
-                  className="flex-1 min-w-0 bg-transparent outline-none text-[14px] text-[#111827] font-medium placeholder:text-[#9CA3AF]" />
+                  className="flex-1 min-w-0 bg-transparent outline-none text-[14px] text-[#111827] font-medium placeholder:text-[#6B7280]" />
                 <span className="text-[#6B7280] text-[13px] font-medium">/hr</span>
               </div>
             </Field>
@@ -530,10 +530,10 @@ export function EditProfileScreen() {
               </div>
             </Field>
 
-            <Field label="Location" htmlFor="location"
+            <Field label="Location (optional)" htmlFor="location"
               hint={form.lat != null && form.lng != null
-                ? `Saved: ${form.lat.toFixed(3)}, ${form.lng.toFixed(3)} — pick an address to change it.`
-                : 'Used to show your shifts to nearby workers.'}>
+                ? `Saved: ${form.lat.toFixed(3)}, ${form.lng.toFixed(3)} — pick an address to change it. Others only ever see a rounded location.`
+                : 'Optional. Used to show distances to shifts. Others only ever see a rounded location.'}>
               <LocationAutocomplete value={locationQuery} onChange={setLocationQuery} label="Your location"
                 onPlacePicked={({ lat, lng }) => { set('lat', lat); set('lng', lng); }} />
               <button type="button" onClick={useCurrentLocation} disabled={locating}

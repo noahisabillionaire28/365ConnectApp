@@ -108,7 +108,7 @@ export function TemplatesScreen() {
                   className="flex-1 min-w-0 text-left disabled:opacity-60">
                   <p className="text-[#111827] text-[14px] font-semibold truncate">{t.name}</p>
                   <p className="text-[#6B7280] text-[12px] truncate">{templateSummary(t.payload)}</p>
-                  <p className="text-[#9CA3AF] text-[11px]">{templateUsage(t)}</p>
+                  <p className="text-[#6B7280] text-[11px]">{templateUsage(t)}</p>
                 </button>
                 <button type="button" aria-label={`More options for ${t.name}`} onClick={() => setMenuFor(t)}
                   className="w-10 h-10 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#F3F4F6]">

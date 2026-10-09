@@ -50,7 +50,7 @@ function SummaryRow({
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[#9CA3AF] text-[11px] font-semibold uppercase tracking-wider mb-0.5">{label}</p>
+        <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider mb-0.5">{label}</p>
         <p className="text-[#111827] text-[14px] font-semibold leading-snug break-words">{value}</p>
         {sub && <p className="text-[#6B7280] text-[12px] mt-0.5">{sub}</p>}
       </div>
@@ -85,7 +85,7 @@ function ReadinessItem({ label, done }: { label: string; done: boolean }) {
       {done
         ? <CheckCircle2 size={15} aria-hidden className="text-[#10B981] flex-shrink-0" />
         : <AlertCircle  size={15} aria-hidden className="text-[#9CA3AF] flex-shrink-0" />}
-      <span className={`text-[13px] ${done ? 'text-[#374151]' : 'text-[#9CA3AF]'}`}>{label}</span>
+      <span className={`text-[13px] ${done ? 'text-[#374151]' : 'text-[#6B7280]'}`}>{label}</span>
     </div>
   );
 }
@@ -343,11 +343,11 @@ export function PostShiftStep5Screen() {
             )}
             <div className="border-t border-[#E5E7EB] my-2" />
             <CostRow label="Total Estimated Cost" value={`$${totalCost.toFixed(2)}`} highlight />
-            <p className="text-[#9CA3AF] text-[11px] mt-3 leading-relaxed">
+            <p className="text-[#6B7280] text-[11px] mt-3 leading-relaxed">
               {hourly
                 ? 'Estimated total based on listed hours. Final cost may vary if shift hours change.'
                 : 'Flat rate per worker. Final cost depends on how many spots are filled.'}
-              {' '}Workers are paid after successful clock-out confirmation.
+              {' '}Workers are paid after successful clock-out confirmation. You pay workers the listed rate; 365 Connect adds no fee.
             </p>
           </div>
         )}
@@ -398,7 +398,7 @@ export function PostShiftStep5Screen() {
             isEditing ? 'Save Changes →' : isSeries ? `Post ${shiftCount} shifts →` : 'Post Shift →'
           )}
         </motion.button>
-        <p className="text-center text-[#9CA3AF] text-[11px] mt-2">
+        <p className="text-center text-[#6B7280] text-[11px] mt-2">
           {isEditing ? 'Changes apply immediately' : isSeries ? `All ${shiftCount} shifts go live immediately` : 'Your shift goes live immediately'}
         </p>
       </div>

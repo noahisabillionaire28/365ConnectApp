@@ -34,12 +34,12 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 const INPUT_CLS =
   'w-full bg-white border border-[#E5E7EB] rounded-[10px] px-3 h-[46px] ' +
-  'text-[#111827] text-[14px] font-medium placeholder:text-[#9CA3AF] ' +
+  'text-[#111827] text-[14px] font-medium placeholder:text-[#6B7280] ' +
   'focus:outline-none focus:border-[#0A1628] transition-colors';
 
 const TEXTAREA_CLS =
   'w-full bg-white border border-[#E5E7EB] rounded-[10px] px-3 py-3 ' +
-  'text-[#111827] text-[14px] font-medium placeholder:text-[#9CA3AF] ' +
+  'text-[#111827] text-[14px] font-medium placeholder:text-[#6B7280] ' +
   'focus:outline-none focus:border-[#0A1628] transition-colors resize-none leading-relaxed';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -137,7 +137,7 @@ export function PostShiftStep4Screen() {
               step={0.5}
               className={INPUT_CLS + ' pl-7' + (errors.payRate ? ' border-[#EF4444]' : '')}
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9CA3AF] text-[12px] font-medium pointer-events-none">
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] text-[12px] font-medium pointer-events-none">
               / hr
             </span>
           </div>

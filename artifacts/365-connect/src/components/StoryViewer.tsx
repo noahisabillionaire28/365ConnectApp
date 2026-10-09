@@ -176,11 +176,11 @@ export function StoryViewer({
           className="absolute right-0 top-0 bottom-0 w-2/3 z-10" />
 
         {/* Desktop arrows */}
-        <button type="button" aria-hidden onClick={goPrev}
+        <button type="button" aria-label="Previous story" onClick={goPrev}
           className="hidden sm:flex absolute left-1 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/15 items-center justify-center">
           <ChevronLeft size={20} className="text-white" />
         </button>
-        <button type="button" aria-hidden onClick={goNext}
+        <button type="button" aria-label="Next story" onClick={goNext}
           className="hidden sm:flex absolute right-1 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/15 items-center justify-center">
           <ChevronRight size={20} className="text-white" />
         </button>

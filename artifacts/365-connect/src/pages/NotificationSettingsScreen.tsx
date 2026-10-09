@@ -151,7 +151,7 @@ export function NotificationSettingsScreen() {
                 divider
                 icon={(on) => <Mail size={17} aria-hidden className={on ? 'text-white' : 'text-[#0A1628]'} />}
                 title="Email notifications"
-                subtitle="Bookings, requests, reminders and payments by email too. Likes, comments and roster adds stay in-app."
+                subtitle="Bookings, shift requests and changes, timesheet approvals, payment updates and shift reminders by email. No marketing. Likes, comments and roster adds stay in-app. Every email has a one-click unsubscribe link."
                 on={prefs.email_notifications}
                 onToggle={() => update({ email_notifications: !prefs.email_notifications })}
                 saving={saving}
@@ -165,7 +165,9 @@ export function NotificationSettingsScreen() {
                     ? 'Not available yet on the server.'
                     : push.permission === 'denied'
                     ? 'Blocked in your browser settings. Allow notifications for this site to turn it on.'
-                    : 'New messages and shift chat alerts on this device, even when the app is closed.'}
+                    : push.subscribed
+                    ? 'New messages, shift chat and booking alerts on this device, even when the app is closed.'
+                    : 'Turning this on asks your device for permission. We will send new messages, shift chat and booking alerts only; never ads. Turn it off here any time.'}
                   on={push.subscribed}
                   onToggle={() => void togglePush()}
                   saving={push.busy || push.serverReady === false || push.permission === 'denied'}
@@ -178,7 +180,7 @@ export function NotificationSettingsScreen() {
             )}
             <p className="text-[#737373] text-[12px] leading-relaxed px-1 mt-3">
               Turning a channel off stops new alerts on that channel. You can turn it
-              back on anytime.
+              back on anytime. Security and legal notices (such as a password reset or a change to the Terms) may still be sent.
             </p>
 
             {isWorker && (
@@ -205,7 +207,7 @@ export function NotificationSettingsScreen() {
                       <p className="flex-1 min-w-0 text-[#111827] text-[14px] font-medium truncate">{savedSearchLabel(s)}</p>
                       <button type="button" onClick={() => savedSearches.remove(s.id)}
                         aria-label={`Remove saved search: ${savedSearchLabel(s)}`}
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-[#9CA3AF] active:bg-[#F3F4F6] flex-shrink-0">
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#F3F4F6] flex-shrink-0">
                         <X size={15} aria-hidden />
                       </button>
                     </div>

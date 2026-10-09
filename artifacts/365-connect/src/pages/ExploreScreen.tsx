@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import { useLocation } from 'wouter';
+import { useDialog } from '@/hooks/useDialog';
 import { Search, BadgeCheck, ImagePlus } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { PostCard } from '@/components/PostCard';
@@ -27,7 +28,7 @@ function ExploreTile({ person, onTap }: { person: WorkerPerson; onTap: () => voi
       )}
       {person.isPro && (
         <div className="absolute top-1.5 right-1.5 bg-black/60 rounded-full p-0.5">
-          <BadgeCheck size={13} aria-label="Pro verified" style={{ color: GOLD }} />
+          <BadgeCheck size={13} aria-label="Pro member" style={{ color: GOLD }} />
         </div>
       )}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 py-1">
@@ -84,6 +85,9 @@ export function ExploreScreen() {
     if (fileRef.current) fileRef.current.value = '';
   }
 
+  const composeTitleId = useId();
+  const composeRef = useDialog<HTMLDivElement>(!!composeFile, posting ? null : closeCompose);
+
   function closeCompose() {
     if (composePreview) URL.revokeObjectURL(composePreview);
     setComposeFile(null);
@@ -133,7 +137,7 @@ export function ExploreScreen() {
                 <Search size={15} aria-hidden className="text-[#737373] flex-shrink-0" />
                 <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search workers" aria-label="Search workers"
-                  className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#9CA3AF] outline-none" />
+                  className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#6B7280] outline-none" />
               </div>
             </div>
             <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none" role="radiogroup" aria-label="Filter by job type"
@@ -218,7 +222,7 @@ export function ExploreScreen() {
                     {isLoadingMore ? 'Loading…' : 'Load more'}
                   </button>
                 ) : (
-                  <p className="text-[#9CA3AF] text-[12px]">You're all caught up.</p>
+                  <p className="text-[#6B7280] text-[12px]">You're all caught up.</p>
                 )}
               </div>
             )}
@@ -241,11 +245,12 @@ export function ExploreScreen() {
 
       {/* Compose sheet — photo preview + caption with #hashtags */}
       {composeFile && (
-        <div data-no-pull className="fixed inset-0 z-[80] flex flex-col bg-white max-w-app mx-auto" role="dialog" aria-label="New post">
+        <div ref={composeRef} data-no-pull className="fixed inset-0 z-[80] flex flex-col bg-white max-w-app mx-auto"
+          role="dialog" aria-modal="true" aria-labelledby={composeTitleId}>
           <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 border-b border-[#EFEFEF]">
             <button type="button" onClick={closeCompose} disabled={posting}
               className="text-[#111827] text-[15px] font-medium disabled:opacity-50">Cancel</button>
-            <h1 className="text-[#111827] font-bold text-[16px]">New post</h1>
+            <h1 id={composeTitleId} className="text-[#111827] font-bold text-[16px]">New post</h1>
             <button type="button" onClick={() => void handlePost()} disabled={posting}
               className="text-[#2563EB] text-[15px] font-bold disabled:opacity-50">
               {posting ? 'Posting…' : 'Share'}
@@ -263,11 +268,11 @@ export function ExploreScreen() {
               rows={4}
               maxLength={MAX_CAPTION}
               aria-label="Caption"
-              className="w-full bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 text-[14px] text-[#111827] placeholder:text-[#9CA3AF] outline-none focus:border-[#0A1628]"
+              className="w-full bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 text-[14px] text-[#111827] placeholder:text-[#6B7280] outline-none focus:border-[#0A1628]"
             />
             <div className="flex items-start justify-between gap-3 mt-2">
-              <p className="text-[#9CA3AF] text-[12px]">Tip: #hashtags make your post discoverable by clients searching for talent.</p>
-              <p className="text-[#9CA3AF] text-[11px] flex-shrink-0 tabular-nums" aria-live="polite">{composeCaption.length}/{MAX_CAPTION}</p>
+              <p className="text-[#6B7280] text-[12px]">Tip: #hashtags make your post discoverable by clients searching for talent.</p>
+              <p className="text-[#6B7280] text-[11px] flex-shrink-0 tabular-nums" aria-live="polite">{composeCaption.length}/{MAX_CAPTION}</p>
             </div>
           </div>
         </div>

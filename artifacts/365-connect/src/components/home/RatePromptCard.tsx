@@ -72,7 +72,7 @@ export function RatePromptCard({ role }: { role: 'worker' | 'poster' }) {
         Rate
       </button>
       <button type="button" onClick={dismiss} aria-label="Dismiss"
-        className="w-8 h-8 rounded-full flex items-center justify-center text-[#9CA3AF] flex-shrink-0">
+        className="w-8 h-8 rounded-full flex items-center justify-center text-[#6B7280] flex-shrink-0">
         <X size={15} aria-hidden />
       </button>
     </div>

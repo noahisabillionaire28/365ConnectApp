@@ -10,6 +10,7 @@ const EMAIL = LEGAL.contactEmail;
 
 export const TERMS: LegalDocument = {
   title: 'Terms of Service',
+  shortTitle: 'Terms',
   effectiveDate: LEGAL.termsVersion,
   intro: [
     `These Terms of Service (the "Terms") are a binding agreement between you and ${C} ("${C}," "we," "us," or "our") and govern your access to and use of the 365 Connect website, mobile and web applications, and related services (together, the "Platform"). Please read them carefully. They include an agreement to resolve disputes through binding individual arbitration, a waiver of class actions and jury trials (Section 25), a release (Section 24), and limits on our liability (Section 22).`,
@@ -111,9 +112,10 @@ export const TERMS: LegalDocument = {
       paragraphs: [
         `Pay for shifts is owed by the Poster to the Worker. Depending on the features available to you, payment may be made outside the Platform and simply recorded in the app ("recorded as paid"), or processed through a third-party payment processor, currently Stripe, when that feature is enabled. When Stripe processes a payment, Stripe's terms and privacy policy apply to the payment itself, and you authorize the charges you initiate. We never store full card numbers.`,
         `${C} is not a payment agent, bank, money transmitter, or escrow service, and does not guarantee that any Poster will pay or that any Worker will be paid, unless we expressly state otherwise in writing for a specific feature. Where we do act as a limited payment collection agent for a specific feature, we will say so clearly in the app before you use it.`,
-        `We may charge Posters, Workers, or both a service fee or subscription fee (for example, a Pro subscription) for using parts of the Platform. Fees are disclosed before you incur them, may change with notice, and are non-refundable except as required by law or as stated at the point of purchase. Subscriptions renew automatically until cancelled in the app or through the app store you purchased from.`,
+        `${C} currently charges no fees to Posters or Workers. We may in the future charge Posters, Workers, or both a service fee or subscription fee (for example, a Pro subscription) for using parts of the Platform. Fees are disclosed before you incur them, may change with notice, never apply to a shift posted or booked before the change, and are non-refundable except as required by law or as stated in our Refund & Cancellation Policy or at the point of purchase. Subscriptions renew automatically until cancelled in the app or through the app store you purchased from.`,
         `If a payment you make is charged back, reversed, or disputed with your bank, you remain liable for the amount owed and for any fees we incur, and we may suspend your account until the matter is resolved. You are responsible for all taxes that apply to amounts you pay or receive through or in connection with the Platform, including sales, use, income, and self-employment taxes. We may issue tax forms where the law requires us to for payments we process.`,
       ],
+      links: [{ label: 'Refund & Cancellation Policy', page: 'refunds' }],
     },
     {
       id: 'ratings',
@@ -175,8 +177,9 @@ export const TERMS: LegalDocument = {
       id: 'third-party',
       heading: '16. Third-party services',
       paragraphs: [
-        `The Platform depends on services operated by others, including hosting (Vercel), database, authentication, and file storage (Supabase), email delivery (Resend), payment processing (Stripe), push notifications and maps (Apple), map tiles (OpenStreetMap contributors and CARTO), web fonts (Google), and an automated-matching processor (Anthropic). Your use of those services through the Platform is subject to their terms where they apply to you directly, such as Apple's app store terms or Stripe's terms for payments you make. We are not responsible for third-party services, for links to third-party websites, or for the acts of any venue, Poster, or Worker.`,
+        `The Platform depends on services operated by others, including hosting (Vercel), database, authentication, and file storage (Supabase), email delivery (Resend), payment processing (Stripe), push notifications and maps (Apple), map tiles (OpenStreetMap contributors and CARTO), address search (Nominatim, run by the OpenStreetMap Foundation), default shift photos (Unsplash), web fonts (Google), and an automated-matching processor (Anthropic). Your use of those services through the Platform is subject to their terms where they apply to you directly, such as Apple's app store terms or Stripe's terms for payments you make. We are not responsible for third-party services, for links to third-party websites, or for the acts of any venue, Poster, or Worker.`,
       ],
+      links: [{ label: 'Cookie & Local Storage Policy', page: 'cookies' }],
     },
     {
       id: 'beta-ai',

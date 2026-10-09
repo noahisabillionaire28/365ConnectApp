@@ -62,7 +62,7 @@ export function CallOutSheet({ open, shiftLabel, busy, onConfirm, onCancel }: {
           </div>
           <textarea value={note} onChange={(e) => setNote(e.target.value.slice(0, 200))} rows={2} disabled={busy}
             placeholder="Anything the poster should know? (optional)" aria-label="Optional note"
-            className="w-full border border-[#E5E7EB] rounded-[12px] px-3 py-2.5 text-[14px] text-[#111827] resize-none outline-none focus:border-[#0A1628] placeholder:text-[#9CA3AF]" />
+            className="w-full border border-[#E5E7EB] rounded-[12px] px-3 py-2.5 text-[14px] text-[#111827] resize-none outline-none focus:border-[#0A1628] placeholder:text-[#6B7280]" />
           <div className="flex items-start gap-2 rounded-[12px] bg-amber-50 border border-amber-200 px-3 py-2.5">
             <AlertTriangle size={15} aria-hidden className="text-amber-600 flex-shrink-0 mt-0.5" />
             <p className="text-amber-800 text-[12px] leading-relaxed">

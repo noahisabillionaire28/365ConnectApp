@@ -10,6 +10,7 @@ const EMAIL = LEGAL.contactEmail;
 
 export const PRIVACY: LegalDocument = {
   title: 'Privacy Policy',
+  shortTitle: 'Privacy',
   effectiveDate: LEGAL.privacyVersion,
   intro: [
     `This Privacy Policy explains how ${C} ("${C}," "we," "us," or "our") collects, uses, shares, and protects information about you when you use the 365 Connect website, mobile and web applications, and related services (together, the "Platform"). It also explains the choices you have, including rights under California and other U.S. state privacy laws.`,
@@ -43,9 +44,10 @@ export const PRIVACY: LegalDocument = {
         `Approximate location for distance: with your permission, the app may read your device location, or use the home location on your profile, to show how far shifts or Workers are from you, to sort results, and to send saved-search alerts for nearby shifts. Posters see a Worker's distance, not the Worker's coordinates; other users see profile locations rounded to roughly one kilometer.`,
         `Device and push information: device type, operating system, browser, app version, language, time zone, push notification tokens (web push endpoints and Apple device tokens), and crash or error reports.`,
         `Usage and log data: pages and screens viewed, features used, search filters, shifts viewed and applied to, taps on notifications, timestamps, IP address, and referring URLs. Our hosting and database providers keep standard server logs.`,
-        `Cookies and local storage: we use essential cookies and browser or device storage to keep you signed in, remember your preferences (such as a chosen tab or notification choice), cache data for offline use, and protect against abuse. We do not use advertising cookies or third-party tracking pixels.`,
+        `Cookies and local storage: we use essential browser or device storage only, to keep you signed in, remember your preferences (such as a chosen tab or a dismissed hint), cache data so the app opens quickly, and register push notifications. We set no advertising, analytics or tracking cookies and use no third-party tracking pixels. Our Cookie & Local Storage Policy lists every item.`,
         `Timesheet and shift events: clock-in and clock-out times, breaks, manual entries, adjustments, approvals, disputes, swaps, cancellations, no-shows, and arrival statuses.`,
       ],
+      links: [{ label: 'Cookie & Local Storage Policy', page: 'cookies' }],
     },
     {
       id: 'collect-third-party',
@@ -77,7 +79,7 @@ export const PRIVACY: LegalDocument = {
       id: 'automated',
       heading: '5. Automated matching',
       paragraphs: [
-        `The Platform may show a "match" score or insight suggesting how well a shift fits a Worker, or how well a Worker fits a shift. These are produced in two ways. First, by rules we run ourselves, such as whether your skills, distance, availability, and pay expectations fit the posting. Second, by an automated processor operated by Anthropic, to which we send non-identifying signals about the shift (role, event type, date and time, general area, requirements) and about the Worker's work history on the Platform (skills, past event types, ratings bands, reliability indicators). We do not send names, email addresses, phone numbers, photos, messages, or precise locations to that processor, and the processor is contractually prohibited from using the signals to train its models or for its own purposes.`,
+        `The Platform may show a "match" score or insight suggesting how well a shift fits a Worker, or how well a Worker fits a shift. These are produced in two ways. First, by rules we run ourselves, such as whether your skills, distance, availability, and pay expectations fit the posting. Second, by an automated processor operated by Anthropic, to which we send non-identifying signals about the shift (title, role, event type, date and time, requirements, description) and about each candidate Worker (a random account identifier, skills, certifications, rating and review count, distance to the worksite in miles, shifts worked, shifts with this Poster, no-shows and on-time rate, availability that day). We do not send names, usernames, bios, email addresses, phone numbers, photos, messages, or precise locations to that processor, and the processor is contractually prohibited from using the signals to train its models or for its own purposes.`,
         `Match insights are informational. No booking, payment, suspension, or other decision with legal or similarly significant effects is made solely by an automated system: Posters decide whom to book, Workers decide which shifts to take, and any account action is taken by a person on our team. You may ask us how a match insight about you was produced, and you may ask a person to review any decision you believe was influenced by it, by contacting ${EMAIL}.`,
       ],
     },
@@ -102,10 +104,17 @@ export const PRIVACY: LegalDocument = {
         `Resend: transactional email delivery.`,
         `Stripe: payment processing and subscription billing, where enabled.`,
         `Anthropic: automated-matching processor, receiving the non-identifying signals described in Section 5.`,
-        `Apple: push notifications to iOS devices and Apple Maps map rendering and geocoding; Apple may receive device tokens and the map areas requested.`,
-        `Google: web fonts served from Google Fonts, which receive your IP address when fonts load.`,
+        `Apple: push notifications to iOS devices and Safari, and Apple Maps map rendering; Apple may receive device tokens and the map areas requested.`,
+        `Google: web fonts served from Google Fonts, which receive your IP address when fonts load; and, if you enable web push in Chrome or Edge, delivery of those notifications through Google's push service, which receives your push endpoint and an encrypted payload it cannot read.`,
+        `Mozilla: delivery of web push notifications you enable in Firefox, on the same terms.`,
         `OpenStreetMap contributors and CARTO: map tiles, which receive the map areas requested and your IP address.`,
+        `Nominatim (OpenStreetMap Foundation): address search when you type a venue or profile address; it receives the address text and your IP address.`,
+        `Unsplash: the default cover photo on a shift that has no photo of its own; it receives the image request and your IP address.`,
       ],
+      after: [
+        `Our Cookie & Local Storage Policy describes what each of these services sees when the app loads. The full list, with what each one receives, is also published in our third-party inventory on request.`,
+      ],
+      links: [{ label: 'Cookie & Local Storage Policy', page: 'cookies' }],
     },
     {
       id: 'sharing-other',
@@ -113,7 +122,7 @@ export const PRIVACY: LegalDocument = {
       paragraphs: [
         `Legal requests and safety. We may disclose information if we believe in good faith that doing so is required by law, subpoena, court order, or government request; to enforce our Terms; to detect, prevent, or address fraud, security, or technical issues; or to protect the rights, property, or safety of ${C}, our users, or the public. Where permitted, we will try to notify you of a legal request for your information.`,
         `Business transfers. If ${C} is involved in a merger, acquisition, financing, reorganization, bankruptcy, or sale of all or part of its assets, your information may be transferred as part of that transaction, subject to this Policy, and we will notify you of any change in ownership or in how your information is used.`,
-        `With your direction. We share information when you ask us to, for example when you export a shift to your calendar, share a post, or connect a third-party service.`,
+        `With your direction. We share information when you ask us to, for example when you export a shift to your calendar (Google Calendar or an .ics file), open directions in Apple Maps, Google Maps or Waze, share a post, or connect a third-party service. When you paste a link in chat, our server (not your device) fetches that page once to show its title and preview image, so the linked site sees our server's address rather than yours.`,
         `Aggregate or de-identified data. We may share statistics that do not identify you, such as the number of shifts filled in a city.`,
         `We do not sell your personal information, and we do not share it for cross-context behavioral advertising.`,
       ],
@@ -139,13 +148,15 @@ export const PRIVACY: LegalDocument = {
         `You control much of your information directly in the app:`,
       ],
       bullets: [
-        `Profile: edit or remove profile details, photos, skills, location, and availability in Edit Profile at any time.`,
+        `Profile: edit or remove profile details, photos, skills, location, and availability in Edit Profile at any time. A profile location is optional: it is used only to show distances, and other users see it rounded to about one kilometer.`,
         `Notifications: turn push, in-app, and email notifications on or off in Settings → Notifications, and manage saved-search alerts there. Service and security messages may still be sent.`,
         `Location: control the app's access to your location in your device or browser settings. If you turn it off, distance features will use your profile location or be unavailable, and clock-in may require Poster approval of a manual entry.`,
         `Posts, stories, and messages: delete your own posts, stories, and comments at any time; messages you delete are removed from the conversation for both parties.`,
         `Blocking: block another user to stop them from messaging you or seeing your profile.`,
+        `Download your data: Settings → Legal → Download my data gives you a copy of your profile, applications, timesheets, payments, reviews given and received, posts, the messages you sent, notifications and legal acceptances as a JSON file, at any time and without asking us.`,
         `Delete your account: Settings → Delete account removes your profile and data as described in Section 9. Deletion is refused only while you have an upcoming booking or an open posted shift.`,
-        `Data export: ask us for a copy of the information we hold about you by emailing ${EMAIL}; we will provide it in a portable format within the time the law requires.`,
+        `Email: every email we send has a one-click unsubscribe link, and Settings → Notifications → Email notifications turns them off for good. Service and security messages may still be sent.`,
+        `Privacy request: for anything else, including a correction or a request on behalf of someone else, email ${EMAIL} with the subject "Privacy request" from the address on your account; we answer within the time the law requires (45 days in California).`,
       ],
     },
     {
@@ -156,7 +167,7 @@ export const PRIVACY: LegalDocument = {
         `Categories of personal information we collect, and have collected in the past 12 months: identifiers (name, username, email, IP address, device identifiers, push tokens); personal information described in Cal. Civ. Code § 1798.80 (name, contact details, and, for payments processed through Stripe, tokenized payment information); characteristics of protected classifications only to the extent you choose to include them in your profile or Content; commercial information (shifts posted, booked, worked, and paid, subscription status); internet or network activity (usage and log data); geolocation data (precise location at clock-in and clock-out; approximate location for distance); audio and visual information (photos, videos, and audio you upload); professional or employment-related information (skills, certifications, work history on the Platform, ratings, timesheets); and inferences drawn from the above (match insights). We collect these from you, from your devices, from other users, and from the providers listed in Section 7, for the business purposes described in Section 4.`,
         `We disclose each of these categories to the service providers listed in Section 7 for business purposes, and share the categories described in Section 7 with other users as needed to staff shifts. We do not sell personal information, we do not share it for cross-context behavioral advertising, and we have no actual knowledge of selling or sharing the personal information of anyone under 16. We do not use or disclose sensitive personal information for purposes other than those permitted by the CCPA (such as providing the services you request and preventing fraud), so we do not offer a separate "limit the use of my sensitive personal information" control.`,
         `Your rights. Subject to certain exceptions, you have the right to: know what personal information we have collected about you, including the categories and specific pieces, the sources, our purposes, and the categories of third parties with whom we disclose it; delete personal information we collected from you; correct inaccurate personal information; receive a portable copy of your information; and not be discriminated against for exercising these rights. We will not deny you services, charge a different price, or provide a different level of quality because you exercised a right.`,
-        `How to exercise your rights. Email ${EMAIL} with the subject "California privacy request," or use Settings → Delete account for deletion. We will verify your request by confirming that you control the email address on the account (and may ask for additional information for sensitive requests). You may designate an authorized agent to make a request on your behalf; we will ask the agent for written permission signed by you and may ask you to verify your identity directly with us. We respond within 45 days and will tell you if we need up to 45 more.`,
+        `How to exercise your rights. Email ${EMAIL} with the subject "California privacy request," use Settings → Legal → Download my data for a portable copy, or use Settings → Delete account for deletion. We will verify your request by confirming that you control the email address on the account (and may ask for additional information for sensitive requests). You may designate an authorized agent to make a request on your behalf; we will ask the agent for written permission signed by you and may ask you to verify your identity directly with us. We respond within 45 days and will tell you if we need up to 45 more.`,
         `Notice of Financial Incentive: we do not offer financial incentives in exchange for personal information. Shine the Light: California Civil Code § 1798.83 permits residents to request information about disclosure of personal information to third parties for their direct marketing purposes; we do not disclose personal information to third parties for their direct marketing.`,
       ],
     },
@@ -171,7 +182,7 @@ export const PRIVACY: LegalDocument = {
       id: 'children',
       heading: '14. Children',
       paragraphs: [
-        `The Platform is for adults. You must be at least 18 to create an account, and we do not knowingly collect personal information from anyone under 18. In particular, we do not knowingly collect information from children under 13 as defined by the Children's Online Privacy Protection Act (COPPA). If we learn that we have collected information from someone under 18, we will delete it and close the account. If you believe a minor has provided us information, contact ${EMAIL}.`,
+        `The Platform is for adults. You must be at least 18 to create an account, and you confirm that you are when you sign up; we do not ask for a date of birth or other proof because we do not want to collect more than we need. We do not knowingly collect personal information from anyone under 18, and in particular not from children under 13 as defined by the Children's Online Privacy Protection Act (COPPA). An account we find to belong to someone under 18 is deleted, together with the information it holds, as soon as we learn of it. If you believe a minor has provided us information, contact ${EMAIL}.`,
       ],
     },
     {

@@ -149,7 +149,7 @@ export function PostEventScreen() {
               </select>
               <div className="grid grid-cols-2 gap-2">
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF] text-[14px]">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280] text-[14px]">$</span>
                   <input type="number" inputMode="decimal" value={p.pay_rate}
                     onChange={(e) => updatePos(i, { pay_rate: e.target.value })}
                     placeholder="Pay /hr" className={`${inputCls} pl-7`} />

@@ -35,7 +35,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 const INPUT_CLS =
   'w-full bg-white border border-[#E5E7EB] rounded-[10px] px-3 h-[46px] ' +
-  'text-[#111827] text-[14px] font-medium placeholder:text-[#9CA3AF] ' +
+  'text-[#111827] text-[14px] font-medium placeholder:text-[#6B7280] ' +
   'focus:outline-none focus:border-[#0A1628] transition-colors';
 
 const DEFAULT_COORDS = { lat: 25.7825, lng: -80.1298 };
@@ -137,7 +137,7 @@ function LocationAutocomplete({
           ))}
         </div>
       )}
-      {loading && <p className="text-[#9CA3AF] text-[11px] mt-1.5">Searching…</p>}
+      {loading && <p className="text-[#6B7280] text-[11px] mt-1.5">Searching…</p>}
       {error && <p className="text-[#EF4444] text-[11px] mt-1.5">{error}</p>}
     </div>
   );

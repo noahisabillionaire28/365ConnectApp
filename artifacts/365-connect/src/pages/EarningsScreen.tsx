@@ -123,6 +123,9 @@ function SummaryCard({ payments }: { payments: PaymentRow[] }) {
           <p className="text-white font-bold text-[18px]">{fmtAmount(pending)}</p>
         </div>
       </div>
+      <p className="text-white/70 text-[11px] mt-3 leading-snug" data-testid="earnings-fee-note">
+        The poster pays your approved pay. 365 Connect adds no fee today, so the amounts shown are what you receive.
+      </p>
     </div>
   );
 }
@@ -172,7 +175,7 @@ function PaymentCard({ payment, index, onOpen }: { payment: PaymentRow; index: n
           {/* Info */}
           <div className="flex-1 min-w-0">
             <p className="text-[#111827] text-[14px] font-semibold leading-snug truncate">{typeLabel(payment)}</p>
-            <p className="text-[#9CA3AF] text-[11px] mt-0.5">{fmtDate(payment.created_at)}</p>
+            <p className="text-[#6B7280] text-[11px] mt-0.5">{fmtDate(payment.created_at)}</p>
             <div className="mt-1.5">
               {payment.timeline ? <StageChip timeline={payment.timeline} /> : <StatusChip status={payment.status} />}
             </div>
@@ -185,7 +188,7 @@ function PaymentCard({ payment, index, onOpen }: { payment: PaymentRow; index: n
                 {isSubscription || isOutgoing ? `−${fmtAmount(payment.amount)}` : `+${fmtAmount(payment.net_amount)}`}
               </p>
               {!isSubscription && !isOutgoing && payment.fee > 0 && (
-                <p className="text-[#9CA3AF] text-[11px] mt-0.5">
+                <p className="text-[#6B7280] text-[11px] mt-0.5">
                   gross {fmtAmount(payment.amount)}
                 </p>
               )}
@@ -303,7 +306,7 @@ export function EarningsScreen() {
                   Shift Earnings
                 </p>
                 {visibleShifts.length === 0 ? (
-                  <p className="text-[#9CA3AF] text-[13px] px-1 py-4 text-center">
+                  <p className="text-[#6B7280] text-[13px] px-1 py-4 text-center">
                     No shifts {filter === 'paid' ? 'paid' : filter === 'approved' ? 'approved and awaiting payment' : 'pending approval'} right now.
                   </p>
                 ) : (
@@ -347,7 +350,7 @@ export function EarningsScreen() {
             <div className="mt-2 bg-[#F3F4F6] rounded-[10px] px-4 py-3">
               <div className="flex items-center gap-2">
                 <CreditCard size={13} aria-hidden className="text-[#737373]" />
-                <p className="text-[#9CA3AF] text-[11px]">
+                <p className="text-[#6B7280] text-[11px]">
                   Subscription charges are simulated.
                 </p>
               </div>

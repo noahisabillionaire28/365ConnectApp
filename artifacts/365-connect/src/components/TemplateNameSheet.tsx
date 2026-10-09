@@ -3,8 +3,9 @@
  * a shift template. Used from the post-shift success screen and the owner's
  * shift detail page.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { BookmarkPlus } from 'lucide-react';
+import { useDialog } from '@/hooks/useDialog';
 import { useTemplates } from '@/hooks/useTemplates';
 import { useToast } from '@/contexts/ToastContext';
 import type { TemplatePayload } from '@/store/postShiftStore';
@@ -24,6 +25,8 @@ export function TemplateNameSheet({
   const [err, setErr] = useState('');
 
   useEffect(() => { if (open) { setName(defaultName); setErr(''); } }, [open, defaultName]);
+  const titleId = useId();
+  const ref = useDialog<HTMLDivElement>(open, saving ? null : onClose);
 
   if (!open) return null;
 
@@ -44,14 +47,14 @@ export function TemplateNameSheet({
 
   return (
     <div data-no-pull className="fixed inset-0 z-[90] flex items-end justify-center bg-black/40"
-      role="dialog" aria-modal="true" aria-label="Save as template"
       onClick={() => { if (!saving) onClose(); }}>
-      <div className="w-full max-w-app bg-white rounded-t-[20px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+20px)]"
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId}
+        className="w-full max-w-app bg-white rounded-t-[20px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+20px)]"
         onClick={(e) => e.stopPropagation()}>
         <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-4" />
         <div className="flex items-center gap-2 mb-1">
           <BookmarkPlus size={18} aria-hidden className="text-[#0A1628]" />
-          <p className="text-[#111827] font-bold text-[17px]">Save as template</p>
+          <p id={titleId} className="text-[#111827] font-bold text-[17px]">Save as template</p>
         </div>
         <p className="text-[#6B7280] text-[13px] leading-relaxed mb-4">
           Keeps the job types, location, pay, headcount and details — not the dates — so the next post takes a minute.

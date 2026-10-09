@@ -62,7 +62,7 @@ function AssignCard({ worker, shiftFull, shiftStarted, shiftJobTypes, isAssignin
             {worker.username ? `@${worker.username}` : 'Worker'}
           </p>
           {worker.isPro && (
-            <BadgeCheck size={15} aria-label="Verified worker" style={{ color: GOLD }} fill={GOLD}
+            <BadgeCheck size={15} aria-label="Pro member" style={{ color: GOLD }} fill={GOLD}
               className="flex-shrink-0 text-white" />
           )}
         </div>
@@ -98,7 +98,7 @@ function AssignCard({ worker, shiftFull, shiftStarted, shiftJobTypes, isAssignin
             {offerPending ? (
               <span className="text-[11px] font-semibold text-[#6B7280]">Offer sent · awaiting reply</span>
             ) : offerExpired ? (
-              <span className="text-[11px] font-semibold text-[#9CA3AF]">Offer expired · no reply</span>
+              <span className="text-[11px] font-semibold text-[#6B7280]">Offer expired · no reply</span>
             ) : (
               <button type="button" disabled={busy || shiftFull || shiftStarted} onClick={() => onOffer(worker.id)}
                 aria-label={`Send ${worker.username ? `@${worker.username}` : 'worker'} an offer they can accept or decline`}

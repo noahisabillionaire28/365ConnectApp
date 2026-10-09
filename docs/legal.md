@@ -133,3 +133,41 @@ alongside the `legal_acceptances` rows: `accepted_at` of the user's first
 pre-arbitration dispute notices (30-day informal period), DMCA notices and
 counter-notices, and privacy / CCPA requests, which have statutory response
 deadlines (45 days for California).
+
+## Data minimisation: what the app writes to `users`
+
+Audited 2026-10-09 against `POST /users` and `PATCH /users/me`
+(`artifacts/api-server/src/routes/users.ts`), the admin and legal routes, and
+every screen that writes a profile. Every column the app writes is read by at
+least one feature; nothing was found that is collected and never used.
+
+| Column | Written by | Read by |
+| --- | --- | --- |
+| `username`, `photo_url`, `bio` | setup screens, Edit Profile | every profile, card, post and chat header |
+| `job_types`, `primary_job_type`, `secondary_job_types` | setup screens, Edit Profile | matching, People feed filters, worker lists, shift requests |
+| `certifications` | Worker setup, Edit Profile | worker profile, applicant and roster cards |
+| `availability`, `is_available` | Worker setup, Profile card, Edit Profile | People feed "available today", match score, shift requests, workers list |
+| `hourly_rate` | Worker setup, Edit Profile | worker profile, saved-workers list |
+| `lat`, `lng` | setup screens, Edit Profile (optional) | distance to shifts and workers; coarsened to two decimals (~1 km) for anyone but the user and admins |
+| `company_name` | Client / Staffer setup, Edit Profile | shift cards, profiles, invites, emails |
+| `in_app_notifications`, `email_notifications` | Notification settings, one-click unsubscribe | notification fan-out |
+| `quick_replies` | Chat | Chat quick-reply bar |
+| `email` | server, from the auth account only | transactional email |
+| `is_pro` | server, after a recorded subscription; admin | Pro badge, limits |
+| `role`, `status`, `is_banned` | role select (once), admin | authorisation, suspended screen |
+| `terms_version`, `privacy_version` | `POST /legal/accept` | the legal gate |
+| `rating` | database trigger from `reviews` | profiles and cards |
+
+The unused `followers_count` / `following_count` columns are dropped by the
+pending migration below. The profile location is labelled optional in Edit
+Profile with a one-line explanation of what it is used for.
+
+## Pending database step
+
+Migration `0037_data_minimisation_rating_delete.sql` (drops the unused
+`users.followers_count` / `following_count` columns and makes the rating trigger
+also fire on review deletion) could not be applied through the tooling on
+2026-10-09: the table-level statements kept waiting on `public.reviews` /
+`public.users`. The trigger function itself is already updated live. Re-run the
+migration from the Supabase SQL editor when the database is quiet; it is
+idempotent and fails fast after 5 seconds if the lock is still unavailable.

@@ -27,7 +27,7 @@ const SLIDES: Record<Role, { icon: React.ComponentType<{ size: number; style?: R
     {
       icon:  Search,
       title: 'Get discovered',
-      body:  'Build a profile that showcases your skills and schedule. Clients find you automatically.',
+      body:  'Build a profile that showcases your skills and schedule so posters can find you.',
     },
     {
       icon:  Zap,
@@ -37,7 +37,7 @@ const SLIDES: Record<Role, { icon: React.ComponentType<{ size: number; style?: R
     {
       icon:  Star,
       title: 'Build your reputation',
-      body:  'Earn verified reviews after every shift. A stronger rating unlocks better-paying opportunities.',
+      body:  'Earn reviews from posters after every shift. A strong rating helps you stand out.',
     },
   ],
   client: [
@@ -48,8 +48,8 @@ const SLIDES: Record<Role, { icon: React.ComponentType<{ size: number; style?: R
     },
     {
       icon:  Users,
-      title: 'Vetted talent, fast',
-      body:  'Browse matched workers with verified ratings, past-event photos, and real reviews.',
+      title: 'Find talent, fast',
+      body:  'Browse matched workers with ratings and reviews from other posters, plus their past-event photos.',
     },
     {
       icon:  BarChart2,
@@ -66,7 +66,7 @@ const SLIDES: Record<Role, { icon: React.ComponentType<{ size: number; style?: R
     {
       icon:  Cpu,
       title: 'Smart matching',
-      body:  'AI-powered matching surfaces the right workers for every shift automatically.',
+      body:  'Match insights suggest workers who fit each shift. You decide whom to book.',
     },
     {
       icon:  LineChart,

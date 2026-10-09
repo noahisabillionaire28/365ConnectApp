@@ -249,7 +249,7 @@ function MyShiftSection({
         <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.16em]">
           {label}
           {items.length > 0 && (
-            <span className="ml-1.5 text-[#9CA3AF] font-semibold normal-case tracking-normal">({items.length})</span>
+            <span className="ml-1.5 text-[#6B7280] font-semibold normal-case tracking-normal">({items.length})</span>
           )}
         </p>
       </div>
@@ -260,7 +260,7 @@ function MyShiftSection({
               onCalendar={onCalendar && calendarEventFor(a) ? () => onCalendar(a) : undefined} />
           ))
           : (
-            <p className="px-4 py-4 text-center text-[#9CA3AF] text-[13px]">{emptyText}</p>
+            <p className="px-4 py-4 text-center text-[#6B7280] text-[13px]">{emptyText}</p>
           )}
       </div>
     </div>
@@ -413,7 +413,7 @@ function SwapOfferCard({ s, busy, onRespond }: {
           {busy ? 'Working…' : 'Accept'}
         </button>
       </div>
-      <p className="text-[#9CA3AF] text-[11px] mt-2 text-center">The poster approves the swap before you are booked.</p>
+      <p className="text-[#6B7280] text-[11px] mt-2 text-center">The poster approves the swap before you are booked.</p>
     </div>
   );
 }
@@ -698,7 +698,7 @@ function ClientShiftCard({
               )}
             </div>
             {shift.location && (
-              <p className="text-[#9CA3AF] text-[12px] mt-1 flex items-center gap-1 truncate">
+              <p className="text-[#6B7280] text-[12px] mt-1 flex items-center gap-1 truncate">
                 <MapPin size={11} aria-hidden />{shift.location}
               </p>
             )}
@@ -773,7 +773,7 @@ function ClientShiftGroup({
         <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.16em]">
           {label}
           {shifts.length > 0 && (
-            <span className="ml-1.5 text-[#9CA3AF] font-semibold normal-case tracking-normal">({shifts.length})</span>
+            <span className="ml-1.5 text-[#6B7280] font-semibold normal-case tracking-normal">({shifts.length})</span>
           )}
         </p>
       </div>
@@ -787,7 +787,7 @@ function ClientShiftGroup({
         ))
         : (
           <div className="mx-4 bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-4 text-center">
-            <p className="text-[#9CA3AF] text-[13px]">{emptyText}</p>
+            <p className="text-[#6B7280] text-[13px]">{emptyText}</p>
           </div>
         )}
     </div>
@@ -843,7 +843,7 @@ function ClientMyShiftsView() {
         <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-10 text-center">
           <Briefcase size={28} aria-hidden className="text-[#D1D5DB] mx-auto mb-3" />
           <p className="text-[#6B7280] font-semibold text-[14px]">No shifts posted yet</p>
-          <p className="text-[#9CA3AF] text-[12px] mt-1">Post a shift to start finding workers.</p>
+          <p className="text-[#6B7280] text-[12px] mt-1">Post a shift to start finding workers.</p>
           <button type="button" onClick={() => { resetDraft(); navigate('/post-shift/name'); }}
             className="mt-4 h-[40px] px-5 bg-[#0A1628] text-white rounded-[10px] text-[13px] font-semibold">
             Post a Shift

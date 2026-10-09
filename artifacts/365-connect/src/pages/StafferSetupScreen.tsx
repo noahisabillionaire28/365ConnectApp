@@ -140,7 +140,7 @@ function StepHeader({ step, total, onBack }: { step: number; total: number; onBa
     <>
       <div className="flex items-center px-5 pt-12 pb-4">
         {step > 1 ? (
-          <button onClick={onBack}
+          <button type="button" onClick={onBack} aria-label="Back"
             className="w-10 h-10 flex items-center justify-center rounded-full mr-3 active:scale-95 transition-transform"
             style={{ border: `1px solid ${BORDER}` }}>
             <ChevronLeft size={20} style={{ color: TEXT }} />

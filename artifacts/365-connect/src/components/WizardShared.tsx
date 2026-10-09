@@ -122,12 +122,12 @@ export function SectionRow({ icon, label, value, sub }: {
 /* ── Shared input / textarea CSS strings ──────────────────────────────────── */
 export const INPUT_CLS =
   'w-full bg-white border border-[#DBDBDB] rounded-[8px] px-3 h-[44px] ' +
-  'text-black text-[14px] font-medium placeholder:text-[#9CA3AF] ' +
+  'text-black text-[14px] font-medium placeholder:text-[#6B7280] ' +
   'focus:outline-none focus:border-black transition-colors';
 
 export const TEXTAREA_CLS =
   'w-full bg-white border border-[#DBDBDB] rounded-[8px] px-3 py-3 ' +
-  'text-black text-[14px] font-medium placeholder:text-[#9CA3AF] ' +
+  'text-black text-[14px] font-medium placeholder:text-[#6B7280] ' +
   'focus:outline-none focus:border-black transition-colors resize-none leading-relaxed';
 
 /* ── Job-type tile (multi-select) ─────────────────────────────────────────── */
@@ -241,7 +241,7 @@ export function LocationAutocomplete({ value, onChange, onPlacePicked, error, la
           ))}
         </div>
       )}
-      {loading && <p className="text-[#9CA3AF] text-[11px] mt-1">Searching…</p>}
+      {loading && <p className="text-[#6B7280] text-[11px] mt-1">Searching…</p>}
       {error && <p className="text-red-500 text-[11px] mt-1">{error}</p>}
     </div>
   );

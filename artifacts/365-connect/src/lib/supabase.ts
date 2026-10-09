@@ -173,8 +173,6 @@ export type UserRow = {
   /** Phase 11 — admin moderation status. 'active' | 'suspended' | 'flagged' */
   status: 'active' | 'suspended' | 'flagged' | null;
   is_banned: boolean;
-  followers_count: number;
-  following_count: number;
 };
 
 /** Matches the actual `shifts` table after Phase 2 additions */
