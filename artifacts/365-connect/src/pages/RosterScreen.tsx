@@ -215,7 +215,7 @@ export function RosterScreen() {
             <Search size={15} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or role"
               aria-label="Search roster"
-              className="w-full h-[40px] rounded-[10px] bg-[#F3F4F6] pl-9 pr-3 text-[14px] text-[#111827] placeholder:text-[#9CA3AF] focus:outline-none" />
+              className="w-full h-[40px] rounded-[10px] bg-[#F3F4F6] pl-9 pr-3 text-[14px] text-[#111827] placeholder:text-[#6B7280] focus:outline-none" />
           </div>
         )}
       </div>

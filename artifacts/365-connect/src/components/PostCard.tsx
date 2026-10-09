@@ -48,7 +48,7 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
             {post.author_username ? `@${post.author_username}` : 'Worker'}
           </p>
         </button>
-        <span className="ml-auto text-[#9CA3AF] text-[11px] flex-shrink-0">{relativeTime(post.created_at)}</span>
+        <span className="ml-auto text-[#6B7280] text-[11px] flex-shrink-0">{relativeTime(post.created_at)}</span>
         {canDelete && (
           <button type="button" aria-label="Post options" onClick={() => setMenuOpen(true)}
             className="w-8 h-8 -mr-1.5 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#F3F4F6]">

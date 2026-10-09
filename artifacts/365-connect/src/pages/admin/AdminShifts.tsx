@@ -215,7 +215,7 @@ export function AdminShifts() {
           <Search size={14} aria-hidden className="text-[#737373] flex-shrink-0" />
           <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by role or venue…" aria-label="Search shifts"
-            className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#9CA3AF] focus:outline-none" />
+            className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#6B7280] focus:outline-none" />
           {search && (
             <button type="button" aria-label="Clear" onClick={() => setSearch('')}>
               <X size={13} aria-hidden className="text-[#737373]" />

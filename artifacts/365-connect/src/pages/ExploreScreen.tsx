@@ -133,7 +133,7 @@ export function ExploreScreen() {
                 <Search size={15} aria-hidden className="text-[#737373] flex-shrink-0" />
                 <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search workers" aria-label="Search workers"
-                  className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#9CA3AF] outline-none" />
+                  className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#6B7280] outline-none" />
               </div>
             </div>
             <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none" role="radiogroup" aria-label="Filter by job type"
@@ -218,7 +218,7 @@ export function ExploreScreen() {
                     {isLoadingMore ? 'Loading…' : 'Load more'}
                   </button>
                 ) : (
-                  <p className="text-[#9CA3AF] text-[12px]">You're all caught up.</p>
+                  <p className="text-[#6B7280] text-[12px]">You're all caught up.</p>
                 )}
               </div>
             )}
@@ -263,11 +263,11 @@ export function ExploreScreen() {
               rows={4}
               maxLength={MAX_CAPTION}
               aria-label="Caption"
-              className="w-full bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 text-[14px] text-[#111827] placeholder:text-[#9CA3AF] outline-none focus:border-[#0A1628]"
+              className="w-full bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 text-[14px] text-[#111827] placeholder:text-[#6B7280] outline-none focus:border-[#0A1628]"
             />
             <div className="flex items-start justify-between gap-3 mt-2">
-              <p className="text-[#9CA3AF] text-[12px]">Tip: #hashtags make your post discoverable by clients searching for talent.</p>
-              <p className="text-[#9CA3AF] text-[11px] flex-shrink-0 tabular-nums" aria-live="polite">{composeCaption.length}/{MAX_CAPTION}</p>
+              <p className="text-[#6B7280] text-[12px]">Tip: #hashtags make your post discoverable by clients searching for talent.</p>
+              <p className="text-[#6B7280] text-[11px] flex-shrink-0 tabular-nums" aria-live="polite">{composeCaption.length}/{MAX_CAPTION}</p>
             </div>
           </div>
         </div>

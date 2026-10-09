@@ -50,7 +50,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 const INPUT_CLS =
   'w-full bg-white border border-[#E5E7EB] rounded-[10px] px-3 h-[46px] ' +
-  'text-[#111827] text-[14px] font-medium placeholder:text-[#9CA3AF] ' +
+  'text-[#111827] text-[14px] font-medium placeholder:text-[#6B7280] ' +
   'focus:outline-none focus:border-[#0A1628] transition-colors';
 
 // ─── Spots stepper ────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ function SpotsStepper({
         <p className="text-[#111827] text-[14px] font-semibold">
           {count} {count === 1 ? 'spot' : 'spots'}
         </p>
-        <p className="text-[#9CA3AF] text-[11px]">workers needed</p>
+        <p className="text-[#6B7280] text-[11px]">workers needed</p>
       </div>
       <div className="flex items-center gap-3">
         <button
@@ -399,7 +399,7 @@ export function PostShiftStep3Screen() {
               <Users size={13} aria-hidden className="text-[#0A1628]" />
             </div>
             <h2 className="text-[#111827] font-bold text-[15px]">Spots Available</h2>
-            {isSeries && <span className="text-[#9CA3AF] text-[11px] font-medium">per shift</span>}
+            {isSeries && <span className="text-[#6B7280] text-[11px] font-medium">per shift</span>}
           </div>
           <SpotsStepper
             count={spots}

@@ -52,7 +52,7 @@ export function MultiDatePicker({
       </div>
       <div className="grid grid-cols-7 gap-1 mb-1">
         {WEEKDAY_LABELS.map((d, i) => (
-          <p key={i} className="text-center text-[#9CA3AF] text-[10px] font-semibold uppercase">{d}</p>
+          <p key={i} className="text-center text-[#6B7280] text-[10px] font-semibold uppercase">{d}</p>
         ))}
       </div>
       <div className="grid grid-cols-7 gap-1">

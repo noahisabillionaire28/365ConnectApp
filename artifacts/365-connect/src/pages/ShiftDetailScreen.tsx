@@ -647,7 +647,7 @@ export function ShiftDetailScreen() {
           </p>
           <textarea value={disputeNote} onChange={(e) => setDisputeNote(e.target.value.slice(0, 500))} rows={3} disabled={acking}
             placeholder="What should the hours be, and why? (optional)" aria-label="Dispute note"
-            className="w-full border border-[#E5E7EB] rounded-[12px] px-3 py-2.5 text-[14px] text-[#111827] resize-none outline-none focus:border-[#0A1628] placeholder:text-[#9CA3AF]" />
+            className="w-full border border-[#E5E7EB] rounded-[12px] px-3 py-2.5 text-[14px] text-[#111827] resize-none outline-none focus:border-[#0A1628] placeholder:text-[#6B7280]" />
         </div>
       }
     />
@@ -809,7 +809,7 @@ export function ShiftDetailScreen() {
                   </p>
                 </div>
               </div>
-              {profileHref && <span className="text-[#9CA3AF] text-[16px] flex-shrink-0" aria-hidden>→</span>}
+              {profileHref && <span className="text-[#6B7280] text-[16px] flex-shrink-0" aria-hidden>→</span>}
             </>
           );
           return profileHref ? (
@@ -838,7 +838,7 @@ export function ShiftDetailScreen() {
               className="flex items-center gap-2 text-[#0A1628] text-[13px] font-semibold">
               <Repeat2 size={14} aria-hidden />
               Part of a series{shift.seriesIndex && shift.seriesCount ? ` · ${shift.seriesIndex} of ${shift.seriesCount}` : ''}
-              <span className="text-[#9CA3AF] font-medium">· See all dates</span>
+              <span className="text-[#6B7280] font-medium">· See all dates</span>
             </button>
           </div>
         )}
@@ -1074,7 +1074,7 @@ export function ShiftDetailScreen() {
                   </div>
                 )}
                 {!approved && (
-                  <p className="text-[#9CA3AF] text-[11px] mt-3 leading-relaxed">
+                  <p className="text-[#6B7280] text-[11px] mt-3 leading-relaxed">
                     The poster reviews your timesheet before paying. You will be told if anything changes.
                   </p>
                 )}
@@ -1286,7 +1286,7 @@ export function ShiftDetailScreen() {
                         ${p.pay_rate}/{p.pay_period ?? 'hr'} · {left === 0 ? 'Full' : `${left} spot${left === 1 ? '' : 's'} left`}
                       </p>
                     </div>
-                    {!isThis && <span className="text-[#9CA3AF] text-[16px] flex-shrink-0">→</span>}
+                    {!isThis && <span className="text-[#6B7280] text-[16px] flex-shrink-0">→</span>}
                   </button>
                 );
               })}
@@ -1321,7 +1321,7 @@ export function ShiftDetailScreen() {
                         {formatTime(s.start_time, s.timezone)} – {formatTime(s.end_time, s.timezone)} · {state}
                       </p>
                     </div>
-                    {!isThis && <span className="text-[#9CA3AF] text-[16px] flex-shrink-0">→</span>}
+                    {!isThis && <span className="text-[#6B7280] text-[16px] flex-shrink-0">→</span>}
                   </button>
                 );
               })}
@@ -1498,7 +1498,7 @@ export function ShiftDetailScreen() {
                 <CheckCircle2 size={15} aria-hidden /> {respondingSwapId ? 'Working…' : 'Accept'}
               </button>
             </div>
-            <p className="text-[#9CA3AF] text-[11px] mt-2 text-center">The poster approves the swap before you are booked.</p>
+            <p className="text-[#6B7280] text-[11px] mt-2 text-center">The poster approves the swap before you are booked.</p>
           </div>
         )}
 
@@ -1646,7 +1646,7 @@ export function ShiftDetailScreen() {
           </div>
         )}
         {ctaState === 'clock-in' && lifecycle === 'in_progress' && (
-          <p className="text-center text-[#9CA3AF] text-[12px] mt-2">
+          <p className="text-center text-[#6B7280] text-[12px] mt-2">
             Running into a problem? Message the poster in the shift chat.
           </p>
         )}

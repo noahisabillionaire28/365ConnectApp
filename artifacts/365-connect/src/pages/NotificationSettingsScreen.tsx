@@ -207,7 +207,7 @@ export function NotificationSettingsScreen() {
                       <p className="flex-1 min-w-0 text-[#111827] text-[14px] font-medium truncate">{savedSearchLabel(s)}</p>
                       <button type="button" onClick={() => savedSearches.remove(s.id)}
                         aria-label={`Remove saved search: ${savedSearchLabel(s)}`}
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-[#9CA3AF] active:bg-[#F3F4F6] flex-shrink-0">
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#F3F4F6] flex-shrink-0">
                         <X size={15} aria-hidden />
                       </button>
                     </div>

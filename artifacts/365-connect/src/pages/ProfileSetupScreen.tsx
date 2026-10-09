@@ -157,7 +157,7 @@ export function ProfileSetupScreen() {
   };
 
   const INPUT_BASE = "bg-white border border-[#DBDBDB] rounded-[12px] focus-within:border-black transition-colors";
-  const TEXT_BASE  = "bg-transparent outline-none text-black text-[16px] font-medium placeholder:text-[#9CA3AF]";
+  const TEXT_BASE  = "bg-transparent outline-none text-black text-[16px] font-medium placeholder:text-[#6B7280]";
 
   return (
     <div className="flex flex-col h-full bg-white text-black overflow-hidden">
@@ -245,7 +245,7 @@ export function ProfileSetupScreen() {
               <textarea autoFocus
                 placeholder="e.g. High-energy bartender with 5+ years in upscale venues. TIPS certified. Known for fast service and great vibes."
                 value={bio} onChange={(e) => setBio(e.target.value)} maxLength={160} rows={5}
-                className="w-full bg-transparent outline-none text-black text-[15px] leading-relaxed placeholder:text-[#9CA3AF] resize-none p-4 pb-8" />
+                className="w-full bg-transparent outline-none text-black text-[15px] leading-relaxed placeholder:text-[#6B7280] resize-none p-4 pb-8" />
               <span className="absolute bottom-3 right-4 text-[11px] text-[#737373]">{bio.length}/160</span>
             </div>
           </div>
@@ -300,7 +300,7 @@ export function ProfileSetupScreen() {
                 <input autoFocus type="text"
                   placeholder={certs.length === 0 ? 'Type and press Enter to add…' : 'Add another…'}
                   value={certInput} onChange={(e) => setCertInput(e.target.value)} onKeyDown={handleCertKeyDown}
-                  className="flex-1 min-w-[140px] bg-transparent outline-none text-black text-[14px] placeholder:text-[#9CA3AF] py-[6px]" />
+                  className="flex-1 min-w-[140px] bg-transparent outline-none text-black text-[14px] placeholder:text-[#6B7280] py-[6px]" />
               </div>
             </div>
             {certs.length === 0 && (
@@ -341,7 +341,7 @@ export function ProfileSetupScreen() {
               <textarea placeholder="Describe what you were working — role, venue, event type…"
                 value={postDescription} onChange={(e) => setPostDescription(e.target.value)}
                 maxLength={300} rows={4}
-                className="w-full bg-transparent outline-none text-black text-[15px] leading-relaxed placeholder:text-[#9CA3AF] resize-none p-4" />
+                className="w-full bg-transparent outline-none text-black text-[15px] leading-relaxed placeholder:text-[#6B7280] resize-none p-4" />
             </div>
 
             {saveError && (

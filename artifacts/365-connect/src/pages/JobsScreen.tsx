@@ -225,7 +225,7 @@ function MapPane({ shifts, selectedId, userCoords, onPinClick, onOpenShift }: {
           onChange={(e) => { setAddressQuery(e.target.value); setNotFound(false); }}
           placeholder="Search an address or area"
           aria-label="Search an address or area"
-          className="flex-1 min-w-0 bg-transparent text-[#111827] text-[14px] font-medium placeholder:text-[#9CA3AF] outline-none"
+          className="flex-1 min-w-0 bg-transparent text-[#111827] text-[14px] font-medium placeholder:text-[#6B7280] outline-none"
         />
         {searching ? (
           <span className="w-4 h-4 rounded-full border-2 border-[#E5E7EB] border-t-[#0A1628] animate-spin" aria-label="Searching" />
@@ -297,7 +297,7 @@ function MapPane({ shifts, selectedId, userCoords, onPinClick, onOpenShift }: {
                     <p className="text-[#6B7280] text-[11px] truncate flex items-center gap-1">
                       <MapPin size={10} aria-hidden />{shift.location}{userCoords ? ` · ${shift.distanceMiles} mi` : ''}
                     </p>
-                    <p className="text-[#9CA3AF] text-[11px] truncate mt-0.5">{shift.date} · {shift.startTime}</p>
+                    <p className="text-[#6B7280] text-[11px] truncate mt-0.5">{shift.date} · {shift.startTime}</p>
                   </div>
                   <div className="flex flex-col items-end flex-shrink-0">
                     <div className="flex items-baseline gap-0.5">
@@ -425,7 +425,7 @@ export function JobsScreen() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Search shifts"
-              className="flex-1 min-w-0 w-full bg-transparent text-black text-[14px] placeholder:text-[#9CA3AF] outline-none font-medium"
+              className="flex-1 min-w-0 w-full bg-transparent text-black text-[14px] placeholder:text-[#6B7280] outline-none font-medium"
             />
             {query && (
               <button type="button" aria-label="Clear search" onClick={() => setQuery('')}

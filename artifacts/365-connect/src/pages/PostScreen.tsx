@@ -31,17 +31,17 @@ function CommentRow({ c, canDelete, onDelete }: {
           {c.body}
         </p>
         <div className="flex items-center gap-3 mt-0.5">
-          <p className="text-[#9CA3AF] text-[11px]">{relativeTime(c.created_at)}</p>
+          <p className="text-[#6B7280] text-[11px]">{relativeTime(c.created_at)}</p>
           {canDelete && (confirming
             ? (
               <>
                 <button type="button" onClick={() => onDelete(c.id)} className="text-[#EF4444] text-[11px] font-bold">Delete</button>
-                <button type="button" onClick={() => setConfirming(false)} className="text-[#9CA3AF] text-[11px]">Cancel</button>
+                <button type="button" onClick={() => setConfirming(false)} className="text-[#6B7280] text-[11px]">Cancel</button>
               </>
             )
             : (
               <button type="button" aria-label="Delete comment" onClick={() => setConfirming(true)}
-                className="text-[#9CA3AF]">
+                className="text-[#6B7280]">
                 <Trash2 size={13} aria-hidden />
               </button>
             ))}
@@ -101,9 +101,9 @@ export function PostScreen() {
             <p className="px-4 pt-3 pb-1 text-[#6B7280] text-[12px] font-bold uppercase tracking-wide">
               {comments.length} comment{comments.length !== 1 ? 's' : ''}
             </p>
-            {commentsLoading && <div className="px-4 py-3 text-[#9CA3AF] text-[13px]">Loading…</div>}
+            {commentsLoading && <div className="px-4 py-3 text-[#6B7280] text-[13px]">Loading…</div>}
             {!commentsLoading && comments.length === 0 && (
-              <p className="px-4 py-6 text-[#9CA3AF] text-[13px] text-center">Be the first to comment.</p>
+              <p className="px-4 py-6 text-[#6B7280] text-[13px] text-center">Be the first to comment.</p>
             )}
             {comments.map((c) => (
               <CommentRow key={c.id} c={c}
@@ -123,7 +123,7 @@ export function PostScreen() {
           onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
           placeholder="Add a comment…"
           aria-label="Add a comment"
-          className="flex-1 h-[42px] rounded-full bg-[#F3F4F6] border border-[#E5E7EB] px-4 text-[14px] text-[#111827] placeholder:text-[#9CA3AF] outline-none"
+          className="flex-1 h-[42px] rounded-full bg-[#F3F4F6] border border-[#E5E7EB] px-4 text-[14px] text-[#111827] placeholder:text-[#6B7280] outline-none"
         />
         <button type="button" onClick={submit} disabled={!text.trim() || addComment.isPending}
           aria-label="Post comment"

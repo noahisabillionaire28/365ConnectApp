@@ -61,7 +61,7 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
           {!person.isAvailable && (
             <>
               <span className="text-[#D1D5DB]">·</span>
-              <span className="text-[#9CA3AF] text-[12px]">Not taking shifts</span>
+              <span className="text-[#6B7280] text-[12px]">Not taking shifts</span>
             </>
           )}
         </div>

@@ -513,7 +513,7 @@ export function WorkerProfileScreen() {
                 return (
                   <span key={key}
                     className={`px-2.5 py-1 rounded-full text-[12px] font-semibold border ${
-                      on ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-[#FAFAFA] border-[#DBDBDB] text-[#9CA3AF]'
+                      on ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-[#FAFAFA] border-[#DBDBDB] text-[#6B7280]'
                     }`}>
                     {label}
                   </span>

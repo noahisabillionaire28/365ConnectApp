@@ -107,17 +107,17 @@ export function SwapSheet({ open, shiftLabel, busy, onSend, onCancel }: {
               <Search size={15} aria-hidden className="text-[#9CA3AF] flex-shrink-0" />
               <input value={query} onChange={(e) => setQuery(e.target.value)} disabled={busy}
                 placeholder="Search a worker by name" aria-label="Search a worker by name" autoFocus
-                className="flex-1 min-w-0 bg-transparent text-[14px] text-[#111827] outline-none placeholder:text-[#9CA3AF]" />
+                className="flex-1 min-w-0 bg-transparent text-[14px] text-[#111827] outline-none placeholder:text-[#6B7280]" />
             </label>
             <div className="mt-2 flex flex-col gap-1.5 min-h-[56px]" role="listbox" aria-label="Matching workers">
               {term.length === 0 && (
-                <p className="text-[#9CA3AF] text-[12px] px-1 py-2">Type a name or @username to find a worker.</p>
+                <p className="text-[#6B7280] text-[12px] px-1 py-2">Type a name or @username to find a worker.</p>
               )}
               {term.length > 0 && search.isLoading && (
-                <p className="text-[#9CA3AF] text-[12px] px-1 py-2">Searching…</p>
+                <p className="text-[#6B7280] text-[12px] px-1 py-2">Searching…</p>
               )}
               {term.length > 0 && !search.isLoading && results.length === 0 && (
-                <p className="text-[#9CA3AF] text-[12px] px-1 py-2">No workers match “{term}”.</p>
+                <p className="text-[#6B7280] text-[12px] px-1 py-2">No workers match “{term}”.</p>
               )}
               {results.map((w) => (
                 <button key={w.id} type="button" role="option" aria-selected={false} disabled={busy}
@@ -142,7 +142,7 @@ export function SwapSheet({ open, shiftLabel, busy, onSend, onCancel }: {
 
         <textarea value={note} onChange={(e) => setNote(e.target.value.slice(0, 300))} rows={2} disabled={busy}
           placeholder="Add a note for them (optional)" aria-label="Optional note"
-          className="mt-3 w-full border border-[#E5E7EB] rounded-[12px] px-3 py-2.5 text-[14px] text-[#111827] resize-none outline-none focus:border-[#0A1628] placeholder:text-[#9CA3AF]" />
+          className="mt-3 w-full border border-[#E5E7EB] rounded-[12px] px-3 py-2.5 text-[14px] text-[#111827] resize-none outline-none focus:border-[#0A1628] placeholder:text-[#6B7280]" />
 
         <div className="mt-3 flex items-start gap-2 rounded-[12px] bg-[#F0F7FF] border border-[#DBDBDB] px-3 py-2.5">
           <Info size={15} aria-hidden className="text-[#0095F6] flex-shrink-0 mt-0.5" />
