@@ -6,7 +6,7 @@
 import { Router } from 'express';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { invalidateRole } from '../lib/roleCache.js';
-import { sendEmail, renderNotificationEmail, appUrl } from '../lib/email.js';
+import { sendEmailDetailed, renderNotificationEmail, appUrl } from '../lib/email.js';
 import { unsubscribeUrl } from '../lib/unsubscribe.js';
 import type { Request, Response, NextFunction } from 'express';
 
@@ -230,8 +230,8 @@ router.post('/test-email', async (req, res) => {
       ctaHref: appUrl(),
       unsubscribeUrl: unsub,
     });
-    const sent = await sendEmail({ to, subject: 'Test email from 365 Connect', html, text, unsubscribeUrl: unsub });
-    res.json({ sent, to, configured: !!process.env['RESEND_API_KEY'] });
+    const r = await sendEmailDetailed({ to, subject: 'Test email from 365 Connect', html, text, unsubscribeUrl: unsub });
+    res.json({ sent: r.ok, to, configured: !!process.env['RESEND_API_KEY'], reason: r.reason ?? null });
   } catch (err) {
     console.error('[admin/test-email]', err);
     res.status(500).json({ error: 'Internal server error' });

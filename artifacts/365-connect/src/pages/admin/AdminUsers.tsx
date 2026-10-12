@@ -1,11 +1,9 @@
 import { useState, useMemo } from 'react';
-import { useEffect } from 'react';
-import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, X, Ban, Flag, ChevronRight, Star, BadgeCheck, AlertCircle, Trash2, ExternalLink,
 } from 'lucide-react';
-import { isAdminAuthenticated, initAdminSession } from '@/store/adminStore';
+import { useAdminGate } from '@/hooks/useAdminGate';
 import { useAdminUsers, useUpdateUser, useDeleteUser } from '@/hooks/useAdminData';
 import type { AdminUserRow } from '@/lib/adminApi';
 
@@ -358,12 +356,11 @@ const FILTERS: { key: FilterOpt; label: string }[] = [
 
 /* ── AdminUsers ──────────────────────────────────────────────────────────── */
 export function AdminUsers() {
-  const [, navigate]    = useLocation();
   const [search, setSearch]     = useState('');
   const [filter, setFilter]     = useState<FilterOpt>('all');
   const [detail, setDetail]     = useState<AdminUserRow | null>(null);
 
-  useEffect(() => { initAdminSession().then((ok) => { if (!ok) navigate('/admin/login'); }); }, [navigate]);
+  const adminReady = useAdminGate();
 
   const { data: users = [], isLoading, isError } = useAdminUsers();
 
@@ -377,7 +374,11 @@ export function AdminUsers() {
     return matchSearch && matchFilter;
   }), [users, search, filter]);
 
-  if (!isAdminAuthenticated()) return null;
+  if (!adminReady) return (
+    <div className="min-h-[100dvh] bg-[#FAFAFA] flex items-center justify-center">
+      <div className="w-8 h-8 rounded-full border-2 border-black border-t-transparent animate-spin" />
+    </div>
+  );
 
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col pt-[60px]">

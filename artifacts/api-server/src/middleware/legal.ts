@@ -17,6 +17,8 @@
  *                    who declines the new terms must still be able to delete
  *                    their account
  *   /push/*          device registration happens on launch, before the gate
+ *   /admin/*         platform operators; the admin panel has no acceptance
+ *                    screen, and every admin route checks the admin role itself
  */
 import type { Request, Response, NextFunction } from 'express';
 import { userLegalIsCurrent } from '../lib/legal.js';
@@ -34,6 +36,7 @@ export function isLegalExempt(method: string, path: string): boolean {
   if (p === '/auth' || p.startsWith('/auth/')) return true;
   if (p === '/legal' || p.startsWith('/legal/')) return true;
   if (p === '/push' || p.startsWith('/push/')) return true;
+  if (p === '/admin' || p.startsWith('/admin/')) return true;
   if (p === '/users' && method === 'POST') return true;
   if (p === '/users/me') return true;
   return false;

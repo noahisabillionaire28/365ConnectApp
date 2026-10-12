@@ -44,15 +44,25 @@ export type SendEmailInput = {
 };
 
 /** Send one email. Returns true if it was accepted by Resend, false otherwise. */
-export async function sendEmail({ to, subject, html, text, unsubscribeUrl, headers }: SendEmailInput): Promise<boolean> {
+export async function sendEmail(input: SendEmailInput): Promise<boolean> {
+  return (await sendEmailDetailed(input)).ok;
+}
+
+/**
+ * Same as sendEmail, but says why a send did not go out (Resend's own error
+ * text when it refused), for the admin "send test email" check.
+ */
+export async function sendEmailDetailed(
+  { to, subject, html, text, unsubscribeUrl, headers }: SendEmailInput,
+): Promise<{ ok: boolean; reason?: string }> {
   const key = apiKey();
   if (!key) {
     logger.info({ to, subject }, '[email] RESEND_API_KEY not set — skipping send');
-    return false;
+    return { ok: false, reason: 'RESEND_API_KEY is not set on the API server.' };
   }
   if (!to || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) {
     logger.warn({ to }, '[email] invalid recipient — skipping');
-    return false;
+    return { ok: false, reason: 'That is not a valid email address.' };
   }
   const allHeaders: Record<string, string> = { ...(headers ?? {}) };
   if (unsubscribeUrl) {
@@ -78,12 +88,15 @@ export async function sendEmail({ to, subject, html, text, unsubscribeUrl, heade
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
       logger.warn({ status: res.status, detail }, '[email] Resend rejected the send');
-      return false;
+      let message = detail;
+      try { message = (JSON.parse(detail) as { message?: string }).message || detail; } catch { /* plain text */ }
+      return { ok: false, reason: `Resend refused it (${res.status}): ${message.slice(0, 300)}` };
     }
-    return true;
+    return { ok: true };
   } catch (err) {
-    logger.warn({ err: err instanceof Error ? err.message : String(err) }, '[email] send threw');
-    return false;
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn({ err: message }, '[email] send threw');
+    return { ok: false, reason: `Could not reach Resend: ${message}` };
   }
 }
 

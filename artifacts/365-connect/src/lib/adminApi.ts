@@ -36,12 +36,18 @@ async function makeHeaders(): Promise<HeadersInit> {
   return h;
 }
 
+/** The server's own error text (and status) when it sent one, for the UI. */
+async function apiError(res: Response, what: string): Promise<Error> {
+  const b = await res.json().catch(() => null) as { error?: string } | null;
+  return new Error(b?.error ? `${b.error} (${res.status})` : `Admin API ${what} → ${res.status}`);
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: await makeHeaders(),
     credentials: 'include',
   });
-  if (!res.ok) throw new Error(`Admin API ${path} → ${res.status}`);
+  if (!res.ok) throw await apiError(res, path);
   return res.json() as Promise<T>;
 }
 
@@ -52,7 +58,7 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
     credentials: 'include',
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`Admin API PATCH ${path} → ${res.status}`);
+  if (!res.ok) throw await apiError(res, `PATCH ${path}`);
   return res.json() as Promise<T>;
 }
 
@@ -63,7 +69,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     credentials: 'include',
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`Admin API POST ${path} → ${res.status}`);
+  if (!res.ok) throw await apiError(res, `POST ${path}`);
   return res.json() as Promise<T>;
 }
 
@@ -73,10 +79,7 @@ async function del<T>(path: string): Promise<T> {
     headers: await makeHeaders(),
     credentials: 'include',
   });
-  if (!res.ok) {
-    const b = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
-    throw new Error(b.error ?? `Admin API DELETE ${path} → ${res.status}`);
-  }
+  if (!res.ok) throw await apiError(res, `DELETE ${path}`);
   return res.json() as Promise<T>;
 }
 
@@ -173,7 +176,7 @@ export const adminApi = {
   backfillShiftCoords: (updates: Array<{ id: string; lat: number; lng: number }>) =>
     post<{ updated: number }>(`/shifts/backfill-coords`, { updates }),
   sendTestEmail: (to?: string) =>
-    post<{ sent: boolean; to: string; configured: boolean }>(`/test-email`, to ? { to } : {}),
+    post<{ sent: boolean; to: string; configured: boolean; reason?: string | null }>(`/test-email`, to ? { to } : {}),
   deleteUser:    (id: string) =>
     del<{ ok: boolean }>(`/users/${id}`),
   updateDispute: (id: string, status: string, note?: string) =>
