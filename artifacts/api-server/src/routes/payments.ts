@@ -202,7 +202,7 @@ router.post('/checkout', requireAuth, async (req, res) => {
 
     const origin =
       (typeof req.headers['origin'] === 'string' && req.headers['origin']) ||
-      'https://365-connect-app.vercel.app';
+      'https://join365connect.com';
 
     const form = new URLSearchParams();
     form.set('mode', 'payment');

@@ -3,7 +3,7 @@
  * the sign-up and acceptance sheets, and in print. Edit the prose here; bump
  * LEGAL.termsVersion (and the server copy) when the change is material.
  */
-import { LEGAL, type LegalDocument } from './config';
+import { LEGAL, legalEntitySentence, legalMailClause, type LegalDocument } from './config';
 
 const C = LEGAL.entityName;
 const EMAIL = LEGAL.contactEmail;
@@ -294,8 +294,8 @@ export const TERMS: LegalDocument = {
       id: 'contact',
       heading: '30. Contact',
       paragraphs: [
-        `Questions about these Terms, notices of dispute, arbitration opt-outs, and copyright notices can be sent to ${C} at ${EMAIL} or by mail to: ${LEGAL.mailingAddress}.`,
-        `${C} is currently operated by an individual and a small team based in ${LEGAL.governingLaw}, United States. ${LEGAL.entityNote}.`,
+        `Questions about these Terms, notices of dispute, arbitration opt-outs, and copyright notices can be sent to ${C} at ${EMAIL}${legalMailClause()}.`,
+        `${C} is currently operated by an individual and a small team based in ${LEGAL.governingLaw}, United States.${legalEntitySentence()}`,
       ],
     },
   ],

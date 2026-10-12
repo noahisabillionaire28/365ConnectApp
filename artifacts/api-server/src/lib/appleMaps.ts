@@ -10,7 +10,7 @@
  *   APPLE_MAPS_KEY     — the .p8 file contents (PEM), newlines may be "\n"-escaped
  *   APPLE_TEAM_ID      — your Apple team id (falls back to APNS_TEAM_ID)
  *   APPLE_MAPS_ORIGIN  — optional comma-separated allow-list of web origins
- *                        (e.g. https://365-connect-app.vercel.app). When set, a
+ *                        (e.g. https://join365connect.com). When set, a
  *                        token is only minted for those origins.
  *
  * When the key is missing the app falls back to the built-in map style.

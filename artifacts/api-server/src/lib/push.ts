@@ -16,7 +16,7 @@ import { unreadMessageTotal } from './chat.js';
 
 const PUBLIC_KEY  = process.env['VAPID_PUBLIC_KEY']  ?? '';
 const PRIVATE_KEY = process.env['VAPID_PRIVATE_KEY'] ?? '';
-const SUBJECT     = process.env['VAPID_SUBJECT']     ?? 'mailto:support@365connect.app';
+const SUBJECT     = process.env['VAPID_SUBJECT']     ?? 'mailto:support@join365connect.com';
 
 let configured = false;
 if (PUBLIC_KEY && PRIVATE_KEY) {

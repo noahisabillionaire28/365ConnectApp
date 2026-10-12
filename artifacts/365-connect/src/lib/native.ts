@@ -49,7 +49,7 @@ export async function initNative(handlers: {
   try { await StatusBar.setStyle({ style: Style.Light }); } catch { /* not on this platform */ }
   try { await Keyboard.setAccessoryBarVisible({ isVisible: false }); } catch { /* ignore */ }
 
-  // connect365://shift/abc  or  https://365-connect-app.vercel.app/shift/abc
+  // connect365://shift/abc  or  https://join365connect.com/shift/abc
   void App.addListener('appUrlOpen', ({ url }) => {
     try {
       const u = new URL(url);

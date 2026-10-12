@@ -77,14 +77,16 @@ rendered verbatim into the documents today:
 
 | Field | Current value | Replace with |
 | --- | --- | --- |
-| `entityName` / `entityNote` | `365 Connect` + a TODO note | The registered legal entity (e.g. "365 Connect LLC") once formed; then delete `entityNote` and the sentences that print it (the last section of each document). |
-| `mailingAddress` | `TODO: mailing address for legal notices` | A street or registered-agent address that can receive dispute notices, DMCA notices and arbitration opt-outs. |
-| `contactEmail` / `contactEmailNote` | `legal@365connect.app` | A monitored mailbox. The Terms promise a reply path for dispute notices, arbitration opt-outs, privacy requests and California requests, so mail to it must be read. |
+| `entityName` / `entityNote` | `365 Connect` + a TODO note | The registered legal entity (e.g. "365 Connect LLC") once formed, and an `entityNote` sentence such as "365 Connect is operated by 365 Connect LLC". While either is still a TODO the documents simply leave it out. |
+| `mailingAddress` | `TODO: mailing address for legal notices` | A street or registered-agent address that can receive dispute notices, DMCA notices and arbitration opt-outs. Until it is set, the "or by mail to" clause is left out of the published text. |
+| `contactEmail` / `contactEmailNote` | `legal@join365connect.com` | Set. Mail to it must reach an inbox someone reads (forwarding on the domain, see below): the Terms promise a reply path for dispute notices, arbitration opt-outs, privacy requests and California requests. |
 
 Also worth confirming: `governingLaw` / `venueCounty` (California / Los
-Angeles County) match where the business is actually based, and the
-`support@365connect.com` address on the suspended-account screen matches the
-legal mailbox's domain.
+Angeles County) match where the business is actually based.
+
+`legal@join365connect.com` and `support@join365connect.com` (suspended-account
+screen, push contact) only work once the domain has inbound mail set up, for
+example free forwarding to a personal inbox. Without it, mail to them bounces.
 
 ## How versions and re-acceptance work
 

@@ -11,7 +11,7 @@ Local Storage Policy mirror this table; update all three together.
 | Service | Where in code | Purpose | Data shared |
 | --- | --- | --- | --- |
 | Supabase (US) | `365-connect/src/lib/supabase.ts`, `api-server/src/lib/supabaseAdmin.ts`, `routes/storage.ts` | Postgres database, auth (email/password, Google and Apple sign-in), file storage (avatars, post photos, chat media, uploads), realtime | Everything the app stores: accounts, profiles, content, messages, timesheets, clock-in coordinates, payment records, legal acceptances |
-| Vercel | deployment (`365-connect-app.vercel.app`) | Hosts the web app and the API | Request logs (IP, user agent, URL), everything passing through the API |
+| Vercel | deployment (`join365connect.com`, also `365-connect-app.vercel.app`) | Hosts the web app and the API | Request logs (IP, user agent, URL), everything passing through the API |
 | Resend | `api-server/src/lib/email.ts` | Transactional email (notifications, unsubscribe links) | Recipient email address, subject and body of the notification |
 | Stripe | `api-server/src/routes/payments.ts` (Checkout Sessions API) | Payment processing and Pro subscription billing, where enabled | Account id, email, amount; card details are entered on Stripe's page and never reach us |
 | Anthropic | `api-server/src/lib/matching.ts` | Ranks candidate workers for a shift ("match insights") | Shift title, role, event type, time, requirements, description; per candidate a random account id, skills, certifications, rating and review count, distance in miles, shifts worked, shifts with this poster, no-shows, on-time rate, availability that day. No names, usernames, bios, photos, messages or coordinates. Only used when `ANTHROPIC_API_KEY` is set; rules otherwise |

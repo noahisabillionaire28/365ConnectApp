@@ -13,8 +13,8 @@ export const LEGAL = {
   entityNote: 'TODO: replace with the registered legal entity name (e.g. "365 Connect LLC") once formed',
   governingLaw: 'California',
   venueCounty: 'Los Angeles County',
-  contactEmail: 'legal@365connect.app',
-  contactEmailNote: 'TODO: replace with a monitored mailbox',
+  contactEmail: 'legal@join365connect.com',
+  contactEmailNote: 'Mail to this address must reach an inbox someone reads (see docs/legal.md)',
   mailingAddress: 'TODO: mailing address for legal notices',
   termsVersion: '2026-10-06',
   privacyVersion: '2026-10-06',
@@ -55,6 +55,19 @@ export type LegalDocument = {
 /** A config value that still needs the owner's input (see docs/legal.md). */
 export function isLegalPlaceholder(value: string): boolean {
   return /^TODO\b/i.test(value.trim());
+}
+
+/**
+ * " or by mail to: <address>" once a mailing address is set, otherwise
+ * nothing, so a placeholder never reaches the published text.
+ */
+export function legalMailClause(): string {
+  return isLegalPlaceholder(LEGAL.mailingAddress) ? '' : ` or by mail to: ${LEGAL.mailingAddress}`;
+}
+
+/** The entity sentence (" <note>.") once set, otherwise nothing. */
+export function legalEntitySentence(): string {
+  return isLegalPlaceholder(LEGAL.entityNote) ? '' : ` ${LEGAL.entityNote.replace(/\.$/, '')}.`;
 }
 
 /** "2026-10-06" → "October 6, 2026" for the effective-date line. */

@@ -6,7 +6,7 @@
  */
 import { isNative } from './native';
 
-export const APP_ORIGIN = 'https://365-connect-app.vercel.app';
+export const APP_ORIGIN = 'https://join365connect.com';
 
 export type CalendarEvent = {
   shiftId: string;

@@ -25,8 +25,8 @@ export function SuspendedGate() {
       <p className="text-[#6B7280] text-[14px] leading-relaxed max-w-[300px] mb-8">
         Your 365 Connect account has been suspended by an administrator. If you
         believe this is a mistake, please contact support at{' '}
-        <a href="mailto:support@365connect.com" className="text-[#2563EB] font-semibold">
-          support@365connect.com
+        <a href="mailto:support@join365connect.com" className="text-[#2563EB] font-semibold">
+          support@join365connect.com
         </a>.
       </p>
       <button type="button" onClick={() => void signOut()}
