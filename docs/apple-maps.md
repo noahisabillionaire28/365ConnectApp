@@ -35,7 +35,7 @@ TestFlight. Once enrolled:
    | `APPLE_MAPS_KEY_ID` | the 10-character Key ID |
    | `APPLE_MAPS_KEY` | the whole `.p8` file contents |
    | `APPLE_TEAM_ID` | your Team ID (optional if `APNS_TEAM_ID` is already set) |
-   | `APPLE_MAPS_ORIGIN` | optional: `https://365-connect-app.vercel.app,capacitor://localhost` |
+   | `APPLE_MAPS_ORIGIN` | optional: `https://join365connect.com,https://365-connect-app.vercel.app,capacitor://localhost` |
 
 4. Open `https://365-connect-api.vercel.app/api/healthz` and confirm
    `"maps": "apple"`. Open any shift in the app: the map is now Apple Maps.

@@ -25,7 +25,7 @@ function fromAddress(): string {
 }
 
 export function appUrl(): string {
-  return (process.env['APP_URL'] || 'https://365-connect-app.vercel.app').replace(/\/$/, '');
+  return (process.env['APP_URL'] || 'https://join365connect.com').replace(/\/$/, '');
 }
 
 export type SendEmailInput = {
