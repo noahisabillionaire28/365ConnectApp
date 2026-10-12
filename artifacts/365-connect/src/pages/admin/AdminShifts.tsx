@@ -1,9 +1,7 @@
 import { useState, useMemo } from 'react';
-import { useEffect } from 'react';
-import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Users, DollarSign, Calendar, XCircle, AlertCircle, MapPin } from 'lucide-react';
-import { isAdminAuthenticated, initAdminSession } from '@/store/adminStore';
+import { useAdminGate } from '@/hooks/useAdminGate';
 import { useAdminShifts, useCancelShift, useReopenShift } from '@/hooks/useAdminData';
 import { adminApi, type AdminShiftRow } from '@/lib/adminApi';
 import { geocodeAddress } from '@/lib/geocode';
@@ -158,13 +156,12 @@ const FILTERS: { key: ShiftFilter; label: string }[] = [
 
 /* ── AdminShifts ─────────────────────────────────────────────────────────── */
 export function AdminShifts() {
-  const [, navigate] = useLocation();
   const [filter, setFilter] = useState<ShiftFilter>('all');
   const [search, setSearch] = useState('');
   const [fixing, setFixing] = useState(false);
   const [fixMsg, setFixMsg] = useState<string | null>(null);
 
-  useEffect(() => { initAdminSession().then((ok) => { if (!ok) navigate('/admin/login'); }); }, [navigate]);
+  const adminReady = useAdminGate();
 
   const { data: shifts = [], isLoading, isError, refetch } = useAdminShifts();
 
@@ -205,7 +202,11 @@ export function AdminShifts() {
     return matchFilter && matchSearch;
   }), [shifts, filter, search]);
 
-  if (!isAdminAuthenticated()) return null;
+  if (!adminReady) return (
+    <div className="min-h-[100dvh] bg-[#FAFAFA] flex items-center justify-center">
+      <div className="w-8 h-8 rounded-full border-2 border-black border-t-transparent animate-spin" />
+    </div>
+  );
 
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col pt-[60px]">

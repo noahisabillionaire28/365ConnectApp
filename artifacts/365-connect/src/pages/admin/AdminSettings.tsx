@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useLocation } from 'wouter';
+import { useState } from 'react';
 import { Settings, ShieldCheck, Lock, Bell, Mail } from 'lucide-react';
-import { isAdminAuthenticated, initAdminSession } from '@/store/adminStore';
+import { useAdminGate } from '@/hooks/useAdminGate';
 import { adminApi } from '@/lib/adminApi';
 
 function SettingRow({
@@ -21,13 +20,16 @@ function SettingRow({
 }
 
 export function AdminSettings() {
-  const [, navigate] = useLocation();
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailMsg, setEmailMsg]   = useState<string | null>(null);
   const [testTo, setTestTo]       = useState('');
 
-  useEffect(() => { initAdminSession().then((ok) => { if (!ok) navigate('/admin/login'); }); }, [navigate]);
-  if (!isAdminAuthenticated()) return null;
+  const adminReady = useAdminGate();
+  if (!adminReady) return (
+    <div className="min-h-[100dvh] bg-[#FAFAFA] flex items-center justify-center">
+      <div className="w-8 h-8 rounded-full border-2 border-black border-t-transparent animate-spin" />
+    </div>
+  );
 
   async function handleTestEmail() {
     setEmailBusy(true); setEmailMsg(null);
@@ -35,9 +37,13 @@ export function AdminSettings() {
       const r = await adminApi.sendTestEmail(testTo.trim() || undefined);
       if (r.sent) setEmailMsg(`✓ Sent to ${r.to}. Check your inbox (and spam).`);
       else if (!r.configured) setEmailMsg('✗ RESEND_API_KEY is not set on the API server yet.');
-      else setEmailMsg('✗ Resend rejected the send — check your domain/From address.');
-    } catch {
-      setEmailMsg('✗ Could not reach the server. Try again.');
+      else setEmailMsg(`✗ ${r.reason || 'Resend rejected the send. Check the domain and From address.'}`);
+    } catch (e) {
+      // A thrown TypeError means the request never got an answer; anything
+      // else is the server's own reason, shown as-is so it can be acted on.
+      setEmailMsg(e instanceof TypeError
+        ? '✗ Could not reach the server. Check your connection and try again.'
+        : `✗ ${e instanceof Error ? e.message : 'The server refused the request.'}`);
     } finally { setEmailBusy(false); }
   }
 
@@ -76,7 +82,7 @@ export function AdminSettings() {
             <div>
               <p className="text-black text-[14px] font-semibold">Transactional Email</p>
               <p className="text-[#737373] text-[12px]">
-                While unverified, Resend only delivers to your Resend signup email.
+                Sends a sample notification from the app's sender address to check delivery.
               </p>
             </div>
           </div>
