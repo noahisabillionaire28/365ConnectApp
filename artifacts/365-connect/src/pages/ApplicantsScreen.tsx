@@ -24,6 +24,7 @@ import { apiClient, isApiStatus } from '@/lib/api';
 import { startShiftPayment } from '@/lib/checkout';
 import { formatTime, shiftHeadline } from '@/lib/supabase';
 import { utcToZonedParts, zonedTimeToUtc, zoneAbbrev, DEFAULT_SHIFT_TZ } from '@/lib/timezone';
+import { LoadError } from '@/components/StateView';
 
 /** Hourly pay periods; anything else is a flat total. Mirrors the server's computePay. */
 function isHourly(payPeriod: string | null | undefined): boolean {
@@ -352,8 +353,8 @@ export function ApplicantsScreen() {
   // While the shift is still loading nothing is decided yet (skeleton below).
   const shiftMissing = !shiftLoading && !shift && isApiStatus(shiftError, 404);
   const canManage = !shift || !user?.id || isAdmin || shift.clientId === user.id;
-  const { applicants, isLoading: appsLoading, approve, decline, refetch: refetchApps } = useShiftApplicants(id);
-  const { workers: confirmed, isLoading: confLoading, refetch: refetchConfirmed } = useAcceptedWorkers(id);
+  const { applicants, isLoading: appsLoading, isError: appsError, approve, decline, refetch: refetchApps } = useShiftApplicants(id);
+  const { workers: confirmed, isLoading: confLoading, isError: confError, refetch: refetchConfirmed } = useAcceptedWorkers(id);
   const { invites, refetch: refetchInvites } = useShiftInvites(id);
   // Swaps between workers that need (or needed) the poster's decision.
   const { swaps, refetch: refetchSwaps } = useShiftSwaps(canManage ? id : undefined);
@@ -655,7 +656,10 @@ export function ApplicantsScreen() {
         </div>
         )}
 
-        {loading ? (
+        {!loading && (appsError || confError) ? (
+          // Never show "0 confirmed" for a crew we simply failed to load.
+          <LoadError what="this shift's crew" onRetry={refetchAll} compact />
+        ) : loading ? (
           <div className="flex flex-col gap-2" aria-hidden>
             <div className="h-[46px] rounded-[8px] bg-[#F3F4F6] animate-pulse" />
             <div className="h-[46px] rounded-[8px] bg-[#F3F4F6] animate-pulse mb-2" />

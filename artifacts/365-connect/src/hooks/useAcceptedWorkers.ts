@@ -121,5 +121,5 @@ export function useAcceptedWorkers(
     select: toAccepted,
   });
 
-  return { workers: q.data ?? [], isLoading: q.isLoading, refetch: q.refetch };
+  return { workers: q.data ?? [], isLoading: q.isLoading, isError: q.isError && !q.data, refetch: q.refetch };
 }

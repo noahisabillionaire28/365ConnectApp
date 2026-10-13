@@ -6,6 +6,7 @@ import { BottomTabNav } from '@/components/BottomTabNav';
 import { useConversations, type ConversationWithOther } from '@/hooks/useConversations';
 import { relativeTime } from '@/hooks/useNotifications';
 import { useToast } from '@/contexts/ToastContext';
+import { LoadError } from '@/components/StateView';
 
 type Filter = 'all' | 'groups' | 'archived';
 
@@ -191,6 +192,8 @@ export function MessagesScreen() {
       <div className="flex-1 overflow-y-auto pb-[64px]">
         {source.isLoading ? (
           <MessagesSkeleton />
+        ) : source.isError ? (
+          <LoadError what="your messages" onRetry={() => void source.refetch()} />
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-20 px-8 text-center">
             <div className="w-16 h-16 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center">
@@ -203,7 +206,7 @@ export function MessagesScreen() {
               {filter === 'groups'
                 ? 'A group chat opens automatically for every shift once workers are confirmed.'
                 : filter === 'archived' ? 'Archived threads live here until you unarchive them.'
-                : 'Message a worker or client from their profile, or open a shift chat from the Roster.'}
+                : 'Chats with workers, clients and your shift group chats show up here.'}
             </p>
           </div>
         ) : (

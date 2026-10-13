@@ -7,6 +7,7 @@ import { useShiftById } from '@/hooks/useShifts';
 import { useRole } from '@/contexts/RoleContext';
 import { useToast } from '@/contexts/ToastContext';
 import { BottomTabNav } from '@/components/BottomTabNav';
+import { LoadError } from '@/components/StateView';
 
 const GOLD = '#FFD700';
 
@@ -124,7 +125,7 @@ export function AssignWorkersScreen() {
   const [, navigate] = useLocation();
   const { role, roleLoading } = useRole();
   const { data: shift, isLoading: shiftLoading } = useShiftById(id);
-  const { workers, isLoading, error, assign, offer, assigningId, offeringId } = useAssignWorkers(id);
+  const { workers, isLoading, error, assign, offer, assigningId, offeringId, reload } = useAssignWorkers(id);
   const { showToast } = useToast();
 
   function handleAssign(workerId: string) {
@@ -177,11 +178,6 @@ export function AssignWorkersScreen() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pt-5 pb-[80px]">
-        {error && (
-          <p className="text-[#EF4444] text-[12px] font-medium mb-3 bg-red-50 border border-[#EF4444]/20 rounded-[8px] px-3 py-2">
-            {error}
-          </p>
-        )}
 
         {!isLoadingAny && shift && (
           <div className="rounded-[12px] border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 mb-4">
@@ -209,6 +205,8 @@ export function AssignWorkersScreen() {
           <div className="flex flex-col gap-3">
             {[1, 2, 3].map((n) => <AssignCardSkeleton key={n} />)}
           </div>
+        ) : error && workers.length === 0 ? (
+          <LoadError what="your roster" onRetry={reload} />
         ) : workers.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6 pt-16">
             <div className="w-16 h-16 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center">

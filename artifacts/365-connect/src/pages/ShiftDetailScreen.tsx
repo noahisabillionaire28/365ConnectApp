@@ -181,7 +181,9 @@ export function ShiftDetailScreen() {
   const isWorkerForHooks = profile.role === 'worker';
   const { existing: myReview } = useExistingReview(id, user?.id, isWorkerForHooks ? shift?.clientId : undefined);
   const isOwnerForHooks = !!user?.id && !!shift && user.id === shift.clientId;
-  const { applicants: pendingApplicants } = useShiftApplicants(isOwnerForHooks ? id : undefined);
+  const { applicants: rosterRows } = useShiftApplicants(isOwnerForHooks ? id : undefined);
+  // The hook returns the whole roster (every status); the badge is for people waiting on a decision.
+  const pendingCount = rosterRows.filter((a) => a.status === 'pending').length;
   const { workers: acceptedWorkers } = useAcceptedWorkers(
     isOwnerForHooks ? id : undefined,
     isOwnerForHooks ? user?.id : undefined,
@@ -1403,13 +1405,13 @@ export function ShiftDetailScreen() {
             )}
             <motion.button type="button" whileTap={{ scale: 0.97 }}
               onClick={() => navigate(`/shift/${shiftId}/applicants`)}
-              aria-label={`View applicants${pendingApplicants.length > 0 ? `, ${pendingApplicants.length} pending` : ''}`}
+              aria-label={`View applicants${pendingCount > 0 ? `, ${pendingCount} pending` : ''}`}
               className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] tracking-wide flex items-center justify-center gap-2.5">
               <Users size={18} aria-hidden />
               Manage Roster
-              {pendingApplicants.length > 0 && (
+              {pendingCount > 0 && (
                 <span className="bg-white/20 text-white text-[12px] font-bold px-2 py-0.5 rounded-full">
-                  {pendingApplicants.length}
+                  {pendingCount}
                 </span>
               )}
             </motion.button>

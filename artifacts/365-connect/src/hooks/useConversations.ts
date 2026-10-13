@@ -155,5 +155,5 @@ export function useConversations(opts: { archived?: boolean } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, archived]);
 
-  return { items: q.data ?? [], isLoading: q.isLoading, refetch: load, getOrCreateConversation: getOrCreate, setPrefs, deleteConversation };
+  return { items: q.data ?? [], isLoading: q.isLoading, isError: q.isError && !q.data, refetch: load, getOrCreateConversation: getOrCreate, setPrefs, deleteConversation };
 }

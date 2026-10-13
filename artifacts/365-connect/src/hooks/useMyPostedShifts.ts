@@ -18,5 +18,5 @@ export function useMyPostedShifts() {
     staleTime: 30_000,
   });
 
-  return { shifts: query.data ?? [], isLoading: query.isLoading, error: query.error };
+  return { shifts: query.data ?? [], isLoading: query.isLoading, error: query.error, refetch: query.refetch };
 }

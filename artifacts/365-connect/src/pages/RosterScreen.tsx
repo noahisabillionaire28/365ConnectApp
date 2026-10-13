@@ -9,6 +9,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { getOrCreateDirectConversation } from '@/hooks/useConversations';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
+import { LoadError } from '@/components/StateView';
 
 const GOLD = '#FFD700';
 
@@ -134,7 +135,7 @@ export function RosterScreen() {
   const { user } = useAuth();
   const { role, roleLoading } = useRole();
   const { showToast } = useToast();
-  const { workers, isLoading, error, remove } = useRoster();
+  const { workers, isLoading, error, remove, refetch } = useRoster();
   const { shifts } = useClientShiftsDashboard();
   const [query, setQuery] = useState('');
   const [assigning, setAssigning] = useState<RosterWorker | null>(null);
@@ -221,16 +222,12 @@ export function RosterScreen() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pt-4 pb-[80px]">
-        {error && (
-          <p className="text-[#EF4444] text-[12px] font-medium mb-3 bg-red-50 border border-[#EF4444]/20 rounded-[8px] px-3 py-2">
-            {error}
-          </p>
-        )}
-
         {isLoading ? (
           <div className="flex flex-col gap-3">
             {[1, 2, 3].map((n) => <RosterCardSkeleton key={n} />)}
           </div>
+        ) : error && workers.length === 0 ? (
+          <LoadError what="your roster" onRetry={() => void refetch()} />
         ) : workers.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6 pt-16">
             <div className="w-16 h-16 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center">

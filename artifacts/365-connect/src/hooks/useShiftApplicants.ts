@@ -107,5 +107,5 @@ export function useShiftApplicants(shiftId: string | undefined) {
     } catch (e) { return e instanceof Error ? e.message : 'Could not decline this applicant.'; }
   }, [updateStatus]);
 
-  return { applicants: q.data ?? [], isLoading: q.isLoading, approve, decline, updateStatus, refetch: q.refetch };
+  return { applicants: q.data ?? [], isLoading: q.isLoading, isError: q.isError && !q.data, approve, decline, updateStatus, refetch: q.refetch };
 }

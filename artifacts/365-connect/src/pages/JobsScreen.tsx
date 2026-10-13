@@ -19,6 +19,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { resetDraft } from '@/store/postShiftStore';
 import { JOB_TYPES } from '@/lib/jobTypes';
 import { EVENT_TYPES } from '@/lib/eventTypes';
+import { StateView, LoadError } from '@/components/StateView';
 
 const NAVY = '#0A1628';
 
@@ -361,6 +362,9 @@ export function JobsScreen() {
   const isWorkerRole = role === 'worker' || role === null;
   const shifts    = isWorkerRole ? openShifts.shifts    : postedShifts.shifts;
   const isLoading = isWorkerRole ? openShifts.isLoading : postedShifts.isLoading;
+  // A failed load must not read as "no shifts match": show it as an error with a retry.
+  const loadFailed = !isLoading && shifts.length === 0 && !!(isWorkerRole ? openShifts.error : postedShifts.error);
+  const retryLoad = () => { void (isWorkerRole ? openShifts.refetch() : postedShifts.refetch()); };
   const { appliedShiftIds } = useApplications();
 
   const textFiltered = shifts.filter((s) =>
@@ -496,11 +500,16 @@ export function JobsScreen() {
               </motion.div>
             ))}
 
-            {!isLoading && visibleShifts.length === 0 && (
-              <div className="mt-6 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-10 text-center">
-                <p className="text-[#6B7280] text-[14px] font-medium">No shifts match this filter.</p>
-                <p className="text-[#6B7280] text-[12px] mt-1">Try a different category or clear the search.</p>
-              </div>
+            {loadFailed && <LoadError what="shifts" onRetry={retryLoad} />}
+
+            {!isLoading && !loadFailed && visibleShifts.length === 0 && (
+              shifts.length === 0 ? (
+                <StateView icon={CalendarDays}
+                  title={isWorkerRole ? 'No open shifts right now' : "You haven't posted any shifts yet"}
+                  body={isWorkerRole ? 'New shifts appear here as soon as they are posted. Turn on alerts to hear first.' : 'Post a shift and it shows up here with its applicants.'} />
+              ) : (
+                <StateView title="No shifts match your filters" body="Try another role or event type, or clear the search." />
+              )
             )}
 
             {/* Paging: the feed loads 50 at a time; fetch the next page on demand */}
