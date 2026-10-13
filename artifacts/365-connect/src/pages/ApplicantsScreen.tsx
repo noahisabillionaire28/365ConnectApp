@@ -140,7 +140,7 @@ function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onP
           <p className="text-[#111827] font-semibold text-[14px] truncate">
             {w.username ? `@${w.username}` : 'Worker'}
           </p>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
             {Number(w.rating) > 0 && (
               <span className="flex items-center gap-0.5 text-[11px] text-[#6B7280]">
                 <Star size={10} aria-hidden className="text-[#FFD700] fill-[#FFD700]" />
@@ -165,10 +165,12 @@ function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onP
               </span>
             )}
             {w.approved && w.workerAck === 'disputed' && (
-              <span className="text-[10px] font-bold text-red-500 bg-red-50 border border-red-200 rounded-full px-1.5 py-0.5"
-                title={w.dispute_note ?? undefined}>
+              <span className="text-[10px] font-bold text-red-500 bg-red-50 border border-red-200 rounded-full px-1.5 py-0.5">
                 Disputed
               </span>
+            )}
+            {w.approved && w.workerAck === 'disputed' && w.dispute_note && (
+              <span className="basis-full text-[12px] text-[#92400E] leading-snug">“{w.dispute_note}”</span>
             )}
             {!w.clock_out && <DayOfChip s={w.dayOfStatus} />}
           </div>
@@ -253,8 +255,9 @@ function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onP
 function ReviewSheet({ w, payRate, payPeriod, timezone, shiftEndISO, busy, onApprove, onClose }: {
   w: AcceptedWorker; payRate: number; payPeriod: string | null; timezone: string | null;
   shiftEndISO: string | null; busy: boolean;
-  onApprove: (breakMinutes: number, clockOutISO?: string) => void; onClose: () => void;
+  onApprove: (breakMinutes: number, clockOutISO?: string, totalHours?: number) => void; onClose: () => void;
 }) {
+  const disputed = w.approved && w.workerAck === 'disputed';
   const tz = timezone || DEFAULT_SHIFT_TZ;
   const hourly = isHourly(payPeriod);
   // Forgot to clock out: the manager sets the clock-out (defaults to the
@@ -275,7 +278,11 @@ function ReviewSheet({ w, payRate, payPeriod, timezone, shiftEndISO, busy, onApp
   const grossH = w.clock_in && clockOutISO
     ? Math.max(0, (Date.parse(clockOutISO) - Date.parse(w.clock_in)) / 3_600_000) : 0;
   const [breakMin, setBreakMin] = useState<number>(Math.round(w.breakMinutes ?? 0));
-  const billable = Math.max(0, grossH - breakMin / 60);
+  // Time the manager adds or removes on top of the clock (e.g. a worker who
+  // stayed for load-out after clocking out). Sent as the billable total.
+  const [adjMin, setAdjMin] = useState<number>(0);
+  const [adjText, setAdjText] = useState<string>('0');
+  const billable = Math.max(0, grossH - breakMin / 60 + adjMin / 60);
   // Same rule as the server: hourly pays regular up to 8h then 1.5× beyond;
   // a day / event rate is a flat amount whatever the hours.
   const regular = hourly ? Math.min(billable, 8) : billable;
@@ -294,7 +301,25 @@ function ReviewSheet({ w, payRate, payPeriod, timezone, shiftEndISO, busy, onApp
           {w.username ? `@${w.username}` : 'Worker'} · {payRate ? (hourly ? `$${payRate}/hr` : `$${payRate} flat per ${payPeriod}`) : ''}
         </p>
 
+        {disputed && (
+          <div className="rounded-[12px] bg-amber-50 border border-amber-200 px-4 py-3 mb-4" role="note">
+            <p className="text-amber-800 text-[13px] font-semibold">{w.username ? `@${w.username}` : 'The worker'} disputed these hours</p>
+            {w.dispute_note
+              ? <p className="text-amber-900 text-[14px] leading-relaxed mt-1">“{w.dispute_note}”</p>
+              : <p className="text-amber-800 text-[13px] mt-1">They didn't leave a note. Message them if you're not sure what to change.</p>}
+            <p className="text-amber-800 text-[12px] mt-2">Adjust the break or add time below, then re-approve. They'll be asked to confirm again.</p>
+          </div>
+        )}
+
         <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-4 py-3 mb-4 flex flex-col gap-2.5">
+          {w.clock_in && (
+            <div className="flex justify-between text-[14px]">
+              <span className="text-[#6B7280]">Clocked in – out</span>
+              <span className="text-[#111827] font-semibold">
+                {formatTime(w.clock_in, timezone)} – {clockOutISO ? formatTime(clockOutISO, timezone) : '…'}{zoneLabel ? ` ${zoneLabel}` : ''}
+              </span>
+            </div>
+          )}
           {needsClockOut && (
             <div className="flex flex-col gap-1 pb-1 border-b border-[#E5E7EB]">
               <p className="text-[12px] text-amber-700 font-semibold">
@@ -312,6 +337,17 @@ function ReviewSheet({ w, payRate, payPeriod, timezone, shiftEndISO, busy, onApp
               onChange={(e) => setBreakMin(Math.max(0, parseInt(e.target.value || '0') || 0))}
               className="w-20 h-9 rounded-[8px] border border-[#E5E7EB] bg-white px-2.5 text-[14px] text-[#111827] text-right outline-none focus:border-[#0A1628]" />
           </div>
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor="adj-min" className="text-[#6B7280] text-[14px] leading-tight">Add or remove time (min)<span className="block text-[11px]">e.g. 30, or -15</span></label>
+            <input id="adj-min" type="text" inputMode="numeric" value={adjText}
+              onChange={(e) => {
+                const t = e.target.value.replace(/[^0-9-]/g, '').replace(/(?!^)-/g, '');
+                setAdjText(t);
+                const n = parseInt(t, 10);
+                setAdjMin(Number.isFinite(n) ? Math.max(-720, Math.min(720, n)) : 0);
+              }}
+              className="w-20 h-9 rounded-[8px] border border-[#E5E7EB] bg-white px-2.5 text-[14px] text-[#111827] text-right outline-none focus:border-[#0A1628]" />
+          </div>
           {billable > 6 && breakMin < 30 && (
             <p className="text-[11px] text-amber-600">Tip: shifts over 6h usually include a 30-min unpaid break.</p>
           )}
@@ -327,9 +363,10 @@ function ReviewSheet({ w, payRate, payPeriod, timezone, shiftEndISO, busy, onApp
         </div>
 
         <button type="button" disabled={busy || (needsClockOut && grossH <= 0)}
-          onClick={() => onApprove(breakMin, needsClockOut && clockOutISO ? clockOutISO : undefined)}
+          onClick={() => onApprove(breakMin, needsClockOut && clockOutISO ? clockOutISO : undefined,
+            adjMin !== 0 ? Math.round(billable * 100) / 100 : undefined)}
           className="w-full h-[50px] rounded-[10px] bg-[#0A1628] text-white font-bold text-[15px] disabled:opacity-60">
-          {busy ? 'Approving…' : 'Approve timesheet'}
+          {busy ? 'Approving…' : disputed ? 'Re-approve timesheet' : 'Approve timesheet'}
         </button>
         <button type="button" onClick={onClose} className="w-full h-11 mt-1 text-[#6B7280] font-semibold text-[14px]">
           Cancel
@@ -500,7 +537,7 @@ export function ApplicantsScreen() {
     } finally { setBusyId(null); }
   }
 
-  async function handleApprove(w: AcceptedWorker, breakMinutes: number, clockOutISO?: string) {
+  async function handleApprove(w: AcceptedWorker, breakMinutes: number, clockOutISO?: string, totalHours?: number) {
     if (!user?.id || !id) return;
     setBusyId(w.id);
     try {
@@ -508,6 +545,8 @@ export function ApplicantsScreen() {
         shift_id: id, worker_id: w.workerId, break_minutes: breakMinutes,
         // Manager override for a worker who forgot to clock out.
         ...(clockOutISO ? { clock_out: clockOutISO } : {}),
+        // Time added or removed in the sheet: the confirmed billable total.
+        ...(totalHours != null ? { total_hours: totalHours } : {}),
       });
       showToast('Timesheet approved. You can pay this worker now.');
       setReviewing(null);
@@ -905,7 +944,7 @@ export function ApplicantsScreen() {
       {reviewing && (
         <ReviewSheet w={reviewing} payRate={shift?.payRate ?? 0} payPeriod={shift?.payPeriod ?? null}
           timezone={shift?.timezone ?? null} shiftEndISO={shift?.endTimeISO ?? null} busy={busyId === reviewing.id}
-          onApprove={(brk, clockOut) => void handleApprove(reviewing, brk, clockOut)}
+          onApprove={(brk, clockOut, total) => void handleApprove(reviewing, brk, clockOut, total)}
           onClose={() => setReviewing(null)} />
       )}
     </div>
