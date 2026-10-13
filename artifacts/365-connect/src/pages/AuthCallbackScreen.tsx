@@ -48,6 +48,11 @@ export function AuthCallbackScreen() {
       } catch (e) {
         console.warn('[AuthCallback] upsert warning:', e);
       }
+      // Arriving from an email-change confirmation link: the auth account has
+      // the new address; copy it onto the profile so emails follow it.
+      if (session.user.email) {
+        try { await apiClient(session.user.id).post('/users/me/sync-email', {}); } catch { /* Edit Profile retries */ }
+      }
 
       let profile: { username: string | null; role: string | null; availability: unknown; bio?: string | null; company_name?: string | null } | null = null;
       try {

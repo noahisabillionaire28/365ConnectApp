@@ -25,7 +25,7 @@ export const PRIVACY: LegalDocument = {
         `Information you provide:`,
       ],
       bullets: [
-        `Account information: email address, password (stored only as a hash by our authentication provider), and, if you sign in with Google or Apple, the name, email, and profile picture those services share with us.`,
+        `Account information: email address, password (stored only as a hash by our authentication provider), a phone number if you choose to add one (never shown on your profile), and, if you sign in with Google or Apple, the name, email, and profile picture those services share with us.`,
         `Profile information: username, display or business name, photo, bio, home location or service area, skills, event types, certifications and licences, hourly rate, availability, and, for Posters, company or venue details, points of contact, and phone numbers you choose to add to a shift.`,
         `Role-specific details: for Workers, work history on the Platform, ratings, and arrival records; for Posters, shift postings, rosters, templates, and saved workers; for Staffers, the Workers on your roster and assignments you make.`,
         `Content: posts, stories, comments, likes, follows, hashtags, messages and chat attachments (images, video, audio, and PDF files), shift descriptions, reviews, timesheet notes, dispute descriptions, and anything else you upload or send.`,

@@ -4,6 +4,7 @@ import { invalidateRole, getRoleInfo } from '../lib/roleCache.js';
 import { requireAuth, requireSession } from '../middleware/auth.js';
 import { HttpError, sendError } from '../lib/httpError.js';
 import { normalizeUsername, isUniqueViolation, HANDLE_TAKEN } from '../lib/username.js';
+import { normalizePhone } from '../lib/phone.js';
 import { isBlockedEitherWay } from '../lib/chat.js';
 import { rateLimit } from '../lib/rateLimit.js';
 import { LEGAL_VERSIONS } from '../lib/legal.js';
@@ -219,6 +220,26 @@ router.post('/', requireAuth, async (req, res) => {
   return res.json(data);
 });
 
+/**
+ * POST /api/users/me/sync-email — copy the account's confirmed email onto the
+ * profile row. Email changes are made and confirmed with the auth service
+ * (the app never writes users.email directly); the app calls this after the
+ * confirmation link lands, so reminders and receipts go to the new address.
+ * requireSession: a suspended account must still be able to fix its email.
+ */
+router.post('/me/sync-email', requireSession, async (req, res) => {
+  const email = await authEmail(req.userId!);
+  if (!email) return res.status(502).json({ error: "Couldn't read your account email. Try again." });
+  const { data: row, error: readErr } = await adminDb
+    .from('users').select('email').eq('id', req.userId).maybeSingle();
+  if (readErr) return res.status(500).json({ error: readErr.message });
+  if (!row) return res.status(404).json({ error: 'User not found' });
+  if (row.email === email) return res.json({ email, updated: false });
+  const { error } = await adminDb.from('users').update({ email }).eq('id', req.userId);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ email, updated: true });
+});
+
 /** PATCH /api/users/me — partial update of current user */
 router.patch('/me', requireAuth, async (req, res) => {
   // email (verified by auth), is_pro (subscription) and status (admin) are
@@ -228,7 +249,7 @@ router.patch('/me', requireAuth, async (req, res) => {
     'primary_job_type', 'secondary_job_types', 'availability',
     'lat', 'lng', 'company_name', 'is_available',
     'in_app_notifications', 'email_notifications', 'hourly_rate',
-    'quick_replies',
+    'quick_replies', 'phone',
   ];
   const body = req.body as Record<string, unknown>;
   const updates: Record<string, unknown> = {};
@@ -238,6 +259,9 @@ router.patch('/me', requireAuth, async (req, res) => {
   if (!Object.keys(updates).length) return res.status(400).json({ error: 'No valid fields' });
   if ('username' in updates) {
     try { updates.username = normalizeUsername(updates.username); } catch (e) { return sendError(res, e); }
+  }
+  if ('phone' in updates) {
+    try { updates.phone = normalizePhone(updates.phone); } catch (e) { return sendError(res, e); }
   }
 
   const { data, error } = await adminDb

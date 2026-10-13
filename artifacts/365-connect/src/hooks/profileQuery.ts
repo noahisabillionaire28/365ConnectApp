@@ -25,6 +25,9 @@ export type UserProfileRow = {
   is_available:        boolean;
   hourly_rate:         number | null;
   company_name?:       string | null;
+  /** Private: only ever returned to the owner by GET /users/me. */
+  email?:              string | null;
+  phone?:              string | null;
 };
 
 export const profileQueryKey = (userId: string | null | undefined) => ['profile', userId ?? 'anon'] as const;
