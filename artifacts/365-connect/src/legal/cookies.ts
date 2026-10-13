@@ -45,7 +45,6 @@ export const COOKIES: LegalDocument = {
         `Loading some parts of the app means your browser or phone connects directly to another company's servers, which therefore see your IP address and basic request details in the ordinary way any web request does. None of them set cookies for 365 Connect except where noted.`,
       ],
       bullets: [
-        `Google Fonts (fonts.googleapis.com, fonts.gstatic.com): the Space Grotesk typeface. Google receives the font request and your IP address; it does not set cookies for font requests.`,
         `Map tiles (CARTO, drawing OpenStreetMap data) and, where configured, Apple Maps (MapKit JS): the map images and place labels for the areas you look at. The tile provider sees the map areas requested and your IP address.`,
         `Nominatim (OpenStreetMap Foundation): when a poster types a venue address, the text is sent to Nominatim to turn it into coordinates. Nominatim sees the address text and your IP address.`,
         `Unsplash (images.unsplash.com): the default cover photo shown on a shift that has no photo of its own. Unsplash sees the image request and your IP address.`,

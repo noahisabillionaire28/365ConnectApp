@@ -440,7 +440,7 @@ export function WorkerSetupScreen() {
                 placeholder="yourhandle"
                 value={username}
                 onChange={e => setUsername(e.target.value.replace(/[^a-zA-Z0-9_.]/g, '').toLowerCase())}
-                className="flex-1 bg-transparent outline-none text-[16px] font-medium placeholder:text-[#C0C0C0]"
+                className="flex-1 bg-transparent outline-none text-[16px] font-medium placeholder:text-[#9CA3AF]"
                 style={{ color: TEXT }}
                 maxLength={30}
                 data-testid="input-username"
@@ -509,7 +509,7 @@ export function WorkerSetupScreen() {
                 onChange={e => setBio(e.target.value)}
                 maxLength={160}
                 rows={5}
-                className="w-full bg-transparent outline-none text-[15px] leading-relaxed resize-none p-4 pb-8 placeholder:text-[#C0C0C0]"
+                className="w-full bg-transparent outline-none text-[15px] leading-relaxed resize-none p-4 pb-8 placeholder:text-[#9CA3AF]"
                 style={{ color: TEXT }}
               />
               <span className="absolute bottom-3 right-4 text-[11px]" style={{ color: MUTED }}>{bio.length}/160</span>
@@ -662,7 +662,7 @@ export function WorkerSetupScreen() {
                     }
                     if (e.key === 'Backspace' && !certInput && certs.length) setCerts(p => p.slice(0, -1));
                   }}
-                  className="flex-1 min-w-[140px] bg-transparent outline-none text-[14px] py-[6px] placeholder:text-[#C0C0C0]"
+                  className="flex-1 min-w-[140px] bg-transparent outline-none text-[14px] py-[6px] placeholder:text-[#9CA3AF]"
                   style={{ color: TEXT }}
                 />
               </div>
@@ -742,7 +742,7 @@ export function WorkerSetupScreen() {
                 onChange={e => setPostCaption(e.target.value)}
                 maxLength={300}
                 rows={4}
-                className="w-full bg-transparent outline-none text-[15px] leading-relaxed resize-none p-4 pb-8 placeholder:text-[#C0C0C0]"
+                className="w-full bg-transparent outline-none text-[15px] leading-relaxed resize-none p-4 pb-8 placeholder:text-[#9CA3AF]"
                 style={{ color: TEXT }}
               />
               <span className="absolute bottom-3 right-4 text-[11px]" style={{ color: MUTED }}>{postCaption.length}/300</span>

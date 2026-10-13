@@ -36,7 +36,7 @@ function Avatar({ url, name, size = 40 }: { url: string | null; name: string | n
   const initials = (name ?? 'W').replace('@', '').slice(0, 2).toUpperCase();
   return (
     <div style={{ width: size, height: size }}
-      className="rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center overflow-hidden flex-shrink-0">
+      className="rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center overflow-hidden flex-shrink-0">
       {url ? <img src={url} alt="" className="w-full h-full object-cover" />
            : <span className="text-black font-bold text-[13px]">{initials}</span>}
     </div>
@@ -44,8 +44,8 @@ function Avatar({ url, name, size = 40 }: { url: string | null; name: string | n
 }
 
 const ATTENDANCE: Record<Attendance, { label: string; cls: string }> = {
-  applied: { label: 'Applied',  cls: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]' },
-  booked:  { label: 'Confirmed', cls: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]' },
+  applied: { label: 'Applied',  cls: 'bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280]' },
+  booked:  { label: 'Confirmed', cls: 'bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280]' },
   on_site: { label: 'On-site',  cls: 'bg-blue-50 border-blue-200 text-blue-600' },
   done:    { label: 'Done',     cls: 'bg-emerald-50 border-emerald-200 text-emerald-600' },
   no_show: { label: 'No-show',  cls: 'bg-red-50 border-red-200 text-red-500' },
@@ -287,7 +287,7 @@ function ReviewSheet({ w, payRate, payPeriod, timezone, shiftEndISO, busy, onApp
     <div className="fixed inset-0 z-[100] flex items-end justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative w-full max-w-app max-h-[85dvh] overflow-y-auto bg-white rounded-t-[20px] px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+32px)]">
-        <div className="w-10 h-1 rounded-full bg-[#DBDBDB] mx-auto mb-4" />
+        <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-4" />
         <p className="text-[#111827] font-bold text-[17px] mb-1">Review timesheet</p>
         <p className="text-[#6B7280] text-[13px] mb-4">
           {w.username ? `@${w.username}` : 'Worker'} · {payRate ? (hourly ? `$${payRate}/hr` : `$${payRate} flat per ${payPeriod}`) : ''}
@@ -554,15 +554,15 @@ export function ApplicantsScreen() {
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
       {/* Header */}
-      <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-4 border-b border-[#DBDBDB] flex items-center gap-3 flex-shrink-0">
+      <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-4 border-b border-[#E5E7EB] flex items-center gap-3 flex-shrink-0">
         <button type="button" aria-label="Go back"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate(`/shift/${id ?? ''}`); }}
-          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} aria-hidden className="text-black" />
         </button>
         <div className="min-w-0">
           <h1 className="text-black font-bold text-[18px] leading-tight truncate">{shift ? shiftHeadline(shift) : 'Roster'}</h1>
-          <p className="text-[#737373] text-[12px] truncate">
+          <p className="text-[#6B7280] text-[12px] truncate">
             {shift ? ['Roster', shift.jobType, shift.companyName].filter(Boolean).join(' · ') : 'Loading…'}
           </p>
         </div>
@@ -607,7 +607,7 @@ export function ApplicantsScreen() {
               <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200">{onSiteCount} on-site</span>
               {lateCount > 0 && <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-500 border border-red-200">{lateCount} late</span>}
               <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">{doneCount} done</span>
-              {noShowCount > 0 && <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#FAFAFA] text-[#737373] border border-[#DBDBDB]">{noShowCount} no-show</span>}
+              {noShowCount > 0 && <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#FAFAFA] text-[#6B7280] border border-[#E5E7EB]">{noShowCount} no-show</span>}
             </div>
           )}
         </div>
@@ -615,8 +615,8 @@ export function ApplicantsScreen() {
 
         {/* Actions — only once the shift is known; hidden once it is cancelled or over */}
         {!loading && closed && (
-          <div className="mb-3 rounded-[10px] bg-[#FAFAFA] border border-[#DBDBDB] px-4 py-3 text-center">
-            <p className="text-[#737373] text-[13px] font-semibold">
+          <div className="mb-3 rounded-[10px] bg-[#FAFAFA] border border-[#E5E7EB] px-4 py-3 text-center">
+            <p className="text-[#6B7280] text-[13px] font-semibold">
               {shift?.status === 'cancelled' ? 'This shift was cancelled.' : 'This shift has ended.'}
             </p>
           </div>
@@ -632,7 +632,7 @@ export function ApplicantsScreen() {
         {!loading && shift && !closed && (
         <div className="flex gap-2 mb-2">
           <button type="button" onClick={() => setConfirmBroadcast(true)} disabled={inviting}
-            className="flex-1 h-[46px] rounded-[8px] bg-[#0095F6] text-white font-bold text-[13px] flex items-center justify-center gap-2 disabled:opacity-60">
+            className="flex-1 h-[46px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[13px] flex items-center justify-center gap-2 disabled:opacity-60">
             <Send size={15} aria-hidden />
             {inviting ? 'Sending…' : 'Request All Workers'}
           </button>
@@ -670,9 +670,9 @@ export function ApplicantsScreen() {
             ))}
           </div>
         ) : shiftError && !shift ? (
-          <div className="rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-5 py-8 text-center">
+          <div className="rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-5 py-8 text-center">
             <p className="text-[#111827] font-semibold text-[14px]">Couldn't load this roster.</p>
-            <p className="text-[#737373] text-[12px] mt-1">Check your connection and try again.</p>
+            <p className="text-[#6B7280] text-[12px] mt-1">Check your connection and try again.</p>
             <button type="button" onClick={() => { void refetchShift(); refetchAll(); }}
               className="mt-4 h-[40px] px-5 rounded-full bg-[#0A1628] text-white text-[13px] font-bold">
               Retry
@@ -709,7 +709,7 @@ export function ApplicantsScreen() {
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-[#FAFAFA] border-[#DBDBDB] text-[#737373] flex items-center gap-1">
+                            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280] flex items-center gap-1">
                               <AlarmClock size={11} aria-hidden /> Waiting for {toName}
                             </span>
                             <button type="button" disabled={busy} onClick={() => void handleSwapDecision(s, 'decline')}
@@ -860,7 +860,7 @@ export function ApplicantsScreen() {
                       <p className="flex-1 min-w-0 text-[#111827] font-semibold text-[14px] truncate">
                         {inv.worker_username ? `@${inv.worker_username}` : 'Worker'}
                       </p>
-                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-[#FAFAFA] border-[#DBDBDB] text-[#737373] flex items-center gap-1">
+                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280] flex items-center gap-1">
                         <AlarmClock size={11} aria-hidden /> Invited
                       </span>
                     </div>
@@ -875,7 +875,7 @@ export function ApplicantsScreen() {
                 <SectionHeader label="Declined invite" count={invitedDeclined.length} />
                 <div className="flex flex-col gap-2 opacity-70">
                   {invitedDeclined.map((inv: ShiftInvite) => (
-                    <div key={inv.id} className="bg-[#FAFAFA] border border-[#EFEFEF] rounded-[12px] px-3.5 py-3 flex items-center gap-3">
+                    <div key={inv.id} className="bg-[#FAFAFA] border border-[#F3F4F6] rounded-[12px] px-3.5 py-3 flex items-center gap-3">
                       <Avatar url={inv.worker_photo} name={inv.worker_username} />
                       <p className="flex-1 min-w-0 text-[#6B7280] font-semibold text-[14px] truncate">
                         {inv.worker_username ? `@${inv.worker_username}` : 'Worker'}

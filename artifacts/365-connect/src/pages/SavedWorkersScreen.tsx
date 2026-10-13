@@ -38,7 +38,7 @@ export function SavedWorkersScreen() {
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[56px]">
-      <div className="sticky top-0 z-20 bg-white border-b border-[#EFEFEF] px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
+      <div className="sticky top-0 z-20 bg-white border-b border-[#F3F4F6] px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
         <button type="button" aria-label="Back"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/home'); }}
           className="w-10 h-10 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
@@ -52,10 +52,10 @@ export function SavedWorkersScreen() {
           <div key={n} className="h-[72px] bg-[#FAFAFA] border border-[#E5E7EB] rounded-[14px] animate-pulse" />
         ))}
         {!isLoading && workers.length === 0 && (
-          <div className="mt-8 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-12 text-center">
-            <Bookmark size={26} aria-hidden className="text-[#DBDBDB] mx-auto mb-2" />
+          <div className="mt-8 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-12 text-center">
+            <Bookmark size={26} aria-hidden className="text-[#E5E7EB] mx-auto mb-2" />
             <p className="text-[#111827] text-[15px] font-semibold">No saved workers yet</p>
-            <p className="text-[#737373] text-[13px] mt-1">Tap the bookmark on a worker's profile to save them here for fast re-hire.</p>
+            <p className="text-[#6B7280] text-[13px] mt-1">Tap the bookmark on a worker's profile to save them here for fast re-hire.</p>
           </div>
         )}
         {!isLoading && workers.map((w) => (

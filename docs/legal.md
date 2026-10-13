@@ -62,7 +62,7 @@ other people; how it is used; the automated-matching disclosure (rules plus
 non-identifying signals sent to a processor at Anthropic; no solely automated
 decisions with legal effect; people decide bookings); legal bases; sharing
 with the counterparty on a shift and with other users; processors (Supabase,
-Vercel, Resend, Stripe, Anthropic, Apple, Google Fonts, OpenStreetMap /
+Vercel, Resend, Stripe, Anthropic, Apple, OpenStreetMap /
 CARTO); legal requests and business transfers; retention; security; choices
 (notifications, location permission, delete account in-app, export on
 request); California rights (CCPA/CPRA categories, know / delete / correct /

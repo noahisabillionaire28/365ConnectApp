@@ -48,7 +48,7 @@ function StatusBadge({ status }: { status: string }) {
 /* ── Skeleton row ────────────────────────────────────────────────────────── */
 function SkeletonRow() {
   return (
-    <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#DBDBDB] animate-pulse">
+    <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#E5E7EB] animate-pulse">
       <div className="w-10 h-10 rounded-full bg-[#E5E7EB] flex-shrink-0" />
       <div className="flex-1 min-w-0 flex flex-col gap-1.5">
         <div className="h-3 w-32 bg-[#E5E7EB] rounded-full" />
@@ -74,13 +74,13 @@ function ConfirmOverlay({
         initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
         exit={{ y: 40, opacity: 0 }} transition={{ type: 'spring', stiffness: 360, damping: 36 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[400px] bg-white border border-[#DBDBDB] rounded-[20px] px-5 py-5"
+        className="w-full max-w-[400px] bg-white border border-[#E5E7EB] rounded-[20px] px-5 py-5"
       >
         <p className="text-black text-[16px] font-semibold mb-1.5">Are you sure?</p>
-        <p className="text-[#737373] text-[14px] mb-5 leading-relaxed">{message}</p>
+        <p className="text-[#6B7280] text-[14px] mb-5 leading-relaxed">{message}</p>
         <div className="flex gap-3">
           <button type="button" aria-label="Cancel" onClick={onCancel}
-            className="flex-1 h-[48px] rounded-[8px] bg-white border border-[#DBDBDB] text-black font-semibold text-[14px]">
+            className="flex-1 h-[48px] rounded-[8px] bg-white border border-[#E5E7EB] text-black font-semibold text-[14px]">
             Cancel
           </button>
           <button type="button" onClick={onConfirm}
@@ -128,10 +128,10 @@ function UserDetailSheet({
         className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" onClick={onClose} aria-hidden />
       <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', stiffness: 360, damping: 38 }}
-        className="fixed bottom-0 left-0 right-0 max-h-[88dvh] bg-white border-t border-[#DBDBDB] rounded-t-[24px] z-50 flex flex-col overflow-hidden"
+        className="fixed bottom-0 left-0 right-0 max-h-[88dvh] bg-white border-t border-[#E5E7EB] rounded-t-[24px] z-50 flex flex-col overflow-hidden"
         role="dialog" aria-modal="true" aria-label={`User: ${user.username ?? user.email}`}
       >
-        <div aria-hidden className="w-10 h-1 rounded-full bg-[#DBDBDB] mx-auto mt-3 mb-4 flex-shrink-0" />
+        <div aria-hidden className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mt-3 mb-4 flex-shrink-0" />
 
         <div className="overflow-y-auto flex-1 px-5 pb-8">
           {/* Header */}
@@ -140,9 +140,9 @@ function UserDetailSheet({
               <div className="relative">
                 {user.photo_url ? (
                   <img src={user.photo_url} alt={user.username ?? 'User'} loading="lazy"
-                    className="w-14 h-14 rounded-full object-cover border border-[#DBDBDB]" />
+                    className="w-14 h-14 rounded-full object-cover border border-[#E5E7EB]" />
                 ) : (
-                  <div className="w-14 h-14 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+                  <div className="w-14 h-14 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
                     <span className="text-black font-bold text-[18px]">
                       {(user.username ?? user.email ?? 'U').slice(0, 1).toUpperCase()}
                     </span>
@@ -166,7 +166,7 @@ function UserDetailSheet({
                   </p>
                   {user.is_pro && <BadgeCheck size={16} aria-hidden className="text-[#FFD700]" />}
                 </div>
-                <p className="text-[#737373] text-[12px]">{user.email}</p>
+                <p className="text-[#6B7280] text-[12px]">{user.email}</p>
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   <RoleBadge role={user.role} />
                   <StatusBadge status={user.status ?? 'active'} />
@@ -174,8 +174,8 @@ function UserDetailSheet({
               </div>
             </div>
             <button type="button" aria-label="Close panel" onClick={onClose}
-              className="w-8 h-8 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
-              <X size={14} aria-hidden className="text-[#737373]" />
+              className="w-8 h-8 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
+              <X size={14} aria-hidden className="text-[#6B7280]" />
             </button>
           </div>
 
@@ -186,9 +186,9 @@ function UserDetailSheet({
               { label: 'Rating',  value: Number(user.rating) > 0 ? Number(user.rating).toFixed(1) : 'N/A' },
               { label: 'Pro',     value: user.is_pro ? 'Yes' : 'No' },
             ].map(({ label, value }) => (
-              <div key={label} className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] py-3 px-3 text-center">
+              <div key={label} className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] py-3 px-3 text-center">
                 <p className="text-black font-bold text-[14px] leading-tight">{value}</p>
-                <p className="text-[#737373] text-[10px] font-semibold uppercase tracking-wide mt-0.5">{label}</p>
+                <p className="text-[#6B7280] text-[10px] font-semibold uppercase tracking-wide mt-0.5">{label}</p>
               </div>
             ))}
           </div>
@@ -222,7 +222,7 @@ function UserDetailSheet({
             <button type="button" disabled={busy}
               aria-label="Delete user permanently"
               onClick={() => setConfirmOp('delete')}
-              className="w-full h-[44px] rounded-[8px] bg-white border border-[#DBDBDB] text-[#737373] font-semibold text-[13px] flex items-center justify-center gap-2">
+              className="w-full h-[44px] rounded-[8px] bg-white border border-[#E5E7EB] text-[#6B7280] font-semibold text-[13px] flex items-center justify-center gap-2">
               <Trash2 size={14} aria-hidden />
               Delete User
             </button>
@@ -277,7 +277,7 @@ function FilterChip({ label, active, onSelect }: { label: string; active: boolea
   return (
     <button type="button" aria-pressed={active} aria-label={`Filter by ${label}`} onClick={onSelect}
       className={`flex-shrink-0 h-[32px] px-3.5 rounded-full text-[12px] font-semibold border transition-all ${
-        active ? 'bg-black text-white border-black' : 'bg-white border-[#DBDBDB] text-[#737373]'
+        active ? 'bg-black text-white border-black' : 'bg-white border-[#E5E7EB] text-[#6B7280]'
       }`}>
       {label}
     </button>
@@ -289,14 +289,14 @@ function UserListRow({ user, onOpen }: { user: AdminUserRow; onOpen: (u: AdminUs
   return (
     <motion.button type="button" aria-label={`Open profile for ${user.username ?? user.email}`}
       whileTap={{ backgroundColor: '#FAFAFA' }} onClick={() => onOpen(user)}
-      className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-[#DBDBDB] text-left"
+      className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-[#E5E7EB] text-left"
     >
       <div className="relative flex-shrink-0">
         {user.photo_url ? (
           <img src={user.photo_url} alt={user.username ?? ''} loading="lazy"
-            className="w-10 h-10 rounded-full object-cover border border-[#DBDBDB]" />
+            className="w-10 h-10 rounded-full object-cover border border-[#E5E7EB]" />
         ) : (
-          <div className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
             <span className="text-black font-bold text-[13px]">
               {(user.username ?? user.email ?? 'U').slice(0, 1).toUpperCase()}
             </span>
@@ -325,7 +325,7 @@ function UserListRow({ user, onOpen }: { user: AdminUserRow; onOpen: (u: AdminUs
           <RoleBadge role={user.role} />
           <StatusBadge status={user.status ?? 'active'} />
           {Number(user.rating) > 0 && (
-            <span className="flex items-center gap-0.5 text-[11px] text-[#737373]">
+            <span className="flex items-center gap-0.5 text-[11px] text-[#6B7280]">
               <Star size={10} aria-hidden className="text-[#FFD700] fill-[#FFD700]" />
               {Number(user.rating).toFixed(1)}
             </span>
@@ -336,7 +336,7 @@ function UserListRow({ user, onOpen }: { user: AdminUserRow; onOpen: (u: AdminUs
         </p>
       </div>
 
-      <ChevronRight size={15} aria-hidden className="text-[#DBDBDB] flex-shrink-0" />
+      <ChevronRight size={15} aria-hidden className="text-[#E5E7EB] flex-shrink-0" />
     </motion.button>
   );
 }
@@ -383,16 +383,16 @@ export function AdminUsers() {
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col pt-[60px]">
 
-      <div className="sticky top-[60px] z-30 bg-white border-b border-[#DBDBDB] px-4 pt-4 pb-3">
-        <div className="flex items-center gap-2 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[8px] px-3 h-[40px] mb-3">
-          <Search size={14} aria-hidden className="text-[#737373] flex-shrink-0" />
+      <div className="sticky top-[60px] z-30 bg-white border-b border-[#E5E7EB] px-4 pt-4 pb-3">
+        <div className="flex items-center gap-2 bg-[#FAFAFA] border border-[#E5E7EB] rounded-[8px] px-3 h-[40px] mb-3">
+          <Search size={14} aria-hidden className="text-[#6B7280] flex-shrink-0" />
           <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by username or email…"
             aria-label="Search users"
             className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#6B7280] focus:outline-none" />
           {search && (
             <button type="button" aria-label="Clear search" onClick={() => setSearch('')}>
-              <X size={13} aria-hidden className="text-[#737373]" />
+              <X size={13} aria-hidden className="text-[#6B7280]" />
             </button>
           )}
         </div>
@@ -402,7 +402,7 @@ export function AdminUsers() {
           ))}
         </div>
         {!isLoading && (
-          <p className="text-[#737373] text-[11px] font-medium mt-2">
+          <p className="text-[#6B7280] text-[11px] font-medium mt-2">
             {filtered.length} of {users.length} user{users.length !== 1 ? 's' : ''}
           </p>
         )}
@@ -414,7 +414,7 @@ export function AdminUsers() {
         {isError && (
           <div className="flex flex-col items-center justify-center py-20 gap-3 px-8">
             <AlertCircle size={32} aria-hidden className="text-red-400" />
-            <p className="text-[#737373] text-[14px] text-center">
+            <p className="text-[#6B7280] text-[14px] text-center">
               Could not load users. Check API server and Supabase connection.
             </p>
           </div>

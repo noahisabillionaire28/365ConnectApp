@@ -23,7 +23,7 @@ function Avatar({ url, name, size = 36 }: { url: string | null; name: string | n
   const initials = (name ?? 'W').replace('@', '').slice(0, 2).toUpperCase();
   return (
     <div style={{ width: size, height: size }}
-      className="rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center overflow-hidden flex-shrink-0">
+      className="rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center overflow-hidden flex-shrink-0">
       {url ? <img src={url} alt="" className="w-full h-full object-cover" />
            : <span className="text-black font-bold text-[12px]">{initials}</span>}
     </div>
@@ -87,8 +87,8 @@ export function SwapSheet({ open, shiftLabel, busy, onSend, onCancel }: {
             </p>
           </div>
           <button type="button" onClick={close} aria-label="Close" disabled={busy}
-            className="w-8 h-8 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
-            <X size={15} aria-hidden className="text-[#737373]" />
+            className="w-8 h-8 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
+            <X size={15} aria-hidden className="text-[#6B7280]" />
           </button>
         </div>
 
@@ -148,8 +148,8 @@ export function SwapSheet({ open, shiftLabel, busy, onSend, onCancel }: {
           placeholder="Add a note for them (optional)" aria-label="Optional note"
           className="mt-3 w-full border border-[#E5E7EB] rounded-[12px] px-3 py-2.5 text-[14px] text-[#111827] resize-none outline-none focus:border-[#0A1628] placeholder:text-[#6B7280]" />
 
-        <div className="mt-3 flex items-start gap-2 rounded-[12px] bg-[#F0F7FF] border border-[#DBDBDB] px-3 py-2.5">
-          <Info size={15} aria-hidden className="text-[#0095F6] flex-shrink-0 mt-0.5" />
+        <div className="mt-3 flex items-start gap-2 rounded-[12px] bg-[#F0F7FF] border border-[#E5E7EB] px-3 py-2.5">
+          <Info size={15} aria-hidden className="text-[#0A1628] flex-shrink-0 mt-0.5" />
           <p className="text-[#374151] text-[12px] leading-relaxed">
             You keep your spot until the poster approves the swap. You can cancel the offer any time before then.
           </p>

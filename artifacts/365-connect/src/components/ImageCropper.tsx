@@ -130,7 +130,7 @@ export function ImageCropper({
           type="button"
           onClick={handleDone}
           disabled={applying}
-          className="text-[#0095F6] text-[15px] font-bold py-2 pl-4 disabled:opacity-40"
+          className="text-[#0A1628] text-[15px] font-bold py-2 pl-4 disabled:opacity-40"
           aria-label="Confirm crop"
         >
           {applying ? 'Saving…' : 'Done'}

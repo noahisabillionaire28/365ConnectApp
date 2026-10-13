@@ -56,13 +56,13 @@ export class ErrorBoundary extends Component<Props, State> {
         </div>
 
         {/* Error icon */}
-        <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+        <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
           <span className="text-[28px] select-none">⚡</span>
         </div>
 
         <div className="flex flex-col gap-1.5">
           <p className="text-black font-bold text-[18px]">Something went wrong</p>
-          <p className="text-[#737373] text-[13px] leading-relaxed max-w-[280px]">
+          <p className="text-[#6B7280] text-[13px] leading-relaxed max-w-[280px]">
             This screen hit a snag. Your account and everything you've saved are safe — tap below to reload the app.
           </p>
           {/* The raw error stays in the console for debugging; it is not shown to users. */}
@@ -79,7 +79,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <button
             type="button"
             onClick={this.goHome}
-            className="w-full h-[48px] rounded-[8px] bg-white border border-[#DBDBDB] text-[#111827] font-semibold text-[14px]"
+            className="w-full h-[48px] rounded-[8px] bg-white border border-[#E5E7EB] text-[#111827] font-semibold text-[14px]"
           >
             {getCachedAccessToken() ? 'Go to Home' : 'Back to start'}
           </button>

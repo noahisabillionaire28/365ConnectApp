@@ -9,7 +9,6 @@ import { useLocation, useSearch } from 'wouter';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Sparkles, LayoutTemplate, ChevronRight } from 'lucide-react';
 import { getDraft, setDraft, resetDraft, getEditShiftId, setEditShiftId, loadDraftFromTemplate } from '@/store/postShiftStore';
-import { BottomTabNav } from '@/components/BottomTabNav';
 import { useRole } from '@/contexts/RoleContext';
 import { useToast } from '@/contexts/ToastContext';
 import { useTemplates, templateSummary, templateUsage } from '@/hooks/useTemplates';
@@ -83,7 +82,7 @@ export function PostShiftNameScreen() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[72px]">
+    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[calc(env(safe-area-inset-bottom)+112px)]">
       <div className="bg-white px-5 pt-[calc(env(safe-area-inset-top)+16px)] pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
         <div className="flex items-center gap-3 mb-4">
           <button
@@ -125,7 +124,7 @@ export function PostShiftNameScreen() {
               err ? 'border-[#EF4444]' : 'border-[#E5E7EB]'}`}
           />
           {err && <p className="text-[#EF4444] text-[11px] mt-1.5">{err}</p>}
-          <p className="text-[#737373] text-[11px] mt-1.5">{title.length}/80</p>
+          <p className="text-[#6B7280] text-[11px] mt-1.5">{title.length}/80</p>
         </div>
 
         <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider mt-6 mb-2 flex items-center gap-1.5">
@@ -169,7 +168,7 @@ export function PostShiftNameScreen() {
         )}
       </div>
 
-      <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-4 pt-4 bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4 bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
         <motion.button
           type="button" whileTap={{ scale: 0.97 }}
           onClick={handleContinue}
@@ -182,8 +181,6 @@ export function PostShiftNameScreen() {
           Continue
         </motion.button>
       </div>
-
-      <BottomTabNav />
     </div>
   );
 }

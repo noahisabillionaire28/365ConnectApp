@@ -20,7 +20,6 @@ import { usePostShift } from '@/hooks/usePostShift';
 import { usePostShiftSeries } from '@/hooks/useShiftSeries';
 import { useUpdateShift } from '@/hooks/useUpdateShift';
 import { useAuth } from '@/contexts/AuthContext';
-import { BottomTabNav } from '@/components/BottomTabNav';
 import { useToast } from '@/contexts/ToastContext';
 
 // ─── Wizard primitives ────────────────────────────────────────────────────────
@@ -214,7 +213,7 @@ export function PostShiftStep5Screen() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[72px]">
+    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[calc(env(safe-area-inset-bottom)+112px)]">
 
       {/* Header */}
       <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
@@ -374,7 +373,7 @@ export function PostShiftStep5Screen() {
       </div>
 
       {/* Fixed CTA */}
-      <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-4 pt-4
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4
         bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
         <motion.button
           type="button" whileTap={{ scale: 0.97 }}
@@ -402,8 +401,6 @@ export function PostShiftStep5Screen() {
           {isEditing ? 'Changes apply immediately' : isSeries ? `All ${shiftCount} shifts go live immediately` : 'Your shift goes live immediately'}
         </p>
       </div>
-
-      <BottomTabNav />
     </div>
   );
 }

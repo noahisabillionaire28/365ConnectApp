@@ -42,10 +42,10 @@ export function AddToCalendarSheet({ open, event, onClose }: {
             <div className="flex items-center justify-between mb-1">
               <p id={titleId} className="font-bold text-[16px] text-[#111827]">Add to calendar</p>
               <button type="button" onClick={onClose} aria-label="Close" className="w-11 h-11 -mr-3 flex items-center justify-center">
-                <X size={18} aria-hidden className="text-[#737373]" />
+                <X size={18} aria-hidden className="text-[#6B7280]" />
               </button>
             </div>
-            <p className="text-[#737373] text-[13px] mb-4 truncate">
+            <p className="text-[#6B7280] text-[13px] mb-4 truncate">
               {[event.jobType, event.companyName].filter(Boolean).join(' · ')} · reminder 2 hours before
             </p>
             <button type="button" onClick={() => void handleIcs()}

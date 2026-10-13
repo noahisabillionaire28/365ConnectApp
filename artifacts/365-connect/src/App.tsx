@@ -17,7 +17,7 @@ function RouteFallback() {
   }, []);
   return (
     <div className="min-h-[100dvh] bg-white flex items-center justify-center" aria-busy="true" aria-label="Loading">
-      {slow && <div className="w-7 h-7 rounded-full border-2 border-[#DBDBDB] border-t-[#0A1628] animate-spin" />}
+      {slow && <div className="w-7 h-7 rounded-full border-2 border-[#E5E7EB] border-t-[#0A1628] animate-spin" />}
     </div>
   );
 }
@@ -269,7 +269,7 @@ function AdminRouter() {
   return (
     <div
       className="min-h-[100dvh] bg-[#FAFAFA]"
-      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+      style={{ fontFamily: "'Space Grotesk Variable', 'Space Grotesk', system-ui, sans-serif" }}
     >
       {showNav && <Suspense fallback={null}><AdminNav /></Suspense>}
 

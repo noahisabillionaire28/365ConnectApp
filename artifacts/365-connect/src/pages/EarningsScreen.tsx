@@ -349,7 +349,7 @@ export function EarningsScreen() {
 
             <div className="mt-2 bg-[#F3F4F6] rounded-[10px] px-4 py-3">
               <div className="flex items-center gap-2">
-                <CreditCard size={13} aria-hidden className="text-[#737373]" />
+                <CreditCard size={13} aria-hidden className="text-[#6B7280]" />
                 <p className="text-[#6B7280] text-[11px]">
                   Subscription charges are simulated.
                 </p>

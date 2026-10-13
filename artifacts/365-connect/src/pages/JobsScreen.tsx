@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   Search, MapPin, Plus, X,
-  List as ListIcon, Map as MapIcon, CalendarDays, Clock, DollarSign, Users, CheckCircle2, Zap, BellPlus,
+  List as ListIcon, Map as MapIcon, CalendarDays, Clock, Users, CheckCircle2, Zap, BellPlus,
 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
 import { useSavedSearches, savedSearchLabel, sameSearch, type SavedSearch, type SavedSearchInput } from '@/hooks/useSavedSearches';
@@ -145,9 +145,8 @@ function ShiftRow({ shift, applied, showDistance, onTap }: {
             <Clock size={12} aria-hidden />{shift.startTime}
           </span>
         </div>
-        <div className="flex items-baseline gap-0.5">
-          <DollarSign size={14} aria-hidden className="text-[#111827] self-center" />
-          <span className="text-[#111827] font-bold text-[19px]">{shift.payRate}</span>
+        <div className="flex items-baseline">
+          <span className="text-[#111827] font-bold text-[19px]">${shift.payRate}</span>
           <span className="text-[#6B7280] text-[12px] font-medium">/{shift.payPeriod}</span>
         </div>
       </div>
@@ -158,9 +157,9 @@ function ShiftRow({ shift, applied, showDistance, onTap }: {
 function ShiftRowSkeleton() {
   return (
     <div className="rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-4 flex flex-col gap-3">
-      <div className="w-24 h-5 rounded-full bg-[#EFEFEF] animate-pulse" />
-      <div className="w-40 h-4 rounded bg-[#EFEFEF] animate-pulse" />
-      <div className="w-full h-4 rounded bg-[#EFEFEF] animate-pulse" />
+      <div className="w-24 h-5 rounded-full bg-[#F3F4F6] animate-pulse" />
+      <div className="w-40 h-4 rounded bg-[#F3F4F6] animate-pulse" />
+      <div className="w-full h-4 rounded bg-[#F3F4F6] animate-pulse" />
     </div>
   );
 }
@@ -294,8 +293,8 @@ function MapPane({ shifts, selectedId, userCoords, onPinClick, onOpenShift }: {
                     </div>
                     <p className="text-[#111827] font-bold text-[15px] truncate">{shiftHeadline(shift)}</p>
                     <p className="text-[#374151] text-[12px] font-medium truncate">{shift.companyName}</p>
-                    <p className="text-[#6B7280] text-[11px] truncate flex items-center gap-1">
-                      <MapPin size={10} aria-hidden />{shift.location}{userCoords ? ` · ${shift.distanceMiles} mi` : ''}
+                    <p className="text-[#6B7280] text-[11px] min-w-0 flex items-center gap-1">
+                      <MapPin size={10} aria-hidden className="flex-shrink-0" /><span className="truncate">{shift.location}{userCoords ? ` · ${shift.distanceMiles} mi` : ''}</span>
                     </p>
                     <p className="text-[#6B7280] text-[11px] truncate mt-0.5">{shift.date} · {shift.startTime}</p>
                   </div>
@@ -418,7 +417,7 @@ export function JobsScreen() {
       <div className="flex-shrink-0 bg-white border-b border-[#EAEAEA]">
         <div className="px-4 pt-4 pb-2 flex items-center gap-2">
           <div className="flex-1 min-w-0 flex items-center gap-2 bg-[#F5F5F5] border border-[#E5E7EB] rounded-[12px] px-3.5 h-[44px]">
-            <Search size={16} aria-hidden className="text-[#737373] flex-shrink-0" />
+            <Search size={16} aria-hidden className="text-[#6B7280] flex-shrink-0" />
             <input
               type="search"
               placeholder="Search shifts"
@@ -429,7 +428,7 @@ export function JobsScreen() {
             />
             {query && (
               <button type="button" aria-label="Clear search" onClick={() => setQuery('')}
-                className="text-[#737373] text-[13px]">✕</button>
+                className="text-[#6B7280] text-[13px]">✕</button>
             )}
           </div>
           <ViewToggle view={view} onChange={setView} />
@@ -442,7 +441,7 @@ export function JobsScreen() {
             onChange={(e) => { setEventTypeFilter(e.target.value || null); setSelectedId(null); }}
             aria-label="Filter by event type"
             className={`flex-shrink-0 h-10 px-3 rounded-full text-[12px] font-semibold outline-none whitespace-nowrap
-              ${eventTypeFilter ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
+              ${eventTypeFilter ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#E5E7EB]'}`}>
             <option value="">Event: All</option>
             {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
@@ -451,7 +450,7 @@ export function JobsScreen() {
             onChange={(e) => { setJobTypeFilter(e.target.value || null); setSelectedId(null); }}
             aria-label="Filter by job type"
             className={`flex-shrink-0 h-10 px-3 rounded-full text-[12px] font-semibold outline-none whitespace-nowrap
-              ${jobTypeFilter ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
+              ${jobTypeFilter ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#E5E7EB]'}`}>
             <option value="">Job Type: All</option>
             {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
@@ -463,7 +462,7 @@ export function JobsScreen() {
               <button key={pill.key} type="button" role="radio" aria-checked={active}
                 onClick={() => { setActiveFilter(pill.key); setSelectedId(null); }}
                 className={`flex-shrink-0 h-10 px-4 rounded-full text-[12px] font-semibold transition-all duration-150 whitespace-nowrap
-                  ${active ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
+                  ${active ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#E5E7EB]'}`}>
                 {pill.label}
               </button>
             );
@@ -498,8 +497,8 @@ export function JobsScreen() {
             ))}
 
             {!isLoading && visibleShifts.length === 0 && (
-              <div className="mt-6 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-                <p className="text-[#737373] text-[14px] font-medium">No shifts match this filter.</p>
+              <div className="mt-6 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-10 text-center">
+                <p className="text-[#6B7280] text-[14px] font-medium">No shifts match this filter.</p>
                 <p className="text-[#6B7280] text-[12px] mt-1">Try a different category or clear the search.</p>
               </div>
             )}

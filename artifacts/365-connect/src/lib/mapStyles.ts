@@ -2,16 +2,16 @@
 export const LIGHT_MAP_STYLES: google.maps.MapTypeStyle[] = [
   { elementType: 'geometry',              stylers: [{ color: '#f5f5f5' }] },
   { elementType: 'labels.icon',           stylers: [{ visibility: 'off' }] },
-  { elementType: 'labels.text.fill',      stylers: [{ color: '#737373' }] },
+  { elementType: 'labels.text.fill',      stylers: [{ color: '#6B7280' }] },
   { elementType: 'labels.text.stroke',    stylers: [{ color: '#f5f5f5' }] },
   { featureType: 'administrative',        elementType: 'geometry',            stylers: [{ color: '#e8e8e8' }] },
-  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#737373' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#6B7280' }] },
   { featureType: 'poi',                   stylers: [{ visibility: 'off' }] },
   { featureType: 'road',                 elementType: 'geometry',            stylers: [{ color: '#ffffff' }] },
   { featureType: 'road',                 elementType: 'geometry.stroke',     stylers: [{ color: '#e8e8e8' }] },
   { featureType: 'road',                 elementType: 'labels.text.fill',    stylers: [{ color: '#9e9e9e' }] },
   { featureType: 'road.highway',         elementType: 'geometry',            stylers: [{ color: '#dadada' }] },
-  { featureType: 'road.highway',         elementType: 'labels.text.fill',    stylers: [{ color: '#737373' }] },
+  { featureType: 'road.highway',         elementType: 'labels.text.fill',    stylers: [{ color: '#6B7280' }] },
   { featureType: 'transit',              stylers: [{ visibility: 'off' }] },
   { featureType: 'water',               elementType: 'geometry',            stylers: [{ color: '#c9c9c9' }] },
   { featureType: 'water',               elementType: 'labels.text.fill',    stylers: [{ color: '#9e9e9e' }] },
@@ -24,7 +24,7 @@ export function blackPinUrl(selected: boolean): string {
   const cx     = size / 2;
   const cy     = size / 2;
   const dotR   = selected ? 6 : 4.5;
-  const stroke = selected ? '#FFFFFF' : '#DBDBDB';
+  const stroke = selected ? '#FFFFFF' : '#E5E7EB';
   const sw     = selected ? 2.5 : 1.5;
   const svg = `<svg width="${size}" height="${height}" viewBox="0 0 ${size} ${height}"
     xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 2px 6px rgba(0,0,0,0.25))">

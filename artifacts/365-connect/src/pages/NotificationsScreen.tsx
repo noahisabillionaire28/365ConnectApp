@@ -10,7 +10,7 @@ import type { NotificationRow as NotificationRowType } from '@/lib/supabase';
 type IconColor = 'blue' | 'green' | 'red' | 'gold' | 'navy';
 
 const ICON_META: Record<string, { icon: React.ComponentType<{ size?: number; className?: string }>; color: IconColor }> = {
-  application_received:  { icon: MapPin,      color: 'blue'  },
+  application_received:  { icon: UserPlus,    color: 'blue'  },
   application_accepted:  { icon: CheckCheck,  color: 'green' },
   application_declined:  { icon: XCircle,     color: 'red'   },
   new_shift_match:       { icon: MapPin,      color: 'navy'  },
@@ -60,15 +60,15 @@ const ICON_META: Record<string, { icon: React.ComponentType<{ size?: number; cla
 };
 
 const COLOR_CLASSES: Record<IconColor, { bg: string; icon: string }> = {
-  blue:  { bg: 'bg-blue-50 border-blue-200',       icon: 'text-[#0095F6]' },
+  blue:  { bg: 'bg-[#EEF2F8] border-[#D6DEEA]',       icon: 'text-[#0A1628]' },
   green: { bg: 'bg-emerald-50 border-emerald-200', icon: 'text-emerald-600' },
   red:   { bg: 'bg-red-50 border-red-200',         icon: 'text-[#EF4444]' },
   gold:  { bg: 'bg-amber-50 border-amber-200',     icon: 'text-amber-500' },
-  navy:  { bg: 'bg-slate-50 border-[#DBDBDB]',     icon: 'text-[#0A1628]' },
+  navy:  { bg: 'bg-slate-50 border-[#E5E7EB]',     icon: 'text-[#0A1628]' },
 };
 
 function SystemAvatar({ type }: { type: string }) {
-  const meta   = ICON_META[type] ?? ICON_META.application_received;
+  const meta   = ICON_META[type] ?? { icon: Bell, color: 'navy' as IconColor };
   const styles = COLOR_CLASSES[meta.color];
   const Icon   = meta.icon;
   return (
@@ -88,7 +88,7 @@ function NotificationCard({ item, index, onOpen }: { item: NotificationRowType; 
     <button
       type="button" onClick={onOpen}
       style={{ animationDelay: `${Math.min(index * 40, 300)}ms` }}
-      className={`anim-rise-in w-full flex items-start gap-3 px-4 py-3.5 border-b border-[#DBDBDB] text-left transition-colors ${
+      className={`anim-rise-in w-full flex items-start gap-3 px-4 py-3.5 border-b border-[#E5E7EB] text-left transition-colors ${
         isUnread ? 'bg-[#F0F4FA]' : 'bg-white'
       }`}
       role="listitem" aria-label={item.title}
@@ -99,7 +99,7 @@ function NotificationCard({ item, index, onOpen }: { item: NotificationRowType; 
       <SystemAvatar type={item.type} />
       <div className="flex-1 min-w-0">
         <p className="text-black font-semibold text-[14px] leading-[1.4] break-words">{item.title}</p>
-        {item.body && <p className="text-[#737373] text-[13px] leading-[1.4] mt-0.5 break-words">{item.body}</p>}
+        {item.body && <p className="text-[#6B7280] text-[13px] leading-[1.4] mt-0.5 break-words">{item.body}</p>}
         {item.type === 'payment_received' && item.amount != null && (
           <p className="text-emerald-600 font-bold text-[14px] mt-1">{formatUsd(item.amount)}</p>
         )}
@@ -114,7 +114,7 @@ function SectionHeader({ label, showMarkRead, onMarkRead }: {
 }) {
   return (
     <div className="flex items-center justify-between px-4 pt-5 pb-2">
-      <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em]">{label}</p>
+      <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em]">{label}</p>
       {showMarkRead && (
         <button type="button" aria-label="Mark all notifications as read" onClick={onMarkRead}
           className="min-h-10 px-2 -mr-2 -my-2 flex items-center text-[#0A1628] text-[12px] font-semibold active:opacity-60 transition-opacity">
@@ -129,11 +129,11 @@ function NotificationsSkeleton() {
   return (
     <div className="flex flex-col gap-0" aria-hidden>
       {[1, 2, 3, 4].map((n) => (
-        <div key={n} className="flex items-start gap-3 px-4 py-3.5 border-b border-[#DBDBDB]">
-          <div className="w-11 h-11 rounded-full bg-[#EFEFEF] animate-pulse flex-shrink-0" />
+        <div key={n} className="flex items-start gap-3 px-4 py-3.5 border-b border-[#E5E7EB]">
+          <div className="w-11 h-11 rounded-full bg-[#F3F4F6] animate-pulse flex-shrink-0" />
           <div className="flex-1 flex flex-col gap-2 pt-1">
-            <div className="w-3/4 h-3.5 rounded bg-[#EFEFEF] animate-pulse" />
-            <div className="w-1/3 h-3 rounded bg-[#EFEFEF] animate-pulse" />
+            <div className="w-3/4 h-3.5 rounded bg-[#F3F4F6] animate-pulse" />
+            <div className="w-1/3 h-3 rounded bg-[#F3F4F6] animate-pulse" />
           </div>
         </div>
       ))}
@@ -162,7 +162,7 @@ export function NotificationsScreen() {
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
       {/* Header */}
-      <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 border-b border-[#DBDBDB] bg-white">
+      <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 border-b border-[#E5E7EB] bg-white">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-black font-bold text-[22px] tracking-tight">Notifications</h1>
@@ -175,8 +175,8 @@ export function NotificationsScreen() {
           </div>
           <button type="button" aria-label="Notification settings"
             onClick={() => navigate('/notification-settings')}
-            className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center active:opacity-60 transition-opacity">
-            <Settings size={15} aria-hidden className="text-[#737373]" />
+            className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center active:opacity-60 transition-opacity">
+            <Settings size={15} aria-hidden className="text-[#6B7280]" />
           </button>
         </div>
       </div>
@@ -187,11 +187,11 @@ export function NotificationsScreen() {
           <NotificationsSkeleton />
         ) : items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 py-20 text-center">
-            <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
-              <Bell size={26} aria-hidden className="text-[#737373]" />
+            <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
+              <Bell size={26} aria-hidden className="text-[#6B7280]" />
             </div>
             <p className="text-black font-semibold text-[16px]">No notifications yet</p>
-            <p className="text-[#737373] text-[13px]">
+            <p className="text-[#6B7280] text-[13px]">
               You'll see updates here about applications, payments, reviews and more.
             </p>
           </div>

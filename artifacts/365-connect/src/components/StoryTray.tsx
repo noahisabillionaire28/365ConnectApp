@@ -19,20 +19,20 @@ function Ring({ group, onTap }: { group: StoryGroup; onTap: () => void }) {
       <span
         className={`w-[64px] h-[64px] rounded-full p-[2.5px] flex items-center justify-center ${
           group.has_unseen
-            ? 'bg-gradient-to-tr from-[#F58529] via-[#DD2A7B] to-[#8134AF]'
-            : 'bg-[#DBDBDB]'
+            ? 'bg-gradient-to-tr from-[#0A1628] via-[#1E3A5F] to-[#D4A017]'
+            : 'bg-[#E5E7EB]'
         }`}>
         <span className="w-full h-full rounded-full bg-white p-[2px] flex items-center justify-center overflow-hidden">
           {group.photo_url ? (
             <img src={group.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
           ) : (
-            <span className="w-full h-full rounded-full bg-[#EFEFEF] flex items-center justify-center text-[#6B7280] font-bold text-[15px]">
+            <span className="w-full h-full rounded-full bg-[#F3F4F6] flex items-center justify-center text-[#6B7280] font-bold text-[15px]">
               {initials}
             </span>
           )}
         </span>
       </span>
-      <span className="text-[11px] text-[#262626] font-medium truncate max-w-[64px]">
+      <span className="text-[11px] text-[#111827] font-medium truncate max-w-[64px]">
         {group.is_me ? 'Your story' : group.username}
       </span>
     </button>
@@ -89,7 +89,7 @@ export function StoryTray() {
 
   return (
     <>
-      <div className="flex gap-1 px-3 py-3 overflow-x-auto scrollbar-none border-b border-[#EFEFEF]"
+      <div className="flex gap-1 px-3 py-3 overflow-x-auto scrollbar-none border-b border-[#F3F4F6]"
         style={{ WebkitOverflowScrolling: 'touch' }}>
         {/* Your story — add tile */}
         {(canPostStory || myGroup) && (
@@ -99,22 +99,22 @@ export function StoryTray() {
             className="relative w-[64px] h-[64px] rounded-full">
             <span className={`w-[64px] h-[64px] rounded-full p-[2.5px] flex items-center justify-center ${
               myGroup?.has_unseen
-                ? 'bg-gradient-to-tr from-[#F58529] via-[#DD2A7B] to-[#8134AF]'
-                : 'bg-[#DBDBDB]'
+                ? 'bg-gradient-to-tr from-[#0A1628] via-[#1E3A5F] to-[#D4A017]'
+                : 'bg-[#E5E7EB]'
             }`}>
               <span className="w-full h-full rounded-full bg-white p-[2px] flex items-center justify-center overflow-hidden">
                 {myAvatar ? (
                   <img src={myAvatar} alt="" className="w-full h-full rounded-full object-cover" />
                 ) : (
-                  <span className="w-full h-full rounded-full bg-[#EFEFEF]" />
+                  <span className="w-full h-full rounded-full bg-[#F3F4F6]" />
                 )}
               </span>
             </span>
-            <span className="absolute bottom-0 right-0 w-[20px] h-[20px] rounded-full bg-[#0095F6] border-2 border-white flex items-center justify-center">
+            <span className="absolute bottom-0 right-0 w-[20px] h-[20px] rounded-full bg-[#0A1628] border-2 border-white flex items-center justify-center">
               <Plus size={12} className="text-white" strokeWidth={3} />
             </span>
           </button>
-          <span className="text-[11px] text-[#262626] font-medium">
+          <span className="text-[11px] text-[#111827] font-medium">
             {uploading ? 'Posting…' : 'Your story'}
           </span>
         </div>

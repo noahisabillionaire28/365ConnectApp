@@ -37,7 +37,7 @@ function StatusChip({ status }: { status: string }) {
 /* ── Skeleton ────────────────────────────────────────────────────────────── */
 function SkeletonRow() {
   return (
-    <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#DBDBDB] animate-pulse">
+    <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#E5E7EB] animate-pulse">
       <div className="w-10 h-10 rounded-full bg-[#E5E7EB] flex-shrink-0" />
       <div className="flex-1 flex flex-col gap-1.5">
         <div className="h-3 w-28 bg-[#E5E7EB] rounded-full" />
@@ -50,7 +50,7 @@ function SkeletonRow() {
 
 function SkeletonStat() {
   return (
-    <div className="bg-white border border-[#DBDBDB] rounded-[12px] p-4 flex flex-col gap-2 animate-pulse">
+    <div className="bg-white border border-[#E5E7EB] rounded-[12px] p-4 flex flex-col gap-2 animate-pulse">
       <div className="h-2.5 w-20 bg-[#E5E7EB] rounded-full" />
       <div className="h-7 w-24 bg-[#E5E7EB] rounded-[6px]" />
       <div className="h-2.5 w-16 bg-[#E5E7EB] rounded-full" />
@@ -63,7 +63,7 @@ function PaymentRow({ payment }: { payment: AdminPaymentRow }) {
   const isSubscription = payment.payment_type === 'pro_subscription';
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-      className="flex items-center gap-3 px-4 py-3.5 border-b border-[#DBDBDB] last:border-none"
+      className="flex items-center gap-3 px-4 py-3.5 border-b border-[#E5E7EB] last:border-none"
     >
       <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
         isSubscription ? 'bg-[#FFD700]/15 border border-[#FFD700]/30' : 'bg-emerald-50 border border-emerald-200'
@@ -77,7 +77,7 @@ function PaymentRow({ payment }: { payment: AdminPaymentRow }) {
         <p className="text-black font-semibold text-[13px] truncate">
           {isSubscription ? 'Pro Subscription' : 'Shift Earnings'}
         </p>
-        <p className="text-[#737373] text-[11px] mt-0.5">
+        <p className="text-[#6B7280] text-[11px] mt-0.5">
           {fmtDate(payment.created_at)}
           {payment.fee > 0 && ` · ${fmtUsd(payment.fee)} fee`}
         </p>
@@ -132,7 +132,7 @@ export function AdminRevenue() {
 
       <div className="px-4 pt-6 pb-4">
         <h1 className="text-black font-bold text-[22px] tracking-tight">Revenue</h1>
-        <p className="text-[#737373] text-[13px] mt-0.5">Platform earnings and payment history</p>
+        <p className="text-[#6B7280] text-[13px] mt-0.5">Platform earnings and payment history</p>
       </div>
 
       {/* Summary cards */}
@@ -142,22 +142,22 @@ export function AdminRevenue() {
         ) : (
           <>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              className="bg-white border border-[#DBDBDB] rounded-[12px] p-4">
-              <p className="text-[#737373] text-[10px] font-bold uppercase tracking-wider mb-1">Gross Revenue</p>
+              className="bg-white border border-[#E5E7EB] rounded-[12px] p-4">
+              <p className="text-[#6B7280] text-[10px] font-bold uppercase tracking-wider mb-1">Gross Revenue</p>
               <p className="text-black font-bold text-[22px]">{fmtUsd(stats.totalRevenue)}</p>
-              <p className="text-[#737373] text-[11px] mt-0.5">completed shift payments</p>
+              <p className="text-[#6B7280] text-[11px] mt-0.5">completed shift payments</p>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-              className="bg-white border border-[#DBDBDB] rounded-[12px] p-4">
-              <p className="text-[#737373] text-[10px] font-bold uppercase tracking-wider mb-1">Platform Fees</p>
+              className="bg-white border border-[#E5E7EB] rounded-[12px] p-4">
+              <p className="text-[#6B7280] text-[10px] font-bold uppercase tracking-wider mb-1">Platform Fees</p>
               <p className="text-[#10B981] font-bold text-[22px]">{fmtUsd(stats.platformFeeRev)}</p>
-              <p className="text-[#737373] text-[11px] mt-0.5">8% of gross</p>
+              <p className="text-[#6B7280] text-[11px] mt-0.5">8% of gross</p>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-              className="col-span-2 bg-white border border-[#DBDBDB] rounded-[12px] p-4 flex items-center gap-3">
+              className="col-span-2 bg-white border border-[#E5E7EB] rounded-[12px] p-4 flex items-center gap-3">
               <TrendingUp size={20} aria-hidden className="text-black flex-shrink-0" />
               <div>
-                <p className="text-[#737373] text-[10px] font-bold uppercase tracking-wider">Total Transactions</p>
+                <p className="text-[#6B7280] text-[10px] font-bold uppercase tracking-wider">Total Transactions</p>
                 <p className="text-black font-bold text-[18px] mt-0.5">{payments.length}</p>
               </div>
             </motion.div>
@@ -171,7 +171,7 @@ export function AdminRevenue() {
           <button key={key} type="button" aria-pressed={filter === key}
             onClick={() => setFilter(key)}
             className={`flex-shrink-0 h-10 px-3.5 rounded-full text-[12px] font-semibold border transition-all ${
-              filter === key ? 'bg-black text-white border-black' : 'bg-white border-[#DBDBDB] text-[#737373]'
+              filter === key ? 'bg-black text-white border-black' : 'bg-white border-[#E5E7EB] text-[#6B7280]'
             }`}>
             {label}
           </button>
@@ -179,13 +179,13 @@ export function AdminRevenue() {
       </div>
 
       {/* List */}
-      <div className="flex-1 bg-white border-t border-[#DBDBDB]" role="list" aria-label="Payment list">
+      <div className="flex-1 bg-white border-t border-[#E5E7EB]" role="list" aria-label="Payment list">
         {isLoading && Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)}
 
         {isError && (
           <div className="flex flex-col items-center justify-center py-20 gap-3 px-8">
             <AlertCircle size={32} aria-hidden className="text-red-400" />
-            <p className="text-[#737373] text-[14px] text-center">Could not load payments.</p>
+            <p className="text-[#6B7280] text-[14px] text-center">Could not load payments.</p>
           </div>
         )}
 
@@ -202,7 +202,7 @@ export function AdminRevenue() {
 
         {!isLoading && !isError && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 gap-2">
-            <DollarSign size={32} aria-hidden className="text-[#DBDBDB]" />
+            <DollarSign size={32} aria-hidden className="text-[#E5E7EB]" />
             <p className="text-[#6B7280] text-[14px]">No payments recorded yet.</p>
           </div>
         )}

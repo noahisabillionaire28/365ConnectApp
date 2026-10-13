@@ -10,7 +10,7 @@ summarises the attribution-bearing items; this file is the full list. Audited
 
 | Asset | Source | Licence | Obligation | Status |
 | --- | --- | --- | --- | --- |
-| Space Grotesk typeface | Florian Karsten, served from Google Fonts | SIL Open Font License 1.1 | None for web use; attribution is customary | Credited in the footer |
+| Space Grotesk typeface | Florian Karsten, bundled with the app (@fontsource-variable/space-grotesk) | SIL Open Font License 1.1 | None for web use; attribution is customary | Credited in the footer |
 | Icons | [Lucide](https://lucide.dev) (`lucide-react`) | ISC | Keep the copyright notice in the bundle (the library does this) | Credited in the footer |
 | Default shift cover photos (`COVER_FALLBACKS` in `src/lib/supabase.ts`) | Unsplash, all 11 URLs on `images.unsplash.com` | [Unsplash License](https://unsplash.com/license): free for commercial use, no attribution required, no compiling into a competing stock service | None | Credited anyway in the footer |
 | Map tiles (Leaflet fallback map) | CARTO "Voyager" basemap over OpenStreetMap data | CARTO basemaps are free for non-commercial and low-volume use with attribution; OSM data is ODbL | "© OpenStreetMap © CARTO" must stay visible on the map | Shown on the map (`TILE_ATTR` in `LeafletMap.tsx`) and in the footer. **Owner:** confirm volume stays within CARTO's free tier or move to a paid plan |

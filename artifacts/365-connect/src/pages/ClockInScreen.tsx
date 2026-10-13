@@ -53,17 +53,17 @@ function GeoCheckScreen() {
         <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.35, 0.1, 0.35] }}
           transition={{ repeat: Infinity, duration: 2, ease: 'easeOut', delay: 0.3 }}
           className="absolute w-16 h-16 rounded-full bg-black/10" />
-        <div className="w-14 h-14 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center relative z-10">
+        <div className="w-14 h-14 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center relative z-10">
           <MapPin size={24} aria-hidden className="text-black" />
         </div>
       </div>
 
-      <div className="w-7 h-7 rounded-full border-[2.5px] border-[#DBDBDB] border-t-[#0A1628] animate-spin"
+      <div className="w-7 h-7 rounded-full border-[2.5px] border-[#E5E7EB] border-t-[#0A1628] animate-spin"
         role="status" aria-label="Verifying location" />
 
       <div className="text-center">
         <p className="text-black font-semibold text-[18px]">Verifying location…</p>
-        <p className="text-[#737373] text-[13px] mt-1.5">Checking your distance from the venue</p>
+        <p className="text-[#6B7280] text-[13px] mt-1.5">Checking your distance from the venue</p>
       </div>
     </motion.div>
   );
@@ -85,7 +85,7 @@ function GeoSuccessScreen({ locationLabel }: { locationLabel: string }) {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.18 }} className="text-center">
         <p className="text-[#10B981] font-bold text-[26px]">You're on-site!</p>
-        <p className="text-[#737373] text-[15px] mt-1.5">Clock in confirmed</p>
+        <p className="text-[#6B7280] text-[15px] mt-1.5">Clock in confirmed</p>
       </motion.div>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
@@ -124,12 +124,12 @@ function GeoFailScreen({ reason, distance, message, shiftLocation, onRetry, onCo
 
       <div>
         <p className="text-[#EF4444] font-bold text-[22px]">{copy.title}</p>
-        <p className="text-[#737373] text-[14px] mt-2 leading-relaxed">{copy.body}</p>
+        <p className="text-[#6B7280] text-[14px] mt-2 leading-relaxed">{copy.body}</p>
       </div>
 
-      <div className="w-full bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-4 text-left flex flex-col gap-4">
+      <div className="w-full bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-4 py-4 text-left flex flex-col gap-4">
         <div>
-          <p className="text-[#737373] text-[11px] font-semibold uppercase tracking-widest mb-1">Required</p>
+          <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-widest mb-1">Required</p>
           <div className="flex items-center gap-2">
             <MapPin size={13} aria-hidden className="text-[#10B981] flex-shrink-0" />
             <p className="text-black text-[14px] font-medium">{shiftLocation}</p>
@@ -137,7 +137,7 @@ function GeoFailScreen({ reason, distance, message, shiftLocation, onRetry, onCo
         </div>
         {reason === 'too-far' && distance !== null && (
           <div>
-            <p className="text-[#737373] text-[11px] font-semibold uppercase tracking-widest mb-1">Your distance</p>
+            <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-widest mb-1">Your distance</p>
             <div className="flex items-center gap-2">
               <MapPin size={13} aria-hidden className="text-[#EF4444] flex-shrink-0" />
               <p className="text-[#EF4444] text-[14px] font-medium">{distance.toFixed(1)} mi away</p>
@@ -149,11 +149,11 @@ function GeoFailScreen({ reason, distance, message, shiftLocation, onRetry, onCo
       <div className="w-full flex flex-col gap-3 mt-2">
         <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={onRetry}
           aria-label="Try location check again"
-          className="w-full h-[52px] rounded-[8px] bg-white border border-[#DBDBDB] text-black font-semibold text-[15px]">
+          className="w-full h-[52px] rounded-[8px] bg-white border border-[#E5E7EB] text-black font-semibold text-[15px]">
           Try Again
         </motion.button>
         <button type="button" aria-label="Message your shift manager" onClick={onContact} disabled={contacting}
-          className="min-h-10 px-3 flex items-center justify-center text-[#737373] text-[13px] underline underline-offset-2 active:text-black disabled:opacity-50">
+          className="min-h-10 px-3 flex items-center justify-center text-[#6B7280] text-[13px] underline underline-offset-2 active:text-black disabled:opacity-50">
           {contacting ? 'Opening chat…' : 'Contact shift manager'}
         </button>
       </div>
@@ -175,7 +175,7 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
 
       {/* Shift info header */}
       <div className="pt-[72px] px-6 text-center">
-        <p className="text-[#737373] text-[12px] font-semibold uppercase tracking-widest mb-1">
+        <p className="text-[#6B7280] text-[12px] font-semibold uppercase tracking-widest mb-1">
           {shift.jobType}
         </p>
         <p className="text-black font-bold text-[20px] leading-tight">{shiftHeadline(shift)}</p>
@@ -188,7 +188,7 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
         {isBreak ? (
           <div className="flex flex-col items-center gap-8 relative z-10">
             <div className="text-center opacity-35" aria-label={`Shift time: ${fmtHMS(shiftSecs)}`}>
-              <p className="text-[#737373] text-[10px] font-semibold uppercase tracking-[0.18em] mb-1.5">
+              <p className="text-[#6B7280] text-[10px] font-semibold uppercase tracking-[0.18em] mb-1.5">
                 Shift Time
               </p>
               <p className="text-black font-bold tabular-nums leading-none" style={{ fontSize: 44 }}>
@@ -197,10 +197,10 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
             </div>
 
             <div className="text-center" aria-live="polite" aria-label={`Break time: ${fmtHMS(breakSecs)}`}>
-              <p className="text-[#0095F6] text-[11px] font-semibold uppercase tracking-[0.18em] mb-2">
+              <p className="text-[#0A1628] text-[11px] font-semibold uppercase tracking-[0.18em] mb-2">
                 Break Time
               </p>
-              <p className="font-bold tabular-nums leading-none text-[#0095F6]" style={{ fontSize: 72 }}>
+              <p className="font-bold tabular-nums leading-none text-[#0A1628]" style={{ fontSize: 72 }}>
                 {fmtHMS(breakSecs)}
               </p>
             </div>
@@ -223,9 +223,9 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
           isBreak ? 'bg-blue-50 border-blue-200' : 'bg-emerald-50 border-emerald-200'
         }`} aria-label={isBreak ? 'Status: On Break' : 'Status: On Shift'}>
           <motion.div animate={{ opacity: [1, 0.25, 1] }} transition={{ repeat: Infinity, duration: 1.6 }}
-            className={`w-2 h-2 rounded-full flex-shrink-0 ${isBreak ? 'bg-[#0095F6]' : 'bg-[#10B981]'}`} />
+            className={`w-2 h-2 rounded-full flex-shrink-0 ${isBreak ? 'bg-[#0A1628]' : 'bg-[#10B981]'}`} />
           <span className={`text-[13px] font-bold uppercase tracking-[0.14em] ${
-            isBreak ? 'text-[#0095F6]' : 'text-[#10B981]'
+            isBreak ? 'text-[#0A1628]' : 'text-[#10B981]'
           }`}>
             {isBreak ? 'On Break' : 'On Shift'}
           </span>
@@ -245,8 +245,8 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
           <>
             <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={onTakeBreak}
               aria-label="Take a break"
-              className="w-full h-[52px] rounded-[8px] bg-white border border-[#DBDBDB] text-black font-semibold text-[15px] flex items-center justify-center gap-2.5">
-              <Coffee size={17} aria-hidden className="text-[#737373]" />
+              className="w-full h-[52px] rounded-[8px] bg-white border border-[#E5E7EB] text-black font-semibold text-[15px] flex items-center justify-center gap-2.5">
+              <Coffee size={17} aria-hidden className="text-[#6B7280]" />
               Take Break
             </motion.button>
             <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={onEndShift}
@@ -274,10 +274,10 @@ function ConfirmEndOverlay({ companyName, onConfirm, onCancel }: {
       <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', stiffness: 360, damping: 36 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-app bg-white border-t border-[#DBDBDB] rounded-t-[24px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+40px)]">
-        <div aria-hidden className="w-10 h-1 rounded-full bg-[#DBDBDB] mx-auto mb-6" />
+        className="w-full max-w-app bg-white border-t border-[#E5E7EB] rounded-t-[24px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+40px)]">
+        <div aria-hidden className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-6" />
         <h2 className="text-black font-bold text-[22px] mb-2">End your shift?</h2>
-        <p className="text-[#737373] text-[14px] mb-7 leading-relaxed">
+        <p className="text-[#6B7280] text-[14px] mb-7 leading-relaxed">
           Your timesheet will be submitted to{' '}
           <span className="text-black font-medium">{companyName}</span> and your pay will be calculated.
         </p>
@@ -287,7 +287,7 @@ function ConfirmEndOverlay({ companyName, onConfirm, onCancel }: {
           End Shift
         </motion.button>
         <button type="button" aria-label="Cancel and continue working" onClick={onCancel}
-          className="w-full h-[44px] text-[#737373] font-medium text-[15px]">
+          className="w-full h-[44px] text-[#6B7280] font-medium text-[15px]">
           Continue working
         </button>
       </motion.div>
@@ -314,10 +314,10 @@ function TransferScreen({ netPay, onDone }: { netPay: number; onDone: () => void
       </motion.div>
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
         className="text-center">
-        <p className="text-[#737373] text-[13px] font-semibold uppercase tracking-widest mb-1.5">Sending instant transfer</p>
+        <p className="text-[#6B7280] text-[13px] font-semibold uppercase tracking-widest mb-1.5">Sending instant transfer</p>
         <p className="text-[#10B981] font-bold" style={{ fontSize: 40 }}>{fmtMoney(netPay)}</p>
       </motion.div>
-      <div className="w-6 h-6 rounded-full border-2 border-[#DBDBDB] border-t-[#10B981] animate-spin" role="status" aria-label="Processing transfer" />
+      <div className="w-6 h-6 rounded-full border-2 border-[#E5E7EB] border-t-[#10B981] animate-spin" role="status" aria-label="Processing transfer" />
     </motion.div>
   );
 }
@@ -328,7 +328,7 @@ function SummaryRow({ label, value, valueClass = 'text-black', small = false, bo
 }) {
   return (
     <div className="flex items-center justify-between">
-      <p className={`text-[#737373] ${small ? 'text-[12px]' : 'text-[14px]'}`}>{label}</p>
+      <p className={`text-[#6B7280] ${small ? 'text-[12px]' : 'text-[14px]'}`}>{label}</p>
       <p className={`${bold ? 'font-bold' : 'font-medium'} ${small ? 'text-[13px]' : 'text-[15px]'} ${valueClass}`}>
         {value}
       </p>
@@ -353,24 +353,24 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
           <CheckCircle2 size={38} aria-hidden className="text-[#10B981]" />
         </motion.div>
         <h1 className="text-black font-bold text-[28px] tracking-tight">Shift Complete</h1>
-        <p className="text-[#737373] text-[14px] mt-1.5 font-medium">
+        <p className="text-[#6B7280] text-[14px] mt-1.5 font-medium">
           {shift.jobType} · {shift.companyName}
         </p>
       </div>
 
       {/* Summary card */}
-      <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[16px] px-5 py-5 mb-5">
-        <p className="text-[#737373] text-[10px] font-bold uppercase tracking-[0.2em] mb-4">Shift Summary</p>
+      <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[16px] px-5 py-5 mb-5">
+        <p className="text-[#6B7280] text-[10px] font-bold uppercase tracking-[0.2em] mb-4">Shift Summary</p>
 
-        <div className="flex flex-col gap-3.5 pb-4 border-b border-[#DBDBDB]">
+        <div className="flex flex-col gap-3.5 pb-4 border-b border-[#E5E7EB]">
           <SummaryRow label="Total time on clock" value={fmtHM(shiftSecs)} />
           <SummaryRow label="Break deducted" value={breakSecs > 0 ? `−${fmtHM(breakSecs)}` : '—'}
-            valueClass="text-[#737373]" />
+            valueClass="text-[#6B7280]" />
           <SummaryRow label="Hours billed" value={fmtHM(billedSecs)} bold />
         </div>
 
         <div className="flex flex-col gap-3.5 pt-4">
-          <div className="flex items-center justify-between mt-1 pt-4 border-t border-[#DBDBDB]">
+          <div className="flex items-center justify-between mt-1 pt-4 border-t border-[#E5E7EB]">
             <div>
               <p className="text-black font-bold text-[16px]">Estimated pay</p>
               <p className="text-[#6B7280] text-[11px]">Final after manager approval · 365 Connect deducts no fee</p>
@@ -399,7 +399,7 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
         Rate this Shift
       </motion.button>
       <button type="button" onClick={onDone} aria-label="Back to your schedule"
-        className="w-full h-[44px] mt-2 text-[#737373] font-semibold text-[14px]">
+        className="w-full h-[44px] mt-2 text-[#6B7280] font-semibold text-[14px]">
         Done — back to Schedule
       </button>
     </motion.div>
@@ -416,7 +416,7 @@ function AlreadyDoneScreen({ shift, netPay, onDone }: { shift: MockShift; netPay
       </div>
       <div>
         <p className="text-black font-bold text-[20px]">This shift is already complete</p>
-        <p className="text-[#737373] text-[14px] mt-2">
+        <p className="text-[#6B7280] text-[14px] mt-2">
           You clocked out of {shift.companyName}{netPay !== null ? ` · net pay ${fmtMoney(netPay)}` : ''}.
         </p>
       </div>
@@ -438,13 +438,13 @@ function EndShiftErrorScreen({ message, onRetry, onBack }: { message: string | n
       </div>
       <div>
         <p className="text-black font-bold text-[20px]">We hit a snag</p>
-        <p className="text-[#737373] text-[14px] mt-2">{message ?? 'Something went wrong ending your shift.'}</p>
+        <p className="text-[#6B7280] text-[14px] mt-2">{message ?? 'Something went wrong ending your shift.'}</p>
       </div>
       <button type="button" onClick={onRetry}
         className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px]">
         Try Again
       </button>
-      <button type="button" onClick={onBack} className="text-[#0095F6] font-semibold text-[14px]">
+      <button type="button" onClick={onBack} className="text-[#0A1628] font-semibold text-[14px]">
         Back to Shift
       </button>
     </motion.div>
@@ -691,7 +691,7 @@ export function ClockInScreen() {
   if (isLoading) {
     return (
       <div className="min-h-[100dvh] bg-white flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-[#DBDBDB] border-t-[#0A1628] animate-spin"
+        <div className="w-8 h-8 rounded-full border-2 border-[#E5E7EB] border-t-[#0A1628] animate-spin"
           role="status" aria-label="Loading shift" />
       </div>
     );
@@ -700,10 +700,10 @@ export function ClockInScreen() {
   if (error || !shift) {
     return (
       <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center gap-4">
-        <p className="text-[#737373] text-[15px]">{error ? "Couldn't load this shift." : 'Shift not found.'}</p>
+        <p className="text-[#6B7280] text-[15px]">{error ? "Couldn't load this shift." : 'Shift not found.'}</p>
         <button type="button"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate(`/shift/${id ?? ''}`); }}
-          className="text-[#0095F6] font-semibold text-[14px]">← Go back</button>
+          className="text-[#0A1628] font-semibold text-[14px]">← Go back</button>
       </div>
     );
   }
@@ -717,7 +717,7 @@ export function ClockInScreen() {
           <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             type="button" aria-label="Go back to shift details"
             onClick={() => navigate(`/shift/${shift.id}`)}
-            className="absolute top-5 left-4 w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center z-20">
+            className="absolute top-5 left-4 w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center z-20">
             <ChevronLeft size={18} aria-hidden className="text-black" />
           </motion.button>
         )}

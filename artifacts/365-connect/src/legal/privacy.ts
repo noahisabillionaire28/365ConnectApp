@@ -105,7 +105,7 @@ export const PRIVACY: LegalDocument = {
         `Stripe: payment processing and subscription billing, where enabled.`,
         `Anthropic: automated-matching processor, receiving the non-identifying signals described in Section 5.`,
         `Apple: push notifications to iOS devices and Safari, and Apple Maps map rendering; Apple may receive device tokens and the map areas requested.`,
-        `Google: web fonts served from Google Fonts, which receive your IP address when fonts load; and, if you enable web push in Chrome or Edge, delivery of those notifications through Google's push service, which receives your push endpoint and an encrypted payload it cannot read.`,
+        `Google: if you enable web push in Chrome or Edge, delivery of those notifications through Google's push service, which receives your push endpoint and an encrypted payload it cannot read.`,
         `Mozilla: delivery of web push notifications you enable in Firefox, on the same terms.`,
         `OpenStreetMap contributors and CARTO: map tiles, which receive the map areas requested and your IP address.`,
         `Nominatim (OpenStreetMap Foundation): address search when you type a venue or profile address; it receives the address text and your IP address.`,

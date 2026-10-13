@@ -38,7 +38,7 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
   }
 
   return (
-    <article className="bg-white border-b border-[#EFEFEF]">
+    <article className="bg-white border-b border-[#F3F4F6]">
       <div className="flex items-center gap-2.5 px-4 py-3">
         <button type="button" onClick={goAuthor}
           className="w-10 h-10 rounded-full overflow-hidden bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">

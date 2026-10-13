@@ -76,7 +76,7 @@ export function PostScreen() {
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
-      <div className="sticky top-0 z-20 bg-white border-b border-[#EFEFEF] px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
+      <div className="sticky top-0 z-20 bg-white border-b border-[#F3F4F6] px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
         <button type="button" aria-label="Back"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/explore'); }}
           className="w-10 h-10 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
@@ -88,7 +88,7 @@ export function PostScreen() {
       <div className="flex-1 overflow-y-auto pb-[76px]">
         {isLoading && <div className="h-[380px] bg-[#FAFAFA] animate-pulse" />}
         {!isLoading && !post && (
-          <p className="text-center text-[#737373] text-[14px] py-20">This post is no longer available.</p>
+          <p className="text-center text-[#6B7280] text-[14px] py-20">This post is no longer available.</p>
         )}
         {post && (
           <PostCard post={post} onLike={(id) => toggleLike.mutate(id)}
@@ -115,7 +115,7 @@ export function PostScreen() {
       </div>
 
       {/* Composer */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app bg-white border-t border-[#EFEFEF] px-3 py-2.5 flex items-center gap-2">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app bg-white border-t border-[#F3F4F6] px-3 py-2.5 flex items-center gap-2">
         <input
           type="text"
           value={text}

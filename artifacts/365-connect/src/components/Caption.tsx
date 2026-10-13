@@ -15,9 +15,10 @@ export function Caption({ text, author }: { text: string; author?: string | null
       {author && (
         <button type="button" className="font-semibold"
           onClick={(e) => { e.stopPropagation(); navigate(`/worker/${author}`); }}>
-          @{author}{' '}
+          @{author}
         </button>
       )}
+      {author && ' '}
       {parts.map((p, i) => {
         if (p.startsWith('#') && p.length > 1) {
           return (

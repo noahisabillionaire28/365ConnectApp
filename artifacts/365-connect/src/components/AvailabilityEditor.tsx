@@ -80,7 +80,7 @@ export function AvailabilityEditor({
               onClick={() => toggleDay(key)}
               data-testid={`day-chip-${key}`}
               className={`h-11 rounded-[10px] border text-[14px] font-bold flex items-center justify-center transition-colors disabled:cursor-not-allowed ${
-                on ? 'bg-[#0A1628] border-[#0A1628] text-white' : 'bg-white border-[#DBDBDB] text-[#111827]'
+                on ? 'bg-[#0A1628] border-[#0A1628] text-white' : 'bg-white border-[#E5E7EB] text-[#111827]'
               }`}>
               {on ? <span className="flex items-center gap-0.5">{short}<Check size={11} aria-hidden strokeWidth={3} /></span> : short}
             </button>

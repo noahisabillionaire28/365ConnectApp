@@ -9,7 +9,6 @@ import { ChevronLeft, Check } from 'lucide-react';
 import { JOB_TEMPLATES } from '@/data/postShiftTemplates';
 import { getDraft, setDraft, initDraftLocation } from '@/store/postShiftStore';
 import { useProfile } from '@/hooks/useProfile';
-import { BottomTabNav } from '@/components/BottomTabNav';
 
 // ─── Shared wizard primitives ─────────────────────────────────────────────────
 function StepBar({ current, total }: { current: number; total: number }) {
@@ -41,7 +40,7 @@ function JobTile({
       onClick={onToggle}
       aria-label={`${selected ? 'Deselect' : 'Select'} ${label}`}
       aria-pressed={selected}
-      className={`relative flex flex-col items-center justify-center gap-2.5 rounded-[12px] py-5 px-2
+      className={`relative w-full h-full min-h-[112px] flex flex-col items-center justify-center gap-2.5 rounded-[12px] py-5 px-2
         border-2 transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A1628]/30
         ${selected
           ? 'bg-[#0A1628]/5 border-[#0A1628]'
@@ -102,7 +101,7 @@ export function PostShiftStep1Screen() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[72px]">
+    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[calc(env(safe-area-inset-bottom)+112px)]">
 
       {/* Header */}
       <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
@@ -127,7 +126,7 @@ export function PostShiftStep1Screen() {
         {/* Job type grid */}
         <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider mb-3">
           Job Types <span className="normal-case text-[#EF4444]">*</span>
-          <span className="normal-case text-[#737373] font-medium tracking-normal"> — pick all you need</span>
+          <span className="normal-case text-[#6B7280] font-medium tracking-normal"> — pick all you need</span>
         </p>
         <div
           className="grid grid-cols-2 gap-3 mb-6"
@@ -155,7 +154,7 @@ export function PostShiftStep1Screen() {
       </div>
 
       {/* Fixed CTA */}
-      <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-4 pt-4
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4
         bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
         {jobTypes.length > 0 ? (
           <motion.p
@@ -181,8 +180,6 @@ export function PostShiftStep1Screen() {
           Continue
         </motion.button>
       </div>
-
-      <BottomTabNav />
     </div>
   );
 }

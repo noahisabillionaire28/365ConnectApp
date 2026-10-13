@@ -15,7 +15,7 @@ export function StepBar({ current, total }: { current: number; total: number }) 
       aria-valuetext={`Step ${current} of ${total}`}>
       {Array.from({ length: total }).map((_, i) => (
         <div key={i} className={`h-[3px] rounded-full flex-1 transition-all duration-300 ${
-          i < current ? 'bg-black' : 'bg-[#DBDBDB]'
+          i < current ? 'bg-black' : 'bg-[#E5E7EB]'
         }`} />
       ))}
     </div>
@@ -31,17 +31,17 @@ export function StepHeader({
   onBack: () => void;
 }) {
   return (
-    <div className="px-5 pt-5 pb-4 border-b border-[#DBDBDB] bg-white">
+    <div className="px-5 pt-5 pb-4 border-b border-[#E5E7EB] bg-white">
       <div className="flex items-center gap-3 mb-4">
         <button type="button" aria-label="Go back" onClick={onBack}
-          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} aria-hidden className="text-black" />
         </button>
         <div className="flex-1"><StepBar current={current} total={total} /></div>
-        <span className="text-[#737373] text-[12px] font-medium flex-shrink-0">{current} of {total}</span>
+        <span className="text-[#6B7280] text-[12px] font-medium flex-shrink-0">{current} of {total}</span>
       </div>
       <h1 className="text-black font-bold text-[22px] tracking-tight">{title}</h1>
-      <p className="text-[#737373] text-[13px] mt-1">{subtitle}</p>
+      <p className="text-[#6B7280] text-[13px] mt-1">{subtitle}</p>
     </div>
   );
 }
@@ -53,7 +53,7 @@ export function CTABar({
   label?: string; onPress: () => void; disabled?: boolean; loading?: boolean;
 }) {
   return (
-    <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-9 pt-4 bg-gradient-to-t from-white via-white/95 to-transparent z-10 border-t border-[#DBDBDB]">
+    <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-9 pt-4 bg-gradient-to-t from-white via-white/95 to-transparent z-10 border-t border-[#E5E7EB]">
       <motion.button type="button" whileTap={{ scale: disabled ? 1 : 0.97 }}
         onClick={onPress} disabled={disabled || loading}
         aria-label={label} aria-disabled={disabled || loading}
@@ -62,7 +62,7 @@ export function CTABar({
           loading
             ? 'bg-black/40 text-white/60 cursor-not-allowed'
             : disabled
-            ? 'bg-[#F0F0F0] text-[#6B7280] cursor-not-allowed border border-[#DBDBDB]'
+            ? 'bg-[#F0F0F0] text-[#6B7280] cursor-not-allowed border border-[#E5E7EB]'
             : 'bg-black text-white'
         }`}>
         {loading
@@ -80,12 +80,12 @@ export function FormSection({ icon, title, children }: {
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-6 h-6 rounded-[7px] bg-[#F5F5F5] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+        <div className="w-6 h-6 rounded-[7px] bg-[#F5F5F5] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
           {icon}
         </div>
         <h2 className="text-black font-bold text-[15px]">{title}</h2>
       </div>
-      <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-4 flex flex-col gap-4">
+      <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-4 py-4 flex flex-col gap-4">
         {children}
       </div>
     </div>
@@ -95,7 +95,7 @@ export function FormSection({ icon, title, children }: {
 /* ── Form label ───────────────────────────────────────────────────────────── */
 export function FormLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="text-[#737373] text-[11px] font-semibold uppercase tracking-wider mb-1.5">
+    <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider mb-1.5">
       {children}
     </p>
   );
@@ -106,14 +106,14 @@ export function SectionRow({ icon, label, value, sub }: {
   icon: ReactNode; label: string; value: string; sub?: string;
 }) {
   return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-[#DBDBDB] last:border-0">
-      <div className="w-7 h-7 rounded-[8px] bg-[#F5F5F5] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0 mt-0.5">
+    <div className="flex items-start gap-3 py-2.5 border-b border-[#E5E7EB] last:border-0">
+      <div className="w-7 h-7 rounded-[8px] bg-[#F5F5F5] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 mt-0.5">
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[#737373] text-[11px] font-semibold uppercase tracking-wider mb-0.5">{label}</p>
+        <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider mb-0.5">{label}</p>
         <p className="text-black text-[14px] font-medium leading-snug">{value}</p>
-        {sub && <p className="text-[#737373] text-[12px] mt-0.5">{sub}</p>}
+        {sub && <p className="text-[#6B7280] text-[12px] mt-0.5">{sub}</p>}
       </div>
     </div>
   );
@@ -121,12 +121,12 @@ export function SectionRow({ icon, label, value, sub }: {
 
 /* ── Shared input / textarea CSS strings ──────────────────────────────────── */
 export const INPUT_CLS =
-  'w-full bg-white border border-[#DBDBDB] rounded-[8px] px-3 h-[44px] ' +
+  'w-full bg-white border border-[#E5E7EB] rounded-[8px] px-3 h-[44px] ' +
   'text-black text-[14px] font-medium placeholder:text-[#6B7280] ' +
   'focus:outline-none focus:border-black transition-colors';
 
 export const TEXTAREA_CLS =
-  'w-full bg-white border border-[#DBDBDB] rounded-[8px] px-3 py-3 ' +
+  'w-full bg-white border border-[#E5E7EB] rounded-[8px] px-3 py-3 ' +
   'text-black text-[14px] font-medium placeholder:text-[#6B7280] ' +
   'focus:outline-none focus:border-black transition-colors resize-none leading-relaxed';
 
@@ -141,7 +141,7 @@ export function JobTypeTile({
       aria-pressed={selected} whileTap={{ scale: 0.94 }} onClick={onToggle}
       className={`relative flex flex-col items-center justify-center gap-2.5 rounded-[12px] py-5 px-3
         border-2 transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-black/30
-        ${selected ? 'bg-black/5 border-black' : 'bg-white border-[#DBDBDB] active:border-[#AAAAAA]'}`}>
+        ${selected ? 'bg-black/5 border-black' : 'bg-white border-[#E5E7EB] active:border-[#AAAAAA]'}`}>
       {selected && (
         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
           className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black flex items-center justify-center">
@@ -150,10 +150,10 @@ export function JobTypeTile({
       )}
       <div className={`w-11 h-11 rounded-[10px] flex items-center justify-center ${
         selected ? 'bg-black/10' : 'bg-[#FAFAFA]'}`}>
-        <Icon size={22} aria-hidden className={selected ? 'text-black' : 'text-[#737373]'} />
+        <Icon size={22} aria-hidden className={selected ? 'text-black' : 'text-[#6B7280]'} />
       </div>
       <span className={`text-[12px] font-semibold text-center leading-tight ${
-        selected ? 'text-black' : 'text-[#737373]'}`}>
+        selected ? 'text-black' : 'text-[#6B7280]'}`}>
         {template.label}
       </span>
     </motion.button>

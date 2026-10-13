@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { EVENT_TYPES } from '@/lib/eventTypes';
 import { getDraft, setDraft } from '@/store/postShiftStore';
-import { BottomTabNav } from '@/components/BottomTabNav';
 import { useRole } from '@/contexts/RoleContext';
 
 function StepBar({ current, total }: { current: number; total: number }) {
@@ -56,7 +55,7 @@ export function PostShiftEventTypeScreen() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[72px]">
+    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[calc(env(safe-area-inset-bottom)+112px)]">
       {/* Header */}
       <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
         <div className="flex items-center gap-3 mb-4">
@@ -126,7 +125,7 @@ export function PostShiftEventTypeScreen() {
       </div>
 
       {/* Fixed CTA */}
-      <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-4 pt-4
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4
         bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
         {eventType && (
           <motion.p key={eventType} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
@@ -147,8 +146,6 @@ export function PostShiftEventTypeScreen() {
           Continue
         </motion.button>
       </div>
-
-      <BottomTabNav />
     </div>
   );
 }

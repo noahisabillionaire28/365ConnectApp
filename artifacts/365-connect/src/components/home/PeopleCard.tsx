@@ -30,7 +30,7 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
     <div className="mx-4 rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-4 flex items-center gap-4">
       <button type="button" aria-label={`View ${person.username}'s profile`}
         onClick={() => navigate(`/worker/${person.username}`)}
-        className="w-16 h-16 rounded-full overflow-hidden bg-[#EFEFEF] flex-shrink-0 flex items-center justify-center">
+        className="w-16 h-16 rounded-full overflow-hidden bg-[#F3F4F6] flex-shrink-0 flex items-center justify-center">
         {person.photoUrl ? (
           <img src={person.photoUrl} alt="" aria-hidden loading="lazy" decoding="async"
             className="w-full h-full object-cover" />
@@ -88,10 +88,10 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
 export function PeopleCardSkeleton() {
   return (
     <div className="mx-4 rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-4 flex items-center gap-4">
-      <div className="w-16 h-16 rounded-full bg-[#EFEFEF] animate-pulse flex-shrink-0" />
+      <div className="w-16 h-16 rounded-full bg-[#F3F4F6] animate-pulse flex-shrink-0" />
       <div className="flex-1 flex flex-col gap-2">
-        <div className="w-24 h-4 rounded bg-[#EFEFEF] animate-pulse" />
-        <div className="w-32 h-3 rounded bg-[#EFEFEF] animate-pulse" />
+        <div className="w-24 h-4 rounded bg-[#F3F4F6] animate-pulse" />
+        <div className="w-32 h-3 rounded bg-[#F3F4F6] animate-pulse" />
       </div>
     </div>
   );

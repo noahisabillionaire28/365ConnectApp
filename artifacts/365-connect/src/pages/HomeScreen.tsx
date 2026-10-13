@@ -41,26 +41,26 @@ function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => voi
     <div className="flex items-center justify-between px-4 pt-4 pb-2">
       <div>
         <h1 className="text-black font-bold text-[22px] leading-tight">365 Connect</h1>
-        <p className="text-[#737373] text-[12px] font-medium mt-[1px]">{subtitle}</p>
+        <p className="text-[#6B7280] text-[12px] font-medium mt-[1px]">{subtitle}</p>
       </div>
       <div className="flex items-center gap-2">
         {onPost && (
           <button type="button" aria-label="Post a shift" onClick={onPost}
-            className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+            className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
             <PlusCircle size={16} aria-hidden className="text-black" />
           </button>
         )}
         <button type="button" aria-label="Search" onClick={() => navigate('/explore')}
-          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
-          <Search size={16} aria-hidden className="text-[#737373]" />
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
+          <Search size={16} aria-hidden className="text-[#6B7280]" />
         </button>
         <button type="button"
           aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
           onClick={() => navigate('/notifications')}
-          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center relative">
-          <Bell size={16} aria-hidden className="text-[#737373]" />
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center relative">
+          <Bell size={16} aria-hidden className="text-[#6B7280]" />
           {unreadCount > 0 && (
-            <span aria-hidden className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#0095F6] border-[1.5px] border-white" />
+            <span aria-hidden className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#EF4444] border-[1.5px] border-white" />
           )}
         </button>
       </div>
@@ -342,8 +342,8 @@ function WorkerAvailableView() {
           </div>
         )}
         {error && !isLoading && (
-          <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-            <p className="text-[#737373] text-[14px]">Couldn't load shifts right now.</p>
+          <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-10 text-center">
+            <p className="text-[#6B7280] text-[14px]">Couldn't load shifts right now.</p>
           </div>
         )}
         {!isLoading && !error && (
@@ -355,8 +355,8 @@ function WorkerAvailableView() {
               </div>
             ))}
             {shifts.length === 0 && (
-              <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-                <p className="text-[#737373] text-[14px]">
+              <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-10 text-center">
+                <p className="text-[#6B7280] text-[14px]">
                   {hasLocation ? 'No shifts match your job types within 25 miles right now.' : 'No shifts match your job types right now.'}
                 </p>
                 <div className="flex gap-2 justify-center mt-4">
@@ -365,7 +365,7 @@ function WorkerAvailableView() {
                     Browse all jobs
                   </button>
                   <button type="button" onClick={() => navigate('/profile/edit#work')}
-                    className="h-[38px] px-4 rounded-[10px] border border-[#DBDBDB] text-[#111827] text-[13px] font-semibold">
+                    className="h-[38px] px-4 rounded-[10px] border border-[#E5E7EB] text-[#111827] text-[13px] font-semibold">
                     Update job types
                   </button>
                 </div>
@@ -390,9 +390,9 @@ function SwapOfferCard({ s, busy, onRespond }: {
   return (
     <div className="rounded-[14px] border border-[#0A1628] p-4 bg-white">
       <button type="button" onClick={() => navigate(`/shift/${s.shiftId}`)} className="w-full text-left">
-        <p className="text-[#111827] font-bold text-[15px] truncate flex items-center gap-1.5">
+        <p className="text-[#111827] font-bold text-[15px] min-w-0 flex items-center gap-1.5">
           <Repeat2 size={14} aria-hidden className="text-[#0A1628] flex-shrink-0" />
-          {from} offered you their spot
+          <span className="truncate">{from} offered you their spot</span>
         </p>
         <p className="text-[#6B7280] text-[12px] mt-[2px] truncate">
           {[sh?.jobType, sh?.companyName].filter(Boolean).join(' · ')}
@@ -545,7 +545,7 @@ function WorkerHomeFeed() {
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
-      <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
+      <div className="bg-white sticky top-0 z-40 border-b border-[#E5E7EB]">
         <FeedHeader subtitle={subtitle} />
         <SegmentControl
           tabs={[
@@ -598,24 +598,24 @@ function WorkerDiscoveryBody() {
         style={{ WebkitOverflowScrolling: 'touch' }}>
         <select aria-label="Filter by job type" value={jobType ?? ''}
           onChange={(e) => setJobType(e.target.value || null)}
-          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#E5E7EB] bg-white text-black flex-shrink-0">
           <option value="">All job types</option>
           {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
         <select aria-label="Filter by rating" value={rating}
           onChange={(e) => setRating(e.target.value as typeof rating)}
-          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#E5E7EB] bg-white text-black flex-shrink-0">
           {RATING_FILTERS.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
         <select aria-label="Filter by distance" value={distance}
           onChange={(e) => setDistance(e.target.value as typeof distance)}
-          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#E5E7EB] bg-white text-black flex-shrink-0">
           {DISTANCE_FILTERS.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
         <button type="button" role="switch" aria-checked={availableOnly}
           onClick={() => setAvailableOnly((v) => !v)}
           className={`h-10 px-3 rounded-full text-[12px] font-semibold border flex items-center gap-1.5 flex-shrink-0 ${
-            availableOnly ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'
+            availableOnly ? 'bg-black text-white border-black' : 'bg-white text-black border-[#E5E7EB]'
           }`}>
           <SlidersHorizontal size={12} aria-hidden />
           Available today
@@ -626,16 +626,16 @@ function WorkerDiscoveryBody() {
         <div className="pt-4 pb-4 flex flex-col gap-3">
           {isLoading && Array.from({ length: 4 }).map((_, i) => <PeopleCardSkeleton key={i} />)}
           {error && !isLoading && (
-            <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-              <p className="text-[#737373] text-[14px]">Couldn't load workers right now.</p>
+            <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-10 text-center">
+              <p className="text-[#6B7280] text-[14px]">Couldn't load workers right now.</p>
             </div>
           )}
           {!isLoading && !error && filtered.map((person) => (
             <PeopleCard key={person.id} person={person} />
           ))}
           {!isLoading && !error && filtered.length === 0 && (
-            <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-              <p className="text-[#737373] text-[14px]">No workers found. Try adjusting your filters.</p>
+            <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-10 text-center">
+              <p className="text-[#6B7280] text-[14px]">No workers found. Try adjusting your filters.</p>
             </div>
           )}
         </div>
@@ -698,8 +698,8 @@ function ClientShiftCard({
               )}
             </div>
             {shift.location && (
-              <p className="text-[#6B7280] text-[12px] mt-1 flex items-center gap-1 truncate">
-                <MapPin size={11} aria-hidden />{shift.location}
+              <p className="text-[#6B7280] text-[12px] mt-1 flex items-center gap-1 min-w-0">
+                <MapPin size={11} aria-hidden className="flex-shrink-0" /><span className="truncate">{shift.location}</span>
               </p>
             )}
           </div>
@@ -891,7 +891,7 @@ function ClientHomeFeed() {
   const [tab, setTab] = useState<'browse' | 'my-shifts'>(useInitialPosterTab());
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
-      <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
+      <div className="bg-white sticky top-0 z-40 border-b border-[#E5E7EB]">
         <FeedHeader subtitle={tab === 'browse' ? 'Discover workers' : 'Your posted shifts'} />
         <SegmentControl
           tabs={[
@@ -921,7 +921,7 @@ function StafferHomeFeed() {
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
-      <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
+      <div className="bg-white sticky top-0 z-40 border-b border-[#E5E7EB]">
         <FeedHeader subtitle={tab === 'browse' ? 'Discover workers' : 'Your posted shifts'} onPost={handlePostShift} />
         <SegmentControl
           tabs={[

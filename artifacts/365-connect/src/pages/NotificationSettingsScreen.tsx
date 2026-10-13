@@ -135,7 +135,7 @@ export function NotificationSettingsScreen() {
         {prefs && (
           <>
             <InstallBanner flush />
-            <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.12em] px-1 mb-2">
+            <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.12em] px-1 mb-2">
               Choose how you hear from us
             </p>
             <div className="bg-white border border-[#EDEEF0] rounded-[18px] shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
@@ -178,14 +178,14 @@ export function NotificationSettingsScreen() {
               <button type="button" onClick={() => void push.sendTest().then((e) => showToast(e ?? 'Test sent — check your notifications.', e ? 'error' : 'success'))}
                 className="mt-3 text-[#0A1628] text-[13px] font-bold px-1">Send a test notification</button>
             )}
-            <p className="text-[#737373] text-[12px] leading-relaxed px-1 mt-3">
+            <p className="text-[#6B7280] text-[12px] leading-relaxed px-1 mt-3">
               Turning a channel off stops new alerts on that channel. You can turn it
               back on anytime. Security and legal notices (such as a password reset or a change to the Terms) may still be sent.
             </p>
 
             {isWorker && (
               <div className="mt-6">
-                <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.12em] px-1 mb-2">
+                <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.12em] px-1 mb-2">
                   Saved search alerts
                 </p>
                 <div className="bg-white border border-[#EDEEF0] rounded-[18px] shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">

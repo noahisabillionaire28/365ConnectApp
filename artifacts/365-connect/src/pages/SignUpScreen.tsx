@@ -271,7 +271,7 @@ export function SignUpScreen() {
             inputMode="email"
             value={email}
             onChange={e => { setEmail(e.target.value); setError(null); }}
-            className="w-full rounded-[12px] px-4 py-3.5 outline-none font-medium text-[15px] transition-colors placeholder:text-[#C0C0C0]"
+            className="w-full rounded-[12px] px-4 py-3.5 outline-none font-medium text-[15px] transition-colors placeholder:text-[#9CA3AF]"
             style={{ border: `1px solid ${BORDER}`, color: TEXT, background: '#FFFFFF' }}
             placeholder="name@example.com"
             data-testid="input-email"
@@ -288,7 +288,7 @@ export function SignUpScreen() {
               value={password}
               onChange={e => { setPassword(e.target.value); setError(null); }}
               onKeyDown={e => e.key === 'Enter' && handleSignUp()}
-              className="w-full rounded-[12px] px-4 py-3.5 pr-12 outline-none font-medium text-[15px] transition-colors placeholder:text-[#C0C0C0]"
+              className="w-full rounded-[12px] px-4 py-3.5 pr-12 outline-none font-medium text-[15px] transition-colors placeholder:text-[#9CA3AF]"
               style={{ border: `1px solid ${BORDER}`, color: TEXT, background: '#FFFFFF' }}
               placeholder="Min. 6 characters"
               data-testid="input-password"

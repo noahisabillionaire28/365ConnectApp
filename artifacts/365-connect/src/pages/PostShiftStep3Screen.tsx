@@ -15,7 +15,6 @@ import {
   MAX_SERIES_OCCURRENCES, WEEKDAY_LABELS, WEEKDAY_NAMES, type RepeatRule, type RepeatType,
 } from '@/lib/recurrence';
 import { MultiDatePicker } from '@/components/MultiDatePicker';
-import { BottomTabNav } from '@/components/BottomTabNav';
 import { browserTimeZone, zonedTimeToUtc } from '@/lib/timezone';
 
 const REPEAT_OPTIONS: { value: RepeatType; label: string }[] = [
@@ -184,7 +183,7 @@ export function PostShiftStep3Screen() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[72px]">
+    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[calc(env(safe-area-inset-bottom)+112px)]">
 
       {/* Header */}
       <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
@@ -411,7 +410,7 @@ export function PostShiftStep3Screen() {
       </div>
 
       {/* Fixed CTA */}
-      <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-4 pt-4
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4
         bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
         <motion.button
           type="button" whileTap={{ scale: 0.97 }}
@@ -422,8 +421,6 @@ export function PostShiftStep3Screen() {
           Continue
         </motion.button>
       </div>
-
-      <BottomTabNav />
     </div>
   );
 }

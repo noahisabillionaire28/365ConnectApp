@@ -7,14 +7,14 @@ function SettingRow({
   icon: Icon, label, value,
 }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between px-4 py-4 border-b border-[#DBDBDB] last:border-none">
+    <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E7EB] last:border-none">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+        <div className="w-8 h-8 rounded-[8px] bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
           <Icon size={14} aria-hidden className="text-black" />
         </div>
         <p className="text-black text-[14px] font-semibold">{label}</p>
       </div>
-      <p className="text-[#737373] text-[13px]">{value}</p>
+      <p className="text-[#6B7280] text-[13px]">{value}</p>
     </div>
   );
 }
@@ -51,37 +51,37 @@ export function AdminSettings() {
     <div className="min-h-[100dvh] bg-[#FAFAFA] pt-[60px]">
       <div className="px-4 pt-6 pb-4">
         <h1 className="text-black font-bold text-[22px] tracking-tight">Settings</h1>
-        <p className="text-[#737373] text-[13px] mt-0.5">Admin panel configuration</p>
+        <p className="text-[#6B7280] text-[13px] mt-0.5">Admin panel configuration</p>
       </div>
 
-      <div className="mx-4 bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-6">
-        <div className="px-4 py-3 border-b border-[#DBDBDB]">
-          <p className="text-[#737373] text-[10px] font-bold uppercase tracking-[0.16em]">Security</p>
+      <div className="mx-4 bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden mb-6">
+        <div className="px-4 py-3 border-b border-[#E5E7EB]">
+          <p className="text-[#6B7280] text-[10px] font-bold uppercase tracking-[0.16em]">Security</p>
         </div>
         <SettingRow icon={ShieldCheck} label="Admin Token Auth"  value="Enabled" />
         <SettingRow icon={Lock}        label="Service Role Key"  value="Server-side" />
       </div>
 
-      <div className="mx-4 bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-6">
-        <div className="px-4 py-3 border-b border-[#DBDBDB]">
-          <p className="text-[#737373] text-[10px] font-bold uppercase tracking-[0.16em]">Platform</p>
+      <div className="mx-4 bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden mb-6">
+        <div className="px-4 py-3 border-b border-[#E5E7EB]">
+          <p className="text-[#6B7280] text-[10px] font-bold uppercase tracking-[0.16em]">Platform</p>
         </div>
         <SettingRow icon={Settings} label="Platform Fee"  value="8% of gross" />
         <SettingRow icon={Bell}     label="Pro Plan Fee"  value="$17 / month" />
       </div>
 
-      <div className="mx-4 bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-6">
-        <div className="px-4 py-3 border-b border-[#DBDBDB]">
-          <p className="text-[#737373] text-[10px] font-bold uppercase tracking-[0.16em]">Email</p>
+      <div className="mx-4 bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden mb-6">
+        <div className="px-4 py-3 border-b border-[#E5E7EB]">
+          <p className="text-[#6B7280] text-[10px] font-bold uppercase tracking-[0.16em]">Email</p>
         </div>
         <div className="px-4 py-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 rounded-[8px] bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
               <Mail size={14} aria-hidden className="text-black" />
             </div>
             <div>
               <p className="text-black text-[14px] font-semibold">Transactional Email</p>
-              <p className="text-[#737373] text-[12px]">
+              <p className="text-[#6B7280] text-[12px]">
                 Sends a sample notification from the app's sender address to check delivery.
               </p>
             </div>
@@ -90,7 +90,7 @@ export function AdminSettings() {
             <input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)}
               placeholder="Send to… (blank = your account email)"
               aria-label="Test recipient email"
-              className="flex-1 h-[38px] rounded-[8px] border border-[#DBDBDB] bg-[#FAFAFA] px-3 text-[13px] text-black placeholder:text-[#6B7280] outline-none focus:border-black" />
+              className="flex-1 h-[38px] rounded-[8px] border border-[#E5E7EB] bg-[#FAFAFA] px-3 text-[13px] text-black placeholder:text-[#6B7280] outline-none focus:border-black" />
             <button type="button" onClick={() => void handleTestEmail()} disabled={emailBusy}
               className="px-3.5 h-[38px] rounded-[8px] bg-[#0A1628] text-white text-[13px] font-bold disabled:opacity-60 flex-shrink-0">
               {emailBusy ? 'Sending…' : 'Send test'}

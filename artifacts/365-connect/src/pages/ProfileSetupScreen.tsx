@@ -156,7 +156,7 @@ export function ProfileSetupScreen() {
     6: true, // first post is optional
   };
 
-  const INPUT_BASE = "bg-white border border-[#DBDBDB] rounded-[12px] focus-within:border-black transition-colors";
+  const INPUT_BASE = "bg-white border border-[#E5E7EB] rounded-[12px] focus-within:border-black transition-colors";
   const TEXT_BASE  = "bg-transparent outline-none text-black text-[16px] font-medium placeholder:text-[#6B7280]";
 
   return (
@@ -175,17 +175,17 @@ export function ProfileSetupScreen() {
       <div className="flex items-center px-5 pt-12 pb-4">
         {step > 1 ? (
           <button type="button" onClick={handleBack} aria-label="Back"
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-[#FAFAFA] border border-[#DBDBDB] mr-3 active:scale-95 transition-transform">
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-[#FAFAFA] border border-[#E5E7EB] mr-3 active:scale-95 transition-transform">
             <ChevronLeft size={20} className="text-black" />
           </button>
         ) : (
           <div className="w-10 h-10 mr-3" />
         )}
-        <span className="text-[13px] text-[#737373] font-medium">Step {step} of {TOTAL_STEPS}</span>
+        <span className="text-[13px] text-[#6B7280] font-medium">Step {step} of {TOTAL_STEPS}</span>
       </div>
 
       {/* Progress bar */}
-      <div className="mx-5 h-[3px] bg-[#DBDBDB] rounded-full overflow-hidden mb-8">
+      <div className="mx-5 h-[3px] bg-[#E5E7EB] rounded-full overflow-hidden mb-8">
         <div className="h-full bg-black rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
       </div>
 
@@ -196,7 +196,7 @@ export function ProfileSetupScreen() {
         {step === 1 && (
           <div className="flex flex-col">
             <h1 className="text-[26px] font-bold leading-tight mb-2">What's your @handle?</h1>
-            <p className="text-[#737373] text-[14px] mb-8">This is how clients and workers find you on 365 Connect.</p>
+            <p className="text-[#6B7280] text-[14px] mb-8">This is how clients and workers find you on 365 Connect.</p>
             <div className={`flex items-center ${INPUT_BASE} px-4 h-[56px]`}>
               <span className="text-black font-semibold text-[18px] mr-1">@</span>
               <input autoFocus type="text" placeholder="yourhandle" value={username}
@@ -204,7 +204,7 @@ export function ProfileSetupScreen() {
                 className={TEXT_BASE + ' flex-1'} maxLength={30} />
             </div>
             {username.length > 0 && (
-              <p className="text-[#737373] text-[12px] mt-2 ml-1">Your profile will be at @{username}</p>
+              <p className="text-[#6B7280] text-[12px] mt-2 ml-1">Your profile will be at @{username}</p>
             )}
           </div>
         )}
@@ -213,23 +213,23 @@ export function ProfileSetupScreen() {
         {step === 2 && (
           <div className="flex flex-col items-center">
             <h1 className="text-[26px] font-bold leading-tight mb-2 self-start">Add a profile photo</h1>
-            <p className="text-[#737373] text-[14px] mb-10 self-start">Show the world who you are.</p>
+            <p className="text-[#6B7280] text-[14px] mb-10 self-start">Show the world who you are.</p>
             <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
             <button onClick={() => photoInputRef.current?.click()}
-              className="relative w-[160px] h-[160px] rounded-full bg-[#FAFAFA] border-2 border-dashed border-[#DBDBDB] flex items-center justify-center overflow-hidden active:scale-95 transition-transform">
+              className="relative w-[160px] h-[160px] rounded-full bg-[#FAFAFA] border-2 border-dashed border-[#E5E7EB] flex items-center justify-center overflow-hidden active:scale-95 transition-transform">
               {photoPreview ? (
                 <img src={photoPreview} alt="Profile" className="w-full h-full object-cover" />
               ) : (
                 <div className="flex flex-col items-center gap-2">
-                  <div className="w-12 h-12 rounded-full bg-[#EFEFEF] flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-[#F3F4F6] flex items-center justify-center">
                     <Camera size={22} className="text-black" />
                   </div>
-                  <span className="text-[12px] text-[#737373] font-medium">Tap to upload</span>
+                  <span className="text-[12px] text-[#6B7280] font-medium">Tap to upload</span>
                 </div>
               )}
             </button>
             {photoPreview && (
-              <button onClick={() => photoInputRef.current?.click()} className="mt-5 text-[14px] text-[#0095F6] font-semibold">
+              <button onClick={() => photoInputRef.current?.click()} className="mt-5 text-[14px] text-[#0A1628] font-semibold">
                 Change photo
               </button>
             )}
@@ -240,13 +240,13 @@ export function ProfileSetupScreen() {
         {step === 3 && (
           <div className="flex flex-col">
             <h1 className="text-[26px] font-bold leading-tight mb-2">Write a short bio</h1>
-            <p className="text-[#737373] text-[14px] mb-8">Tell clients what makes you great. Keep it concise.</p>
+            <p className="text-[#6B7280] text-[14px] mb-8">Tell clients what makes you great. Keep it concise.</p>
             <div className={`relative ${INPUT_BASE}`}>
               <textarea autoFocus
                 placeholder="e.g. High-energy bartender with 5+ years in upscale venues. TIPS certified. Known for fast service and great vibes."
                 value={bio} onChange={(e) => setBio(e.target.value)} maxLength={160} rows={5}
                 className="w-full bg-transparent outline-none text-black text-[15px] leading-relaxed placeholder:text-[#6B7280] resize-none p-4 pb-8" />
-              <span className="absolute bottom-3 right-4 text-[11px] text-[#737373]">{bio.length}/160</span>
+              <span className="absolute bottom-3 right-4 text-[11px] text-[#6B7280]">{bio.length}/160</span>
             </div>
           </div>
         )}
@@ -255,14 +255,14 @@ export function ProfileSetupScreen() {
         {step === 4 && (
           <div className="flex flex-col">
             <h1 className="text-[26px] font-bold leading-tight mb-2">What do you do?</h1>
-            <p className="text-[#737373] text-[14px] mb-6">Select all roles that apply to you.</p>
+            <p className="text-[#6B7280] text-[14px] mb-6">Select all roles that apply to you.</p>
             <div className="grid grid-cols-2 gap-3">
               {JOB_TYPES.map((job) => {
                 const sel = selectedJobs.includes(job);
                 return (
                   <button key={job} onClick={() => toggleJob(job)}
                     className={`relative flex items-center justify-between px-4 py-[14px] rounded-[12px] text-left transition-all active:scale-[0.97] ${
-                      sel ? 'bg-black/5 border-2 border-black text-black' : 'bg-white border border-[#DBDBDB] text-[#737373]'
+                      sel ? 'bg-black/5 border-2 border-black text-black' : 'bg-white border border-[#E5E7EB] text-[#6B7280]'
                     }`}>
                     <span className="text-[13px] font-semibold leading-snug pr-2">{job}</span>
                     {sel && (
@@ -286,13 +286,13 @@ export function ProfileSetupScreen() {
         {step === 5 && (
           <div className="flex flex-col">
             <h1 className="text-[26px] font-bold leading-tight mb-2">Any certifications?</h1>
-            <p className="text-[#737373] text-[14px] mb-8">Optional — add TIPS, ServSafe, CPR, Food Handler, or any others.</p>
+            <p className="text-[#6B7280] text-[14px] mb-8">Optional — add TIPS, ServSafe, CPR, Food Handler, or any others.</p>
             <div className={`${INPUT_BASE} p-3 min-h-[56px]`}>
               <div className="flex flex-wrap gap-2">
                 {certs.map((cert) => (
-                  <span key={cert} className="inline-flex items-center gap-1 bg-[#FAFAFA] border border-[#DBDBDB] text-black text-[13px] font-medium px-3 py-[6px] rounded-full">
+                  <span key={cert} className="inline-flex items-center gap-1 bg-[#FAFAFA] border border-[#E5E7EB] text-black text-[13px] font-medium px-3 py-[6px] rounded-full">
                     {cert}
-                    <button onClick={() => removeCert(cert)} className="ml-1 text-[#737373] hover:text-black transition-colors">
+                    <button onClick={() => removeCert(cert)} className="ml-1 text-[#6B7280] hover:text-black transition-colors">
                       <X size={12} />
                     </button>
                   </span>
@@ -304,7 +304,7 @@ export function ProfileSetupScreen() {
               </div>
             </div>
             {certs.length === 0 && (
-              <p className="text-[#737373] text-[12px] mt-3 ml-1">You can always add these later from your profile.</p>
+              <p className="text-[#6B7280] text-[12px] mt-3 ml-1">You can always add these later from your profile.</p>
             )}
           </div>
         )}
@@ -313,26 +313,26 @@ export function ProfileSetupScreen() {
         {step === 6 && (
           <div className="flex flex-col">
             <h1 className="text-[26px] font-bold leading-tight mb-2">Share your first moment</h1>
-            <p className="text-[#737373] text-[14px] mb-8">Optional — upload a photo from a past event to show clients your experience.</p>
+            <p className="text-[#6B7280] text-[14px] mb-8">Optional — upload a photo from a past event to show clients your experience.</p>
 
             <input ref={postPhotoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePostPhotoChange} />
             <button onClick={() => postPhotoInputRef.current?.click()}
-              className="w-full aspect-[4/3] rounded-[12px] bg-[#FAFAFA] border border-dashed border-[#DBDBDB] flex items-center justify-center overflow-hidden active:scale-[0.98] transition-transform mb-5">
+              className="w-full aspect-[4/3] rounded-[12px] bg-[#FAFAFA] border border-dashed border-[#E5E7EB] flex items-center justify-center overflow-hidden active:scale-[0.98] transition-transform mb-5">
               {postPhotoPreview ? (
                 <img src={postPhotoPreview} alt="Post" className="w-full h-full object-cover" />
               ) : (
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-14 h-14 rounded-full bg-[#EFEFEF] flex items-center justify-center">
+                  <div className="w-14 h-14 rounded-full bg-[#F3F4F6] flex items-center justify-center">
                     <Plus size={24} className="text-black" />
                   </div>
-                  <span className="text-[13px] text-[#737373] font-medium">Tap to upload photo</span>
+                  <span className="text-[13px] text-[#6B7280] font-medium">Tap to upload photo</span>
                 </div>
               )}
             </button>
 
             {postPhotoPreview && (
               <button onClick={() => postPhotoInputRef.current?.click()}
-                className="text-[13px] text-[#0095F6] font-semibold mb-5 text-center">
+                className="text-[13px] text-[#0A1628] font-semibold mb-5 text-center">
                 Change photo
               </button>
             )}
@@ -364,7 +364,7 @@ export function ProfileSetupScreen() {
             </button>
             {(step === 2 || step === 5) && (
               <button onClick={handleNext}
-                className="w-full text-center text-[14px] text-[#737373] font-medium hover:text-black transition-colors py-2">
+                className="w-full text-center text-[14px] text-[#6B7280] font-medium hover:text-black transition-colors py-2">
                 {step === 2 ? 'Skip for now' : 'Skip — add later'}
               </button>
             )}
@@ -377,7 +377,7 @@ export function ProfileSetupScreen() {
             </button>
             {!saving && !postPhotoPreview && (
               <button onClick={handleComplete}
-                className="w-full text-center text-[14px] text-[#737373] font-medium hover:text-black transition-colors py-2">
+                className="w-full text-center text-[14px] text-[#6B7280] font-medium hover:text-black transition-colors py-2">
                 Skip for now — complete without a post
               </button>
             )}
