@@ -176,6 +176,12 @@
   outline-offset: 2px;
 }
 
+/* The first-visit storage notice floats above the page, but never above an
+   open dialog: it would sit on top of a bottom sheet's main button. */
+body:has([aria-modal="true"]) [data-testid="storage-notice"] {
+  display: none;
+}
+
 /* iOS safe areas (viewport-fit=cover is set in index.html) */
 @utility pb-safe {
   padding-bottom: env(safe-area-inset-bottom);

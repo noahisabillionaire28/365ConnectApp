@@ -97,7 +97,7 @@ export function useProfile(): ProfileResult {
 export type ProfilePatch = Partial<Pick<UserProfileRow,
   'username' | 'photo_url' | 'bio' | 'job_types' | 'certifications' |
   'primary_job_type' | 'secondary_job_types' | 'availability' |
-  'lat' | 'lng' | 'company_name' | 'is_available' | 'hourly_rate'
+  'lat' | 'lng' | 'company_name' | 'is_available' | 'hourly_rate' | 'phone'
 >>;
 
 /**

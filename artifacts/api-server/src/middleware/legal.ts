@@ -16,6 +16,7 @@
  *   /users/me        GET / POST / PATCH / DELETE — profile setup, and a user
  *                    who declines the new terms must still be able to delete
  *                    their account
+ *   /users/me/sync-email  copies a confirmed email change onto the profile
  *   /push/*          device registration happens on launch, before the gate
  *   /admin/*         platform operators; the admin panel has no acceptance
  *                    screen, and every admin route checks the admin role itself
@@ -38,7 +39,7 @@ export function isLegalExempt(method: string, path: string): boolean {
   if (p === '/push' || p.startsWith('/push/')) return true;
   if (p === '/admin' || p.startsWith('/admin/')) return true;
   if (p === '/users' && method === 'POST') return true;
-  if (p === '/users/me') return true;
+  if (p === '/users/me' || p === '/users/me/sync-email') return true;
   return false;
 }
 

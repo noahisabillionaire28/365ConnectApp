@@ -55,6 +55,26 @@ the app (an admin can, from the panel). The splash and Home screens no longer
 send a signed-in user to role select when the profile read merely failed:
 they show a retry card, so a network blip can never rewrite an account.
 
+## Changing email, password and phone
+
+All three live in the Account section of Edit Profile (`/profile/edit#account`).
+
+- **Email** goes through the auth service (`supabase.auth.updateUser({ email })`),
+  never a direct write to `users.email`. Nothing changes until the user opens
+  the confirmation link (with Supabase's "secure email change" on, links go to
+  both the old and the new address). The link lands on `/auth/callback`, which
+  calls `POST /api/users/me/sync-email` to copy the confirmed address from the
+  auth account onto the profile row, so reminders and receipts follow it. Edit
+  Profile retries the sync whenever the two differ.
+- **Password**: the current password is checked first (a fresh
+  `signInWithPassword`), then `updateUser({ password })`. Accounts that only
+  ever used Google or Apple have no password; they can set one without that
+  step.
+- **Phone** is an optional, private column (`users.phone`, migration 0038),
+  stored as `+<country><number>`; a 10-digit number is taken as US/Canada. It is
+  not in `public_profiles` or the API's public column list, so only the owner
+  (and the data export) ever sees it.
+
 ## Account deletion
 
 `DELETE /api/users/me` (signed-in user) deletes the Supabase auth account;

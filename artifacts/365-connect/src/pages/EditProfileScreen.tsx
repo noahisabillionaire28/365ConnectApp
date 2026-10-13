@@ -7,6 +7,8 @@
  *
  *   Photo          all roles   avatar (workers) / logo (posters)
  *   Basics         all roles   handle, bio (workers) or name (posters)
+ *   Account        all roles   email and password (each changed in its own
+ *                              sheet, through the auth service), phone
  *   Work           worker      primary role, other roles, hourly rate,
  *                              certifications, weekly availability
  *   Business       poster      company name, event types, location
@@ -18,15 +20,18 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ChevronLeft, ChevronRight, Camera, Bell, Check, X, Plus, AlertCircle, CheckCircle2,
-  MapPin, Crosshair, UserCircle2, Briefcase, Building2, User,
+  MapPin, Crosshair, UserCircle2, Briefcase, Building2, User, ShieldCheck, Mail, KeyRound,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { useProfile, useUpdateProfile, type ProfilePatch } from '@/hooks/useProfile';
-import { profileQueryOptions } from '@/hooks/profileQuery';
+import { profileQueryKey, profileQueryOptions } from '@/hooks/profileQuery';
+import { supabase } from '@/lib/supabase';
+import { normalizePhone, formatPhone, PHONE_HINT } from '@/lib/phone';
+import { ChangeEmailSheet, ChangePasswordSheet } from '@/components/AccountSheets';
 import { apiClient, isApiStatus } from '@/lib/api';
 import { uploadAvatar } from '@/lib/storage';
 import { handleFormatError, isHandleTakenError } from '@/lib/username';
@@ -50,6 +55,7 @@ type Form = {
   eventTypes:    string[];
   lat:           number | null;
   lng:           number | null;
+  phone:         string;          // as typed; normalised on save
 };
 
 const BIO_MAX = 300;
@@ -172,6 +178,7 @@ export function EditProfileScreen() {
       eventTypes:    row.secondary_job_types ?? [],
       lat:           row.lat ?? null,
       lng:           row.lng ?? null,
+      phone:         formatPhone(row.phone),
     };
     setInitial(seeded);
     setForm(seeded);
@@ -210,6 +217,30 @@ export function EditProfileScreen() {
     if (cropSrc) URL.revokeObjectURL(cropSrc);
     setCropSrc(null);
   }
+
+  // ── Account: email and password live in the auth service ───────────────────
+  const qc = useQueryClient();
+  const [auth, setAuth] = useState<{ email: string; pendingEmail: string | null; hasPassword: boolean } | null>(null);
+  const [emailSheet, setEmailSheet] = useState(false);
+  const [passwordSheet, setPasswordSheet] = useState(false);
+  const loadAuth = async () => {
+    const { data } = await supabase.auth.getUser();
+    const u = data.user;
+    if (!u) return;
+    const providers = (u.app_metadata?.providers as string[] | undefined) ?? [u.app_metadata?.provider as string].filter(Boolean);
+    const hasPassword = providers.includes('email') || (u.identities ?? []).some((i) => i.provider === 'email');
+    setAuth({ email: u.email ?? '', pendingEmail: u.new_email ?? null, hasPassword });
+  };
+  useEffect(() => { void loadAuth(); }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A confirmed email change shows up on the auth account first; copy it onto
+  // the profile so reminders and receipts follow it.
+  useEffect(() => {
+    if (!auth?.email || !row || !user?.id || (row.email ?? '') === auth.email) return;
+    apiClient(user.id).post('/users/me/sync-email', {})
+      .then(() => qc.invalidateQueries({ queryKey: profileQueryKey(user.id) }))
+      .catch(() => { /* retried on the next visit */ });
+  }, [auth?.email, row?.email, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Handle: live format check + debounced availability lookup ───────────────
   const [handleTaken, setHandleTaken] = useState(false);
@@ -265,12 +296,17 @@ export function EditProfileScreen() {
   const rate = parseRate(form?.hourlyRate ?? '');
   const rateError = Number.isNaN(rate) ? 'Enter a number, e.g. 25.' : null;
   const bioError = isPoster && form && !form.bio.trim() ? 'Please enter a name.' : null;
+  const phoneChanged = !!form && !!initial && form.phone.trim() !== initial.phone.trim();
+  const phoneValue = phoneChanged ? normalizePhone(form!.phone) : null;
+  const phoneError = phoneChanged && phoneValue === undefined
+    ? 'Enter a valid phone number, e.g. (555) 123-4567, or +44 20 7946 0958.' : null;
 
   const patch = useMemo<ProfilePatch>(() => {
     if (!form || !initial) return {};
     const p: ProfilePatch = {};
     if (form.username !== initial.username) p.username = form.username.trim().toLowerCase();
     if (form.bio !== initial.bio) p.bio = form.bio.trim() || null;
+    if (phoneChanged && phoneValue !== undefined) p.phone = phoneValue;
     if (isWorker) {
       const primaryChanged = form.primaryJob !== initial.primaryJob;
       const secondaryChanged = !sameList(form.secondaryJobs, initial.secondaryJobs);
@@ -296,10 +332,10 @@ export function EditProfileScreen() {
       if (form.lat !== initial.lat || form.lng !== initial.lng) { p.lat = form.lat; p.lng = form.lng; }
     }
     return p;
-  }, [form, initial, isWorker, isPoster, role, rate]);
+  }, [form, initial, isWorker, isPoster, role, rate, phoneChanged, phoneValue]);
 
   const dirty = Object.keys(patch).length > 0 || !!photoFile;
-  const blocked = !!handleError || handleChecking || !!rateError || !!bioError;
+  const blocked = !!handleError || handleChecking || !!rateError || !!bioError || !!phoneError;
   const [saving, setSaving] = useState(false);
   const canSave = dirty && !blocked && !saving;
 
@@ -424,6 +460,48 @@ export function EditProfileScreen() {
               </div>
             </Field>
           )}
+        </Card>
+
+        {/* ── Account ───────────────────────────────────────────────────── */}
+        <Card id="account" icon={ShieldCheck} title="Account" hint="Private. Only you can see these.">
+          <div className="flex items-center gap-3">
+            <Mail size={16} aria-hidden className="text-[#6B7280] flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[#374151] text-[13px] font-semibold">Email</p>
+              <p className="text-[#111827] text-[14px] truncate" data-testid="account-email">{auth?.email || profile.email || row?.email}</p>
+              {auth?.pendingEmail && (
+                <p className="text-[#B45309] text-[12px] leading-snug mt-0.5" data-testid="pending-email">
+                  Waiting for you to confirm {auth.pendingEmail}. Check that inbox for the link.
+                </p>
+              )}
+            </div>
+            <button type="button" onClick={() => setEmailSheet(true)} disabled={!auth} data-testid="btn-change-email"
+              className="h-10 px-3.5 rounded-[10px] border border-[#DBDBDB] bg-white text-[#0A1628] text-[13px] font-semibold flex-shrink-0 disabled:opacity-40">
+              Change
+            </button>
+          </div>
+
+          <Field label="Phone number" htmlFor="phone" error={phoneError} hint={`Optional. ${PHONE_HINT}`}>
+            <input id="phone" type="tel" inputMode="tel" autoComplete="tel" value={form.phone} maxLength={32} data-testid="input-phone"
+              onChange={(e) => set('phone', e.target.value)} onBlur={() => {
+                const n = normalizePhone(form.phone);
+                if (n) set('phone', formatPhone(n));
+              }}
+              aria-invalid={!!phoneError} aria-describedby={phoneError ? 'phone-error' : undefined}
+              placeholder="(555) 123-4567" className={`${INPUT} ${inputBorder(phoneError)}`} />
+          </Field>
+
+          <div className="flex items-center gap-3 border-t border-[#F3F4F6] pt-4">
+            <KeyRound size={16} aria-hidden className="text-[#6B7280] flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[#374151] text-[13px] font-semibold">Password</p>
+              <p className="text-[#6B7280] text-[13px]">{auth && !auth.hasPassword ? 'Not set. You sign in with Google or Apple.' : '••••••••'}</p>
+            </div>
+            <button type="button" onClick={() => setPasswordSheet(true)} disabled={!auth} data-testid="btn-change-password"
+              className="h-10 px-3.5 rounded-[10px] border border-[#DBDBDB] bg-white text-[#0A1628] text-[13px] font-semibold flex-shrink-0 disabled:opacity-40">
+              {auth && !auth.hasPassword ? 'Set' : 'Change'}
+            </button>
+          </div>
         </Card>
 
         {/* ── Work (worker) ─────────────────────────────────────────────── */}
@@ -569,6 +647,13 @@ export function EditProfileScreen() {
           {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
+
+      <ChangeEmailSheet open={emailSheet} currentEmail={auth?.email ?? ''}
+        onClose={() => setEmailSheet(false)}
+        onRequested={(next) => setAuth((a) => (a ? { ...a, pendingEmail: next } : a))} />
+      <ChangePasswordSheet open={passwordSheet} email={auth?.email ?? ''} hasPassword={auth?.hasPassword ?? true}
+        onClose={() => setPasswordSheet(false)}
+        onChanged={() => { showToast(auth?.hasPassword ? 'Password changed' : 'Password set'); void loadAuth(); }} />
 
       <ConfirmSheet
         open={discardOpen}
