@@ -6,6 +6,7 @@ import {
 import { useAdminGate } from '@/hooks/useAdminGate';
 import { useAdminUsers, useUpdateUser, useDeleteUser } from '@/hooks/useAdminData';
 import type { AdminUserRow } from '@/lib/adminApi';
+import { useToast } from '@/contexts/ToastContext';
 
 /* ── Shared types ────────────────────────────────────────────────────────── */
 type FilterOpt = 'all' | 'worker' | 'client' | 'admin' | 'staffer' | 'active' | 'suspended' | 'flagged' | 'banned';
@@ -102,6 +103,7 @@ function UserDetailSheet({
   const [confirmOp, setConfirmOp] = useState<'ban' | 'unban' | 'flag' | 'unflag' | 'delete' | null>(null);
   const [busy, setBusy]           = useState(false);
   const [delErr, setDelErr]       = useState<string | null>(null);
+  const { showToast } = useToast();
 
   async function handleDelete() {
     setBusy(true); setDelErr(null);
@@ -117,9 +119,14 @@ function UserDetailSheet({
   });
 
   async function applyUpdate(updates: Parameters<typeof updateUser.mutateAsync>[0]['body']) {
-    setBusy(true);
-    try { await updateUser.mutateAsync({ id: user.id, body: updates }); }
-    finally { setBusy(false); setConfirmOp(null); }
+    setBusy(true); setDelErr(null);
+    try {
+      await updateUser.mutateAsync({ id: user.id, body: updates });
+      const st = (updates as { status?: string }).status;
+      showToast(st === 'active' ? 'Account restored' : st === 'flagged' ? 'Account flagged for review' : st ? 'Account suspended' : 'Account updated');
+    } catch (e) {
+      setDelErr(e instanceof Error ? e.message : "Couldn't update this account. Try again.");
+    } finally { setBusy(false); setConfirmOp(null); }
   }
 
   return (
@@ -358,11 +365,13 @@ const FILTERS: { key: FilterOpt; label: string }[] = [
 export function AdminUsers() {
   const [search, setSearch]     = useState('');
   const [filter, setFilter]     = useState<FilterOpt>('all');
-  const [detail, setDetail]     = useState<AdminUserRow | null>(null);
+  // Keep the id, not a copy: the sheet must reflect the row after an action.
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const adminReady = useAdminGate();
 
   const { data: users = [], isLoading, isError } = useAdminUsers();
+  const detail = detailId ? users.find((u) => u.id === detailId) ?? null : null;
 
   const filtered = useMemo(() => users.filter((u) => {
     const matchSearch = !search.trim() ||
@@ -425,7 +434,7 @@ export function AdminUsers() {
             {filtered.map((user, i) => (
               <motion.div key={user.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                 transition={{ delay: i * 0.015 }} role="listitem">
-                <UserListRow user={user} onOpen={setDetail} />
+                <UserListRow user={user} onOpen={(u) => setDetailId(u.id)} />
               </motion.div>
             ))}
           </AnimatePresence>
@@ -441,7 +450,7 @@ export function AdminUsers() {
 
       <AnimatePresence>
         {detail && (
-          <UserDetailSheet key={detail.id} user={detail} onClose={() => setDetail(null)} />
+          <UserDetailSheet key={detail.id} user={detail} onClose={() => setDetailId(null)} />
         )}
       </AnimatePresence>
     </div>

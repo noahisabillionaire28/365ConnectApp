@@ -8,6 +8,7 @@ import { adminDb } from '../lib/supabaseAdmin.js';
 import { invalidateRole } from '../lib/roleCache.js';
 import { sendEmailDetailed, renderNotificationEmail, appUrl } from '../lib/email.js';
 import { unsubscribeUrl } from '../lib/unsubscribe.js';
+import { createNotification } from './notifications.js';
 import type { Request, Response, NextFunction } from 'express';
 
 const router = Router();
@@ -254,12 +255,51 @@ router.patch('/shifts/:id/cancel', async (req, res) => {
 router.patch('/shifts/:id/reopen', async (req, res) => {
   try {
     const { id } = req.params;
-    // Reopen the shift and clear any accepted bookings so it can be re-staffed.
-    const { error } = await adminDb.from('shifts').update({ status: 'open' }).eq('id', id);
+    const { data: shift, error: sErr } = await adminDb
+      .from('shifts').select('id, status, end_time, client_id, title, job_type').eq('id', id).maybeSingle();
+    if (sErr) throw sErr;
+    if (!shift) return res.status(404).json({ error: 'Shift not found' });
+    // A shift that has happened has a crew with hours and pay attached to it;
+    // reopening it would detach them. Only future filled/cancelled shifts.
+    if (shift.status === 'open') return res.status(409).json({ error: 'This shift is already open.' });
+    if (shift.status === 'completed' || (shift.end_time && new Date(shift.end_time as string).getTime() < Date.now())) {
+      return res.status(409).json({ error: "This shift has already happened, so it can't be reopened." });
+    }
+
+    const { data: booked, error: bErr } = await adminDb
+      .from('applications').select('id, worker_id').eq('shift_id', id).eq('status', 'accepted');
+    if (bErr) throw bErr;
+
+    const { error } = await adminDb.from('shifts').update({ status: 'open', spots_filled: 0 }).eq('id', id);
     if (error) throw error;
-    await adminDb.from('applications').update({ status: 'declined' })
-      .eq('shift_id', id).eq('status', 'accepted');
-    res.json({ ok: true });
+    if ((booked ?? []).length) {
+      const { error: dErr } = await adminDb.from('applications').update({ status: 'declined' })
+        .eq('shift_id', id).eq('status', 'accepted');
+      if (dErr) throw dErr;
+    }
+
+    // Everyone affected hears about it.
+    const label = (shift.title as string | null)?.trim() || `${shift.job_type ?? 'Event'} shift`;
+    await Promise.all([
+      ...(booked ?? []).map((a) => createNotification({
+        userId: a.worker_id as string,
+        type: 'shift_update',
+        title: 'Your booking was removed',
+        body: `"${label}" was reopened by 365 Connect support, so your spot was released. Contact support if this looks wrong.`,
+        shiftId: id,
+        url: `/shift/${id}`,
+      }).catch(() => {})),
+      shift.client_id ? createNotification({
+        userId: shift.client_id as string,
+        type: 'shift_update',
+        title: 'Shift reopened by support',
+        body: `"${label}" is open for applicants again${(booked ?? []).length ? `; ${(booked ?? []).length} booked worker${(booked ?? []).length === 1 ? ' was' : 's were'} released` : ''}.`,
+        shiftId: id,
+        url: `/shift/${id}`,
+      }).catch(() => {}) : Promise.resolve(),
+    ]);
+    console.info('[admin/shifts/reopen]', { admin: req.userId, shift: id, released: (booked ?? []).length });
+    res.json({ ok: true, released: (booked ?? []).length });
   } catch (err) {
     console.error('[admin/shifts/reopen]', err);
     res.status(500).json({ error: 'Internal server error' });

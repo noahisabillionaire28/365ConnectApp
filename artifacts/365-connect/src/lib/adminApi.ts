@@ -172,7 +172,7 @@ export const adminApi = {
   cancelShift:   (id: string) =>
     patch<{ ok: boolean }>(`/shifts/${id}/cancel`, {}),
   reopenShift:   (id: string) =>
-    patch<{ ok: boolean }>(`/shifts/${id}/reopen`, {}),
+    patch<{ ok: boolean; released?: number }>(`/shifts/${id}/reopen`, {}),
   backfillShiftCoords: (updates: Array<{ id: string; lat: number; lng: number }>) =>
     post<{ updated: number }>(`/shifts/backfill-coords`, { updates }),
   sendTestEmail: (to?: string) =>

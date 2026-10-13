@@ -4,6 +4,8 @@ import { Search, X, Users, DollarSign, Calendar, XCircle, AlertCircle, MapPin } 
 import { useAdminGate } from '@/hooks/useAdminGate';
 import { useAdminShifts, useCancelShift, useReopenShift } from '@/hooks/useAdminData';
 import { adminApi, type AdminShiftRow } from '@/lib/adminApi';
+import { ConfirmSheet } from '@/components/ConfirmSheet';
+import { useToast } from '@/contexts/ToastContext';
 import { geocodeAddress } from '@/lib/geocode';
 
 /* ── Status badge ────────────────────────────────────────────────────────── */
@@ -50,8 +52,24 @@ function SkeletonCard() {
 function ShiftCard({ shift }: { shift: AdminShiftRow }) {
   const cancelShift = useCancelShift();
   const reopenShift = useReopenShift();
-  const canReopen = shift.status !== 'open';
+  const { showToast } = useToast();
+  // Only a future shift that is filled or cancelled can be put back on the
+  // market; a shift that has happened has a crew with hours and pay on it.
+  const canReopen = (shift.status === 'filled' || shift.status === 'cancelled')
+    && new Date(shift.end_time).getTime() > Date.now();
   const [confirm, setConfirm] = useState(false);
+  const [reopenAsk, setReopenAsk] = useState(false);
+
+  function handleReopen() {
+    reopenShift.mutate(shift.id, {
+      onSuccess: (r) => {
+        setReopenAsk(false);
+        const n = r?.released ?? 0;
+        showToast(n ? `Shift reopened. ${n} worker${n === 1 ? '' : 's'} released and notified.` : 'Shift reopened.');
+      },
+      onError: (e) => { setReopenAsk(false); showToast(e instanceof Error ? e.message : "Couldn't reopen the shift.", 'error'); },
+    });
+  }
 
   const canCancel = shift.status !== 'cancelled' && shift.status !== 'completed';
 
@@ -132,13 +150,25 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
       {canReopen && (
         <button type="button" disabled={reopenShift.isPending}
           aria-label={`Reopen ${shift.job_type} shift for re-staffing`}
-          onClick={() => reopenShift.mutate(shift.id)}
+          onClick={() => setReopenAsk(true)}
           className="w-full h-[38px] mt-2 rounded-[8px] bg-[#0A1628] text-white text-[12px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60">
           {reopenShift.isPending
             ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-            : 'Reopen / Reassign'}
+            : 'Reopen for applicants'}
         </button>
       )}
+      <ConfirmSheet
+        open={reopenAsk}
+        title="Reopen this shift?"
+        body={shift.spots_filled > 0
+          ? `${shift.spots_filled} booked worker${shift.spots_filled === 1 ? '' : 's'} will be released and notified, and the poster will be told. The shift goes back on the marketplace.`
+          : 'The shift goes back on the marketplace and the poster will be told.'}
+        confirmLabel="Reopen shift"
+        tone="danger"
+        busy={reopenShift.isPending}
+        onConfirm={handleReopen}
+        onCancel={() => setReopenAsk(false)}
+      />
     </motion.div>
   );
 }
