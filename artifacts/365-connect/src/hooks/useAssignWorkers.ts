@@ -34,6 +34,7 @@ export function useAssignWorkers(shiftId: string | undefined) {
   const [error, setError]           = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [offeringId, setOfferingId]   = useState<string | null>(null);
+  const [reloadKey, setReloadKey]     = useState(0);
 
   useEffect(() => {
     if (!shiftId || !user?.id) { setWorkers([]); setLoading(false); return; }
@@ -62,7 +63,7 @@ export function useAssignWorkers(shiftId: string | undefined) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
     }).finally(() => setLoading(false));
-  }, [shiftId, user?.id]);
+  }, [shiftId, user?.id, reloadKey]);
 
   function refreshShift() {
     // The shift's spots-filled count changed — refresh every cached copy so
@@ -115,5 +116,5 @@ export function useAssignWorkers(shiftId: string | undefined) {
 
   const isAssigning = assigningId !== null;
 
-  return { workers, isLoading, error, assign, offer, assigningId, offeringId, isAssigning };
+  return { workers, isLoading, error, assign, offer, assigningId, offeringId, isAssigning, reload: () => setReloadKey((k) => k + 1) };
 }

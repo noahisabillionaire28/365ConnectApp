@@ -162,7 +162,7 @@ export function ResetPasswordScreen() {
             className="w-full text-white font-bold py-[18px] rounded-[14px] mt-2 active:scale-[0.98] transition-transform disabled:opacity-30"
             style={{ background: NAVY }}
           >
-            {loading ? 'Updating…' : 'Update Password'}
+            {loading ? 'Updating…' : 'Update password'}
           </button>
         </div>
       )}

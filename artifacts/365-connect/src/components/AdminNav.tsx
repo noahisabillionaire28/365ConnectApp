@@ -66,7 +66,7 @@ export function AdminNav() {
             style={{ background: ACTIVE }}
           >
             <ExternalLink size={15} aria-hidden />
-            View App
+            View app
           </Link>
 
           {/* Hamburger */}
@@ -165,7 +165,7 @@ export function AdminNav() {
                 >
                   <ExternalLink size={18} aria-hidden style={{ color: '#FFFFFF', flexShrink: 0 }} />
                   <span className="text-[15px] font-semibold" style={{ color: '#FFFFFF' }}>
-                    View App
+                    View app
                   </span>
                 </Link>
               </div>

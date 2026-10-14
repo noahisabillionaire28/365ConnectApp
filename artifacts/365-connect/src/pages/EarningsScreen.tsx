@@ -10,13 +10,16 @@ import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   ChevronLeft, DollarSign, CheckCircle2, Clock3,
-  AlertCircle, Zap, CreditCard, TrendingUp, ChevronRight,
+  AlertCircle, Zap, TrendingUp, ChevronRight,
 } from 'lucide-react';
 import { usePayments, type PaymentRow } from '@/hooks/usePayments';
 import { PayTimeline, StageChip, stageBucket } from '@/components/PayTimeline';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
+import { useToast } from '@/contexts/ToastContext';
 import { confirmShiftPayment } from '@/lib/checkout';
+import { LoadError } from '@/components/StateView';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(iso: string): string {
@@ -69,7 +72,10 @@ function StatusChip({ status }: { status: string }) {
 // ─── Payment type label ───────────────────────────────────────────────────────
 function typeLabel(row: PaymentRow): string {
   if (row.payment_type === 'pro_subscription') return 'Pro subscription';
-  if (row.direction === 'out') return 'Shift payment sent';
+  if (row.direction === 'out') {
+    const who = row.worker_username ? `@${row.worker_username}` : 'Worker';
+    return row.shift_title ? `${who} · ${row.shift_title}` : `Paid ${who}`;
+  }
   const title = row.shift_title || row.company_name;
   const hours = typeof row.hours === 'number' && row.hours > 0 ? ` · ${row.hours.toFixed(1)}h` : '';
   if (row.status === 'needs_clock_out') return `${title ?? 'Shift'} · clock-out missing`;
@@ -125,6 +131,35 @@ function SummaryCard({ payments }: { payments: PaymentRow[] }) {
       </div>
       <p className="text-white/70 text-[11px] mt-3 leading-snug" data-testid="earnings-fee-note">
         The poster pays your approved pay. 365 Connect adds no fee today, so the amounts shown are what you receive.
+      </p>
+    </div>
+  );
+}
+
+// ─── Poster summary (money sent) ──────────────────────────────────────────────
+function PosterSummaryCard({ sent }: { sent: PaymentRow[] }) {
+  const done = sent.filter((p) => p.status === 'completed');
+  const total = done.reduce((a, p) => a + p.amount, 0);
+  const now = new Date();
+  const thisMonth = done
+    .filter((p) => { const d = new Date(p.created_at); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); })
+    .reduce((a, p) => a + p.amount, 0);
+  return (
+    <div className="bg-[#0A1628] rounded-[14px] px-5 py-5 mb-4">
+      <p className="text-white/70 text-[13px] font-medium mb-1">Paid this month</p>
+      <p className="text-white font-bold text-[34px] tracking-tight mb-4">{fmtAmount(thisMonth)}</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white/10 rounded-[10px] px-3 py-2.5">
+          <p className="text-white/70 text-[12px] font-medium mb-0.5">All time</p>
+          <p className="text-white font-bold text-[18px]">{fmtAmount(total)}</p>
+        </div>
+        <div className="bg-white/10 rounded-[10px] px-3 py-2.5">
+          <p className="text-white/70 text-[12px] font-medium mb-0.5">Payments</p>
+          <p className="text-white font-bold text-[18px]">{done.length}</p>
+        </div>
+      </div>
+      <p className="text-white/70 text-[12px] mt-3 leading-snug">
+        You pay workers from each shift's crew page once you've approved their hours.
       </p>
     </div>
   );
@@ -209,15 +244,17 @@ function PaymentCard({ payment, index, onOpen }: { payment: PaymentRow; index: n
 }
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
-function EmptyState() {
+function EmptyState({ poster }: { poster: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
       <div className="w-16 h-16 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center mb-4">
         <TrendingUp size={26} aria-hidden className="text-[#9CA3AF]" />
       </div>
       <h3 className="text-[#111827] font-bold text-[17px] mb-2">No payments yet</h3>
-      <p className="text-[#6B7280] text-[13px] leading-relaxed max-w-[220px]">
-        Complete your first shift to see earnings here. Payments are recorded after clock-out.
+      <p className="text-[#6B7280] text-[13px] leading-relaxed max-w-[260px]">
+        {poster
+          ? "When you approve a worker's hours, you can pay them from the shift's crew page. Every payment shows up here."
+          : 'Complete your first shift to see earnings here. Payments are recorded after clock-out.'}
       </p>
     </div>
   );
@@ -228,6 +265,10 @@ export function EarningsScreen() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const { data: payments = [], isLoading, isError, refetch } = usePayments();
+  const profile = useProfile();
+  const { showToast } = useToast();
+  // Clients and agencies pay; workers earn. Same data, a different page.
+  const isPoster = profile.role === 'client' || profile.role === 'staffer';
   const [confirmMsg, setConfirmMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
 
@@ -237,10 +278,15 @@ export function EarningsScreen() {
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get('session_id');
     if (!sessionId || !user?.id) return;
+    // Back to the crew page the payment was made from, when we know it.
+    const shiftId = params.get('shift_id');
     confirmShiftPayment(user.id, sessionId)
-      .then(() => { setConfirmMsg('Payment recorded — thank you!'); return refetch(); })
-      .catch(() => setConfirmMsg('We could not confirm that payment.'))
-      .finally(() => window.history.replaceState({}, '', '/earnings'));
+      .then(() => {
+        if (shiftId) { showToast('Payment recorded. Thank you!'); navigate(`/shift/${shiftId}/applicants`, { replace: true }); return; }
+        setConfirmMsg('Payment recorded. Thank you!'); return refetch();
+      })
+      .catch(() => setConfirmMsg("We couldn't confirm that payment. If you were charged, it will show here shortly."))
+      .finally(() => { if (!shiftId) window.history.replaceState({}, '', '/earnings'); });
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const shiftPayments = payments.filter((p) => p.payment_type !== 'pro_subscription' && p.direction !== 'out');
@@ -263,8 +309,8 @@ export function EarningsScreen() {
             <ChevronLeft size={18} aria-hidden className="text-[#111827]" />
           </button>
           <div>
-            <h1 className="text-[#111827] font-bold text-[20px] tracking-tight">Payments & Earnings</h1>
-            <p className="text-[#6B7280] text-[12px]">Every shift, from worked to paid</p>
+            <h1 className="text-[#111827] font-bold text-[20px] tracking-tight">{isPoster ? 'Payments' : 'Earnings'}</h1>
+            <p className="text-[#6B7280] text-[12px]">{isPoster ? 'Everything you’ve paid workers' : 'Every shift, from worked to paid'}</p>
           </div>
         </div>
       </div>
@@ -280,11 +326,7 @@ export function EarningsScreen() {
       <div className="flex-1 overflow-y-auto px-4 pt-5 pb-8">
 
         {/* Error */}
-        {isError && (
-          <div className="mb-4 bg-red-50 border border-red-200 rounded-[12px] px-4 py-3" role="alert">
-            <p className="text-[#EF4444] text-[13px] font-medium">Couldn't load payment history. Check your connection.</p>
-          </div>
-        )}
+        {isError && <LoadError what="your payment history" onRetry={() => void refetch()} />}
 
         {/* Loading skeletons */}
         {isLoading && (
@@ -295,15 +337,15 @@ export function EarningsScreen() {
         )}
 
         {/* Populated state */}
-        {!isLoading && !isError && payments.length > 0 && (
+        {!isLoading && !isError && (isPoster ? sentPayments.length + subscriptions.length > 0 : payments.length > 0) && (
           <>
-            <SummaryCard payments={payments} />
+            {isPoster ? <PosterSummaryCard sent={sentPayments} /> : <SummaryCard payments={payments} />}
 
-            {shiftPayments.length > 0 && (
+            {!isPoster && shiftPayments.length > 0 && (
               <div className="mb-5">
                 <FilterRow value={filter} onChange={setFilter} />
                 <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider mb-3">
-                  Shift Earnings
+                  Shift earnings
                 </p>
                 {visibleShifts.length === 0 ? (
                   <p className="text-[#6B7280] text-[13px] px-1 py-4 text-center">
@@ -320,10 +362,10 @@ export function EarningsScreen() {
               </div>
             )}
 
-            {filter === 'all' && sentPayments.length > 0 && (
+            {(isPoster || filter === 'all') && sentPayments.length > 0 && (
               <div className="mb-5">
                 <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider mb-3">
-                  Payments Sent
+                  {isPoster ? 'Payment history' : 'Payments sent'}
                 </p>
                 <div className="flex flex-col gap-3">
                   {sentPayments.map((p, i) => (
@@ -347,19 +389,11 @@ export function EarningsScreen() {
               </div>
             )}
 
-            <div className="mt-2 bg-[#F3F4F6] rounded-[10px] px-4 py-3">
-              <div className="flex items-center gap-2">
-                <CreditCard size={13} aria-hidden className="text-[#737373]" />
-                <p className="text-[#6B7280] text-[11px]">
-                  Subscription charges are simulated.
-                </p>
-              </div>
-            </div>
           </>
         )}
 
         {/* Empty state */}
-        {!isLoading && !isError && payments.length === 0 && <EmptyState />}
+        {!isLoading && !isError && (isPoster ? sentPayments.length === 0 && subscriptions.length === 0 : payments.length === 0) && <EmptyState poster={isPoster} />}
       </div>
 
       <BottomTabNav />

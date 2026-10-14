@@ -7,7 +7,6 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, DollarSign, FileText, ListChecks } from 'lucide-react';
 import { getDraft, setDraft } from '@/store/postShiftStore';
 import { useRole } from '@/contexts/RoleContext';
-import { BottomTabNav } from '@/components/BottomTabNav';
 
 // ─── Wizard primitives ────────────────────────────────────────────────────────
 function StepBar({ current, total }: { current: number; total: number }) {
@@ -87,7 +86,7 @@ export function PostShiftStep4Screen() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[72px]">
+    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[calc(env(safe-area-inset-bottom)+112px)]">
 
       {/* Header */}
       <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
@@ -166,7 +165,7 @@ export function PostShiftStep4Screen() {
             rows={5}
             className={TEXTAREA_CLS}
           />
-          <p className="text-[#737373] text-[11px] mt-1.5 text-right">{description.length} chars</p>
+          <p className="text-[#6B7280] text-[11px] mt-1.5 text-right">{description.length} chars</p>
         </div>
 
         {/* Requirements */}
@@ -253,7 +252,7 @@ export function PostShiftStep4Screen() {
       </div>
 
       {/* Fixed CTA */}
-      <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-4 pt-4
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4
         bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
         <motion.button
           type="button" whileTap={{ scale: 0.97 }}
@@ -261,11 +260,9 @@ export function PostShiftStep4Screen() {
           aria-label="Review shift before posting"
           className="w-full h-[52px] rounded-[12px] bg-[#0A1628] text-white font-bold text-[16px]"
         >
-          Review Shift
+          Review shift
         </motion.button>
       </div>
-
-      <BottomTabNav />
     </div>
   );
 }

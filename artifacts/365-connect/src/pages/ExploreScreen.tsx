@@ -17,7 +17,7 @@ const GOLD = '#FFD700';
 function ExploreTile({ person, onTap }: { person: WorkerPerson; onTap: () => void }) {
   return (
     <button type="button" onClick={onTap} aria-label={`View @${person.username}'s profile`}
-      className="relative aspect-square w-full overflow-hidden bg-[#EFEFEF]">
+      className="relative aspect-square w-full overflow-hidden bg-[#F3F4F6]">
       {person.photoUrl ? (
         <img src={person.photoUrl} alt="" aria-hidden loading="lazy" decoding="async"
           className="w-full h-full object-cover" />
@@ -39,7 +39,7 @@ function ExploreTile({ person, onTap }: { person: WorkerPerson; onTap: () => voi
 }
 
 function ExploreTileSkeleton() {
-  return <div className="aspect-square w-full bg-[#EFEFEF] animate-pulse" />;
+  return <div className="aspect-square w-full bg-[#F3F4F6] animate-pulse" />;
 }
 
 export function ExploreScreen() {
@@ -112,7 +112,7 @@ export function ExploreScreen() {
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[56px]">
-      <div className="sticky top-0 z-20 bg-white border-b border-[#DBDBDB]">
+      <div className="sticky top-0 z-20 bg-white border-b border-[#E5E7EB]">
         {/* Feed / People toggle */}
         <div className="flex items-center gap-2 px-4 pt-4 pb-3">
           <div className="flex bg-[#F3F4F6] rounded-full p-[3px] flex-1" role="tablist" aria-label="Explore view">
@@ -133,8 +133,8 @@ export function ExploreScreen() {
         {tab === 'people' && (
           <>
             <div className="px-4 pb-3">
-              <div className="flex items-center gap-2 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[10px] px-3.5 h-[42px]">
-                <Search size={15} aria-hidden className="text-[#737373] flex-shrink-0" />
+              <div className="flex items-center gap-2 bg-[#FAFAFA] border border-[#E5E7EB] rounded-[10px] px-3.5 h-[42px]">
+                <Search size={15} aria-hidden className="text-[#6B7280] flex-shrink-0" />
                 <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search workers" aria-label="Search workers"
                   className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#6B7280] outline-none" />
@@ -144,14 +144,14 @@ export function ExploreScreen() {
               style={{ WebkitOverflowScrolling: 'touch' }}>
               <button type="button" role="radio" aria-checked={jobType === null} onClick={() => setJobType(null)}
                 className={`flex-shrink-0 h-10 px-3.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
-                  jobType === null ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'}`}>
+                  jobType === null ? 'bg-black text-white border-black' : 'bg-white text-black border-[#E5E7EB]'}`}>
                 All
               </button>
               {JOB_TYPES.map((t) => (
                 <button key={t} type="button" role="radio" aria-checked={jobType === t}
                   onClick={() => setJobType(t)}
                   className={`flex-shrink-0 h-10 px-3.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
-                    jobType === t ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'}`}>
+                    jobType === t ? 'bg-black text-white border-black' : 'bg-white text-black border-[#E5E7EB]'}`}>
                   {t}
                 </button>
               ))}
@@ -164,8 +164,8 @@ export function ExploreScreen() {
         {tab === 'people' ? (
           <>
             {error && !isLoading && (
-              <div className="mx-4 mt-6 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-                <p className="text-[#737373] text-[14px]">Couldn't load workers right now.</p>
+              <div className="mx-4 mt-6 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-10 text-center">
+                <p className="text-[#6B7280] text-[14px]">Couldn't load workers right now.</p>
               </div>
             )}
             {isLoading && (
@@ -181,8 +181,8 @@ export function ExploreScreen() {
               </div>
             )}
             {!isLoading && !error && filtered.length === 0 && (
-              <div className="mx-4 mt-6 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-                <p className="text-[#737373] text-[14px]">No workers found. Try adjusting your filters.</p>
+              <div className="mx-4 mt-6 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-10 text-center">
+                <p className="text-[#6B7280] text-[14px]">No workers found. Try adjusting your filters.</p>
               </div>
             )}
           </>
@@ -192,20 +192,20 @@ export function ExploreScreen() {
             {feedLoading && (
               <div className="flex flex-col">
                 {[1, 2].map((n) => (
-                  <div key={n} className="border-b border-[#EFEFEF] pb-4">
+                  <div key={n} className="border-b border-[#F3F4F6] pb-4">
                     <div className="flex items-center gap-2.5 px-4 py-3">
-                      <div className="w-10 h-10 rounded-full bg-[#EFEFEF] animate-pulse" />
-                      <div className="w-24 h-3 rounded bg-[#EFEFEF] animate-pulse" />
+                      <div className="w-10 h-10 rounded-full bg-[#F3F4F6] animate-pulse" />
+                      <div className="w-24 h-3 rounded bg-[#F3F4F6] animate-pulse" />
                     </div>
-                    <div className="w-full h-[320px] bg-[#EFEFEF] animate-pulse" />
+                    <div className="w-full h-[320px] bg-[#F3F4F6] animate-pulse" />
                   </div>
                 ))}
               </div>
             )}
             {!feedLoading && posts.length === 0 && (
-              <div className="mx-4 mt-8 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-12 text-center">
+              <div className="mx-4 mt-8 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-12 text-center">
                 <p className="text-[#111827] text-[15px] font-semibold">No posts yet</p>
-                <p className="text-[#737373] text-[13px] mt-1">Be the first — tap the camera to share a moment from a shift.</p>
+                <p className="text-[#6B7280] text-[13px] mt-1">Be the first — tap the camera to share a moment from a shift.</p>
               </div>
             )}
             {!feedLoading && posts.map((post) => (
@@ -247,7 +247,7 @@ export function ExploreScreen() {
       {composeFile && (
         <div ref={composeRef} data-no-pull className="fixed inset-0 z-[80] flex flex-col bg-white max-w-app mx-auto"
           role="dialog" aria-modal="true" aria-labelledby={composeTitleId}>
-          <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 border-b border-[#EFEFEF]">
+          <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 border-b border-[#F3F4F6]">
             <button type="button" onClick={closeCompose} disabled={posting}
               className="text-[#111827] text-[15px] font-medium disabled:opacity-50">Cancel</button>
             <h1 id={composeTitleId} className="text-[#111827] font-bold text-[16px]">New post</h1>

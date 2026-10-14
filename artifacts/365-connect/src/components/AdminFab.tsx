@@ -38,10 +38,10 @@ export function AdminFab() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.96 }}
             transition={{ duration: 0.16 }}
-            className="absolute bottom-[52px] left-0 w-[210px] bg-white border border-[#DBDBDB] rounded-[14px] shadow-xl overflow-hidden"
+            className="absolute bottom-[52px] left-0 w-[210px] bg-white border border-[#E5E7EB] rounded-[14px] shadow-xl overflow-hidden"
           >
             <div className="px-3.5 pt-3 pb-2">
-              <p className="text-[#737373] text-[10px] font-bold uppercase tracking-[0.14em]">Viewing app as</p>
+              <p className="text-[#6B7280] text-[10px] font-bold uppercase tracking-[0.14em]">Viewing app as</p>
             </div>
             <div className="px-2 pb-2 flex flex-col">
               {ROLES.map((r) => {
@@ -59,7 +59,7 @@ export function AdminFab() {
               })}
             </div>
             <button type="button" onClick={() => navigate('/admin/dashboard')}
-              className="w-full flex items-center gap-2 px-3.5 h-[46px] border-t border-[#EFEFEF] text-[#2563EB] text-[14px] font-bold">
+              className="w-full flex items-center gap-2 px-3.5 h-[46px] border-t border-[#F3F4F6] text-[#2563EB] text-[14px] font-bold">
               <LayoutDashboard size={16} aria-hidden />
               Admin Dashboard
             </button>

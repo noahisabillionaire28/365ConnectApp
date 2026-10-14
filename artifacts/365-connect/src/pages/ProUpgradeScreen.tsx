@@ -133,7 +133,7 @@ function SuccessOverlay({ onDone }: { onDone: () => void }) {
           onClick={onDone}
           className="w-full max-w-[280px] h-[52px] rounded-[12px] bg-[#0A1628] text-white font-bold text-[16px]"
         >
-          View My Profile
+          View my profile
         </motion.button>
       </motion.div>
     </motion.div>
@@ -302,7 +302,7 @@ export function ProUpgradeScreen() {
             onClick={() => navigate('/profile')}
             className="w-full h-[52px] rounded-[12px] font-bold text-[16px] flex items-center justify-center gap-2.5 bg-[#0A1628] text-white"
           >
-            View Profile
+            View profile
           </motion.button>
         ) : SIMULATE_ALLOWED ? (
           <>

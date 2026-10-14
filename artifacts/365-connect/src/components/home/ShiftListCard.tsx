@@ -55,7 +55,7 @@ export function ShiftListCard({ shift, applied, onTap }: {
           <span className="text-[#111827] text-[13px] font-medium">{shift.date}</span>
           <span className="text-[#6B7280] text-[12px]">{shift.startTime} – {shift.endTime}</span>
         </div>
-        <div className="flex items-baseline gap-1">
+        <div className="flex items-baseline">
           <span className="text-[#111827] font-bold text-[20px]">${shift.payRate}</span>
           <span className="text-[#6B7280] text-[12px] font-medium">/{shift.payPeriod}</span>
         </div>
@@ -76,9 +76,9 @@ export function ShiftListCard({ shift, applied, onTap }: {
 export function ShiftListCardSkeleton() {
   return (
     <div className="mx-4 rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-4 flex flex-col gap-3">
-      <div className="w-24 h-6 rounded-full bg-[#EFEFEF] animate-pulse" />
-      <div className="w-40 h-4 rounded bg-[#EFEFEF] animate-pulse" />
-      <div className="w-full h-4 rounded bg-[#EFEFEF] animate-pulse" />
+      <div className="w-24 h-6 rounded-full bg-[#F3F4F6] animate-pulse" />
+      <div className="w-40 h-4 rounded bg-[#F3F4F6] animate-pulse" />
+      <div className="w-full h-4 rounded bg-[#F3F4F6] animate-pulse" />
     </div>
   );
 }

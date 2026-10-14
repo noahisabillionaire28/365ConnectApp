@@ -80,7 +80,7 @@ export const JOB_TEMPLATES: JobTemplate[] = [
   },
   {
     id: 'promo-model',
-    label: 'Promo Model',
+    label: 'Promotional Model',
     Icon: Camera,
     payRate: 28,
     workersNeeded: 4,

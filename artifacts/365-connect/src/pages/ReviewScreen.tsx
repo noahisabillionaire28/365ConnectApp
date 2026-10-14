@@ -15,6 +15,12 @@ const POSITIVE_TAGS = [
   'Reliable', 'Team player', 'Well dressed', 'Great communicator',
 ];
 
+/** What a worker can say about the client or agency that ran the shift. */
+const CLIENT_POSITIVE_TAGS = [
+  'Clear instructions', 'Respectful', 'Accurate description', 'Easy check-in',
+  'Breaks given', 'Paid on time', 'Well organised', 'Would work again',
+];
+
 const NEGATIVE_TAGS = [
   'Late', 'No call no show', 'Unprofessional', 'Poor attitude',
   'Dress code violation', 'Left early', 'Caused issues',
@@ -54,8 +60,11 @@ export function ReviewScreen() {
   const [submitting,   setSubmitting]   = useState(false);
   const [submitted,    setSubmitted]    = useState(false);
   const [submitError,  setSubmitError]  = useState<string | null>(null);
+  const [comment,      setComment]      = useState('');
 
   const canSeeNegativeTags = profile.role === 'client' || profile.role === 'staffer';
+  // Workers review the poster, so they get tags about how the shift was run.
+  const positiveTagList = canSeeNegativeTags ? POSITIVE_TAGS : CLIENT_POSITIVE_TAGS;
   const displayRating = hoverRating || rating;
 
   function toggleTag(set: React.Dispatch<React.SetStateAction<Set<string>>>, tag: string) {
@@ -79,6 +88,7 @@ export function ReviewScreen() {
       shiftId, reviewerId: user.id, revieweeId: toUserId, rating,
       positiveTags: Array.from(positiveTags),
       negativeTags: canSeeNegativeTags ? Array.from(negativeTags) : [],
+      ...(comment.trim() ? { comment: comment.trim() } : {}),
     });
     setSubmitting(false);
     if (error) { setSubmitError('Could not submit your review — please try again.'); return; }
@@ -96,7 +106,7 @@ export function ReviewScreen() {
   if (isLoading) {
     return (
       <div className="min-h-[100dvh] bg-white flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-[#DBDBDB] border-t-[#0A1628] animate-spin" role="status" aria-label="Loading review" />
+        <div className="w-8 h-8 rounded-full border-2 border-[#E5E7EB] border-t-[#0A1628] animate-spin" role="status" aria-label="Loading review" />
       </div>
     );
   }
@@ -104,8 +114,8 @@ export function ReviewScreen() {
   if (!shift) {
     return (
       <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center gap-4 px-6 text-center">
-        <p className="text-[#737373] text-[15px]">Couldn't load this shift.</p>
-        <button type="button" onClick={goBack} className="text-[#0095F6] font-semibold text-[14px]">← Go back</button>
+        <p className="text-[#6B7280] text-[15px]">Couldn't load this shift.</p>
+        <button type="button" onClick={goBack} className="text-[#0A1628] font-semibold text-[14px]">← Go back</button>
       </div>
     );
   }
@@ -126,13 +136,13 @@ export function ReviewScreen() {
             <div className="flex items-center justify-center gap-1 mt-3" aria-label={`You gave ${existing.rating} stars`}>
               {[1, 2, 3, 4, 5].map((i) => (
                 <Star key={i} size={22} aria-hidden
-                  className={existing.rating >= i ? 'text-[#FFD700] fill-[#FFD700]' : 'text-[#DBDBDB] fill-[#DBDBDB]'} />
+                  className={existing.rating >= i ? 'text-[#FFD700] fill-[#FFD700]' : 'text-[#E5E7EB] fill-[#E5E7EB]'} />
               ))}
             </div>
           )}
         </div>
         {!submitted && (
-          <button type="button" onClick={goBack} className="text-[#0095F6] font-semibold text-[14px]">← Back</button>
+          <button type="button" onClick={goBack} className="text-[#0A1628] font-semibold text-[14px]">← Back</button>
         )}
       </div>
     );
@@ -142,15 +152,15 @@ export function ReviewScreen() {
     <div className="min-h-[100dvh] bg-white flex flex-col">
       <div className="px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
         <button type="button" aria-label="Go back" onClick={goBack}
-          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} aria-hidden className="text-black" />
         </button>
       </div>
 
       <div className="flex-1 flex flex-col px-5 pt-4 pb-10 overflow-y-auto">
         <div className="text-center mb-8">
-          <h1 className="text-black font-bold text-[24px] tracking-tight">Rate Your Experience</h1>
-          <p className="text-[#737373] text-[14px] mt-1.5">
+          <h1 className="text-black font-bold text-[24px] tracking-tight">Rate your experience</h1>
+          <p className="text-[#6B7280] text-[14px] mt-1.5">
             {targetName ?? shift.companyName} · {shift.jobType}
           </p>
         </div>
@@ -161,11 +171,14 @@ export function ReviewScreen() {
             <motion.button key={i} type="button"
               aria-label={`${i} star${i !== 1 ? 's' : ''}`} aria-pressed={rating === i}
               whileTap={{ scale: 0.82 }} onClick={() => setRating(i)}
-              onMouseEnter={() => setHoverRating(i)} onMouseLeave={() => setHoverRating(0)}>
+              // Hover preview for a mouse only: on touch screens a leftover
+              // pointer made all five stars look picked before any tap.
+              onPointerEnter={(e) => { if (e.pointerType === 'mouse') setHoverRating(i); }}
+              onPointerLeave={() => setHoverRating(0)} onPointerCancel={() => setHoverRating(0)}>
               <Star size={42} aria-hidden
                 className={displayRating >= i
                   ? 'text-[#FFD700] fill-[#FFD700]'
-                  : 'text-[#DBDBDB] fill-[#DBDBDB]'} />
+                  : 'text-[#E5E7EB] fill-[#E5E7EB]'} />
             </motion.button>
           ))}
         </div>
@@ -174,7 +187,7 @@ export function ReviewScreen() {
           <AnimatePresence mode="wait">
             {displayRating > 0 && (
               <motion.p key={displayRating} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }} className="text-[#737373] text-[14px] font-medium">
+                exit={{ opacity: 0 }} className="text-[#6B7280] text-[14px] font-medium">
                 {RATING_LABELS[displayRating]}
               </motion.p>
             )}
@@ -182,15 +195,15 @@ export function ReviewScreen() {
         </div>
 
         {/* Positive tags — visible to everyone */}
-        <p className="text-[#737373] text-[11px] font-bold uppercase tracking-widest mb-3">What went well?</p>
+        <p className="text-[#374151] text-[14px] font-semibold mb-3">What went well?</p>
         <div className="flex flex-wrap gap-2 mb-6" role="group" aria-label="Positive review tags">
-          {POSITIVE_TAGS.map((tag) => {
+          {positiveTagList.map((tag) => {
             const on = positiveTags.has(tag);
             return (
               <motion.button key={tag} type="button" aria-pressed={on} whileTap={{ scale: 0.94 }}
                 onClick={() => toggleTag(setPositiveTags, tag)}
                 className={`rounded-full px-4 py-2 text-[13px] font-medium border transition-all duration-150 ${
-                  on ? 'bg-[#10B981]/10 border-[#10B981] text-[#10B981]' : 'bg-white border-[#DBDBDB] text-[#737373]'
+                  on ? 'bg-[#10B981]/10 border-[#10B981] text-[#10B981]' : 'bg-white border-[#E5E7EB] text-[#6B7280]'
                 }`}>
                 {tag}
               </motion.button>
@@ -201,7 +214,7 @@ export function ReviewScreen() {
         {/* Negative tags — client/staffer only, hidden entirely from workers */}
         {canSeeNegativeTags && (
           <>
-            <p className="text-[#737373] text-[11px] font-bold uppercase tracking-widest mb-3">Any issues?</p>
+            <p className="text-[#374151] text-[14px] font-semibold mb-3">Any issues?</p>
             <div className="flex flex-wrap gap-2 mb-6" role="group" aria-label="Issue tags">
               {NEGATIVE_TAGS.map((tag) => {
                 const on = negativeTags.has(tag);
@@ -209,7 +222,7 @@ export function ReviewScreen() {
                   <motion.button key={tag} type="button" aria-pressed={on} whileTap={{ scale: 0.94 }}
                     onClick={() => toggleTag(setNegativeTags, tag)}
                     className={`rounded-full px-4 py-2 text-[13px] font-medium border transition-all duration-150 ${
-                      on ? 'bg-[#EF4444]/10 border-[#EF4444] text-[#EF4444]' : 'bg-white border-[#DBDBDB] text-[#737373]'
+                      on ? 'bg-[#EF4444]/10 border-[#EF4444] text-[#EF4444]' : 'bg-white border-[#E5E7EB] text-[#6B7280]'
                     }`}>
                     {tag}
                   </motion.button>
@@ -218,6 +231,14 @@ export function ReviewScreen() {
             </div>
           </>
         )}
+
+        <label htmlFor="review-comment" className="text-[#374151] text-[14px] font-semibold mb-2 block">
+          Add a comment <span className="text-[#6B7280] font-normal">(optional)</span>
+        </label>
+        <textarea id="review-comment" value={comment} maxLength={500} rows={3}
+          onChange={(e) => setComment(e.target.value.slice(0, 500))}
+          placeholder={canSeeNegativeTags ? 'What stood out about their work?' : 'How was this shift run?'}
+          className="w-full rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2.5 text-[15px] text-[#111827] leading-relaxed resize-none placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#0A1628] mb-6" />
 
         {submitError && (
           <p className="text-[#EF4444] text-[13px] text-center mb-3" role="alert">{submitError}</p>
@@ -229,9 +250,9 @@ export function ReviewScreen() {
           aria-label={rating === 0 ? 'Select a star rating to submit' : 'Submit review'}
           aria-disabled={rating === 0}
           className={`w-full h-[52px] rounded-[8px] font-bold text-[16px] transition-all duration-200 mt-auto ${
-            rating > 0 ? 'bg-[#0A1628] text-white' : 'bg-[#F0F0F0] text-[#6B7280] cursor-not-allowed border border-[#DBDBDB]'
+            rating > 0 ? 'bg-[#0A1628] text-white' : 'bg-[#F0F0F0] text-[#6B7280] cursor-not-allowed border border-[#E5E7EB]'
           }`}>
-          {submitting ? 'Submitting…' : 'Submit Review'}
+          {submitting ? 'Submitting…' : 'Submit review'}
         </motion.button>
         {rating === 0 && (
           <p className="text-center text-[#6B7280] text-[12px] mt-2">Select a rating to continue</p>

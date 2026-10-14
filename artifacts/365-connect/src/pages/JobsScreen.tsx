@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   Search, MapPin, Plus, X,
-  List as ListIcon, Map as MapIcon, CalendarDays, Clock, DollarSign, Users, CheckCircle2, Zap, BellPlus,
+  List as ListIcon, Map as MapIcon, CalendarDays, Clock, Users, CheckCircle2, Zap, BellPlus,
 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
 import { useSavedSearches, savedSearchLabel, sameSearch, type SavedSearch, type SavedSearchInput } from '@/hooks/useSavedSearches';
@@ -19,6 +19,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { resetDraft } from '@/store/postShiftStore';
 import { JOB_TYPES } from '@/lib/jobTypes';
 import { EVENT_TYPES } from '@/lib/eventTypes';
+import { StateView, LoadError } from '@/components/StateView';
 
 const NAVY = '#0A1628';
 
@@ -26,15 +27,33 @@ const NAVY = '#0A1628';
 type FilterKey = 'all' | 'pay30' | 'near3' | 'tonight';
 
 const FILTER_PILLS: { key: FilterKey; label: string }[] = [
-  { key: 'all',     label: 'All Jobs'   },
-  { key: 'pay30',   label: 'Pay Rate: $30+/hr' },
-  { key: 'near3',   label: 'Distance: < 3 mi'  },
-  { key: 'tonight', label: 'Date: Tonight'     },
+  { key: 'all',     label: 'All jobs'   },
+  { key: 'pay30',   label: 'Pay: $30+/hr' },
+  { key: 'near3',   label: 'Under 3 mi'  },
+  { key: 'tonight', label: 'Tonight'     },
 ];
+
+/** What a shift pays per hour: day and event rates are spread over the shift's length. */
+export function hourlyEquivalent(s: Pick<MockShift, 'payRate' | 'payPeriod' | 'startTimeISO' | 'endTimeISO'>): number {
+  if (s.payPeriod === 'hr') return s.payRate;
+  const hours = (Date.parse(s.endTimeISO) - Date.parse(s.startTimeISO)) / 3_600_000;
+  return Number.isFinite(hours) && hours > 0 ? s.payRate / hours : 0;
+}
+
+/** Lower-case and strip accents so "Gala", "gála" and "GALA" all match. */
+const fold = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/** Every word of the query must appear somewhere in the shift (title, role, event, client, place, details). */
+function matchesQuery(s: MockShift, query: string): boolean {
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = fold([shiftHeadline(s), s.jobType, ...(s.jobTypes ?? []), s.eventType ?? '', s.companyName, s.location, s.description ?? ''].join(' '));
+  return words.every((w) => hay.includes(w));
+}
 
 function applyFilter(shifts: MockShift[], f: FilterKey): MockShift[] {
   switch (f) {
-    case 'pay30':   return shifts.filter((s) => s.payRate >= 30);
+    case 'pay30':   return shifts.filter((s) => hourlyEquivalent(s) >= 30);
     case 'near3':   return shifts.filter((s) => s.distanceMiles < 3);
     case 'tonight': return shifts.filter((s) => s.date === 'Tonight');
     default:        return shifts;
@@ -145,9 +164,8 @@ function ShiftRow({ shift, applied, showDistance, onTap }: {
             <Clock size={12} aria-hidden />{shift.startTime}
           </span>
         </div>
-        <div className="flex items-baseline gap-0.5">
-          <DollarSign size={14} aria-hidden className="text-[#111827] self-center" />
-          <span className="text-[#111827] font-bold text-[19px]">{shift.payRate}</span>
+        <div className="flex items-baseline">
+          <span className="text-[#111827] font-bold text-[19px]">${shift.payRate}</span>
           <span className="text-[#6B7280] text-[12px] font-medium">/{shift.payPeriod}</span>
         </div>
       </div>
@@ -158,9 +176,9 @@ function ShiftRow({ shift, applied, showDistance, onTap }: {
 function ShiftRowSkeleton() {
   return (
     <div className="rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-4 flex flex-col gap-3">
-      <div className="w-24 h-5 rounded-full bg-[#EFEFEF] animate-pulse" />
-      <div className="w-40 h-4 rounded bg-[#EFEFEF] animate-pulse" />
-      <div className="w-full h-4 rounded bg-[#EFEFEF] animate-pulse" />
+      <div className="w-24 h-5 rounded-full bg-[#F3F4F6] animate-pulse" />
+      <div className="w-40 h-4 rounded bg-[#F3F4F6] animate-pulse" />
+      <div className="w-full h-4 rounded bg-[#F3F4F6] animate-pulse" />
     </div>
   );
 }
@@ -294,8 +312,8 @@ function MapPane({ shifts, selectedId, userCoords, onPinClick, onOpenShift }: {
                     </div>
                     <p className="text-[#111827] font-bold text-[15px] truncate">{shiftHeadline(shift)}</p>
                     <p className="text-[#374151] text-[12px] font-medium truncate">{shift.companyName}</p>
-                    <p className="text-[#6B7280] text-[11px] truncate flex items-center gap-1">
-                      <MapPin size={10} aria-hidden />{shift.location}{userCoords ? ` · ${shift.distanceMiles} mi` : ''}
+                    <p className="text-[#6B7280] text-[11px] min-w-0 flex items-center gap-1">
+                      <MapPin size={10} aria-hidden className="flex-shrink-0" /><span className="truncate">{shift.location}{userCoords ? ` · ${shift.distanceMiles} mi` : ''}</span>
                     </p>
                     <p className="text-[#6B7280] text-[11px] truncate mt-0.5">{shift.date} · {shift.startTime}</p>
                   </div>
@@ -362,13 +380,12 @@ export function JobsScreen() {
   const isWorkerRole = role === 'worker' || role === null;
   const shifts    = isWorkerRole ? openShifts.shifts    : postedShifts.shifts;
   const isLoading = isWorkerRole ? openShifts.isLoading : postedShifts.isLoading;
+  // A failed load must not read as "no shifts match": show it as an error with a retry.
+  const loadFailed = !isLoading && shifts.length === 0 && !!(isWorkerRole ? openShifts.error : postedShifts.error);
+  const retryLoad = () => { void (isWorkerRole ? openShifts.refetch() : postedShifts.refetch()); };
   const { appliedShiftIds } = useApplications();
 
-  const textFiltered = shifts.filter((s) =>
-    !query || [s.jobType, s.companyName, s.location].some((f) =>
-      f.toLowerCase().includes(query.toLowerCase()),
-    ),
-  );
+  const textFiltered = shifts.filter((s) => matchesQuery(s, query));
   const jobTypeFiltered = jobTypeFilter
     ? textFiltered.filter((s) => s.jobTypes.includes(jobTypeFilter))
     : textFiltered;
@@ -418,7 +435,7 @@ export function JobsScreen() {
       <div className="flex-shrink-0 bg-white border-b border-[#EAEAEA]">
         <div className="px-4 pt-4 pb-2 flex items-center gap-2">
           <div className="flex-1 min-w-0 flex items-center gap-2 bg-[#F5F5F5] border border-[#E5E7EB] rounded-[12px] px-3.5 h-[44px]">
-            <Search size={16} aria-hidden className="text-[#737373] flex-shrink-0" />
+            <Search size={16} aria-hidden className="text-[#6B7280] flex-shrink-0" />
             <input
               type="search"
               placeholder="Search shifts"
@@ -429,7 +446,7 @@ export function JobsScreen() {
             />
             {query && (
               <button type="button" aria-label="Clear search" onClick={() => setQuery('')}
-                className="text-[#737373] text-[13px]">✕</button>
+                className="text-[#6B7280] text-[13px]">✕</button>
             )}
           </div>
           <ViewToggle view={view} onChange={setView} />
@@ -442,7 +459,7 @@ export function JobsScreen() {
             onChange={(e) => { setEventTypeFilter(e.target.value || null); setSelectedId(null); }}
             aria-label="Filter by event type"
             className={`flex-shrink-0 h-10 px-3 rounded-full text-[12px] font-semibold outline-none whitespace-nowrap
-              ${eventTypeFilter ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
+              ${eventTypeFilter ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#E5E7EB]'}`}>
             <option value="">Event: All</option>
             {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
@@ -451,7 +468,7 @@ export function JobsScreen() {
             onChange={(e) => { setJobTypeFilter(e.target.value || null); setSelectedId(null); }}
             aria-label="Filter by job type"
             className={`flex-shrink-0 h-10 px-3 rounded-full text-[12px] font-semibold outline-none whitespace-nowrap
-              ${jobTypeFilter ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
+              ${jobTypeFilter ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#E5E7EB]'}`}>
             <option value="">Job Type: All</option>
             {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
@@ -463,7 +480,7 @@ export function JobsScreen() {
               <button key={pill.key} type="button" role="radio" aria-checked={active}
                 onClick={() => { setActiveFilter(pill.key); setSelectedId(null); }}
                 className={`flex-shrink-0 h-10 px-4 rounded-full text-[12px] font-semibold transition-all duration-150 whitespace-nowrap
-                  ${active ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#DBDBDB]'}`}>
+                  ${active ? 'bg-black text-white border-2 border-black' : 'bg-white text-black border border-[#E5E7EB]'}`}>
                 {pill.label}
               </button>
             );
@@ -497,11 +514,19 @@ export function JobsScreen() {
               </motion.div>
             ))}
 
-            {!isLoading && visibleShifts.length === 0 && (
-              <div className="mt-6 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-                <p className="text-[#737373] text-[14px] font-medium">No shifts match this filter.</p>
-                <p className="text-[#6B7280] text-[12px] mt-1">Try a different category or clear the search.</p>
-              </div>
+            {loadFailed && <LoadError what="shifts" onRetry={retryLoad} />}
+
+            {!isLoading && !loadFailed && visibleShifts.length === 0 && (
+              shifts.length === 0 ? (
+                <StateView icon={CalendarDays}
+                  title={isWorkerRole ? 'No open shifts right now' : "You haven't posted any shifts yet"}
+                  body={isWorkerRole ? 'New shifts appear here as soon as they are posted. Turn on alerts to hear first.' : 'Post a shift and it shows up here with its applicants.'} />
+              ) : (
+                <StateView title={query.trim() ? `No shifts match “${query.trim()}”` : 'No shifts match your filters'}
+                  body="Try another role or event type, or clear the search."
+                  actionLabel="Clear search and filters"
+                  onAction={() => { setQuery(''); setActiveFilter('all'); setJobTypeFilter(null); setEventTypeFilter(null); }} />
+              )
             )}
 
             {/* Paging: the feed loads 50 at a time; fetch the next page on demand */}
@@ -541,7 +566,7 @@ export function JobsScreen() {
           className="absolute bottom-[80px] right-4 z-50 flex items-center gap-2 h-[44px] px-4 bg-black text-white rounded-full shadow-lg font-bold text-[13px]"
         >
           <Plus size={16} aria-hidden className="flex-shrink-0" />
-          Post a Shift
+          Post a shift
         </motion.button>
       )}
 

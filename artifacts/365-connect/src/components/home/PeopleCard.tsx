@@ -10,7 +10,7 @@ const NAVY = '#0A1628';
 /**
  * Client/Staffer Home Feed card (spec B) — vertical Instagram-style worker
  * profile card: circular photo, @username + gold checkmark if is_pro,
- * primary job type, star rating, View Profile + Follow (writes to `follows`).
+ * primary job type, star rating, View profile + Follow (writes to `follows`).
  */
 export function PeopleCard({ person }: { person: WorkerPerson }) {
   const [, navigate] = useLocation();
@@ -30,7 +30,7 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
     <div className="mx-4 rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-4 flex items-center gap-4">
       <button type="button" aria-label={`View ${person.username}'s profile`}
         onClick={() => navigate(`/worker/${person.username}`)}
-        className="w-16 h-16 rounded-full overflow-hidden bg-[#EFEFEF] flex-shrink-0 flex items-center justify-center">
+        className="w-16 h-16 rounded-full overflow-hidden bg-[#F3F4F6] flex-shrink-0 flex items-center justify-center">
         {person.photoUrl ? (
           <img src={person.photoUrl} alt="" aria-hidden loading="lazy" decoding="async"
             className="w-full h-full object-cover" />
@@ -70,7 +70,7 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
       <div className="flex flex-col gap-2 flex-shrink-0">
         <button type="button" onClick={() => navigate(`/worker/${person.username}`)}
           className="h-[34px] px-3.5 rounded-[8px] border border-[#E5E7EB] text-[#111827] text-[12px] font-semibold">
-          View Profile
+          View profile
         </button>
         <button type="button" disabled={isFollowPending}
           onClick={() => (isFollowing ? unfollow() : follow())}
@@ -78,7 +78,7 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
           aria-label={isFollowing ? `Remove @${person.username} from your roster` : `Add @${person.username} to your roster`}
           className="h-[34px] px-3.5 rounded-[8px] text-[12px] font-semibold text-white disabled:opacity-60 whitespace-nowrap"
           style={{ background: isFollowing ? '#6B7280' : NAVY }}>
-          {isFollowing ? 'On Roster' : 'Add to Roster'}
+          {isFollowing ? 'On roster' : 'Add to roster'}
         </button>
       </div>
     </div>
@@ -88,10 +88,10 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
 export function PeopleCardSkeleton() {
   return (
     <div className="mx-4 rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-4 flex items-center gap-4">
-      <div className="w-16 h-16 rounded-full bg-[#EFEFEF] animate-pulse flex-shrink-0" />
+      <div className="w-16 h-16 rounded-full bg-[#F3F4F6] animate-pulse flex-shrink-0" />
       <div className="flex-1 flex flex-col gap-2">
-        <div className="w-24 h-4 rounded bg-[#EFEFEF] animate-pulse" />
-        <div className="w-32 h-3 rounded bg-[#EFEFEF] animate-pulse" />
+        <div className="w-24 h-4 rounded bg-[#F3F4F6] animate-pulse" />
+        <div className="w-32 h-3 rounded bg-[#F3F4F6] animate-pulse" />
       </div>
     </div>
   );

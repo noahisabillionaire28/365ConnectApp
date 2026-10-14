@@ -1,5 +1,5 @@
 /**
- * Bottom sheets for the sign-in details on Edit Profile:
+ * Bottom sheets for the sign-in details on Edit profile:
  *
  *   ChangeEmailSheet     asks the auth service to move the account to a new
  *                        address. Nothing changes until the user opens the

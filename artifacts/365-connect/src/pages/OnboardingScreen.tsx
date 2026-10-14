@@ -186,7 +186,7 @@ export function OnboardingScreen() {
           style={{ background: NAVY }}
           data-testid="btn-walkthrough-next"
         >
-          {slide === slides.length - 1 ? 'Get Started' : 'Next'}
+          {slide === slides.length - 1 ? 'Get started' : 'Next'}
         </button>
       </div>
     </div>

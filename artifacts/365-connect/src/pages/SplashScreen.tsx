@@ -108,7 +108,7 @@ export function SplashScreen() {
           style={{ background: NAVY }}
           data-testid="btn-splash-signup"
         >
-          Sign Up
+          Sign up
         </button>
         <button
           onClick={() => navigate('/login')}
@@ -116,7 +116,7 @@ export function SplashScreen() {
           style={{ border: `1px solid ${BORDER}`, color: NAVY }}
           data-testid="btn-splash-login"
         >
-          Log In
+          Log in
         </button>
       </div>
     </div>

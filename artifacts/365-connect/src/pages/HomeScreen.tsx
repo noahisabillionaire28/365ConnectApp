@@ -2,7 +2,7 @@ import { useState, lazy, Suspense } from 'react';
 import { useLocation, useSearch, Redirect } from 'wouter';
 import {
   Bell, Search, PlusCircle, SlidersHorizontal,
-  Briefcase, CalendarDays, Clock3, DollarSign, MapPin,
+  Briefcase, CalendarDays, Clock3, MapPin,
   Users, ChevronRight, CalendarPlus, Repeat2,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
@@ -32,35 +32,38 @@ import { WeekEarningsCard } from '@/components/home/WeekEarningsCard';
 const AddToCalendarSheet = lazy(() => import('@/components/AddToCalendarSheet').then((m) => ({ default: m.AddToCalendarSheet })));
 import type { CalendarEvent } from '@/lib/calendar';
 import { isDayOfWindow } from '@/hooks/useArrivalStatus';
+import { LoadError } from '@/components/StateView';
+import { ConfirmSheet } from '@/components/ConfirmSheet';
 
 /* ─── Shared header ──────────────────────────────────────────────────────────── */
 function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => void }) {
   const [, navigate] = useLocation();
+  const { role } = useProfile();
   const { unreadCount } = useNotifications();
   return (
     <div className="flex items-center justify-between px-4 pt-4 pb-2">
       <div>
         <h1 className="text-black font-bold text-[22px] leading-tight">365 Connect</h1>
-        <p className="text-[#737373] text-[12px] font-medium mt-[1px]">{subtitle}</p>
+        <p className="text-[#6B7280] text-[12px] font-medium mt-[1px]">{subtitle}</p>
       </div>
       <div className="flex items-center gap-2">
         {onPost && (
           <button type="button" aria-label="Post a shift" onClick={onPost}
-            className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+            className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
             <PlusCircle size={16} aria-hidden className="text-black" />
           </button>
         )}
-        <button type="button" aria-label="Search" onClick={() => navigate('/explore')}
-          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
-          <Search size={16} aria-hidden className="text-[#737373]" />
+        <button type="button" aria-label={role === 'worker' ? 'Search shifts' : 'Search'} onClick={() => navigate(role === 'worker' ? '/jobs' : '/explore')}
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
+          <Search size={16} aria-hidden className="text-[#6B7280]" />
         </button>
         <button type="button"
           aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
           onClick={() => navigate('/notifications')}
-          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center relative">
-          <Bell size={16} aria-hidden className="text-[#737373]" />
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center relative">
+          <Bell size={16} aria-hidden className="text-[#6B7280]" />
           {unreadCount > 0 && (
-            <span aria-hidden className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#0095F6] border-[1.5px] border-white" />
+            <span aria-hidden className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#EF4444] border-[1.5px] border-white" />
           )}
         </button>
       </div>
@@ -174,6 +177,7 @@ function MyShiftRow({ app, onTap, onCalendar }: {
   // page (starts within 12 h or in progress, not ended), so a late-night
   // shift shows them on Home too, whatever the device's calendar day says.
   const dayOf = !cancelled && app.status === 'accepted' && isDayOfWindow(app.startTime, app.endTime, now);
+  const [, navigate] = useLocation();
 
   return (
     <div className="border-b border-[#E5E7EB] last:border-none">
@@ -206,14 +210,18 @@ function MyShiftRow({ app, onTap, onCalendar }: {
         <span className="flex-shrink-0 bg-red-50 border border-red-200 text-red-500 text-[11px] font-bold px-2.5 py-1 rounded-full">
           Cancelled
         </span>
-      ) : clockInNow ? (
-        <span className="flex-shrink-0 bg-[#FFD700] text-black text-[11px] font-bold px-2.5 py-1 rounded-full">
-          Clock in
-        </span>
-      ) : (
+      ) : clockInNow ? null : (
         <ChevronRight size={15} aria-hidden className="text-[#D1D5DB] flex-shrink-0" />
       )}
     </button>
+    {clockInNow && (
+      // A real button that opens the clock-in screen, not a label on the row.
+      <button type="button" onClick={() => navigate(`/clock/${app.shiftId}`)}
+        aria-label={`Clock in to ${app.shiftTitle ?? 'this shift'}`}
+        className="flex-shrink-0 mr-3 h-9 px-3.5 rounded-full bg-[#0A1628] text-white text-[13px] font-semibold active:scale-[0.97] transition-transform">
+        Clock in
+      </button>
+    )}
     {onCalendar && (
       <button type="button" onClick={onCalendar} aria-label={`Add ${app.shiftTitle ?? 'this shift'} to your calendar`}
         className="w-11 h-11 mr-2 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#F3F4F6] flex-shrink-0">
@@ -269,7 +277,7 @@ function MyShiftSection({
 
 function WorkerMyShiftsView() {
   const [, navigate] = useLocation();
-  const { applications, isLoading, error } = useMyApplications();
+  const { applications, isLoading, error, refetch } = useMyApplications();
   const { upcoming, applied, standby, completed, expired, swapped, dropped, notSelected, cancelled } = groupApplications(applications);
   const goToShift = (a: MyApplication) => navigate(`/shift/${a.shiftId}`);
   const [calendarEvent, setCalendarEvent] = useState<CalendarEvent | null>(null);
@@ -294,12 +302,10 @@ function WorkerMyShiftsView() {
     );
   }
 
-  if (error) {
+  if (error && applications.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto pt-4 pb-4">
-        <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-8 text-center">
-          <p className="text-[#6B7280] text-[14px]">Couldn't load your shifts right now.</p>
-        </div>
+        <LoadError what="your shifts" onRetry={() => void refetch()} />
       </div>
     );
   }
@@ -330,7 +336,7 @@ function WorkerMyShiftsView() {
 /* ─── Worker: Available shifts (open shifts near you) ────────────────────────── */
 function WorkerAvailableView() {
   const [, navigate] = useLocation();
-  const { shifts, isLoading, error, hasLocation } = useWorkerHomeShifts();
+  const { shifts, isLoading, error, hasLocation, refetch } = useWorkerHomeShifts();
   const { appliedShiftIds } = useApplications();
 
   return (
@@ -341,11 +347,7 @@ function WorkerAvailableView() {
             {[1, 2, 3].map((n) => <ShiftListCardSkeleton key={n} />)}
           </div>
         )}
-        {error && !isLoading && (
-          <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-            <p className="text-[#737373] text-[14px]">Couldn't load shifts right now.</p>
-          </div>
-        )}
+        {error && !isLoading && <LoadError what="shifts" onRetry={() => void refetch()} />}
         {!isLoading && !error && (
           <div className="flex flex-col gap-4" role="feed" aria-label="Available shifts near you">
             {shifts.map((shift, i) => (
@@ -355,8 +357,8 @@ function WorkerAvailableView() {
               </div>
             ))}
             {shifts.length === 0 && (
-              <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-                <p className="text-[#737373] text-[14px]">
+              <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-10 text-center">
+                <p className="text-[#6B7280] text-[14px]">
                   {hasLocation ? 'No shifts match your job types within 25 miles right now.' : 'No shifts match your job types right now.'}
                 </p>
                 <div className="flex gap-2 justify-center mt-4">
@@ -365,7 +367,7 @@ function WorkerAvailableView() {
                     Browse all jobs
                   </button>
                   <button type="button" onClick={() => navigate('/profile/edit#work')}
-                    className="h-[38px] px-4 rounded-[10px] border border-[#DBDBDB] text-[#111827] text-[13px] font-semibold">
+                    className="h-[38px] px-4 rounded-[10px] border border-[#E5E7EB] text-[#111827] text-[13px] font-semibold">
                     Update job types
                   </button>
                 </div>
@@ -390,9 +392,9 @@ function SwapOfferCard({ s, busy, onRespond }: {
   return (
     <div className="rounded-[14px] border border-[#0A1628] p-4 bg-white">
       <button type="button" onClick={() => navigate(`/shift/${s.shiftId}`)} className="w-full text-left">
-        <p className="text-[#111827] font-bold text-[15px] truncate flex items-center gap-1.5">
+        <p className="text-[#111827] font-bold text-[15px] min-w-0 flex items-center gap-1.5">
           <Repeat2 size={14} aria-hidden className="text-[#0A1628] flex-shrink-0" />
-          {from} offered you their spot
+          <span className="truncate">{from} offered you their spot</span>
         </p>
         <p className="text-[#6B7280] text-[12px] mt-[2px] truncate">
           {[sh?.jobType, sh?.companyName].filter(Boolean).join(' · ')}
@@ -418,7 +420,7 @@ function SwapOfferCard({ s, busy, onRespond }: {
   );
 }
 
-function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType<typeof useShiftRequests>) {
+function WorkerRequestsView({ requests, isLoading, error, refetch, accept, decline }: ReturnType<typeof useShiftRequests>) {
   const [, navigate] = useLocation();
   const { showToast } = useToast();
   const { user } = useAuth();
@@ -428,6 +430,8 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
   // Spots other workers want to hand to me.
   const { incoming: swapOffers } = useMySwaps();
   const { respond: respondSwap, busyId: swapBusyId } = useRespondSwap();
+  // Declining an offer can't be undone, so it asks first.
+  const [declineId, setDeclineId] = useState<string | null>(null);
 
   function answerSwap(s: MySwap, action: 'accept' | 'decline') {
     void respondSwap(s.id, action, s.shiftId).then((err) => {
@@ -442,6 +446,15 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
         {[1, 2].map((n) => (
           <div key={n} className="h-[120px] rounded-[14px] bg-[#FAFAFA] border border-[#E5E7EB] animate-pulse" />
         ))}
+      </div>
+    );
+  }
+
+  if (error && pending.length === 0 && swapOffers.length === 0) {
+    // A failed load must not read as "no offers": a worker could miss one.
+    return (
+      <div className="flex-1 overflow-y-auto pt-4 pb-4">
+        <LoadError what="your shift offers" onRetry={() => void refetch()} />
       </div>
     );
   }
@@ -475,15 +488,26 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
         <div key={r.id} className="rounded-[14px] border border-[#E5E7EB] p-4 bg-white">
           <button type="button" onClick={() => navigate(`/shift/${r.shift_id}`)} className="w-full text-left">
             <p className="text-[#111827] font-bold text-[15px] truncate">{r.shiftTitle ?? 'Shift'}</p>
-            <p className="text-[#6B7280] text-[12px] mt-[2px]">
+            <p className="text-[#6B7280] text-[13px] mt-[2px]">
               {r.companyName ? `${r.companyName} · ` : ''}
-              {r.startTime ? `${friendlyDate(r.startTime)} · ${formatTime(r.startTime)}` : ''}
-              {r.payRate != null ? ` · $${r.payRate}/${r.payPeriod ?? 'hr'}` : ''}
+              {r.startTime ? `${friendlyDate(r.startTime)} · ${formatTime(r.startTime)}${r.endTime ? `–${formatTime(r.endTime)}` : ''}` : ''}
             </p>
+            {(r.location || r.payRate != null) && (
+              <p className="text-[#6B7280] text-[13px] mt-[2px] truncate">
+                {r.payRate != null ? `$${r.payRate}/${r.payPeriod ?? 'hr'}` : ''}
+                {r.payRate != null && r.location ? ' · ' : ''}
+                {r.location ?? ''}
+              </p>
+            )}
+            {r.message?.trim() && (
+              <p className="mt-2.5 rounded-[10px] bg-[#F7F8FA] border border-[#E5E7EB] px-3 py-2 text-[#374151] text-[13px] leading-relaxed">
+                “{r.message.trim()}”
+              </p>
+            )}
           </button>
           <div className="flex gap-2 mt-3.5">
             <button type="button"
-              onClick={() => void decline(r.id).then((res) => showToast(res.ok ? 'Declined.' : (res.message ?? 'Could not decline.'), res.ok ? 'success' : 'error'))}
+              onClick={() => setDeclineId(r.id)}
               className="flex-1 h-10 rounded-[8px] border border-[#E5E7EB] bg-white text-[#111827] font-semibold text-[13px] flex items-center justify-center gap-1.5">
               <X size={15} aria-hidden />
               Decline
@@ -495,13 +519,25 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
                   ? "Shift is full — you're on standby. We'll notify you if a spot opens."
                   : "You're booked! Clock in when you arrive.");
               })}
-              className="flex-1 h-10 rounded-[8px] bg-[#10B981] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5">
+              className="flex-1 h-10 rounded-[8px] bg-[#0A1628] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5">
               <Check size={15} aria-hidden />
               Accept
             </button>
           </div>
         </div>
       ))}
+      <ConfirmSheet
+        open={!!declineId}
+        title="Decline this offer?"
+        body="The client will be told you can't make it. You can still apply to their other shifts."
+        confirmLabel="Decline offer"
+        tone="danger"
+        onConfirm={() => {
+          const id = declineId; setDeclineId(null);
+          if (id) void decline(id).then((res) => showToast(res.ok ? 'Offer declined.' : (res.message ?? 'Could not decline.'), res.ok ? 'success' : 'error'));
+        }}
+        onCancel={() => setDeclineId(null)}
+      />
     </div>
   );
 }
@@ -545,7 +581,7 @@ function WorkerHomeFeed() {
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
-      <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
+      <div className="bg-white sticky top-0 z-40 border-b border-[#E5E7EB]">
         <FeedHeader subtitle={subtitle} />
         <SegmentControl
           tabs={[
@@ -598,24 +634,24 @@ function WorkerDiscoveryBody() {
         style={{ WebkitOverflowScrolling: 'touch' }}>
         <select aria-label="Filter by job type" value={jobType ?? ''}
           onChange={(e) => setJobType(e.target.value || null)}
-          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#E5E7EB] bg-white text-black flex-shrink-0">
           <option value="">All job types</option>
           {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
         <select aria-label="Filter by rating" value={rating}
           onChange={(e) => setRating(e.target.value as typeof rating)}
-          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#E5E7EB] bg-white text-black flex-shrink-0">
           {RATING_FILTERS.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
         <select aria-label="Filter by distance" value={distance}
           onChange={(e) => setDistance(e.target.value as typeof distance)}
-          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#DBDBDB] bg-white text-black flex-shrink-0">
+          className="h-10 px-3 rounded-full text-[12px] font-semibold border border-[#E5E7EB] bg-white text-black flex-shrink-0">
           {DISTANCE_FILTERS.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
         <button type="button" role="switch" aria-checked={availableOnly}
           onClick={() => setAvailableOnly((v) => !v)}
           className={`h-10 px-3 rounded-full text-[12px] font-semibold border flex items-center gap-1.5 flex-shrink-0 ${
-            availableOnly ? 'bg-black text-white border-black' : 'bg-white text-black border-[#DBDBDB]'
+            availableOnly ? 'bg-black text-white border-black' : 'bg-white text-black border-[#E5E7EB]'
           }`}>
           <SlidersHorizontal size={12} aria-hidden />
           Available today
@@ -626,16 +662,16 @@ function WorkerDiscoveryBody() {
         <div className="pt-4 pb-4 flex flex-col gap-3">
           {isLoading && Array.from({ length: 4 }).map((_, i) => <PeopleCardSkeleton key={i} />)}
           {error && !isLoading && (
-            <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-              <p className="text-[#737373] text-[14px]">Couldn't load workers right now.</p>
+            <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-10 text-center">
+              <p className="text-[#6B7280] text-[14px]">Couldn't load workers right now.</p>
             </div>
           )}
           {!isLoading && !error && filtered.map((person) => (
             <PeopleCard key={person.id} person={person} />
           ))}
           {!isLoading && !error && filtered.length === 0 && (
-            <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-10 text-center">
-              <p className="text-[#737373] text-[14px]">No workers found. Try adjusting your filters.</p>
+            <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-10 text-center">
+              <p className="text-[#6B7280] text-[14px]">No workers found. Try adjusting your filters.</p>
             </div>
           )}
         </div>
@@ -646,12 +682,13 @@ function WorkerDiscoveryBody() {
 
 /* ─── Client: My Shifts view ─────────────────────────────────────────────────── */
 function ClientShiftCard({
-  shift, onTap, onApplicants, showCount,
+  shift, onTap, onApplicants, showCount, actionLabel = 'View applicants',
 }: {
   shift: ClientShift;
   onTap: () => void;
   onApplicants?: () => void;
   showCount?: boolean;
+  actionLabel?: string;
 }) {
   const dateStr = shift.startTimeISO
     ? new Date(shift.startTimeISO).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: shift.timezone || undefined })
@@ -692,14 +729,14 @@ function ClientShiftCard({
                 <Clock3 size={11} aria-hidden />{shift.startTime}
               </span>
               {(shift.payRate ?? 0) > 0 && (
-                <span className="text-[#6B7280] text-[12px] flex items-center gap-1">
-                  <DollarSign size={11} aria-hidden />{shift.payRate}/{shift.payPeriod}
+                <span className="text-[#6B7280] text-[12px]">
+                  ${shift.payRate}/{shift.payPeriod ?? 'hr'}
                 </span>
               )}
             </div>
             {shift.location && (
-              <p className="text-[#6B7280] text-[12px] mt-1 flex items-center gap-1 truncate">
-                <MapPin size={11} aria-hidden />{shift.location}
+              <p className="text-[#6B7280] text-[12px] mt-1 flex items-center gap-1 min-w-0">
+                <MapPin size={11} aria-hidden className="flex-shrink-0" /><span className="truncate">{shift.location}</span>
               </p>
             )}
           </div>
@@ -741,7 +778,7 @@ function ClientShiftCard({
           <button type="button" onClick={onApplicants}
             className="flex items-center gap-1.5 text-[#0A1628] text-[12px] font-semibold">
             <Users size={13} aria-hidden />
-            View Applicants
+            {actionLabel}
             {shift.applicantCount > 0 && (
               <span className="bg-[#0A1628] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-0.5">
                 {shift.applicantCount}
@@ -755,7 +792,7 @@ function ClientShiftCard({
 }
 
 function ClientShiftGroup({
-  label, shifts, dotColor, onTap, onApplicants, showCount, emptyText,
+  label, shifts, dotColor, onTap, onApplicants, showCount, emptyText, actionLabel,
 }: {
   label: string;
   shifts: ClientShift[];
@@ -764,6 +801,7 @@ function ClientShiftGroup({
   onApplicants?: (s: ClientShift) => void;
   showCount?: boolean;
   emptyText?: string;
+  actionLabel?: string;
 }) {
   if (shifts.length === 0 && !emptyText) return null;
   return (
@@ -783,6 +821,7 @@ function ClientShiftGroup({
             onTap={() => onTap(s)}
             onApplicants={onApplicants ? () => onApplicants(s) : undefined}
             showCount={showCount}
+            actionLabel={actionLabel}
           />
         ))
         : (
@@ -796,7 +835,7 @@ function ClientShiftGroup({
 
 function ClientMyShiftsView() {
   const [, navigate] = useLocation();
-  const { shifts, isLoading, error } = useClientShiftsDashboard();
+  const { shifts, isLoading, error, refetch } = useClientShiftsDashboard();
   const now = Date.now();
 
   // A shift is "over" once it has ended, whatever its stored status — the
@@ -827,12 +866,10 @@ function ClientMyShiftsView() {
     );
   }
 
-  if (error) {
+  if (error && shifts.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto pt-4 pb-4">
-        <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-8 text-center">
-          <p className="text-[#6B7280] text-[14px]">Couldn't load your shifts right now.</p>
-        </div>
+        <LoadError what="your shifts" onRetry={() => void refetch()} />
       </div>
     );
   }
@@ -846,16 +883,53 @@ function ClientMyShiftsView() {
           <p className="text-[#6B7280] text-[12px] mt-1">Post a shift to start finding workers.</p>
           <button type="button" onClick={() => { resetDraft(); navigate('/post-shift/name'); }}
             className="mt-4 h-[40px] px-5 bg-[#0A1628] text-white rounded-[10px] text-[13px] font-semibold">
-            Post a Shift
+            Post a shift
           </button>
         </div>
       </div>
     );
   }
 
+  // What needs the poster today, so Home starts with decisions, not a list.
+  const upcoming = [...open, ...filled];
+  const waitingApplicants = upcoming.filter((s) => s.applicantCount > 0);
+  const applicantTotal = waitingApplicants.reduce((n, s) => n + s.applicantCount, 0);
+  const swaps = upcoming.filter((s) => s.swapCount > 0);
+  const soonUnfilled = open.filter((s) => {
+    const t = Date.parse(s.startTimeISO || '');
+    return Number.isFinite(t) && t - now < 48 * 3_600_000 && (s.spots_filled ?? 0) < (s.spots_available ?? 0);
+  });
+  const attention: { key: string; text: string; go: () => void }[] = [];
+  if (applicantTotal > 0) attention.push({
+    key: 'apps',
+    text: `${applicantTotal} applicant${applicantTotal === 1 ? '' : 's'} waiting${waitingApplicants.length > 1 ? ` across ${waitingApplicants.length} shifts` : ''}`,
+    go: () => navigate(`/shift/${waitingApplicants[0].id}/applicants`),
+  });
+  if (swaps.length) attention.push({
+    key: 'swaps',
+    text: `${swaps.length} swap request${swaps.length === 1 ? '' : 's'} to approve`,
+    go: () => navigate(`/shift/${swaps[0].id}/applicants`),
+  });
+  for (const s of soonUnfilled.slice(0, 2)) {
+    const left = (s.spots_available ?? 0) - (s.spots_filled ?? 0);
+    attention.push({ key: `fill-${s.id}`, text: `${s.title?.trim() || `${s.jobType ?? 'Event'} shift`} starts soon with ${left} spot${left === 1 ? '' : 's'} open`, go: () => navigate(`/shift/${s.id}/applicants`) });
+  }
+
   return (
     <div className="flex-1 overflow-y-auto pt-4 pb-4">
       <RatePromptCard role="poster" />
+      {attention.length > 0 && (
+        <section aria-label="Needs attention" className="mx-4 mb-5 rounded-[12px] border border-[#FDE68A] bg-[#FFFBEB] overflow-hidden">
+          <p className="px-4 pt-3 pb-1 text-[#92400E] text-[13px] font-semibold">Needs attention</p>
+          {attention.map((a) => (
+            <button key={a.key} type="button" onClick={a.go}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-left border-t border-[#FDE68A] first-of-type:border-t-0 active:bg-[#FEF3C7]">
+              <span className="flex-1 min-w-0 text-[#111827] text-[14px] font-medium leading-snug">{a.text}</span>
+              <ChevronRight size={16} aria-hidden className="text-[#B45309] flex-shrink-0" />
+            </button>
+          ))}
+        </section>
+      )}
       <ClientShiftGroup
         label="Open" shifts={open} dotColor="#10B981"
         onTap={(s) => navigate(`/shift/${s.id}`)}
@@ -867,10 +941,14 @@ function ClientMyShiftsView() {
         label="Confirmed" shifts={filled} dotColor="#0A1628"
         onTap={(s) => navigate(`/shift/${s.id}`)}
         onApplicants={(s) => navigate(`/shift/${s.id}/applicants`)}
+        actionLabel="Crew"
       />
       <ClientShiftGroup
         label="Completed" shifts={completed} dotColor="#6B7280"
         onTap={(s) => navigate(`/shift/${s.id}`)}
+        // Hours are approved and workers paid from the crew page.
+        onApplicants={(s) => navigate(`/shift/${s.id}/applicants`)}
+        actionLabel="Hours & pay"
       />
       <ClientShiftGroup
         label="Cancelled" shifts={cancelled} dotColor="#EF4444"
@@ -883,7 +961,8 @@ function ClientMyShiftsView() {
 /** Read the initial home tab from ?tab= (used after posting a shift). */
 function useInitialPosterTab(): 'browse' | 'my-shifts' {
   const search = useSearch();
-  return new URLSearchParams(search).get('tab') === 'my-shifts' ? 'my-shifts' : 'browse';
+  // Posters open on their own shifts; ?tab=browse jumps to finding workers.
+  return new URLSearchParams(search).get('tab') === 'browse' ? 'browse' : 'my-shifts';
 }
 
 /* ─── (B) Client Home Feed ───────────────────────────────────────────────────── */
@@ -891,12 +970,12 @@ function ClientHomeFeed() {
   const [tab, setTab] = useState<'browse' | 'my-shifts'>(useInitialPosterTab());
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
-      <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
-        <FeedHeader subtitle={tab === 'browse' ? 'Discover workers' : 'Your posted shifts'} />
+      <div className="bg-white sticky top-0 z-40 border-b border-[#E5E7EB]">
+        <FeedHeader subtitle={tab === 'browse' ? 'Find workers for your shifts' : 'Your shifts'} />
         <SegmentControl
           tabs={[
-            { value: 'browse', label: 'Browse Workers' },
-            { value: 'my-shifts', label: 'My Shifts' },
+            { value: 'my-shifts', label: 'My shifts' },
+            { value: 'browse', label: 'Find workers' },
           ]}
           value={tab}
           onChange={(v) => setTab(v as 'browse' | 'my-shifts')}
@@ -911,22 +990,17 @@ function ClientHomeFeed() {
 
 /* ─── (C) Staffer Home Feed ──────────────────────────────────────────────────── */
 function StafferHomeFeed() {
-  const [, navigate] = useLocation();
+  // Posting lives on the tab bar's "Post Shift"; no second header or floating button.
   const [tab, setTab] = useState<'browse' | 'my-shifts'>(useInitialPosterTab());
-
-  function handlePostShift() {
-    resetDraft();
-    navigate('/post-shift/name');
-  }
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
-      <div className="bg-white sticky top-0 z-40 border-b border-[#DBDBDB]">
-        <FeedHeader subtitle={tab === 'browse' ? 'Discover workers' : 'Your posted shifts'} onPost={handlePostShift} />
+      <div className="bg-white sticky top-0 z-40 border-b border-[#E5E7EB]">
+        <FeedHeader subtitle={tab === 'browse' ? 'Find workers for your shifts' : 'Your shifts'} />
         <SegmentControl
           tabs={[
-            { value: 'browse', label: 'Browse Workers' },
-            { value: 'my-shifts', label: 'My Shifts' },
+            { value: 'my-shifts', label: 'My shifts' },
+            { value: 'browse', label: 'Find workers' },
           ]}
           value={tab}
           onChange={(v) => setTab(v as 'browse' | 'my-shifts')}
@@ -935,16 +1009,6 @@ function StafferHomeFeed() {
       <div className="pt-3"><InstallBanner compact /></div>
       {tab === 'browse' ? <WorkerDiscoveryBody /> : <ClientMyShiftsView />}
 
-      <button
-        type="button"
-        onClick={handlePostShift}
-        aria-label="Post a shift"
-        style={{ animationDelay: '150ms' }}
-        className="anim-pop-in fixed bottom-[80px] right-4 z-50 flex items-center gap-2 h-[44px] px-4 bg-[#0A1628] text-white rounded-full shadow-lg font-bold text-[13px] active:scale-[0.93] transition-transform"
-      >
-        <PlusCircle size={16} aria-hidden className="flex-shrink-0" />
-        Post a Shift
-      </button>
 
       <BottomTabNav />
     </div>

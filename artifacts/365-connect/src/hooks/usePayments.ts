@@ -68,6 +68,8 @@ export type PaymentRow = {
   /** 'in' = earned by the worker; 'out' = paid by the client */
   direction?: 'in' | 'out';
   client_id?: string | null;
+  /** 'out' rows: the worker who was paid */
+  worker_username?: string | null;
   /** timesheet rows only */
   hours?: number | null;
   /** timesheet rows only: the per-shift pay timeline and where it is now */

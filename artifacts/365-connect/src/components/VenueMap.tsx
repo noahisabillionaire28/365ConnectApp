@@ -4,13 +4,13 @@
  *   ┌ 11200 Corbin Ave, Porter Ranch, CA 91326            ⓧ ┐   outlined address bar
  *   ├───────────────── edge-to-edge light map ───────────────┤
  *   │   navy balloon pin with the logo · blue "you" dot       │
- *   │ [ Hide Map ]                                            │
+ *   │ [ Hide map ]                                            │
  *   │  Maps  Legal  (drawn by Apple's engine)                │
  *   └─────────────────────────────────────────────────────────┘
  *     Tomorrow • Starts 5:42 PM • ≈ 46 min drive       12.3 mi   footer
  *
  * Tapping the address or the map opens the caller's directions chooser.
- * "Hide Map" collapses the map; the button then reads "Show Map".
+ * "Hide map" collapses the map; the button then reads "Show map".
  */
 import { useState } from 'react';
 import { X } from 'lucide-react';
@@ -105,7 +105,7 @@ export function VenueMap({
             className={`absolute left-4 z-[2] h-[44px] px-5 rounded-[12px] bg-white text-[#111827] text-[16px] font-medium shadow-[0_2px_10px_rgba(0,0,0,0.35)] active:scale-[0.98] ${
               engine === 'apple' ? 'bottom-[54px]' : 'bottom-6'}`}
           >
-            Hide Map
+            Hide map
           </button>
         </div>
       ) : (
@@ -115,7 +115,7 @@ export function VenueMap({
             onClick={() => setHidden(false)}
             className="h-[44px] px-5 rounded-[12px] bg-white border border-[#E5E7EB] text-[#111827] text-[16px] font-medium shadow-sm active:scale-[0.98]"
           >
-            Show Map
+            Show map
           </button>
         </div>
       )}

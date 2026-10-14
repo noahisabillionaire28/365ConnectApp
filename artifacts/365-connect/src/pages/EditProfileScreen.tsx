@@ -114,7 +114,7 @@ function Chip({ selected, onClick, children, disabled = false, testId }: {
   return (
     <button type="button" aria-pressed={selected} onClick={onClick} disabled={disabled} data-testid={testId}
       className={`h-[38px] px-3.5 rounded-full border text-[13px] font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-40 ${
-        selected ? 'bg-[#0A1628] border-[#0A1628] text-white' : 'bg-white border-[#DBDBDB] text-[#111827]'
+        selected ? 'bg-[#0A1628] border-[#0A1628] text-white' : 'bg-white border-[#E5E7EB] text-[#111827]'
       }`}>
       {selected && <Check size={12} aria-hidden strokeWidth={3} />}
       {children}
@@ -126,13 +126,13 @@ function EditSkeleton() {
   return (
     <div className="min-h-[100dvh] bg-[#F9FAFB]" aria-busy="true" aria-label="Loading">
       <div className="sticky top-0 bg-white border-b border-[#E5E7EB] px-4 pt-[calc(env(safe-area-inset-top)+12px)] pb-3 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-[#EFEFEF] animate-pulse" />
-        <div className="w-32 h-5 rounded-full bg-[#EFEFEF] animate-pulse" />
+        <div className="w-10 h-10 rounded-full bg-[#F3F4F6] animate-pulse" />
+        <div className="w-32 h-5 rounded-full bg-[#F3F4F6] animate-pulse" />
       </div>
       <div className="px-4 pt-4 flex flex-col gap-4">
         {[120, 220, 260].map((h, i) => (
           <div key={i} className="bg-white border border-[#E5E7EB] rounded-[12px] p-4 animate-pulse" style={{ height: h }}>
-            <div className="w-24 h-4 rounded-full bg-[#EFEFEF] mb-4" />
+            <div className="w-24 h-4 rounded-full bg-[#F3F4F6] mb-4" />
             <div className="w-full h-11 rounded-[10px] bg-[#F3F4F6] mb-3" />
             <div className="w-3/4 h-11 rounded-[10px] bg-[#F3F4F6]" />
           </div>
@@ -386,10 +386,10 @@ export function EditProfileScreen() {
       {/* Header */}
       <header className="sticky top-0 z-20 bg-white border-b border-[#E5E7EB] px-4 pt-[calc(env(safe-area-inset-top)+12px)] pb-3 flex items-center gap-3">
         <button type="button" aria-label="Go back" onClick={goBack}
-          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+          className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} aria-hidden className="text-black" />
         </button>
-        <h1 className="text-[#111827] font-bold text-[18px] leading-tight flex-1">Edit Profile</h1>
+        <h1 className="text-[#111827] font-bold text-[18px] leading-tight flex-1">Edit profile</h1>
         {dirty && !saving && <span className="text-[#6B7280] text-[12px] font-medium">Unsaved</span>}
       </header>
 
@@ -412,7 +412,7 @@ export function EditProfileScreen() {
             </button>
             <div className="flex flex-col gap-1.5 min-w-0">
               <button type="button" onClick={() => photoRef.current?.click()}
-                className="h-11 px-4 rounded-[10px] border border-[#DBDBDB] bg-white text-[#0A1628] text-[14px] font-semibold flex items-center gap-2 self-start">
+                className="h-11 px-4 rounded-[10px] border border-[#E5E7EB] bg-white text-[#0A1628] text-[14px] font-semibold flex items-center gap-2 self-start">
                 <Camera size={15} aria-hidden /> {isPoster ? 'Change logo' : 'Change photo'}
               </button>
               <p className="text-[#6B7280] text-[12px]">
@@ -476,7 +476,7 @@ export function EditProfileScreen() {
               )}
             </div>
             <button type="button" onClick={() => setEmailSheet(true)} disabled={!auth} data-testid="btn-change-email"
-              className="h-10 px-3.5 rounded-[10px] border border-[#DBDBDB] bg-white text-[#0A1628] text-[13px] font-semibold flex-shrink-0 disabled:opacity-40">
+              className="h-10 px-3.5 rounded-[10px] border border-[#E5E7EB] bg-white text-[#0A1628] text-[13px] font-semibold flex-shrink-0 disabled:opacity-40">
               Change
             </button>
           </div>
@@ -498,7 +498,7 @@ export function EditProfileScreen() {
               <p className="text-[#6B7280] text-[13px]">{auth && !auth.hasPassword ? 'Not set. You sign in with Google or Apple.' : '••••••••'}</p>
             </div>
             <button type="button" onClick={() => setPasswordSheet(true)} disabled={!auth} data-testid="btn-change-password"
-              className="h-10 px-3.5 rounded-[10px] border border-[#DBDBDB] bg-white text-[#0A1628] text-[13px] font-semibold flex-shrink-0 disabled:opacity-40">
+              className="h-10 px-3.5 rounded-[10px] border border-[#E5E7EB] bg-white text-[#0A1628] text-[13px] font-semibold flex-shrink-0 disabled:opacity-40">
               {auth && !auth.hasPassword ? 'Set' : 'Change'}
             </button>
           </div>

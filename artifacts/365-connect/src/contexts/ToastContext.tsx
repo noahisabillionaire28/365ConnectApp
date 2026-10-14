@@ -116,16 +116,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 key={current.id}
                 type="button"
                 onClick={dismiss}
-                className={`${leaving ? 'anim-toast-out' : 'anim-toast-in'} pointer-events-auto w-full flex items-center gap-3 rounded-[14px] px-4 py-3.5 shadow-lg ${
-                  current.variant === 'error' ? 'bg-[#EF4444]' : 'bg-[#10B981]'
-                }`}
+                className={`${leaving ? 'anim-toast-out' : 'anim-toast-in'} pointer-events-auto w-full flex items-center gap-3 rounded-[12px] px-4 py-3.5 bg-[#0A1628] shadow-[0_8px_24px_rgba(16,24,40,0.18)]`}
                 style={{ WebkitTapHighlightColor: 'transparent' }}
                 aria-label={`${current.message} — tap to dismiss`}
               >
                 {current.variant === 'error'
-                  ? <XCircle size={20} className="text-white flex-shrink-0" aria-hidden />
-                  : <CheckCircle2 size={20} className="text-white flex-shrink-0" aria-hidden />}
-                <p className="text-white font-bold text-[14px] leading-snug text-left">
+                  ? <XCircle size={20} className="text-[#F87171] flex-shrink-0" aria-hidden />
+                  : <CheckCircle2 size={20} className="text-[#34D399] flex-shrink-0" aria-hidden />}
+                <p className="text-white font-semibold text-[14px] leading-snug text-left">
                   {current.message}
                 </p>
               </button>

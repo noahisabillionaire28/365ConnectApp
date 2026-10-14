@@ -207,7 +207,7 @@ export function SignUpScreen() {
       </div>
 
       <div className="mt-6">
-        <h1 className="font-bold text-[24px]" style={{ color: TEXT }}>Create Account</h1>
+        <h1 className="font-bold text-[24px]" style={{ color: TEXT }}>Create account</h1>
         <p className="text-[14px] mt-1" style={{ color: MUTED }}>Join the staffing revolution</p>
       </div>
 
@@ -271,7 +271,7 @@ export function SignUpScreen() {
             inputMode="email"
             value={email}
             onChange={e => { setEmail(e.target.value); setError(null); }}
-            className="w-full rounded-[12px] px-4 py-3.5 outline-none font-medium text-[15px] transition-colors placeholder:text-[#C0C0C0]"
+            className="w-full rounded-[12px] px-4 py-3.5 outline-none font-medium text-[15px] transition-colors placeholder:text-[#9CA3AF]"
             style={{ border: `1px solid ${BORDER}`, color: TEXT, background: '#FFFFFF' }}
             placeholder="name@example.com"
             data-testid="input-email"
@@ -288,7 +288,7 @@ export function SignUpScreen() {
               value={password}
               onChange={e => { setPassword(e.target.value); setError(null); }}
               onKeyDown={e => e.key === 'Enter' && handleSignUp()}
-              className="w-full rounded-[12px] px-4 py-3.5 pr-12 outline-none font-medium text-[15px] transition-colors placeholder:text-[#C0C0C0]"
+              className="w-full rounded-[12px] px-4 py-3.5 pr-12 outline-none font-medium text-[15px] transition-colors placeholder:text-[#9CA3AF]"
               style={{ border: `1px solid ${BORDER}`, color: TEXT, background: '#FFFFFF' }}
               placeholder="Min. 6 characters"
               data-testid="input-password"
@@ -324,7 +324,7 @@ export function SignUpScreen() {
           style={{ background: NAVY }}
           data-testid="btn-signup-submit"
         >
-          {loading ? 'Creating account…' : 'Sign Up'}
+          {loading ? 'Creating account…' : 'Sign up'}
         </button>
       </div>
 
@@ -334,7 +334,7 @@ export function SignUpScreen() {
         <p className="text-[14px]" style={{ color: MUTED }}>
           Already have an account?{' '}
           <Link href="/login" className="font-semibold" style={{ color: NAVY }} data-testid="link-login">
-            Log In
+            Log in
           </Link>
         </p>
       </div>

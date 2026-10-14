@@ -81,7 +81,7 @@ export function PostShiftSuccessScreen() {
             className="w-full h-[52px] rounded-[12px] bg-[#0A1628] text-white font-bold text-[16px] flex items-center justify-center gap-2"
           >
             <UserPlus size={17} aria-hidden />
-            {isSeries ? 'Assign the first shift' : 'Assign from Roster'}
+            {isSeries ? 'Assign the first shift' : 'Assign from roster'}
           </motion.button>
         )}
         {shiftId && !isStaffer && (
@@ -91,7 +91,7 @@ export function PostShiftSuccessScreen() {
             className="w-full h-[52px] rounded-[12px] bg-[#0A1628] text-white font-bold text-[16px] flex items-center justify-center gap-2"
           >
             <Send size={17} aria-hidden />
-            Invite Workers
+            Invite workers
           </motion.button>
         )}
         {shiftId && (
@@ -101,7 +101,7 @@ export function PostShiftSuccessScreen() {
             className="w-full h-[52px] rounded-[12px] bg-white border border-[#E5E7EB] text-[#111827] font-bold text-[16px] flex items-center justify-center gap-2"
           >
             <Eye size={17} aria-hidden />
-            {isSeries ? 'View first shift' : 'View Shift'}
+            {isSeries ? 'View first shift' : 'View shift'}
           </motion.button>
         )}
         <motion.button

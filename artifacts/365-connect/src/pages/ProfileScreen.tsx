@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Star, ChevronRight, Settings,
   CreditCard, Bell, Shield, HelpCircle, LogOut,
-  Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
+  Edit3, CalendarDays, LifeBuoy, AlertOctagon, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
   BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck, LayoutTemplate, Trash2, FileText, ShieldCheck,
   Receipt, Cookie, Download,
 } from 'lucide-react';
@@ -29,13 +29,16 @@ import { uploadPostPhoto } from '@/lib/storage';
 import { apiClient } from '@/lib/api';
 import { isIOS } from '@/lib/native';
 
+/** Pro can't be bought yet; a banner for it reads as unfinished. Flip on at launch. */
+const SHOW_PRO_BANNER = false;
+
 /* ── Sub-components ──────────────────────────────────────────────────────── */
 function StarRow({ rating, size = 12 }: { rating: number; size?: number }) {
   return (
     <div className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map((i) => (
         <Star key={i} size={size} aria-hidden
-          className={i <= Math.round(rating) ? 'text-amber-400 fill-amber-400' : 'text-[#DBDBDB] fill-[#DBDBDB]'} />
+          className={i <= Math.round(rating) ? 'text-amber-400 fill-amber-400' : 'text-[#E5E7EB] fill-[#E5E7EB]'} />
       ))}
     </div>
   );
@@ -48,16 +51,16 @@ function SettingRow({ icon: Icon, label, onTap, danger = false, testId }: {
   return (
     <motion.button type="button" whileTap={{ backgroundColor: '#FAFAFA' }} onClick={onTap}
       aria-label={label} data-testid={testId}
-      className="w-full flex items-center gap-4 px-5 py-4 border-b border-[#DBDBDB] text-left transition-colors last:border-none">
+      className="w-full flex items-center gap-4 px-5 py-4 border-b border-[#E5E7EB] text-left transition-colors last:border-none">
       <div className={`w-10 h-10 rounded-[10px] flex items-center justify-center flex-shrink-0 ${
         danger ? 'bg-red-50' : 'bg-[#FAFAFA]'
       }`}>
-        <Icon size={17} aria-hidden className={danger ? 'text-red-500' : 'text-[#737373]'} />
+        <Icon size={17} aria-hidden className={danger ? 'text-red-500' : 'text-[#6B7280]'} />
       </div>
       <span className={`flex-1 text-[15px] font-medium ${danger ? 'text-red-500' : 'text-black'}`}>
         {label}
       </span>
-      {!danger && <ChevronRight size={16} aria-hidden className="text-[#DBDBDB]" />}
+      {!danger && <ChevronRight size={16} aria-hidden className="text-[#E5E7EB]" />}
     </motion.button>
   );
 }
@@ -92,7 +95,7 @@ function ProfileAvatar({
       style={{ width: size, height: size }}
     >
       {initials ? (
-        <span className="font-bold text-[#737373]" style={{ fontSize: size * 0.36 }}>{initials}</span>
+        <span className="font-bold text-[#6B7280]" style={{ fontSize: size * 0.36 }}>{initials}</span>
       ) : (
         <UserCircle2 size={size * 0.55} className="text-[#6B7280]" />
       )}
@@ -107,16 +110,16 @@ function ProfileSkeleton() {
       {/* Cover */}
       <div className="h-[96px] bg-[#F5F5F5] animate-pulse" />
       <div className="px-5 mt-[52px] mb-4 space-y-2">
-        <div className="w-40 h-6 rounded-full bg-[#EFEFEF] animate-pulse" />
-        <div className="w-24 h-4 rounded-full bg-[#EFEFEF] animate-pulse" />
-        <div className="w-full h-4 rounded-full bg-[#EFEFEF] animate-pulse" />
-        <div className="w-3/4 h-4 rounded-full bg-[#EFEFEF] animate-pulse" />
+        <div className="w-40 h-6 rounded-full bg-[#F3F4F6] animate-pulse" />
+        <div className="w-24 h-4 rounded-full bg-[#F3F4F6] animate-pulse" />
+        <div className="w-full h-4 rounded-full bg-[#F3F4F6] animate-pulse" />
+        <div className="w-3/4 h-4 rounded-full bg-[#F3F4F6] animate-pulse" />
       </div>
-      <div className="mx-4 grid grid-cols-3 gap-px bg-[#DBDBDB] border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-5">
+      <div className="mx-4 grid grid-cols-3 gap-px bg-[#E5E7EB] border border-[#E5E7EB] rounded-[12px] overflow-hidden mb-5">
         {[1,2,3].map((n) => (
           <div key={n} className="flex flex-col items-center py-4 bg-[#FAFAFA]">
-            <div className="w-12 h-6 rounded-full bg-[#EFEFEF] animate-pulse mb-1" />
-            <div className="w-10 h-3 rounded-full bg-[#EFEFEF] animate-pulse" />
+            <div className="w-12 h-6 rounded-full bg-[#F3F4F6] animate-pulse mb-1" />
+            <div className="w-10 h-3 rounded-full bg-[#F3F4F6] animate-pulse" />
           </div>
         ))}
       </div>
@@ -127,11 +130,12 @@ function ProfileSkeleton() {
 
 /* ── My Applications ─────────────────────────────────────────────────────── */
 const APPLICATION_STATUS_META: Record<string, { label: string; className: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
-  pending:   { label: 'Pending',  className: 'bg-amber-50 border-amber-200 text-amber-600',     Icon: Hourglass },
-  accepted:  { label: 'Accepted', className: 'bg-emerald-50 border-emerald-200 text-emerald-600', Icon: CheckCircle },
-  declined:  { label: 'Not Selected', className: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]', Icon: XCircle },
-  rejected:  { label: 'Not Selected', className: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]', Icon: XCircle },
-  withdrawn: { label: 'Withdrawn', className: 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]',    Icon: XCircle },
+  pending:   { label: 'Applied',  className: 'bg-amber-50 border-amber-200 text-amber-600',     Icon: Hourglass },
+  accepted:  { label: 'Booked',   className: 'bg-emerald-50 border-emerald-200 text-emerald-600', Icon: CheckCircle },
+  standby:   { label: 'Standby',  className: 'bg-violet-50 border-violet-200 text-violet-700',   Icon: Hourglass },
+  declined:  { label: 'Not selected', className: 'bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280]', Icon: XCircle },
+  rejected:  { label: 'Not selected', className: 'bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280]', Icon: XCircle },
+  withdrawn: { label: 'Withdrawn', className: 'bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280]',    Icon: XCircle },
 };
 
 function ApplicationRow({ application, onTap }: { application: MyApplication; onTap: () => void }) {
@@ -140,19 +144,19 @@ function ApplicationRow({ application, onTap }: { application: MyApplication; on
   return (
     <motion.button type="button" whileTap={{ scale: 0.98 }} onClick={onTap}
       aria-label={`${application.shiftTitle} at ${application.companyName ?? 'client'} — ${label}`}
-      className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-[#DBDBDB] text-left last:border-none">
-      <div className="w-11 h-11 rounded-[10px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0 overflow-hidden">
+      className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-[#E5E7EB] text-left last:border-none">
+      <div className="w-11 h-11 rounded-[10px] bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 overflow-hidden">
         {application.coverImage
           ? <img src={application.coverImage} alt="" className="w-full h-full object-cover" />
-          : <Briefcase size={16} aria-hidden className="text-[#737373]" />}
+          : <Briefcase size={16} aria-hidden className="text-[#6B7280]" />}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-black font-semibold text-[14px] truncate">{application.shiftTitle}</p>
         <div className="flex items-center gap-1.5 mt-0.5">
-          <Clock3 size={11} aria-hidden className="text-[#737373] flex-shrink-0" />
-          <p className="text-[#737373] text-[12px] truncate">
+          <Clock3 size={11} aria-hidden className="text-[#6B7280] flex-shrink-0" />
+          <p className="text-[#6B7280] text-[12px] truncate">
             {application.companyName ?? application.jobType}
-            {application.payRate ? ` · ${application.payRate}/${application.payPeriod}` : ''}
+            {application.payRate ? ` · $${application.payRate}/${application.payPeriod}` : ''}
           </p>
         </div>
       </div>
@@ -171,14 +175,14 @@ function MyApplicationsSection() {
   if (isLoading) {
     return (
       <div className="px-5 mb-6">
-        <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-2.5">My Applications</p>
-        <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
+        <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em] mb-2.5">My Applications</p>
+        <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden">
           {[1, 2].map((n) => (
-            <div key={n} className="flex items-center gap-3 px-4 py-3.5 border-b border-[#DBDBDB] last:border-none">
-              <div className="w-11 h-11 rounded-[10px] bg-[#EFEFEF] animate-pulse flex-shrink-0" />
+            <div key={n} className="flex items-center gap-3 px-4 py-3.5 border-b border-[#E5E7EB] last:border-none">
+              <div className="w-11 h-11 rounded-[10px] bg-[#F3F4F6] animate-pulse flex-shrink-0" />
               <div className="flex-1 space-y-1.5">
-                <div className="w-2/3 h-3.5 rounded bg-[#EFEFEF] animate-pulse" />
-                <div className="w-1/3 h-3 rounded bg-[#EFEFEF] animate-pulse" />
+                <div className="w-2/3 h-3.5 rounded bg-[#F3F4F6] animate-pulse" />
+                <div className="w-1/3 h-3 rounded bg-[#F3F4F6] animate-pulse" />
               </div>
             </div>
           ))}
@@ -191,17 +195,17 @@ function MyApplicationsSection() {
 
   return (
     <div className="px-5 mb-6">
-      <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-2.5">My Applications</p>
+      <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em] mb-2.5">My Applications</p>
       {applications.length > 0 ? (
-        <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
+        <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden">
           {applications.map((app) => (
             <ApplicationRow key={app.applicationId} application={app} onTap={() => navigate(`/shift/${app.shiftId}`)} />
           ))}
         </div>
       ) : (
-        <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] p-4 flex flex-col items-center gap-1 text-center">
-          <Briefcase size={20} aria-hidden className="text-[#DBDBDB] mb-1" />
-          <p className="text-[#737373] text-[13px] font-medium">No applications yet</p>
+        <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] p-4 flex flex-col items-center gap-1 text-center">
+          <Briefcase size={20} aria-hidden className="text-[#E5E7EB] mb-1" />
+          <p className="text-[#6B7280] text-[13px] font-medium">No applications yet</p>
           <p className="text-[#6B7280] text-[12px]">Apply to a shift to see its status here.</p>
         </div>
       )}
@@ -258,29 +262,29 @@ function RostersOnSection() {
 
   return (
     <div className="px-5 mb-6">
-      <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-1">Rosters you're on</p>
+      <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em] mb-1">Rosters you're on</p>
       <p className="text-[#6B7280] text-[12px] mb-2.5">These clients and agencies can offer you their shifts directly.</p>
-      <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden" role="list" aria-label="Rosters you are on">
+      <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden" role="list" aria-label="Rosters you are on">
         {q.isLoading ? (
           <div className="flex items-center gap-3 px-4 py-3.5">
-            <div className="w-10 h-10 rounded-full bg-[#EFEFEF] animate-pulse" />
-            <div className="w-1/2 h-3.5 rounded bg-[#EFEFEF] animate-pulse" />
+            <div className="w-10 h-10 rounded-full bg-[#F3F4F6] animate-pulse" />
+            <div className="w-1/2 h-3.5 rounded bg-[#F3F4F6] animate-pulse" />
           </div>
         ) : owners.map((o) => (
-          <div key={o.id} role="listitem" className="flex items-center gap-3 px-4 py-3 border-b border-[#DBDBDB] last:border-none">
+          <div key={o.id} role="listitem" className="flex items-center gap-3 px-4 py-3 border-b border-[#E5E7EB] last:border-none">
             <button type="button" onClick={() => { if (o.username) navigate(`/worker/${o.username}`); }}
               aria-label={`View ${labelFor(o)}`}
-              className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] overflow-hidden flex items-center justify-center flex-shrink-0">
+              className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] overflow-hidden flex items-center justify-center flex-shrink-0">
               {o.photo_url
                 ? <img src={o.photo_url} alt="" className="w-full h-full object-cover" />
-                : <Users size={16} aria-hidden className="text-[#737373]" />}
+                : <Users size={16} aria-hidden className="text-[#6B7280]" />}
             </button>
             <div className="flex-1 min-w-0">
               <p className="text-black font-semibold text-[14px] truncate">{labelFor(o)}</p>
-              <p className="text-[#737373] text-[12px]">{o.role === 'staffer' ? 'Agency' : 'Client'}{o.company_name && o.username ? ` · @${o.username}` : ''}</p>
+              <p className="text-[#6B7280] text-[12px]">{o.role === 'staffer' ? 'Agency' : 'Client'}{o.company_name && o.username ? ` · @${o.username}` : ''}</p>
             </div>
             <button type="button" onClick={() => setLeaving(o)}
-              className="h-10 px-3 rounded-[8px] border border-[#DBDBDB] text-[#737373] text-[12px] font-semibold flex-shrink-0">
+              className="h-10 px-3 rounded-[8px] border border-[#E5E7EB] text-[#6B7280] text-[12px] font-semibold flex-shrink-0">
               Leave roster
             </button>
           </div>
@@ -316,9 +320,9 @@ function AvailabilityCard() {
 
   return (
     <div className="px-4 mb-5">
-      <div className="bg-white border border-[#DBDBDB] rounded-[12px] px-4 py-4" data-testid="profile-availability">
+      <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-4" data-testid="profile-availability">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em]">Availability</p>
+          <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em]">Availability</p>
           <button type="button" onClick={() => navigate('/profile/edit#availability')}
             className="min-h-10 -my-2 px-2 -mr-2 text-[#0A1628] text-[12px] font-bold">Edit</button>
         </div>
@@ -464,7 +468,7 @@ export function ProfileScreen() {
     return (
       <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-8 pb-[64px] gap-3 text-center">
         <p className="text-black font-semibold text-[16px]">Couldn't load your profile</p>
-        <p className="text-[#737373] text-[13px]">Check your connection and try again.</p>
+        <p className="text-[#6B7280] text-[13px]">Check your connection and try again.</p>
         <button type="button" onClick={() => window.location.reload()}
           className="mt-2 h-[40px] px-6 rounded-full bg-black text-white text-[13px] font-semibold">
           Retry
@@ -496,10 +500,10 @@ export function ProfileScreen() {
       {/* Coming-soon toast */}
       {comingSoonLabel && (
         <div role="status" aria-live="polite"
-          className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-white border border-[#DBDBDB] rounded-[12px] px-4 py-3 flex items-center gap-3 shadow-lg max-w-[340px] w-[90%]">
+          className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-3 flex items-center gap-3 shadow-lg max-w-[340px] w-[90%]">
           <span className="text-black text-[13px] font-medium flex-1">{comingSoonLabel} — coming soon</span>
           <button type="button" aria-label="Dismiss" onClick={() => setComingSoon(null)}
-            className="text-[#737373] text-[18px] leading-none">×</button>
+            className="text-[#6B7280] text-[18px] leading-none">×</button>
         </div>
       )}
 
@@ -509,7 +513,7 @@ export function ProfileScreen() {
 
         {/* Settings gear — opens all settings */}
         <button type="button" aria-label="Settings" onClick={() => setSettingsOpen(true)}
-          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white border border-[#DBDBDB] flex items-center justify-center">
+          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white border border-[#E5E7EB] flex items-center justify-center">
           <Settings size={16} aria-hidden className="text-black" />
         </button>
 
@@ -523,9 +527,9 @@ export function ProfileScreen() {
         <div className="flex justify-end px-5 pt-3">
           <span aria-label={profile.isAvailable ? 'You are available for work' : 'You are not taking new offers'}
             className={`flex items-center gap-1.5 h-10 px-3.5 rounded-full text-[11px] font-bold border ${
-              profile.isAvailable ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]'
+              profile.isAvailable ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280]'
             }`}>
-            <span aria-hidden className={`w-[6px] h-[6px] rounded-full ${profile.isAvailable ? 'bg-emerald-500' : 'bg-[#DBDBDB]'}`} />
+            <span aria-hidden className={`w-[6px] h-[6px] rounded-full ${profile.isAvailable ? 'bg-emerald-500' : 'bg-[#E5E7EB]'}`} />
             {profile.isAvailable ? 'Available' : 'Unavailable'}
           </span>
         </div>
@@ -541,7 +545,7 @@ export function ProfileScreen() {
           )}
         </div>
 
-        <p className="text-[#737373] text-[13px] mb-2">
+        <p className="text-[#6B7280] text-[13px] mb-2">
           {username ? `@${username}` : <span className="italic text-[#6B7280]">No username set</span>}
         </p>
 
@@ -555,7 +559,7 @@ export function ProfileScreen() {
           className="mb-3" />
 
         {bio ? (
-          <p className="text-[#737373] text-[14px] leading-relaxed mb-3">{bio}</p>
+          <p className="text-[#6B7280] text-[14px] leading-relaxed mb-3">{bio}</p>
         ) : (
           <button type="button" onClick={() => navigate('/profile/edit#basics')}
             className="text-[#6B7280] text-[14px] italic mb-3 min-h-10 -my-2 text-left">
@@ -564,8 +568,8 @@ export function ProfileScreen() {
         )}
 
         {memberSince && (
-          <div className="flex items-center gap-1.5 text-[#737373] text-[12px]">
-            <MapPin size={12} aria-hidden />
+          <div className="flex items-center gap-1.5 text-[#6B7280] text-[12px]">
+            <CalendarDays size={12} aria-hidden />
             <span>Member since {memberSince}</span>
           </div>
         )}
@@ -578,7 +582,7 @@ export function ProfileScreen() {
           { label: 'Followers', value: followers },
           { label: 'Following', value: following },
         ].map((s, i) => (
-          <div key={s.label} className={`flex-1 flex flex-col items-center ${i < 2 ? 'border-r border-[#EFEFEF]' : ''}`}>
+          <div key={s.label} className={`flex-1 flex flex-col items-center ${i < 2 ? 'border-r border-[#F3F4F6]' : ''}`}>
             <span className="text-[#111827] font-bold text-[19px] leading-none">{s.value}</span>
             <span className="text-[#6B7280] text-[12px] mt-1">{s.label}</span>
           </div>
@@ -586,7 +590,7 @@ export function ProfileScreen() {
       </div>
 
       {/* Work stats */}
-      <div className="mx-4 grid grid-cols-3 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] mb-5 overflow-hidden"
+      <div className="mx-4 grid grid-cols-3 bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] mb-5 overflow-hidden"
         role="list" aria-label="Profile statistics">
         {(isPoster ? [
           { label: 'Shifts',  value: `${shiftsPosted}`,   sub: 'posted'       },
@@ -598,20 +602,20 @@ export function ProfileScreen() {
           { label: 'Earned',  value: money(totalEarned),   sub: 'lifetime'    },
         ]).map(({ label, value, sub }, i) => (
           <div key={label} role="listitem" aria-label={`${label}: ${value}`}
-            className={`flex flex-col items-center justify-center py-4 ${i < 2 ? 'border-r border-[#DBDBDB]' : ''}`}>
+            className={`flex flex-col items-center justify-center py-4 ${i < 2 ? 'border-r border-[#E5E7EB]' : ''}`}>
             <p className="text-black font-bold text-[22px] leading-tight">{value}</p>
-            <p className="text-[#737373] text-[10px] font-semibold uppercase tracking-wide mt-0.5">{label}</p>
+            <p className="text-[#6B7280] text-[10px] font-semibold uppercase tracking-wide mt-0.5">{label}</p>
             <p className="text-[#6B7280] text-[10px] mt-0.5">{sub}</p>
           </div>
         ))}
       </div>
 
-      {/* Edit Profile — Instagram-style */}
+      {/* Edit profile — Instagram-style */}
       <div className="px-4 mb-5">
         <button type="button" onClick={() => navigate(editProfilePath)}
           aria-label="Edit profile"
-          className="w-full h-[38px] rounded-[10px] bg-[#FAFAFA] border border-[#DBDBDB] text-[#111827] text-[14px] font-semibold flex items-center justify-center gap-2">
-          <Edit3 size={14} aria-hidden /> Edit Profile
+          className="w-full h-[38px] rounded-[10px] bg-[#FAFAFA] border border-[#E5E7EB] text-[#111827] text-[14px] font-semibold flex items-center justify-center gap-2">
+          <Edit3 size={14} aria-hidden /> Edit profile
         </button>
       </div>
 
@@ -621,14 +625,14 @@ export function ProfileScreen() {
       {/* Specialties — worker only */}
       {!isPoster && (
       <div className="px-5 mb-5">
-        <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-2.5" id="job-types-label">
+        <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em] mb-2.5" id="job-types-label">
           Specialties
         </p>
         {specialties.length > 0 ? (
           <div className="flex flex-wrap gap-2" role="list" aria-labelledby="job-types-label">
             {specialties.map((jt) => (
               <span key={jt} role="listitem"
-                className="h-[30px] px-3 bg-[#FAFAFA] border border-[#DBDBDB] rounded-full text-[#737373] text-[12px] font-medium flex items-center">
+                className="h-[30px] px-3 bg-[#FAFAFA] border border-[#E5E7EB] rounded-full text-[#6B7280] text-[12px] font-medium flex items-center">
                 {jt}
               </span>
             ))}
@@ -645,7 +649,7 @@ export function ProfileScreen() {
       {/* Certifications — worker only */}
       {!isPoster && (
       <div className="px-5 mb-6">
-        <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] mb-2.5" id="certs-label">
+        <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em] mb-2.5" id="certs-label">
           Certifications <span className="normal-case tracking-normal font-normal">(self-reported)</span>
         </p>
         {certifications.length > 0 ? (
@@ -653,7 +657,7 @@ export function ProfileScreen() {
             {certifications.map((cert) => (
               <div key={cert} role="listitem" className="flex items-center gap-2.5">
                 <CheckCircle size={13} aria-hidden className="text-emerald-500 flex-shrink-0" />
-                <span className="text-[#737373] text-[13px]">{cert}</span>
+                <span className="text-[#6B7280] text-[13px]">{cert}</span>
               </div>
             ))}
           </div>
@@ -672,7 +676,7 @@ export function ProfileScreen() {
       {/* Posts grid */}
       <div className="px-5 mb-6">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em]">Posts</p>
+          <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em]">Posts</p>
           <button type="button" onClick={() => postFileRef.current?.click()} disabled={postingMoment}
             className="min-h-10 -my-2 px-2 -mr-2 flex items-center gap-1 text-[#0A1628] text-[12px] font-bold disabled:opacity-50">
             <span className="text-[15px] leading-none">＋</span>{postingMoment ? 'Posting…' : 'Share a moment'}
@@ -684,7 +688,7 @@ export function ProfileScreen() {
             {posts.filter((p) => p.photo_url).map((p) => (
               <button type="button" key={p.id} onClick={() => navigate(`/post/${p.id}`)}
                 aria-label="Open post"
-                className="relative aspect-square overflow-hidden bg-[#EFEFEF] rounded-[4px]">
+                className="relative aspect-square overflow-hidden bg-[#F3F4F6] rounded-[4px]">
                 <img src={p.photo_url as string} alt={p.caption ?? 'Post'}
                   loading="lazy" decoding="async" className="w-full h-full object-cover" />
               </button>
@@ -692,7 +696,7 @@ export function ProfileScreen() {
           </div>
         ) : (
           <button type="button" onClick={() => postFileRef.current?.click()} disabled={postingMoment}
-            className="w-full rounded-[12px] bg-[#FAFAFA] border border-[#EFEFEF] px-6 py-8 text-center disabled:opacity-50">
+            className="w-full rounded-[12px] bg-[#FAFAFA] border border-[#F3F4F6] px-6 py-8 text-center disabled:opacity-50">
             <p className="text-[#6B7280] text-[12px]">{postingMoment ? 'Posting your moment…' : 'No posts yet — tap to share a moment.'}</p>
           </button>
         )}
@@ -701,7 +705,7 @@ export function ProfileScreen() {
       {/* Reviews */}
       <div className="px-5 mb-6">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em]">Reviews</p>
+          <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em]">Reviews</p>
           {rating > 0 && (
             <div className="flex items-center gap-1.5">
               <StarRow rating={rating} size={12} />
@@ -712,13 +716,13 @@ export function ProfileScreen() {
         {reviews.length > 0 ? (
           <div className="flex flex-col gap-3">
             {reviews.map((r) => (
-              <div key={r.id} className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] p-4">
+              <div key={r.id} className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] p-4">
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
                     {r.reviewer_photo ? (
                       <img src={r.reviewer_photo} alt="" className="w-6 h-6 rounded-full object-cover" />
                     ) : (
-                      <div className="w-6 h-6 rounded-full bg-[#DBDBDB]" />
+                      <div className="w-6 h-6 rounded-full bg-[#E5E7EB]" />
                     )}
                     <span className="text-black text-[13px] font-semibold">
                       {r.reviewer_username ? `@${r.reviewer_username}` : 'Client'}
@@ -727,7 +731,7 @@ export function ProfileScreen() {
                   <StarRow rating={r.rating} size={11} />
                 </div>
                 {r.comment && (
-                  <p className="text-[#737373] text-[13px] leading-relaxed">{r.comment}</p>
+                  <p className="text-[#6B7280] text-[13px] leading-relaxed">{r.comment}</p>
                 )}
                 {r.positive_tags?.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-2">
@@ -742,9 +746,9 @@ export function ProfileScreen() {
             ))}
           </div>
         ) : (
-          <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] p-4 flex flex-col items-center gap-1 text-center">
-            <Star size={22} aria-hidden className="text-[#DBDBDB] mb-1" />
-            <p className="text-[#737373] text-[13px] font-medium">No reviews yet</p>
+          <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] p-4 flex flex-col items-center gap-1 text-center">
+            <Star size={22} aria-hidden className="text-[#E5E7EB] mb-1" />
+            <p className="text-[#6B7280] text-[13px] font-medium">No reviews yet</p>
             <p className="text-[#6B7280] text-[12px]">
               {profile.role === 'worker'
                 ? 'Reviews from clients will appear here after your first shift.'
@@ -757,7 +761,7 @@ export function ProfileScreen() {
       {/* Go Pro CTA — shown when not yet Pro */}
       {/* Pro is a digital subscription: on iOS it must go through Apple's in-app
           purchase, so it's hidden in the native app until that's wired up. */}
-      {!profile.isPro && !isIOS() && (
+      {SHOW_PRO_BANNER && !profile.isPro && !isIOS() && (
         <div className="px-4 mb-5">
           <motion.button
             type="button" whileTap={{ scale: 0.98 }}
@@ -795,7 +799,7 @@ export function ProfileScreen() {
               className="fixed inset-0 z-[95] bg-white flex flex-col max-w-app mx-auto"
               role="dialog" aria-label="Settings"
             >
-              <div className="sticky top-0 bg-white border-b border-[#EFEFEF] px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
+              <div className="sticky top-0 bg-white border-b border-[#F3F4F6] px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
                 <button type="button" aria-label="Close settings" onClick={() => setSettingsOpen(false)}
                   className="w-10 h-10 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center">
                   <ChevronLeft size={18} aria-hidden className="text-[#0A1628]" />
@@ -804,13 +808,13 @@ export function ProfileScreen() {
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 py-4">
-                <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Account</p>
-                <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-4">
-                  <SettingRow icon={Edit3} label="Edit Profile" onTap={() => go(editProfilePath)} />
+                <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Account</p>
+                <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden mb-4">
+                  <SettingRow icon={Edit3} label="Edit profile" onTap={() => go(editProfilePath)} />
                   {username && (
-                    <SettingRow icon={Eye} label="View My Public Profile" onTap={() => go(`/worker/${username}`)} />
+                    <SettingRow icon={Eye} label="View my public profile" onTap={() => go(`/worker/${username}`)} />
                   )}
-                  <SettingRow icon={CreditCard} label="Payments & Earnings" onTap={() => go('/earnings')} />
+                  <SettingRow icon={CreditCard} label={isPoster ? 'Payments' : 'Earnings'} onTap={() => go('/earnings')} />
                   {profile.role === 'worker' && (
                     <SettingRow icon={CalendarCheck} label="Availability" onTap={() => go('/profile/edit#availability')} />
                   )}
@@ -819,23 +823,31 @@ export function ProfileScreen() {
 
                 {(profile.role === 'client' || profile.role === 'staffer') && (
                   <>
-                    <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Workforce</p>
-                    <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-4">
-                      <SettingRow icon={Bookmark} label="Saved Workers" onTap={() => go('/saved')} />
-                      <SettingRow icon={Users} label="My Roster" onTap={() => go('/roster')} />
+                    <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Workforce</p>
+                    <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden mb-4">
+                      <SettingRow icon={Bookmark} label="Saved workers" onTap={() => go('/saved')} />
+                      <SettingRow icon={Users} label="My roster" onTap={() => go('/roster')} />
                       <SettingRow icon={LayoutTemplate} label="Shift templates" onTap={() => go('/templates')} />
                     </div>
                   </>
                 )}
 
-                {!profile.isPro && !isIOS() && (
-                  <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden mb-4">
+                {SHOW_PRO_BANNER && !profile.isPro && !isIOS() && (
+                  <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden mb-4">
                     <SettingRow icon={Zap} label="365 Connect Pro (coming soon)" onTap={() => go('/pro-upgrade')} />
                   </div>
                 )}
 
-                <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Legal &amp; your data</p>
-                <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden" data-testid="settings-legal">
+                <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Help</p>
+                <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden mb-4" data-testid="settings-help">
+                  <SettingRow icon={LifeBuoy} label="Contact support"
+                    onTap={() => { window.location.href = `mailto:support@join365connect.com?subject=${encodeURIComponent('365 Connect support')}&body=${encodeURIComponent(`\n\n—\nAccount: @${username ?? ''}`)}`; }} />
+                  <SettingRow icon={AlertOctagon} label="Report a safety issue"
+                    onTap={() => { window.location.href = `mailto:support@join365connect.com?subject=${encodeURIComponent('Safety report')}&body=${encodeURIComponent(`What happened, where and when:\n\n—\nAccount: @${username ?? ''}`)}`; }} />
+                </div>
+
+                <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Legal &amp; your data</p>
+                <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden" data-testid="settings-legal">
                   <SettingRow icon={FileText} label="Terms of Service" onTap={() => go('/terms')} />
                   <SettingRow icon={ShieldCheck} label="Privacy Policy" onTap={() => go('/privacy')} />
                   <SettingRow icon={Receipt} label="Refund & Cancellation Policy" onTap={() => go('/refunds')} />
@@ -851,8 +863,8 @@ export function ProfileScreen() {
                   </a>
                 </p>
 
-                <div className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden">
-                  <SettingRow icon={LogOut} label="Log Out" onTap={handleSignOut} danger />
+                <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden">
+                  <SettingRow icon={LogOut} label="Log out" onTap={handleSignOut} danger />
                   {/* The sheet sits below this panel's z-index, so the panel closes first. */}
                   <SettingRow icon={Trash2} label="Delete account" onTap={() => { setSettingsOpen(false); setDeleteWord(''); setDeleteError(null); setDeleteOpen(true); }} danger />
                 </div>

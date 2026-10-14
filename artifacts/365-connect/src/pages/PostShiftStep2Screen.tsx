@@ -8,7 +8,6 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, MapPin, Building2 } from 'lucide-react';
 import { getDraft, setDraft } from '@/store/postShiftStore';
 import { AppMap } from '@/components/AppMap';
-import { BottomTabNav } from '@/components/BottomTabNav';
 
 // ─── Wizard primitives ────────────────────────────────────────────────────────
 function StepBar({ current, total }: { current: number; total: number }) {
@@ -130,7 +129,7 @@ function LocationAutocomplete({
         <div className="absolute z-[1000] left-0 right-0 mt-1.5 bg-white border border-[#E5E7EB] rounded-[12px] shadow-xl max-h-[260px] overflow-y-auto overflow-hidden">
           {suggestions.map((s, i) => (
             <button key={i} type="button" onClick={() => pick(s)}
-              className="w-full flex items-start gap-2.5 text-left px-4 py-3 text-[13px] leading-snug text-[#111827] hover:bg-[#F5F5F5] active:bg-[#EFEFEF] border-b border-[#F3F4F6] last:border-0">
+              className="w-full flex items-start gap-2.5 text-left px-4 py-3 text-[13px] leading-snug text-[#111827] hover:bg-[#F5F5F5] active:bg-[#F3F4F6] border-b border-[#F3F4F6] last:border-0">
               <MapPin size={14} aria-hidden className="text-[#9CA3AF] flex-shrink-0 mt-0.5" />
               <span className="min-w-0">{s.display_name}</span>
             </button>
@@ -218,7 +217,7 @@ export function PostShiftStep2Screen() {
   const displayCoords = mapCoords.lat && mapCoords.lng ? mapCoords : DEFAULT_COORDS;
 
   return (
-    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[72px]">
+    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[calc(env(safe-area-inset-bottom)+112px)]">
 
       {/* Header */}
       <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
@@ -303,7 +302,7 @@ export function PostShiftStep2Screen() {
       </div>
 
       {/* Fixed CTA */}
-      <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-4 pt-4
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4
         bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
         <motion.button
           type="button" whileTap={{ scale: 0.97 }}
@@ -321,8 +320,6 @@ export function PostShiftStep2Screen() {
           ) : 'Continue'}
         </motion.button>
       </div>
-
-      <BottomTabNav />
     </div>
   );
 }

@@ -83,7 +83,7 @@ function SimulatedCardInput({ onConfirm, loading }: { onConfirm: (ref: string) =
           <label className="text-[12px] font-semibold ml-0.5" style={{ color: MUTED }}>Card number</label>
           <input type="text" inputMode="numeric" placeholder="4242 4242 4242 4242"
             value={num} onChange={e => setNum(fmtNum(e.target.value))}
-            className="w-full rounded-[10px] px-4 h-[48px] outline-none text-[15px] font-medium tracking-wider transition-colors placeholder:text-[#C0C0C0]"
+            className="w-full rounded-[10px] px-4 h-[48px] outline-none text-[15px] font-medium tracking-wider transition-colors placeholder:text-[#9CA3AF]"
             style={iStyle} />
         </div>
 
@@ -92,14 +92,14 @@ function SimulatedCardInput({ onConfirm, loading }: { onConfirm: (ref: string) =
             <label className="text-[12px] font-semibold ml-0.5" style={{ color: MUTED }}>Expiry</label>
             <input type="text" inputMode="numeric" placeholder="MM/YY"
               value={exp} onChange={e => setExp(fmtExp(e.target.value))}
-              className="w-full rounded-[10px] px-4 h-[48px] outline-none text-[15px] font-medium transition-colors placeholder:text-[#C0C0C0]"
+              className="w-full rounded-[10px] px-4 h-[48px] outline-none text-[15px] font-medium transition-colors placeholder:text-[#9CA3AF]"
               style={iStyle} />
           </div>
           <div className="flex flex-col gap-1.5 flex-1">
             <label className="text-[12px] font-semibold ml-0.5" style={{ color: MUTED }}>CVC</label>
             <input type="text" inputMode="numeric" placeholder="123"
               value={cvc} onChange={e => setCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              className="w-full rounded-[10px] px-4 h-[48px] outline-none text-[15px] font-medium transition-colors placeholder:text-[#C0C0C0]"
+              className="w-full rounded-[10px] px-4 h-[48px] outline-none text-[15px] font-medium transition-colors placeholder:text-[#9CA3AF]"
               style={iStyle} />
           </div>
         </div>
@@ -108,7 +108,7 @@ function SimulatedCardInput({ onConfirm, loading }: { onConfirm: (ref: string) =
           <label className="text-[12px] font-semibold ml-0.5" style={{ color: MUTED }}>Name on card</label>
           <input type="text" placeholder="Full name"
             value={name} onChange={e => setName(e.target.value)}
-            className="w-full rounded-[10px] px-4 h-[48px] outline-none text-[15px] font-medium transition-colors placeholder:text-[#C0C0C0]"
+            className="w-full rounded-[10px] px-4 h-[48px] outline-none text-[15px] font-medium transition-colors placeholder:text-[#9CA3AF]"
             style={iStyle} />
         </div>
       </div>
@@ -124,7 +124,7 @@ function SimulatedCardInput({ onConfirm, loading }: { onConfirm: (ref: string) =
       <button onClick={handleSubmit} disabled={!isValid || loading}
         className="w-full text-white font-bold text-[16px] h-[52px] rounded-[12px] active:scale-[0.98] transition-transform disabled:opacity-30"
         style={{ background: NAVY }}>
-        {loading ? 'Saving…' : 'Confirm Card'}
+        {loading ? 'Saving…' : 'Confirm card'}
       </button>
 
       <p className="text-[11px] text-center" style={{ color: MUTED }}>
@@ -366,7 +366,7 @@ export function StafferSetupScreen() {
                 value={agencyName}
                 onChange={e => { setAgencyName(e.target.value); setError(null); }}
                 onKeyDown={e => e.key === 'Enter' && continueStep1()}
-                className="w-full rounded-[12px] px-4 h-[56px] outline-none text-[15px] font-medium placeholder:text-[#C0C0C0] transition-colors"
+                className="w-full rounded-[12px] px-4 h-[56px] outline-none text-[15px] font-medium placeholder:text-[#9CA3AF] transition-colors"
                 style={{ border: `1px solid ${BORDER}`, color: TEXT }}
                 maxLength={100}
                 data-testid="input-agency-name"

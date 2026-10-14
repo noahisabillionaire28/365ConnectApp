@@ -9,6 +9,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { getOrCreateDirectConversation } from '@/hooks/useConversations';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
+import { LoadError } from '@/components/StateView';
 
 const GOLD = '#FFD700';
 
@@ -134,7 +135,7 @@ export function RosterScreen() {
   const { user } = useAuth();
   const { role, roleLoading } = useRole();
   const { showToast } = useToast();
-  const { workers, isLoading, error, remove } = useRoster();
+  const { workers, isLoading, error, remove, refetch } = useRoster();
   const { shifts } = useClientShiftsDashboard();
   const [query, setQuery] = useState('');
   const [assigning, setAssigning] = useState<RosterWorker | null>(null);
@@ -200,7 +201,7 @@ export function RosterScreen() {
             <ChevronLeft size={18} aria-hidden className="text-[#0A1628]" />
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-[#0A1628] font-bold text-[18px] leading-tight">My Roster</h1>
+            <h1 className="text-[#0A1628] font-bold text-[18px] leading-tight">My roster</h1>
             <p className="text-[#6B7280] text-[12px] truncate">
               {isLoading ? 'Loading…' : `${workers.length} worker${workers.length !== 1 ? 's' : ''}`}
             </p>
@@ -221,16 +222,12 @@ export function RosterScreen() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pt-4 pb-[80px]">
-        {error && (
-          <p className="text-[#EF4444] text-[12px] font-medium mb-3 bg-red-50 border border-[#EF4444]/20 rounded-[8px] px-3 py-2">
-            {error}
-          </p>
-        )}
-
         {isLoading ? (
           <div className="flex flex-col gap-3">
             {[1, 2, 3].map((n) => <RosterCardSkeleton key={n} />)}
           </div>
+        ) : error && workers.length === 0 ? (
+          <LoadError what="your roster" onRetry={() => void refetch()} />
         ) : workers.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6 pt-16">
             <div className="w-16 h-16 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center">
@@ -243,7 +240,7 @@ export function RosterScreen() {
             <button type="button" onClick={() => navigate('/home?tab=browse')}
               className="mt-2 h-[40px] px-5 rounded-[8px] text-white text-[13px] font-bold"
               style={{ background: '#0A1628' }}>
-              Browse Workers
+              Find workers
             </button>
           </div>
         ) : filtered.length === 0 ? (

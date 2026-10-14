@@ -51,7 +51,7 @@ export function AuthCallbackScreen() {
       // Arriving from an email-change confirmation link: the auth account has
       // the new address; copy it onto the profile so emails follow it.
       if (session.user.email) {
-        try { await apiClient(session.user.id).post('/users/me/sync-email', {}); } catch { /* Edit Profile retries */ }
+        try { await apiClient(session.user.id).post('/users/me/sync-email', {}); } catch { /* Edit profile retries */ }
       }
 
       let profile: { username: string | null; role: string | null; availability: unknown; bio?: string | null; company_name?: string | null } | null = null;
@@ -103,7 +103,7 @@ export function AuthCallbackScreen() {
           </div>
           <button onClick={() => navigate('/login')}
             className="font-semibold text-[14px]" style={{ color: NAVY }}>
-            Back to Login
+            Back to login
           </button>
         </div>
       ) : (

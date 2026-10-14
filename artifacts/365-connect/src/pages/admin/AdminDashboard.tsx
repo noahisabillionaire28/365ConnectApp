@@ -10,7 +10,7 @@ import { useAdminStats } from '@/hooks/useAdminData';
 /* ── Skeleton ────────────────────────────────────────────────────────────── */
 function SkeletonCard() {
   return (
-    <div className="bg-white border border-[#DBDBDB] rounded-[12px] p-4 flex flex-col gap-3 animate-pulse">
+    <div className="bg-white border border-[#E5E7EB] rounded-[12px] p-4 flex flex-col gap-3 animate-pulse">
       <div className="flex items-center justify-between">
         <div className="h-2.5 w-20 bg-[#E5E7EB] rounded-full" />
         <div className="w-8 h-8 rounded-[8px] bg-[#E5E7EB]" />
@@ -34,20 +34,20 @@ function StatCard({
   const inner = (
     <>
       <div className="flex items-center justify-between">
-        <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.16em]">{label}</p>
-        <div className="w-8 h-8 rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+        <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.16em]">{label}</p>
+        <div className="w-8 h-8 rounded-[8px] bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
           <Icon size={15} className="text-black" aria-hidden />
         </div>
       </div>
       <p className="text-black font-bold leading-none" style={{ fontSize: 30 }}>{value}</p>
       <div className="flex items-center justify-between">
-        <p className="text-[#737373] text-[12px] font-medium">{sub}</p>
+        <p className="text-[#6B7280] text-[12px] font-medium">{sub}</p>
         {to && <ChevronRight size={14} aria-hidden className="text-[#C7C7C7]" />}
       </div>
     </>
   );
 
-  const base = 'bg-white border border-[#DBDBDB] rounded-[12px] p-4 flex flex-col gap-3';
+  const base = 'bg-white border border-[#E5E7EB] rounded-[12px] p-4 flex flex-col gap-3';
 
   return (
     <motion.div
@@ -93,7 +93,7 @@ export function AdminDashboard() {
       <main className="px-4 pt-6 pb-12 overflow-y-auto">
         <div className="mb-6">
           <h1 className="text-black font-bold text-[22px] tracking-tight">Overview</h1>
-          <p className="text-[#737373] text-[13px] mt-0.5">
+          <p className="text-[#6B7280] text-[13px] mt-0.5">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         </div>
@@ -147,26 +147,26 @@ export function AdminDashboard() {
         <motion.div
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35, duration: 0.25 }}
-          className="bg-white border border-[#DBDBDB] rounded-[12px] overflow-hidden"
+          className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden"
         >
-          <div className="px-4 py-3.5 border-b border-[#DBDBDB]">
-            <p className="text-[#737373] text-[11px] font-bold uppercase tracking-[0.16em]">Quick Access</p>
+          <div className="px-4 py-3.5 border-b border-[#E5E7EB]">
+            <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.16em]">Quick Access</p>
           </div>
           {[
-            { label: 'Manage Users',   path: '/admin/users',    icon: Users,         sub: 'View, flag, or suspend accounts' },
-            { label: 'Monitor Shifts', path: '/admin/shifts',   icon: Briefcase,     sub: 'Track active and past shifts' },
+            { label: 'Manage users',   path: '/admin/users',    icon: Users,         sub: 'View, flag, or suspend accounts' },
+            { label: 'Monitor shifts', path: '/admin/shifts',   icon: Briefcase,     sub: 'Track active and past shifts' },
             { label: 'Revenue',        path: '/admin/revenue',  icon: DollarSign,    sub: 'All payments and platform fees' },
             { label: 'Disputes',       path: '/admin/disputes', icon: AlertTriangle, sub: 'Case management and moderation' },
           ].map(({ label, path, icon: Icon, sub }, i) => (
             <Link key={path} href={path}
-              className="flex items-center gap-4 px-4 py-4 border-b border-[#DBDBDB] last:border-none transition-colors hover:bg-[#FAFAFA]"
+              className="flex items-center gap-4 px-4 py-4 border-b border-[#E5E7EB] last:border-none transition-colors hover:bg-[#FAFAFA]"
             >
-              <div className="w-10 h-10 rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-[8px] bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
                 <Icon size={16} aria-hidden className="text-black" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-black text-[14px] font-semibold">{label}</p>
-                <p className="text-[#737373] text-[12px]">{sub}</p>
+                <p className="text-[#6B7280] text-[12px]">{sub}</p>
               </div>
             </Link>
           ))}

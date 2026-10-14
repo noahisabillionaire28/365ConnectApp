@@ -19,7 +19,6 @@ Local Storage Policy mirror this table; update all three together.
 | Apple (MapKit JS) | `365-connect/src/lib/mapkit.ts`, `components/AppleMap.tsx` | Map rendering when the Apple engine is active (geocoding is done by Nominatim, below) | Map areas requested, IP address |
 | Google (push) | `api-server/src/lib/push.ts` (`web-push`) | Delivers web push to Chrome and Edge | Push endpoint and an encrypted payload the service cannot read |
 | Mozilla (push) | `api-server/src/lib/push.ts` (`web-push`) | Delivers web push to Firefox | Same as above |
-| Google Fonts | `365-connect/index.html` | Serves Space Grotesk | IP address and user agent on font load |
 | CARTO / OpenStreetMap | `365-connect/src/components/LeafletMap.tsx` | Map tiles (Voyager style) when the Leaflet fallback map is used | Tile areas requested, IP address |
 | Nominatim (OSM Foundation) | `components/WizardShared.tsx`, `lib/geocode.ts`, `pages/PostShiftStep2Screen.tsx` | Address search and geocoding for shift venues and profile locations | The typed address text, IP address. Subject to the Nominatim usage policy (low volume, attribution) |
 | Unsplash | `365-connect/src/lib/supabase.ts` (`COVER_FALLBACKS`) | Default cover photo for a shift with no photo | Image request, IP address |

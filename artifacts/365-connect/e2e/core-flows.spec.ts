@@ -125,8 +125,8 @@ test.describe('worker profile', () => {
   test('tapping a worker card on the home feed opens their profile', async ({ page }) => {
     await page.goto('/home');
 
-    // Client home shows PeopleCards — each has a "View Profile" button
-    const viewBtn = page.getByRole('button', { name: 'View Profile' }).first();
+    // Client home shows PeopleCards — each has a "View profile" button
+    const viewBtn = page.getByRole('button', { name: 'View profile' }).first();
     await expect(viewBtn).toBeVisible({ timeout: 20_000 });
     await viewBtn.click();
 

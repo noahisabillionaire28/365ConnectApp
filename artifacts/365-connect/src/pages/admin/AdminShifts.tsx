@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Users, DollarSign, Calendar, XCircle, AlertCircle, MapPin } from 'lucide-react';
+import { Search, X, Users, Calendar, XCircle, AlertCircle, MapPin } from 'lucide-react';
 import { useAdminGate } from '@/hooks/useAdminGate';
 import { useAdminShifts, useCancelShift, useReopenShift } from '@/hooks/useAdminData';
 import { adminApi, type AdminShiftRow } from '@/lib/adminApi';
+import { ConfirmSheet } from '@/components/ConfirmSheet';
+import { useToast } from '@/contexts/ToastContext';
 import { geocodeAddress } from '@/lib/geocode';
 
 /* ── Status badge ────────────────────────────────────────────────────────── */
@@ -28,7 +30,7 @@ function StatusBadge({ status }: { status: ShiftStatus }) {
 /* ── Skeleton card ───────────────────────────────────────────────────────── */
 function SkeletonCard() {
   return (
-    <div className="bg-white border border-[#DBDBDB] rounded-[12px] p-4 mb-3 animate-pulse">
+    <div className="bg-white border border-[#E5E7EB] rounded-[12px] p-4 mb-3 animate-pulse">
       <div className="flex items-start justify-between mb-2.5">
         <div className="flex-1 flex flex-col gap-1.5 pr-2">
           <div className="h-3.5 w-32 bg-[#E5E7EB] rounded-full" />
@@ -50,8 +52,24 @@ function SkeletonCard() {
 function ShiftCard({ shift }: { shift: AdminShiftRow }) {
   const cancelShift = useCancelShift();
   const reopenShift = useReopenShift();
-  const canReopen = shift.status !== 'open';
+  const { showToast } = useToast();
+  // Only a shift that hasn't started, filled or cancelled, can be put back on
+  // the market: once it starts the crew may be on site and clocked in.
+  const canReopen = (shift.status === 'filled' || shift.status === 'cancelled')
+    && new Date(shift.start_time).getTime() > Date.now();
   const [confirm, setConfirm] = useState(false);
+  const [reopenAsk, setReopenAsk] = useState(false);
+
+  function handleReopen() {
+    reopenShift.mutate(shift.id, {
+      onSuccess: (r) => {
+        setReopenAsk(false);
+        const n = r?.released ?? 0;
+        showToast(n ? `Shift reopened. ${n} worker${n === 1 ? '' : 's'} released and notified.` : 'Shift reopened.');
+      },
+      onError: (e) => { setReopenAsk(false); showToast(e instanceof Error ? e.message : "Couldn't reopen the shift.", 'error'); },
+    });
+  }
 
   const canCancel = shift.status !== 'cancelled' && shift.status !== 'completed';
 
@@ -71,30 +89,27 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
   return (
     <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97 }} transition={{ duration: 0.22 }}
-      className="bg-white border border-[#DBDBDB] rounded-[12px] p-4 mb-3"
+      className="bg-white border border-[#E5E7EB] rounded-[12px] p-4 mb-3"
     >
       <div className="flex items-start justify-between mb-2.5">
         <div className="flex-1 min-w-0 pr-2">
           <p className="text-black font-bold text-[15px] leading-tight truncate">
             {shift.title || shift.job_type}
           </p>
-          <p className="text-[#737373] text-[13px] mt-0.5 truncate">
-            {[shift.job_type, shift.company_name].filter(Boolean).join(' · ') || 'Private Client'}
+          <p className="text-[#6B7280] text-[13px] mt-0.5 truncate">
+            {[shift.job_type, shift.company_name].filter(Boolean).join(' · ') || 'Private client'}
           </p>
         </div>
         <StatusBadge status={shift.status} />
       </div>
 
-      <div className="flex items-center gap-4 text-[12px] text-[#737373] mb-3.5 flex-wrap">
+      <div className="flex items-center gap-4 text-[12px] text-[#6B7280] mb-3.5 flex-wrap">
         <span className="flex items-center gap-1">
           <Calendar size={11} aria-hidden className="text-[#6B7280]" />
           {displayDate}
         </span>
         {(shift.pay_rate ?? 0) > 0 && (
-          <span className="flex items-center gap-1">
-            <DollarSign size={11} aria-hidden className="text-[#6B7280]" />
-            ${shift.pay_rate}/hr
-          </span>
+          <span>${shift.pay_rate}/{shift.pay_period ?? 'hr'}</span>
         )}
         <span className="flex items-center gap-1">
           <Users size={11} aria-hidden className="text-[#6B7280]" />
@@ -107,8 +122,8 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
           <div className="flex gap-2">
             <button type="button" onClick={() => setConfirm(false)}
               aria-label="Cancel — go back"
-              className="flex-1 h-[38px] rounded-[8px] bg-white border border-[#DBDBDB] text-[#737373] text-[12px] font-semibold">
-              Go Back
+              className="flex-1 h-[38px] rounded-[8px] bg-white border border-[#E5E7EB] text-[#6B7280] text-[12px] font-semibold">
+              Go back
             </button>
             <button type="button" disabled={cancelShift.isPending}
               onClick={handleCancel} aria-label="Confirm shift cancellation"
@@ -116,7 +131,7 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
               {cancelShift.isPending ? (
                 <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
               ) : (
-                <><XCircle size={13} aria-hidden />Confirm Cancel</>
+                <><XCircle size={13} aria-hidden />Confirm cancel</>
               )}
             </button>
           </div>
@@ -124,7 +139,7 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
           <button type="button" aria-label={`Cancel ${shift.job_type} shift`}
             onClick={() => setConfirm(true)}
             className="w-full h-[38px] rounded-[8px] bg-red-50 border border-red-200 text-red-600 text-[12px] font-semibold flex items-center justify-center gap-1.5">
-            <XCircle size={13} aria-hidden /> Cancel Shift
+            <XCircle size={13} aria-hidden /> Cancel shift
           </button>
         )
       )}
@@ -132,13 +147,25 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
       {canReopen && (
         <button type="button" disabled={reopenShift.isPending}
           aria-label={`Reopen ${shift.job_type} shift for re-staffing`}
-          onClick={() => reopenShift.mutate(shift.id)}
+          onClick={() => setReopenAsk(true)}
           className="w-full h-[38px] mt-2 rounded-[8px] bg-[#0A1628] text-white text-[12px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60">
           {reopenShift.isPending
             ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-            : 'Reopen / Reassign'}
+            : 'Reopen for applicants'}
         </button>
       )}
+      <ConfirmSheet
+        open={reopenAsk}
+        title="Reopen this shift?"
+        body={shift.spots_filled > 0
+          ? `${shift.spots_filled} booked worker${shift.spots_filled === 1 ? '' : 's'} will be released and notified, and the poster will be told. The shift goes back on the marketplace.`
+          : 'The shift goes back on the marketplace and the poster will be told.'}
+        confirmLabel="Reopen shift"
+        tone="danger"
+        busy={reopenShift.isPending}
+        onConfirm={handleReopen}
+        onCancel={() => setReopenAsk(false)}
+      />
     </motion.div>
   );
 }
@@ -211,15 +238,15 @@ export function AdminShifts() {
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col pt-[60px]">
 
-      <div className="sticky top-[60px] z-30 bg-white border-b border-[#DBDBDB] px-4 pt-4 pb-3">
-        <div className="flex items-center gap-2 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[8px] px-3 h-[40px] mb-3">
-          <Search size={14} aria-hidden className="text-[#737373] flex-shrink-0" />
+      <div className="sticky top-[60px] z-30 bg-white border-b border-[#E5E7EB] px-4 pt-4 pb-3">
+        <div className="flex items-center gap-2 bg-[#FAFAFA] border border-[#E5E7EB] rounded-[8px] px-3 h-[40px] mb-3">
+          <Search size={14} aria-hidden className="text-[#6B7280] flex-shrink-0" />
           <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by role or venue…" aria-label="Search shifts"
             className="flex-1 bg-transparent text-black text-[14px] placeholder:text-[#6B7280] focus:outline-none" />
           {search && (
             <button type="button" aria-label="Clear" onClick={() => setSearch('')}>
-              <X size={13} aria-hidden className="text-[#737373]" />
+              <X size={13} aria-hidden className="text-[#6B7280]" />
             </button>
           )}
         </div>
@@ -228,7 +255,7 @@ export function AdminShifts() {
             <button key={key} type="button" aria-pressed={filter === key}
               onClick={() => setFilter(key)}
               className={`flex-shrink-0 h-10 px-3.5 rounded-full text-[12px] font-semibold border transition-all ${
-                filter === key ? 'bg-black text-white border-black' : 'bg-white border-[#DBDBDB] text-[#737373]'
+                filter === key ? 'bg-black text-white border-black' : 'bg-white border-[#E5E7EB] text-[#6B7280]'
               }`}>
               {label}
             </button>
@@ -236,12 +263,12 @@ export function AdminShifts() {
         </div>
         {!isLoading && (
           <div className="flex items-center justify-between gap-2 mt-2">
-            <p className="text-[#737373] text-[11px] font-medium">
+            <p className="text-[#6B7280] text-[11px] font-medium">
               {filtered.length} of {shifts.length} shift{shifts.length !== 1 ? 's' : ''}
             </p>
             <button type="button" onClick={handleFixLocations} disabled={fixing}
               aria-label="Fix shift map locations"
-              className="flex items-center gap-1.5 h-10 px-3 rounded-full border border-[#DBDBDB] bg-white text-[#0A1628] text-[11px] font-bold disabled:opacity-60">
+              className="flex items-center gap-1.5 h-10 px-3 rounded-full border border-[#E5E7EB] bg-white text-[#0A1628] text-[11px] font-bold disabled:opacity-60">
               {fixing
                 ? <div className="w-3 h-3 border-2 border-[#0A1628]/30 border-t-[#0A1628] rounded-full animate-spin" />
                 : <MapPin size={12} aria-hidden />}
@@ -260,7 +287,7 @@ export function AdminShifts() {
         {isError && (
           <div className="flex flex-col items-center justify-center py-20 gap-3 px-8">
             <AlertCircle size={32} aria-hidden className="text-red-400" />
-            <p className="text-[#737373] text-[14px] text-center">
+            <p className="text-[#6B7280] text-[14px] text-center">
               Could not load shifts. Check API server connection.
             </p>
           </div>

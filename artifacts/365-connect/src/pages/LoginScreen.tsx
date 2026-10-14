@@ -86,7 +86,7 @@ function QuickTestLogin({
                 border:       `1px solid ${disabled ? BORDER : NAVY}`,
                 background:   disabled ? '#F9FAFB' : NAVY,
                 color:        disabled ? MUTED : '#FFFFFF',
-                fontFamily:   "'Space Grotesk', sans-serif",
+                fontFamily:   "'Space Grotesk Variable', 'Space Grotesk', system-ui, sans-serif",
                 fontSize:     '13px',
                 fontWeight:   600,
                 padding:      '12px 8px',
@@ -290,7 +290,7 @@ export function LoginScreen() {
             inputMode="email"
             value={email}
             onChange={e => { setEmail(e.target.value); setError(null); }}
-            className="w-full rounded-[12px] px-4 py-3.5 outline-none font-medium text-[15px] transition-colors placeholder:text-[#C0C0C0]"
+            className="w-full rounded-[12px] px-4 py-3.5 outline-none font-medium text-[15px] transition-colors placeholder:text-[#9CA3AF]"
             style={{ border: `1px solid ${BORDER}`, color: TEXT, background: '#FFFFFF' }}
             placeholder="name@example.com"
             data-testid="input-email"
@@ -307,7 +307,7 @@ export function LoginScreen() {
               value={password}
               onChange={e => { setPassword(e.target.value); setError(null); }}
               onKeyDown={e => e.key === 'Enter' && handleLogin()}
-              className="w-full rounded-[12px] px-4 py-3.5 pr-12 outline-none font-medium text-[15px] transition-colors placeholder:text-[#C0C0C0]"
+              className="w-full rounded-[12px] px-4 py-3.5 pr-12 outline-none font-medium text-[15px] transition-colors placeholder:text-[#9CA3AF]"
               style={{ border: `1px solid ${BORDER}`, color: TEXT, background: '#FFFFFF' }}
               placeholder="Enter your password"
               data-testid="input-password"
@@ -336,7 +336,7 @@ export function LoginScreen() {
           style={{ background: NAVY }}
           data-testid="btn-login-submit"
         >
-          {loading ? 'Signing in…' : 'Log In'}
+          {loading ? 'Signing in…' : 'Log in'}
         </button>
       </div>
 
@@ -344,7 +344,7 @@ export function LoginScreen() {
         <p className="text-[14px]" style={{ color: MUTED }}>
           Don't have an account?{' '}
           <Link href="/signup" className="font-semibold" style={{ color: NAVY }} data-testid="link-signup">
-            Sign Up
+            Sign up
           </Link>
         </p>
         <p className="text-[12px] mt-4 flex items-center justify-center gap-1" style={{ color: MUTED }}>

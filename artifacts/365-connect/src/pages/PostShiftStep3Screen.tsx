@@ -15,8 +15,7 @@ import {
   MAX_SERIES_OCCURRENCES, WEEKDAY_LABELS, WEEKDAY_NAMES, type RepeatRule, type RepeatType,
 } from '@/lib/recurrence';
 import { MultiDatePicker } from '@/components/MultiDatePicker';
-import { BottomTabNav } from '@/components/BottomTabNav';
-import { browserTimeZone, zonedTimeToUtc } from '@/lib/timezone';
+import { browserTimeZone, utcToZonedParts, zonedTimeToUtc } from '@/lib/timezone';
 
 const REPEAT_OPTIONS: { value: RepeatType; label: string }[] = [
   { value: 'none',   label: "Doesn't repeat" },
@@ -102,9 +101,19 @@ export function PostShiftStep3Screen() {
   const [, navigate]  = useLocation();
   const initial       = getDraft();
 
-  const today = new Date().toISOString().split('T')[0];
+  // "Today" is the venue's (or this device's) calendar day, not UTC's: in the
+  // US evening UTC is already tomorrow, which blocked same-night posts.
+  const zone = initial.timezone || browserTimeZone();
+  const today = utcToZonedParts(new Date().toISOString(), zone).date;
+  const tomorrow = (() => {
+    const [y, m, d] = today.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+  })();
+  // Default to today unless the default start time has already gone by.
+  const defaultDate = initial.start_time
+    && Date.parse(zonedTimeToUtc(today, initial.start_time, zone)) <= Date.now() ? tomorrow : today;
 
-  const [date,      setDate]      = useState(initial.date || today);
+  const [date,      setDate]      = useState(initial.date || defaultDate);
   const [startTime, setStartTime] = useState(initial.start_time);
   const [endTime,   setEndTime]   = useState(initial.end_time);
   const [spots,     setSpots]     = useState(initial.spots_available);
@@ -184,7 +193,7 @@ export function PostShiftStep3Screen() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[72px]">
+    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[calc(env(safe-area-inset-bottom)+112px)]">
 
       {/* Header */}
       <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
@@ -411,7 +420,7 @@ export function PostShiftStep3Screen() {
       </div>
 
       {/* Fixed CTA */}
-      <div className="fixed bottom-[56px] left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-4 pt-4
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4
         bg-gradient-to-t from-[#F7F8FA] via-[#F7F8FA]/95 to-transparent z-20">
         <motion.button
           type="button" whileTap={{ scale: 0.97 }}
@@ -422,8 +431,6 @@ export function PostShiftStep3Screen() {
           Continue
         </motion.button>
       </div>
-
-      <BottomTabNav />
     </div>
   );
 }

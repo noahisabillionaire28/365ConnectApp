@@ -13,7 +13,7 @@ export function HashtagScreen() {
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[56px]">
-      <div className="sticky top-0 z-20 bg-white border-b border-[#EFEFEF] px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
+      <div className="sticky top-0 z-20 bg-white border-b border-[#F3F4F6] px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3 flex items-center gap-3">
         <button type="button" aria-label="Back"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/explore'); }}
           className="w-10 h-10 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
@@ -28,9 +28,9 @@ export function HashtagScreen() {
       <main className="flex-1 overflow-y-auto">
         {isLoading && <div className="h-[320px] bg-[#FAFAFA] animate-pulse" />}
         {!isLoading && posts.length === 0 && (
-          <div className="mx-4 mt-8 rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] px-6 py-12 text-center">
+          <div className="mx-4 mt-8 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-12 text-center">
             <p className="text-[#111827] text-[15px] font-semibold">No posts yet for #{tag}</p>
-            <p className="text-[#737373] text-[13px] mt-1">Be the first to tag a post with #{tag}.</p>
+            <p className="text-[#6B7280] text-[13px] mt-1">Be the first to tag a post with #{tag}.</p>
           </div>
         )}
         {!isLoading && posts.map((post) => (

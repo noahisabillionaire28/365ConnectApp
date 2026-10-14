@@ -71,7 +71,7 @@ export function LegalGate() {
             <button key={id} type="button" onClick={() => setSheet(id)} data-testid={`legal-gate-open-${id}`}
               className={`w-full min-h-[56px] px-4 py-3 flex items-center gap-3 text-left ${i > 0 ? 'border-t border-[#E5E7EB]' : ''}`}>
               <div className="w-10 h-10 rounded-[10px] bg-[#FAFAFA] flex items-center justify-center flex-shrink-0">
-                <Icon size={17} aria-hidden className="text-[#737373]" />
+                <Icon size={17} aria-hidden className="text-[#6B7280]" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[#111827] text-[15px] font-semibold">{label}</p>

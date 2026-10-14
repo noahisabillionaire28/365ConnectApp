@@ -214,7 +214,7 @@ function ShiftCard({ card, mine, onOpen }: { card: NonNullable<MessageRow['shift
         {start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' })}
       </p>
       {card.location && (
-        <p className={`text-[12px] flex items-center gap-1 truncate ${mine ? 'text-white/85' : 'text-[#6B7280]'}`}><MapPin size={11} aria-hidden />{card.location}</p>
+        <p className={`text-[12px] flex items-center gap-1 min-w-0 ${mine ? 'text-white/85' : 'text-[#6B7280]'}`}><MapPin size={11} aria-hidden className="flex-shrink-0" /><span className="truncate">{card.location}</span></p>
       )}
       <div className="flex items-center justify-between mt-2">
         <span className={`font-bold text-[15px] ${mine ? 'text-white' : 'text-[#111827]'}`}>${Number(card.pay_rate ?? 0)}<span className="text-[11px] font-medium">/{card.pay_period ?? 'hr'}</span></span>
@@ -252,9 +252,9 @@ function useLongPress(onLongPress: () => void, ms = 420) {
 
 function Avatar({ url, name, size = 28 }: { url: string | null | undefined; name: string | null | undefined; size?: number }) {
   return url
-    ? <img src={url} alt="" style={{ width: size, height: size }} className="rounded-full object-cover border border-[#DBDBDB] flex-shrink-0" />
-    : <div style={{ width: size, height: size }} className="rounded-full bg-[#F3F4F6] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
-        <span className="text-[#737373] font-bold" style={{ fontSize: Math.max(10, size * 0.4) }}>{(name ?? '?').replace('@', '').slice(0, 1).toUpperCase()}</span>
+    ? <img src={url} alt="" style={{ width: size, height: size }} className="rounded-full object-cover border border-[#E5E7EB] flex-shrink-0" />
+    : <div style={{ width: size, height: size }} className="rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
+        <span className="text-[#6B7280] font-bold" style={{ fontSize: Math.max(10, size * 0.4) }}>{(name ?? '?').replace('@', '').slice(0, 1).toUpperCase()}</span>
       </div>;
 }
 
@@ -1061,14 +1061,14 @@ export function ChatScreen() {
       {cropSrc && <ImageCropper imageSrc={cropSrc} defaultAspect={1} onDone={(blob, previewUrl) => void handleCropDone(blob, previewUrl)} onCancel={cancelCrop} />}
 
       {/* Header */}
-      <div className="flex items-center gap-2 px-2 pt-[calc(env(safe-area-inset-top)+12px)] pb-2.5 border-b border-[#DBDBDB] bg-white flex-shrink-0">
+      <div className="flex items-center gap-2 px-2 pt-[calc(env(safe-area-inset-top)+12px)] pb-2.5 border-b border-[#E5E7EB] bg-white flex-shrink-0">
         <button type="button" aria-label="Back to messages" onClick={() => navigate('/messages')}
           className="w-10 h-10 flex items-center justify-center active:opacity-60 transition-opacity flex-shrink-0">
           <ChevronLeft size={22} className="text-black" />
         </button>
         {searching ? (
-          <div className="flex-1 flex items-center gap-2 bg-[#F3F4F6] border border-[#DBDBDB] rounded-[10px] px-3 h-[38px]">
-            <Search size={14} className="text-[#737373] flex-shrink-0" />
+          <div className="flex-1 flex items-center gap-2 bg-[#F3F4F6] border border-[#E5E7EB] rounded-[10px] px-3 h-[38px]">
+            <Search size={14} className="text-[#6B7280] flex-shrink-0" />
             <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search this conversation" aria-label="Search messages"
               className="flex-1 bg-transparent text-black text-[14px] outline-none" />
             <button type="button" onClick={() => { setSearching(false); setQuery(''); }} className="text-[#0A1628] text-[13px] font-bold">Done</button>
@@ -1091,12 +1091,12 @@ export function ChatScreen() {
                 ? <div className="w-10 h-10 rounded-full bg-[#0A1628] flex items-center justify-center flex-shrink-0"><Users size={16} className="text-white" /></div>
                 : <Avatar url={conv.other?.photo_url} name={conv.other?.username} size={36} />}
               <div className="min-w-0">
-                <p className="text-black font-bold text-[15px] truncate flex items-center gap-1.5">
-                  {conv.displayName ?? 'Conversation'}
-                  {conv.is_muted && <BellOff size={12} className="text-[#9CA3AF]" aria-label="Muted" />}
+                <p className="text-black font-bold text-[15px] min-w-0 flex items-center gap-1.5">
+                  <span className="truncate">{conv.displayName ?? 'Conversation'}</span>
+                  {conv.is_muted && <BellOff size={12} className="text-[#9CA3AF] flex-shrink-0" aria-label="Muted" />}
                   {conv.is_pinned && <Pin size={12} className="text-[#9CA3AF]" aria-label="Pinned" />}
                 </p>
-                <p className="text-[#737373] text-[11px] font-medium truncate">
+                <p className="text-[#6B7280] text-[11px] font-medium truncate">
                   {typingLabel ?? (isGroup ? `${conv.members.length ?? 0} members · Shift chat` : conv.shiftTitle ? `📌 ${conv.shiftTitle}` : blocked ? 'Blocked' : 'Tap for info')}
                 </p>
               </div>
@@ -1133,7 +1133,7 @@ export function ChatScreen() {
           {isLoading ? <ChatSkeleton /> : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-2 px-8 text-center">
               <p className="text-black font-semibold text-[15px]">{isGroup ? 'Welcome to the shift chat 👋' : 'Say hello 👋'}</p>
-              <p className="text-[#737373] text-[13px]">
+              <p className="text-[#6B7280] text-[13px]">
                 {isGroup ? 'Everyone confirmed for this shift is here. Share call times, parking and updates in one place.'
                   : `Your messages are private between you and ${otherName}.`}
               </p>
@@ -1185,7 +1185,7 @@ export function ChatScreen() {
 
       {/* Composer */}
       {!searching && (
-        <div className="flex-shrink-0 border-t border-[#DBDBDB] bg-white pb-[env(safe-area-inset-bottom)]">
+        <div className="flex-shrink-0 border-t border-[#E5E7EB] bg-white pb-[env(safe-area-inset-bottom)]">
           {blocked && conv?.other && (
             <div className="px-4 py-3 text-center">
               <p className="text-[#6B7280] text-[13px]">You blocked {otherName}. They can't message you.</p>
@@ -1267,7 +1267,7 @@ export function ChatScreen() {
                     className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-transform disabled:opacity-40 ${showAttach ? 'rotate-45 bg-[#F3F4F6]' : ''}`}>
                     <Plus size={20} className="text-[#0A1628]" />
                   </button>
-                  <div className="flex-1 flex items-end bg-[#F3F4F6] border border-[#DBDBDB] rounded-[20px] px-3 min-h-[38px]">
+                  <div className="flex-1 flex items-end bg-[#F3F4F6] border border-[#E5E7EB] rounded-[20px] px-3 min-h-[38px]">
                     <textarea ref={textRef} value={text} rows={1}
                       onChange={(e) => { setText(e.target.value); autoGrow(); if (e.target.value.trim()) notifyTyping(); else stopTyping(); }}
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleSendText(); } }}

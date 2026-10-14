@@ -55,13 +55,13 @@ function ActionConfirm({
         initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
         exit={{ y: 40, opacity: 0 }} transition={{ type: 'spring', stiffness: 360, damping: 36 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[400px] bg-white border border-[#DBDBDB] rounded-[20px] px-5 py-5"
+        className="w-full max-w-[400px] bg-white border border-[#E5E7EB] rounded-[20px] px-5 py-5"
       >
         <p className="text-black font-bold text-[17px] mb-1.5">{m.title}</p>
-        <p className="text-[#737373] text-[14px] mb-5 leading-relaxed">{m.body}</p>
+        <p className="text-[#6B7280] text-[14px] mb-5 leading-relaxed">{m.body}</p>
         <div className="flex gap-3">
           <button type="button" aria-label="Cancel" onClick={onCancel}
-            className="flex-1 h-[48px] rounded-[8px] bg-white border border-[#DBDBDB] text-black font-semibold text-[14px]">
+            className="flex-1 h-[48px] rounded-[8px] bg-white border border-[#E5E7EB] text-black font-semibold text-[14px]">
             Cancel
           </button>
           <button type="button" onClick={onConfirm}
@@ -77,7 +77,7 @@ function ActionConfirm({
 /* ── Skeleton ────────────────────────────────────────────────────────────── */
 function SkeletonCard() {
   return (
-    <div className="bg-white border border-[#DBDBDB] rounded-[12px] p-4 mb-3 animate-pulse">
+    <div className="bg-white border border-[#E5E7EB] rounded-[12px] p-4 mb-3 animate-pulse">
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 flex flex-col gap-1.5 pr-2">
           <div className="h-3.5 w-28 bg-[#E5E7EB] rounded-full" />
@@ -141,7 +141,7 @@ function DisputeCard({ dispute }: { dispute: AdminDisputeRow }) {
       <motion.div layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97 }} transition={{ duration: 0.22 }}
         className={`border rounded-[12px] p-4 mb-3 ${
-          isOpen ? 'bg-white border-red-200' : 'bg-[#FAFAFA] border-[#DBDBDB]'
+          isOpen ? 'bg-white border-red-200' : 'bg-[#FAFAFA] border-[#E5E7EB]'
         }`} role="listitem"
       >
         <div className="flex items-start justify-between mb-2">
@@ -155,7 +155,7 @@ function DisputeCard({ dispute }: { dispute: AdminDisputeRow }) {
                 {meta.label}
               </span>
             </div>
-            <p className="text-[#737373] text-[12px]">
+            <p className="text-[#6B7280] text-[12px]">
               {typeLabel}
               {dispute.reported_by_user_id && (
                 <> · Reported by <PersonLink user={dispute.reported_by_user} id={dispute.reported_by_user_id} className="underline-offset-2 hover:underline" /></>
@@ -168,9 +168,9 @@ function DisputeCard({ dispute }: { dispute: AdminDisputeRow }) {
         </div>
 
         <div className={`rounded-[8px] px-3.5 py-2.5 mb-3 ${
-          isOpen ? 'bg-red-50 border border-red-200' : 'bg-[#FAFAFA] border border-[#DBDBDB]'
+          isOpen ? 'bg-red-50 border border-red-200' : 'bg-[#FAFAFA] border border-[#E5E7EB]'
         }`}>
-          <p className={`text-[13px] leading-relaxed ${isOpen ? 'text-[#737373]' : 'text-[#6B7280]'}`}>
+          <p className={`text-[13px] leading-relaxed ${isOpen ? 'text-[#6B7280]' : 'text-[#6B7280]'}`}>
             {dispute.reason}
           </p>
         </div>
@@ -262,7 +262,7 @@ export function AdminDisputes() {
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col pt-[60px]">
 
-      <div className="sticky top-[60px] z-30 bg-white border-b border-[#DBDBDB] px-4 pt-4 pb-3">
+      <div className="sticky top-[60px] z-30 bg-white border-b border-[#E5E7EB] px-4 pt-4 pb-3">
         {openCount > 0 && (
           <div role="status" aria-label={`${openCount} open disputes`}
             className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-[8px] px-3.5 py-2.5 mb-3">
@@ -277,14 +277,14 @@ export function AdminDisputes() {
             <button key={key} type="button" aria-pressed={filter === key}
               onClick={() => setFilter(key)}
               className={`flex-shrink-0 h-[32px] px-3.5 rounded-full text-[12px] font-semibold border transition-all ${
-                filter === key ? 'bg-black text-white border-black' : 'bg-white border-[#DBDBDB] text-[#737373]'
+                filter === key ? 'bg-black text-white border-black' : 'bg-white border-[#E5E7EB] text-[#6B7280]'
               }`}>
               {label}
             </button>
           ))}
         </div>
         {!isLoading && (
-          <p className="text-[#737373] text-[11px] font-medium mt-2">
+          <p className="text-[#6B7280] text-[11px] font-medium mt-2">
             {filtered.length} case{filtered.length !== 1 ? 's' : ''}
           </p>
         )}
@@ -296,7 +296,7 @@ export function AdminDisputes() {
         {isError && (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <AlertCircle size={32} aria-hidden className="text-red-400" />
-            <p className="text-[#737373] text-[14px]">Could not load disputes.</p>
+            <p className="text-[#6B7280] text-[14px]">Could not load disputes.</p>
           </div>
         )}
 
@@ -308,7 +308,7 @@ export function AdminDisputes() {
 
         {!isLoading && !isError && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 gap-2">
-            <CheckCircle2 size={32} aria-hidden className="text-[#DBDBDB]" />
+            <CheckCircle2 size={32} aria-hidden className="text-[#E5E7EB]" />
             <p className="text-[#6B7280] text-[14px]">
               {filter === 'open' ? 'No open disputes — all clear.' : 'No cases in this category.'}
             </p>

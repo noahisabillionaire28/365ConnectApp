@@ -34,11 +34,11 @@ export function AdminLogin() {
 
         {/* Logo */}
         <div className="flex flex-col items-center mb-10">
-          <div className="w-16 h-16 rounded-[18px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center mb-4">
+          <div className="w-16 h-16 rounded-[18px] bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center mb-4">
             <ShieldCheck size={32} aria-hidden className="text-black" />
           </div>
           <h1 className="text-black font-bold text-[28px] tracking-tight">365 Connect</h1>
-          <p className="text-[#737373] text-[14px] font-medium mt-1 uppercase tracking-[0.18em]">Admin Portal</p>
+          <p className="text-[#6B7280] text-[14px] font-medium mt-1 uppercase tracking-[0.18em]">Admin Portal</p>
         </div>
 
         {/* Form */}
@@ -48,7 +48,7 @@ export function AdminLogin() {
             <input id="email" type="email" autoComplete="email" value={email}
               onChange={(e) => setEmail(e.target.value)} placeholder="admin@365connect.com"
               aria-required="true" aria-describedby={error ? 'login-error' : undefined}
-              className="h-[52px] rounded-[8px] bg-white border border-[#DBDBDB] px-4 text-black text-[15px] placeholder:text-[#6B7280] focus:outline-none focus:border-black transition-colors" />
+              className="h-[52px] rounded-[8px] bg-white border border-[#E5E7EB] px-4 text-black text-[15px] placeholder:text-[#6B7280] focus:outline-none focus:border-black transition-colors" />
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -57,10 +57,10 @@ export function AdminLogin() {
               <input id="password" type={showPw ? 'text' : 'password'} autoComplete="current-password"
                 value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••"
                 aria-required="true" aria-describedby={error ? 'login-error' : undefined}
-                className="w-full h-[52px] rounded-[8px] bg-white border border-[#DBDBDB] px-4 pr-12 text-black text-[15px] placeholder:text-[#6B7280] focus:outline-none focus:border-black transition-colors" />
+                className="w-full h-[52px] rounded-[8px] bg-white border border-[#E5E7EB] px-4 pr-12 text-black text-[15px] placeholder:text-[#6B7280] focus:outline-none focus:border-black transition-colors" />
               <button type="button" aria-label={showPw ? 'Hide password' : 'Show password'}
                 onClick={() => setShowPw((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-[#737373]">
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-[#6B7280]">
                 {showPw ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
               </button>
             </div>
@@ -81,7 +81,7 @@ export function AdminLogin() {
             }`}>
             {loading ? (
               <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Signing in…</>
-            ) : 'Sign In'}
+            ) : 'Sign in'}
           </motion.button>
         </form>
 

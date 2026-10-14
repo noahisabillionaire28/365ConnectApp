@@ -70,7 +70,7 @@ function StarRow({ rating, max = 5 }: { rating: number; max?: number }) {
     <div className="flex items-center gap-[2px]">
       {Array.from({ length: max }).map((_, i) => (
         <Star key={i} size={12}
-          className={i < Math.round(rating) ? 'text-amber-400 fill-amber-400' : 'text-[#DBDBDB] fill-[#DBDBDB]'} />
+          className={i < Math.round(rating) ? 'text-amber-400 fill-amber-400' : 'text-[#E5E7EB] fill-[#E5E7EB]'} />
       ))}
     </div>
   );
@@ -84,7 +84,7 @@ function StatItem({ value, label }: { value: string | number; label: string }) {
   return (
     <div className="flex flex-col items-center gap-[2px]">
       <span className="text-black font-bold text-[18px] leading-none">{formatted}</span>
-      <span className="text-[#737373] text-[11px] font-medium leading-none">{label}</span>
+      <span className="text-[#6B7280] text-[11px] font-medium leading-none">{label}</span>
     </div>
   );
 }
@@ -123,15 +123,15 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
       aria-label={`Request ${workerUsername ? '@' + workerUsername : 'this worker'} for a shift`}>
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative w-full max-w-app bg-white rounded-t-[20px] max-h-[75vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#DBDBDB] flex-shrink-0">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#E5E7EB] flex-shrink-0">
           <div>
             <h2 className="text-black font-bold text-[17px]">Request for shift</h2>
-            <p className="text-[#737373] text-[12px] mt-[2px]">
+            <p className="text-[#6B7280] text-[12px] mt-[2px]">
               Invite {workerUsername ? `@${workerUsername}` : 'this worker'} to one of your open shifts
             </p>
           </div>
           <button type="button" aria-label="Close" onClick={onClose}
-            className="w-8 h-8 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+            className="w-8 h-8 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
             <X size={16} className="text-black" />
           </button>
         </div>
@@ -142,7 +142,7 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
 
         <div className="px-5 pt-4">
           <label htmlFor="request-note" className="block text-black font-semibold text-[13px] mb-1.5">
-            Message <span className="text-[#737373] font-normal">(optional)</span>
+            Message <span className="text-[#6B7280] font-normal">(optional)</span>
           </label>
           <textarea
             id="request-note"
@@ -153,7 +153,7 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
             aria-invalid={noteTooLong}
             aria-describedby={noteTooLong ? 'request-note-error' : undefined}
             className={`w-full border rounded-[10px] px-3 py-2.5 text-[13px] text-black resize-none outline-none transition-colors ${
-              noteTooLong ? 'border-[#EF4444] focus:border-[#EF4444]' : 'border-[#DBDBDB] focus:border-black'
+              noteTooLong ? 'border-[#EF4444] focus:border-[#EF4444]' : 'border-[#E5E7EB] focus:border-black'
             }`}
           />
           <div className="flex items-center justify-between mt-1">
@@ -172,13 +172,13 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
           {isLoading ? (
             <div className="flex flex-col gap-3">
               {[1, 2, 3].map((n) => (
-                <div key={n} className="h-[68px] rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] animate-pulse" />
+                <div key={n} className="h-[68px] rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] animate-pulse" />
               ))}
             </div>
           ) : openShifts.length === 0 ? (
             <div className="text-center py-10">
               <p className="text-black font-semibold text-[14px]">No open shifts</p>
-              <p className="text-[#737373] text-[12px] mt-1">Post a shift first, then invite workers directly.</p>
+              <p className="text-[#6B7280] text-[12px] mt-1">Post a shift first, then invite workers directly.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
@@ -187,10 +187,10 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
                 const isSent    = sentId === shift.id;
                 return (
                   <div key={shift.id}
-                    className="flex items-center justify-between gap-3 rounded-[12px] border border-[#DBDBDB] px-4 py-3">
+                    className="flex items-center justify-between gap-3 rounded-[12px] border border-[#E5E7EB] px-4 py-3">
                     <div className="min-w-0">
                       <p className="text-black font-semibold text-[14px] truncate">{shift.jobType}</p>
-                      <p className="text-[#737373] text-[12px] mt-[2px]">
+                      <p className="text-[#6B7280] text-[12px] mt-[2px]">
                         ${shift.payRate}/{shift.payPeriod} · {shift.date} {shift.startTime}
                       </p>
                     </div>
@@ -232,7 +232,7 @@ function FollowButton({ profileId, username, asRoster }: {
   }
 
   const label = asRoster
-    ? (isFollowing ? 'On Roster' : 'Add to Roster')
+    ? (isFollowing ? 'On roster' : 'Add to roster')
     : (isFollowing ? 'Following' : 'Follow');
 
   return (
@@ -243,7 +243,7 @@ function FollowButton({ profileId, username, asRoster }: {
       aria-pressed={isFollowing} disabled={isFollowPending} onClick={handlePress}
       className={`flex-1 font-bold text-[14px] py-[14px] rounded-[8px] active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 ${
         isFollowing
-          ? 'bg-white border border-[#DBDBDB] text-black'
+          ? 'bg-white border border-[#E5E7EB] text-black'
           : 'bg-black text-white'
       }`}>
       <Heart size={15} aria-hidden
@@ -295,16 +295,16 @@ function ReportSheet({
           <p className="text-black font-bold text-[17px]">Report @{username ?? 'user'}</p>
           <button type="button" aria-label="Close" onClick={onClose}
             className="w-8 h-8 rounded-full bg-[#F5F5F5] flex items-center justify-center">
-            <X size={16} className="text-[#737373]" />
+            <X size={16} className="text-[#6B7280]" />
           </button>
         </div>
 
-        <p className="text-[#737373] text-[12px] font-semibold uppercase tracking-wide mb-2">Reason</p>
+        <p className="text-[#6B7280] text-[12px] font-semibold uppercase tracking-wide mb-2">Reason</p>
         <div className="flex flex-wrap gap-2 mb-4">
           {REPORT_TYPES.map((t) => (
             <button key={t.key} type="button" onClick={() => setType(t.key)}
               className={`px-3 h-10 rounded-full text-[13px] font-semibold border ${
-                type === t.key ? 'bg-black text-white border-black' : 'bg-white text-[#737373] border-[#DBDBDB]'
+                type === t.key ? 'bg-black text-white border-black' : 'bg-white text-[#6B7280] border-[#E5E7EB]'
               }`}>
               {t.label}
             </button>
@@ -316,13 +316,13 @@ function ReportSheet({
           onChange={(e) => { setReason(e.target.value); setErr(null); }}
           placeholder="What happened?"
           rows={3}
-          className="w-full rounded-[10px] border border-[#DBDBDB] px-3 py-2.5 text-[14px] outline-none focus:border-black resize-none mb-2"
+          className="w-full rounded-[10px] border border-[#E5E7EB] px-3 py-2.5 text-[14px] outline-none focus:border-black resize-none mb-2"
         />
         {err && <p className="text-[#EF4444] text-[12px] mb-2">{err}</p>}
 
         <button type="button" onClick={() => void submit()} disabled={submitting}
           className="w-full h-[48px] rounded-[10px] bg-[#EF4444] text-white font-bold text-[15px] disabled:opacity-60">
-          {submitting ? 'Submitting…' : 'Submit Report'}
+          {submitting ? 'Submitting…' : 'Submit report'}
         </button>
       </div>
     </div>
@@ -350,7 +350,7 @@ export function WorkerProfileScreen() {
   const canRequestShift =
     !!authUser && !!profile && authUser.id !== profile.id &&
     (role === 'client' || role === 'staffer') && profile.role === 'worker';
-  // Agencies keep workers on their roster (Add to Roster); the separate
+  // Agencies keep workers on their roster (Add to roster); the separate
   // bookmark is a client's list, so it is hidden for staffers.
   const canSave = canRequestShift && role === 'client';
   const { saved, toggle: toggleSaved, isPending: savePending } = useSavedWorker(
@@ -391,9 +391,9 @@ export function WorkerProfileScreen() {
 
       const pastShifts: PastShift[] = (reviewData ?? []).map((r) => ({
         id:     r.id,
-        name:   r.shift_title ?? 'Unnamed Shift',
+        name:   r.shift_title ?? 'Untitled shift',
         date:   r.shift_start_time ? friendlyDate(r.shift_start_time) : '—',
-        client: r.reviewer_username ? `@${r.reviewer_username}` : 'Private Client',
+        client: r.reviewer_username ? `@${r.reviewer_username}` : 'Private client',
         rating: r.rating,
       }));
 
@@ -418,14 +418,14 @@ export function WorkerProfileScreen() {
     return (
       <div className="flex flex-col h-full bg-white text-black items-center justify-center px-6">
         <button type="button" aria-label="Go back" onClick={goBack}
-          className="absolute top-12 left-4 w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
+          className="absolute top-12 left-4 w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
           <ChevronLeft size={20} className="text-black" />
         </button>
         <p className="text-[18px] font-bold mb-2">User not found</p>
-        <p className="text-[#737373] text-[14px] text-center mb-6">
+        <p className="text-[#6B7280] text-[14px] text-center mb-6">
           @{params.username} doesn't exist on 365 Connect yet.
         </p>
-        <button onClick={goBack} className="text-[#0095F6] font-semibold text-[14px]">
+        <button onClick={goBack} className="text-[#0A1628] font-semibold text-[14px]">
           Go back
         </button>
       </div>
@@ -456,7 +456,7 @@ export function WorkerProfileScreen() {
             <img src={profile.photo_url} alt={profile.username}
               loading="eager" decoding="async" className="w-full h-full object-cover" />
           ) : (
-            <span className="text-[72px] font-bold text-[#DBDBDB]">{initials}</span>
+            <span className="text-[72px] font-bold text-[#E5E7EB]">{initials}</span>
           )}
         </div>
 
@@ -471,7 +471,7 @@ export function WorkerProfileScreen() {
           <h1 className="text-[22px] font-bold text-black min-w-0 break-words [overflow-wrap:anywhere]">@{profile.username}</h1>
         </div>
 
-        <p className="text-[#737373] text-[13px] font-medium mb-1">
+        <p className="text-[#6B7280] text-[13px] font-medium mb-1">
           {profile.role !== 'worker' && profile.company_name
             ? <><span className="text-black font-semibold">{profile.company_name}</span> · <span className="capitalize">{profile.role === 'staffer' ? 'Agency' : profile.role}</span></>
             : <span className="capitalize">{profile.role === 'staffer' ? 'Agency' : profile.role}</span>}
@@ -496,7 +496,7 @@ export function WorkerProfileScreen() {
           <div className="flex flex-wrap gap-2 mb-6">
             {profile.job_types.map((job) => (
               <span key={job}
-                className="px-3 py-[6px] rounded-full bg-[#FAFAFA] border border-[#DBDBDB] text-black text-[12px] font-semibold">
+                className="px-3 py-[6px] rounded-full bg-[#FAFAFA] border border-[#E5E7EB] text-black text-[12px] font-semibold">
                 {job}
               </span>
             ))}
@@ -506,14 +506,14 @@ export function WorkerProfileScreen() {
         {/* Availability — days this worker can work */}
         {profile.role === 'worker' && profile.availability && DAY_ORDER.some((d) => profile.availability?.[d.key]) && (
           <div className="mb-6">
-            <p className="text-[13px] font-semibold text-[#737373] uppercase tracking-widest mb-2">Availability</p>
+            <p className="text-[13px] font-semibold text-[#6B7280] uppercase tracking-widest mb-2">Availability</p>
             <div className="flex flex-wrap gap-1.5">
               {DAY_ORDER.map(({ key, label }) => {
                 const on = !!profile.availability?.[key];
                 return (
                   <span key={key}
                     className={`px-2.5 py-1 rounded-full text-[12px] font-semibold border ${
-                      on ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-[#FAFAFA] border-[#DBDBDB] text-[#6B7280]'
+                      on ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280]'
                     }`}>
                     {label}
                   </span>
@@ -524,21 +524,21 @@ export function WorkerProfileScreen() {
         )}
 
         {/* Stats row — a worker's shifts and followers; a poster's reviews */}
-        <div className="flex items-center justify-around bg-[#FAFAFA] rounded-[12px] border border-[#DBDBDB] py-4 px-3 mb-6">
+        <div className="flex items-center justify-around bg-[#FAFAFA] rounded-[12px] border border-[#E5E7EB] py-4 px-3 mb-6">
           <StatItem value={profile.pastShifts.length} label={isWorkerProfile ? 'Shifts' : 'Reviews'} />
-          <div className="w-px h-8 bg-[#DBDBDB]" />
+          <div className="w-px h-8 bg-[#E5E7EB]" />
           <div className="flex flex-col items-center gap-[2px]">
             <span className="text-black font-bold text-[18px] leading-none">
               {profile.rating > 0 ? Number(profile.rating).toFixed(1) : '—'}
             </span>
             <div className="flex items-center gap-[3px] mt-[2px]">
               <Star size={10} className="text-amber-400 fill-amber-400" />
-              <span className="text-[#737373] text-[11px] font-medium leading-none">Rating</span>
+              <span className="text-[#6B7280] text-[11px] font-medium leading-none">Rating</span>
             </div>
           </div>
           {isWorkerProfile && (
             <>
-              <div className="w-px h-8 bg-[#DBDBDB]" />
+              <div className="w-px h-8 bg-[#E5E7EB]" />
               <StatItem value={followerCount} label="Followers" />
             </>
           )}
@@ -546,21 +546,21 @@ export function WorkerProfileScreen() {
 
         {/* Action buttons — Follow only exists for workers (the API rejects
             following a client or agency), and the bookmark is a client's list. */}
-        {(isWorkerProfile || authUser?.id !== profile.id) && (
+        {authUser?.id !== profile.id && (
         <div className="flex gap-3 mb-3">
-          {isWorkerProfile && (
+          {isWorkerProfile && authUser?.id !== profile.id && (
             <FollowButton profileId={profile.id} username={profile.username} asRoster={canRequestShift} />
           )}
           {authUser?.id !== profile.id && (
             <button type="button" onClick={() => void handleMessage()} disabled={isStartingChat}
-              className="flex-1 bg-white border border-[#DBDBDB] text-black font-bold text-[14px] py-[14px] rounded-[8px] active:scale-[0.98] transition-transform disabled:opacity-50">
+              className="flex-1 bg-white border border-[#E5E7EB] text-black font-bold text-[14px] py-[14px] rounded-[8px] active:scale-[0.98] transition-transform disabled:opacity-50">
               {isStartingChat ? 'Opening…' : 'Message'}
             </button>
           )}
           {canSave && (
             <button type="button" aria-label={saved ? 'Unsave worker' : 'Save worker'}
               onClick={() => toggleSaved()} disabled={savePending}
-              className="w-[52px] bg-white border border-[#DBDBDB] py-[14px] rounded-[8px] active:scale-[0.98] transition-transform flex items-center justify-center disabled:opacity-60">
+              className="w-[52px] bg-white border border-[#E5E7EB] py-[14px] rounded-[8px] active:scale-[0.98] transition-transform flex items-center justify-center disabled:opacity-60">
               <Bookmark size={18} aria-hidden className={saved ? 'fill-[#0A1628] text-[#0A1628]' : 'text-black'} />
             </button>
           )}
@@ -569,7 +569,7 @@ export function WorkerProfileScreen() {
 
         {canRequestShift && (
           <button type="button" onClick={() => setShowRequestSheet(true)}
-            className="w-full flex items-center justify-center gap-2 bg-[#0095F6] text-white font-bold text-[14px] py-[14px] rounded-[8px] active:scale-[0.98] transition-transform mb-8">
+            className="w-full flex items-center justify-center gap-2 bg-[#0A1628] text-white font-bold text-[14px] py-[14px] rounded-[8px] active:scale-[0.98] transition-transform mb-8">
             <CalendarPlus size={16} aria-hidden />
             Request for shift
           </button>
@@ -580,7 +580,7 @@ export function WorkerProfileScreen() {
             client or agency can see their work the way it was shared. */}
         {workerPosts.length > 0 && (
           <div className="mb-8 -mx-5">
-            <h2 className="text-[13px] font-semibold text-[#737373] uppercase tracking-widest mb-3 px-5">
+            <h2 className="text-[13px] font-semibold text-[#6B7280] uppercase tracking-widest mb-3 px-5">
               Posts
             </h2>
             <div className="flex flex-col gap-6">
@@ -596,14 +596,14 @@ export function WorkerProfileScreen() {
         {/* Certifications */}
         {profile.certifications.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-[13px] font-semibold text-[#737373] uppercase tracking-widest mb-3">
+            <h2 className="text-[13px] font-semibold text-[#6B7280] uppercase tracking-widest mb-3">
               Certifications <span className="normal-case tracking-normal font-normal">(self-reported)</span>
             </h2>
             <div className="flex flex-wrap gap-2">
               {profile.certifications.map((cert) => (
                 <span key={cert}
-                  className="inline-flex items-center gap-[6px] px-3 py-[7px] rounded-full bg-[#FAFAFA] border border-[#DBDBDB] text-[#737373] text-[12px] font-semibold">
-                  <Award size={12} aria-hidden className="text-[#737373]" />
+                  className="inline-flex items-center gap-[6px] px-3 py-[7px] rounded-full bg-[#FAFAFA] border border-[#E5E7EB] text-[#6B7280] text-[12px] font-semibold">
+                  <Award size={12} aria-hidden className="text-[#6B7280]" />
                   {cert}
                 </span>
               ))}
@@ -614,25 +614,25 @@ export function WorkerProfileScreen() {
         {/* Past shifts (a worker) / reviews from workers (a client or agency) */}
         {profile.pastShifts.length > 0 ? (
           <div>
-            <h2 className="text-[13px] font-semibold text-[#737373] uppercase tracking-widest mb-4">
-              {isWorkerProfile ? 'Past Shifts' : 'Reviews from workers'}
+            <h2 className="text-[13px] font-semibold text-[#6B7280] uppercase tracking-widest mb-4">
+              {isWorkerProfile ? 'Past shifts' : 'Reviews from workers'}
             </h2>
             <div className="flex flex-col gap-3">
               {profile.pastShifts.map((shift) => (
                 <div key={shift.id}
-                  className="flex items-center gap-4 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] p-4">
-                  <div className="w-11 h-11 rounded-[10px] bg-white border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+                  className="flex items-center gap-4 bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] p-4">
+                  <div className="w-11 h-11 rounded-[10px] bg-white border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
                     <Star size={16} className="text-amber-400" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-black font-semibold text-[14px] leading-snug truncate">{shift.name}</p>
-                    <p className="text-[#737373] text-[12px] mt-[2px]">
+                    <p className="text-[#6B7280] text-[12px] mt-[2px]">
                       {shift.client} · {shift.date}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-[3px] flex-shrink-0">
                     <StarRow rating={shift.rating} />
-                    <span className="text-[#737373] text-[11px]">{shift.rating}.0</span>
+                    <span className="text-[#6B7280] text-[11px]">{shift.rating}.0</span>
                   </div>
                 </div>
               ))}
@@ -640,7 +640,7 @@ export function WorkerProfileScreen() {
           </div>
         ) : (
           <div className="text-center py-8">
-            <p className="text-[#737373] text-[14px]">{isWorkerProfile ? 'No rated shifts yet.' : 'No reviews from workers yet.'}</p>
+            <p className="text-[#6B7280] text-[14px]">{isWorkerProfile ? 'No rated shifts yet.' : 'No reviews from workers yet.'}</p>
             <p className="text-[#6B7280] text-[12px] mt-1">
               {isWorkerProfile ? "Shifts appear here after they're reviewed." : 'Workers can rate them after a shift.'}
             </p>

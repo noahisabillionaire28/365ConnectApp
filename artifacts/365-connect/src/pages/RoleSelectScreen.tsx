@@ -26,19 +26,19 @@ const CARDS: { role: Role; icon: React.ReactNode; title: string; subtitle: strin
   {
     role:     'worker',
     icon:     <HardHat size={22} />,
-    title:    "I'm Working",
+    title:    "I'm working",
     subtitle: 'Browse shifts, get booked, and build your reputation.',
   },
   {
     role:     'client',
     icon:     <Briefcase size={22} />,
-    title:    "I'm Hiring",
+    title:    "I'm hiring",
     subtitle: 'Post shifts and find event staff fast.',
   },
   {
     role:     'staffer',
     icon:     <Building2 size={22} />,
-    title:    "I'm a Staffing Agency",
+    title:    "I'm a staffing agency",
     subtitle: 'Manage your roster and place workers into shifts at scale.',
   },
 ];

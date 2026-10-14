@@ -4,12 +4,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
+  ChevronLeft, Share2, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, UserPlus,
   Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText, MessagesSquare, Repeat2, DollarSign, Star, CalendarPlus,
   BookmarkPlus,
+  CalendarX2,
 } from 'lucide-react';
-import { useFeedStore, toggleSaved } from '@/store/feedStore';
+import { APP_ORIGIN } from '@/lib/calendar';
 import { useApplications } from '@/hooks/useApplications';
 import { useToast } from '@/contexts/ToastContext';
 import { useApplicationStatus } from '@/hooks/useApplicationStatus';
@@ -22,7 +23,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useMyLocation } from '@/hooks/useMyLocation';
 import { computeMatchScore } from '@/lib/matchScore';
 import { haversineMiles, formatTime, friendlyDate, shiftHeadline } from '@/lib/supabase';
-import { apiClient } from '@/lib/api';
+import { apiClient, isApiStatus } from '@/lib/api';
 import { resetDraft, setDraft, setEditShiftId, type TemplatePayload } from '@/store/postShiftStore';
 import { utcToZonedParts, DEFAULT_SHIFT_TZ } from '@/lib/timezone';
 import { useSeriesShifts, useCancelSeriesFuture } from '@/hooks/useShiftSeries';
@@ -45,6 +46,8 @@ import { SwapSheet, type SwapCandidate } from '@/components/SwapSheet';
 import { useOfferSwap, useRespondSwap, useCancelSwap, isSwapActive } from '@/hooks/useSwaps';
 import { AddToCalendarSheet } from '@/components/AddToCalendarSheet';
 import { useArrivalStatus, isDayOfWindow } from '@/hooks/useArrivalStatus';
+import { StateView, LoadError } from '@/components/StateView';
+import { formatPhone } from '@/lib/phone';
 
 /** Deep links to open a destination in each navigation app. */
 function directionsLinks(lat: number, lng: number, label: string) {
@@ -88,30 +91,30 @@ const usd = (n: number) => n.toLocaleString('en-US', { style: 'currency', curren
 function ShiftDetailSkeleton() {
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
-      <div className="w-full h-[300px] bg-[#EFEFEF] animate-pulse" />
+      <div className="w-full h-[300px] bg-[#F3F4F6] animate-pulse" />
       <div className="px-5 pt-5 flex flex-col gap-4">
         <div className="flex justify-between">
-          <div className="w-28 h-8 rounded-full bg-[#EFEFEF] animate-pulse" />
-          <div className="w-20 h-8 rounded-[8px] bg-[#EFEFEF] animate-pulse" />
+          <div className="w-28 h-8 rounded-full bg-[#F3F4F6] animate-pulse" />
+          <div className="w-20 h-8 rounded-[8px] bg-[#F3F4F6] animate-pulse" />
         </div>
         <div className="flex gap-4 py-2">
-          <div className="w-16 h-4 rounded bg-[#EFEFEF] animate-pulse" />
-          <div className="w-20 h-4 rounded bg-[#EFEFEF] animate-pulse" />
+          <div className="w-16 h-4 rounded bg-[#F3F4F6] animate-pulse" />
+          <div className="w-20 h-4 rounded bg-[#F3F4F6] animate-pulse" />
         </div>
         <div className="flex gap-3">
           {[1, 2, 3].map((n) => (
-            <div key={n} className="flex-1 h-20 rounded-[12px] bg-[#EFEFEF] animate-pulse" />
+            <div key={n} className="flex-1 h-20 rounded-[12px] bg-[#F3F4F6] animate-pulse" />
           ))}
         </div>
-        <div className="h-px bg-[#DBDBDB]" />
+        <div className="h-px bg-[#E5E7EB]" />
         <div className="space-y-2">
-          <div className="w-32 h-5 rounded bg-[#EFEFEF] animate-pulse" />
-          <div className="h-20 rounded-[12px] bg-[#EFEFEF] animate-pulse" />
+          <div className="w-32 h-5 rounded bg-[#F3F4F6] animate-pulse" />
+          <div className="h-20 rounded-[12px] bg-[#F3F4F6] animate-pulse" />
         </div>
         <div className="space-y-2">
-          <div className="w-40 h-5 rounded bg-[#EFEFEF] animate-pulse" />
-          <div className="h-16 rounded bg-[#EFEFEF] animate-pulse" />
-          <div className="h-12 rounded bg-[#EFEFEF] animate-pulse" />
+          <div className="w-40 h-5 rounded bg-[#F3F4F6] animate-pulse" />
+          <div className="h-16 rounded bg-[#F3F4F6] animate-pulse" />
+          <div className="h-12 rounded bg-[#F3F4F6] animate-pulse" />
         </div>
       </div>
     </div>
@@ -126,7 +129,7 @@ function ClientLogo({ name }: { name: string }) {
   const initials = name.split(' ').slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
   return (
     <div aria-hidden
-      className="w-[52px] h-[52px] rounded-[12px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+      className="w-[52px] h-[52px] rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
       <span className="text-black font-bold text-[17px] tracking-tight">{initials}</span>
     </div>
   );
@@ -136,11 +139,11 @@ function StatTile({ icon, label, value, sub, accent }: {
   icon: React.ReactNode; label: string; value: string; sub?: string; accent?: boolean;
 }) {
   return (
-    <div className="flex-1 bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-3 py-3.5 flex flex-col gap-1.5">
-      <div className="w-7 h-7 rounded-[8px] bg-white border border-[#DBDBDB] flex items-center justify-center">{icon}</div>
-      <p className="text-[#737373] text-[10px] font-semibold uppercase tracking-wider">{label}</p>
-      <p className={`font-bold text-[15px] leading-tight ${accent ? 'text-[#0095F6]' : 'text-black'}`}>{value}</p>
-      {sub && <p className="text-[#737373] text-[11px]">{sub}</p>}
+    <div className="flex-1 bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-3 py-3.5 flex flex-col gap-1.5">
+      <div className="w-7 h-7 rounded-[8px] bg-white border border-[#E5E7EB] flex items-center justify-center">{icon}</div>
+      <p className="text-[#6B7280] text-[10px] font-semibold uppercase tracking-wider">{label}</p>
+      <p className={`font-bold text-[15px] leading-tight ${accent ? 'text-[#0A1628]' : 'text-black'}`}>{value}</p>
+      {sub && <p className="text-[#6B7280] text-[11px]">{sub}</p>}
     </div>
   );
 }
@@ -150,7 +153,6 @@ export function ShiftDetailScreen() {
   const { id }       = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { user }      = useAuth();
-  const store        = useFeedStore();
   // useApplications: 7 stable hooks (see hook/useApplications.ts inventory comment)
   const { submitApplication }             = useApplications();
   const {
@@ -169,7 +171,7 @@ export function ShiftDetailScreen() {
   const { coords: myCoords, isDefault: myLocationIsDefault } = useMyLocation();
   // Distance (and therefore the AI Match Score's distance component) is
   // computed against the real viewer location, not a hardcoded fallback.
-  const { data: shift, isLoading, error } = useShiftById(id, myCoords);
+  const { data: shift, isLoading, error, refetch: refetchShift } = useShiftById(id, myCoords);
   const [dressCodeDraft, setDressCodeDraft] = useState<string | null>(null);
   const [savingDressCode, setSavingDressCode] = useState(false);
   // The worker's own timesheet for this shift (null until they clock in).
@@ -181,7 +183,9 @@ export function ShiftDetailScreen() {
   const isWorkerForHooks = profile.role === 'worker';
   const { existing: myReview } = useExistingReview(id, user?.id, isWorkerForHooks ? shift?.clientId : undefined);
   const isOwnerForHooks = !!user?.id && !!shift && user.id === shift.clientId;
-  const { applicants: pendingApplicants } = useShiftApplicants(isOwnerForHooks ? id : undefined);
+  const { applicants: rosterRows } = useShiftApplicants(isOwnerForHooks ? id : undefined);
+  // The hook returns the whole roster (every status); the badge is for people waiting on a decision.
+  const pendingCount = rosterRows.filter((a) => a.status === 'pending').length;
   const { workers: acceptedWorkers } = useAcceptedWorkers(
     isOwnerForHooks ? id : undefined,
     isOwnerForHooks ? user?.id : undefined,
@@ -254,30 +258,25 @@ export function ShiftDetailScreen() {
 
   if (isLoading) return <ShiftDetailSkeleton />;
 
-  if (error) {
+  // A deleted or removed shift (404) is "no longer available", not a
+  // connection problem; anything else gets a real retry.
+  if (error && !isApiStatus(error, 404)) {
     return (
-      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-6 gap-4 text-center">
-        <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center mb-2">
-          <span className="text-[#737373] text-[24px]">⚠</span>
-        </div>
-        <p className="text-[#737373] text-[15px] font-medium">Couldn't load this shift</p>
-        <p className="text-[#6B7280] text-[12px]">Check your connection and try again.</p>
-        <button type="button" onClick={() => window.location.reload()}
-          className="mt-2 text-[#0095F6] font-semibold text-[14px]">Retry</button>
+      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center">
+        <LoadError what="this shift" onRetry={() => void refetchShift()} />
         <button type="button"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/jobs'); }}
-          className="text-[#737373] text-[13px]">← Go back</button>
+          className="h-11 px-4 text-[#6B7280] text-[14px] font-semibold">Go back</button>
       </div>
     );
   }
 
   if (!shift) {
     return (
-      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-6 gap-4 text-center">
-        <p className="text-[#737373] text-[15px]">This shift is no longer available.</p>
-        <button type="button"
-          onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/jobs'); }}
-          className="text-[#0095F6] font-semibold text-[14px]">← Browse shifts</button>
+      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center">
+        <StateView icon={CalendarX2} title="This shift is no longer available"
+          body="The poster may have cancelled or removed it."
+          actionLabel="Browse other shifts" onAction={() => navigate('/jobs')} />
       </div>
     );
   }
@@ -285,7 +284,6 @@ export function ShiftDetailScreen() {
   const shiftId     = shift.id;
   // Completion is tracked per-worker via time_entries.clock_out.
   const hasCompleted = !!myEntry?.clock_out;
-  const saved       = store.isSaved(shiftId);
   const spotsLow    = shift.spotsAvailable < 3;
   const duration    = calcDuration(shift.startTime, shift.endTime);
   const spotsFilled = shift.spotsTotal - shift.spotsAvailable;
@@ -675,7 +673,7 @@ export function ShiftDetailScreen() {
             <button type="button" onClick={() => void handleCancelShift()}
               disabled={cancelling || cancellingFuture}
               className="w-full h-[50px] bg-[#EF4444] text-white font-bold text-[15px] rounded-[12px] disabled:opacity-60">
-              {cancelling ? 'Cancelling…' : shift.seriesId ? 'Cancel this shift only' : 'Yes, Cancel Shift'}
+              {cancelling ? 'Cancelling…' : shift.seriesId ? 'Cancel this shift only' : 'Yes, Cancel shift'}
             </button>
             {shift.seriesId && (
               <button type="button" onClick={() => void handleCancelSeriesFuture()}
@@ -688,7 +686,7 @@ export function ShiftDetailScreen() {
             <button type="button" onClick={() => setShowCancelConfirm(false)}
               disabled={cancelling || cancellingFuture}
               className="w-full h-[50px] border border-[#E5E7EB] text-[#6B7280] font-semibold text-[15px] rounded-[12px] disabled:opacity-60">
-              Keep Shift
+              Keep shift
             </button>
           </div>
         </div>
@@ -712,16 +710,16 @@ export function ShiftDetailScreen() {
             <ChevronLeft size={20} aria-hidden className="text-white" />
           </button>
 
-          <button type="button" aria-label={saved ? 'Remove from saved' : 'Save this shift'}
-            aria-pressed={saved} onClick={() => { if (!saved) showToast('Shift saved to your list.'); toggleSaved(shiftId); }}
+          {/* Share, not "save": the old heart saved to a list no screen showed. */}
+          <button type="button" aria-label="Share this shift"
+            onClick={() => {
+              const url = `${APP_ORIGIN}/shift/${shiftId}`;
+              const title = shiftHeadline(shift);
+              if (navigator.share) { void navigator.share({ title, text: `${title} on 365 Connect`, url }).catch(() => {}); return; }
+              void navigator.clipboard?.writeText(url).then(() => showToast('Link copied'), () => showToast("Couldn't copy the link.", 'error'));
+            }}
             className="absolute top-5 right-4 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 flex items-center justify-center">
-            <AnimatePresence mode="wait">
-              <motion.span key={saved ? 'on' : 'off'}
-                initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.5, opacity: 0 }} transition={{ duration: 0.14 }}>
-                <Heart size={18} aria-hidden className={saved ? 'text-white fill-white' : 'text-white'} />
-              </motion.span>
-            </AnimatePresence>
+            <Share2 size={18} aria-hidden className="text-white" />
           </button>
         </div>
 
@@ -729,9 +727,9 @@ export function ShiftDetailScreen() {
             should mistake them for something they can still act on. */}
         {(lifecycle === 'ended' || shift.status === 'cancelled') && (
           <div className={`mx-5 mt-4 rounded-[12px] px-4 py-3 border flex items-start gap-3 ${
-            shift.status === 'cancelled' ? 'bg-red-50 border-red-200' : 'bg-[#FAFAFA] border-[#DBDBDB]'}`}
+            shift.status === 'cancelled' ? 'bg-red-50 border-red-200' : 'bg-[#FAFAFA] border-[#E5E7EB]'}`}
             role="status">
-            <Clock size={16} aria-hidden className={`flex-shrink-0 mt-0.5 ${shift.status === 'cancelled' ? 'text-red-500' : 'text-[#737373]'}`} />
+            <Clock size={16} aria-hidden className={`flex-shrink-0 mt-0.5 ${shift.status === 'cancelled' ? 'text-red-500' : 'text-[#6B7280]'}`} />
             <div className="min-w-0">
               <p className={`font-bold text-[14px] ${shift.status === 'cancelled' ? 'text-red-600' : 'text-[#111827]'}`}>
                 {shift.status === 'cancelled' ? 'This shift was cancelled' : 'This shift has ended'}
@@ -756,8 +754,53 @@ export function ShiftDetailScreen() {
           <h1 className="text-black font-bold text-[24px] leading-tight break-words">{shiftHeadline(shift)}</h1>
         </div>
 
+        {/* Owner at a glance: where the shift stands and the four things a
+            poster does most, before any of the job-ad content below. */}
+        {canManage && (() => {
+          const booked = Math.max(0, shift.spotsTotal - shift.spotsAvailable);
+          const live = (shift.status === 'open' || shift.status === 'filled') && lifecycle !== 'ended';
+          const tile = 'h-[52px] rounded-[12px] border border-[#E5E7EB] bg-white text-[#0A1628] text-[14px] font-semibold flex items-center justify-center gap-2 active:bg-[#F7F8FA] disabled:opacity-60';
+          return (
+            <section aria-label="Manage this shift" className="mx-5 mt-4 rounded-[14px] bg-[#F7F8FA] border border-[#E5E7EB] p-3" data-testid="owner-panel">
+              <p className="px-1 pb-2.5 text-[#111827] text-[14px] font-semibold">
+                {booked} of {shift.spotsTotal} booked
+                {pendingCount > 0 && <span className="text-[#B45309]"> · {pendingCount} applicant{pendingCount === 1 ? '' : 's'} waiting</span>}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => navigate(`/shift/${shiftId}/applicants`)}
+                  className="h-[52px] rounded-[12px] bg-[#0A1628] text-white text-[14px] font-semibold flex items-center justify-center gap-2 active:opacity-90">
+                  <Users size={16} aria-hidden />
+                  {lifecycle === 'ended' ? 'Hours & pay' : 'Crew'}
+                  {pendingCount > 0 && <span className="bg-white/20 text-[12px] font-bold px-1.5 py-0.5 rounded-full">{pendingCount}</span>}
+                </button>
+                <button type="button" onClick={() => void handleShiftChat()} disabled={openingChat} className={tile}>
+                  <MessagesSquare size={16} aria-hidden />{openingChat ? 'Opening…' : 'Shift chat'}
+                </button>
+                {live ? (
+                  <>
+                    <button type="button" onClick={() => navigate(`/shift/${shiftId}/assign`)} className={tile}>
+                      <UserPlus size={16} aria-hidden />Assign
+                    </button>
+                    <button type="button" onClick={() => void handleEditShift()} disabled={editLoading} className={tile}>
+                      <Edit3 size={15} aria-hidden />{editLoading ? 'Loading…' : 'Edit'}
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" onClick={() => void handleEditShift('clone')} disabled={editLoading} className={`${tile} col-span-2`}>
+                    <Repeat2 size={16} aria-hidden />{editLoading ? 'Loading…' : 'Post again'}
+                  </button>
+                )}
+              </div>
+              <button type="button" onClick={() => document.getElementById('manage-more')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className="w-full h-10 mt-1 text-[#6B7280] text-[13px] font-semibold">
+                More options
+              </button>
+            </section>
+          );
+        })()}
+
         {/* Job type + pay */}
-        <div className="flex items-center justify-between px-5 pt-3 pb-4 border-b border-[#DBDBDB]">
+        <div className="flex items-center justify-between px-5 pt-3 pb-4 border-b border-[#E5E7EB]">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="bg-black text-white text-[12px] font-bold px-4 py-1.5 rounded-full uppercase tracking-wide">
               {shift.jobType}
@@ -779,7 +822,7 @@ export function ShiftDetailScreen() {
               </span>
             )}
             {lifecycle === 'ended' && shift.status !== 'cancelled' && (
-              <span className="bg-[#FAFAFA] text-[#737373] text-[12px] font-bold px-3 py-1.5 rounded-full border border-[#DBDBDB]">
+              <span className="bg-[#FAFAFA] text-[#6B7280] text-[12px] font-bold px-3 py-1.5 rounded-full border border-[#E5E7EB]">
                 Ended
               </span>
             )}
@@ -791,7 +834,7 @@ export function ShiftDetailScreen() {
           </div>
           <div className="flex items-baseline gap-1">
             <span className="text-black font-bold text-[26px]">${shift.payRate}</span>
-            <span className="text-[#737373] text-[14px] font-medium">/{shift.payPeriod}</span>
+            <span className="text-[#6B7280] text-[14px] font-medium">/{shift.payPeriod}</span>
           </div>
         </div>
 
@@ -813,8 +856,8 @@ export function ShiftDetailScreen() {
                   )}
                 </div>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <MapPin size={12} aria-hidden className="text-[#737373] flex-shrink-0" />
-                  <p className="text-[#737373] text-[13px] leading-snug line-clamp-2 break-words">
+                  <MapPin size={12} aria-hidden className="text-[#6B7280] flex-shrink-0" />
+                  <p className="text-[#6B7280] text-[13px] leading-snug line-clamp-2 break-words">
                     {shift.location}{!myLocationIsDefault ? ` · ${distanceMilesLabel} mi away` : ''}
                   </p>
                 </div>
@@ -825,19 +868,19 @@ export function ShiftDetailScreen() {
           return profileHref ? (
             <button type="button" onClick={() => navigate(profileHref)}
               aria-label={`View ${shift.companyName}'s profile`}
-              className="w-full flex items-center gap-4 px-5 py-4 border-b border-[#DBDBDB] text-left active:bg-[#FAFAFA]">
+              className="w-full flex items-center gap-4 px-5 py-4 border-b border-[#E5E7EB] text-left active:bg-[#FAFAFA]">
               {inner}
             </button>
           ) : (
-            <div className="flex items-center gap-4 px-5 py-4 border-b border-[#DBDBDB]">{inner}</div>
+            <div className="flex items-center gap-4 px-5 py-4 border-b border-[#E5E7EB]">{inner}</div>
           );
         })()}
 
         {/* Schedule tiles */}
         <div className="flex gap-3 px-5 pt-4 pb-5" role="group" aria-label="Shift schedule">
-          <StatTile icon={<Calendar size={14} aria-hidden className="text-[#737373]" />} label="Date" value={shift.date} />
-          <StatTile icon={<Clock size={14} aria-hidden className="text-[#737373]" />} label="Time" value={shift.startTime} sub={`Ends ${shift.endTime}`} />
-          <StatTile icon={<Timer size={14} aria-hidden className="text-[#0095F6]" />} label="Duration" value={duration} accent />
+          <StatTile icon={<Calendar size={14} aria-hidden className="text-[#6B7280]" />} label="Date" value={shift.date} />
+          <StatTile icon={<Clock size={14} aria-hidden className="text-[#6B7280]" />} label="Time" value={shift.startTime} sub={`Ends ${shift.endTime}`} />
+          <StatTile icon={<Timer size={14} aria-hidden className="text-[#0A1628]" />} label="Duration" value={duration} accent />
         </div>
 
         {/* Part of a recurring series — the owner can jump between the dates */}
@@ -858,15 +901,15 @@ export function ShiftDetailScreen() {
           <div className="flex items-center justify-between mb-3">
             <SectionHeading>
               <span className="flex items-center gap-2 mb-0">
-                <Shirt size={16} aria-hidden className="text-[#737373]" />
-                Dress Code
+                <Shirt size={16} aria-hidden className="text-[#6B7280]" />
+                Dress code
               </span>
             </SectionHeading>
             {isOwner && dressCodeDraft === null && (
               <button type="button" aria-label="Edit dress code"
                 onClick={() => setDressCodeDraft(shift.dressCode ?? '')}
-                className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center">
-                <Pencil size={13} aria-hidden className="text-[#737373]" />
+                className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
+                <Pencil size={13} aria-hidden className="text-[#6B7280]" />
               </button>
             )}
           </div>
@@ -874,10 +917,10 @@ export function ShiftDetailScreen() {
             <div className="flex flex-col gap-2">
               <textarea value={dressCodeDraft} onChange={(e) => setDressCodeDraft(e.target.value)}
                 rows={3} aria-label="Edit dress code"
-                className="border border-[#DBDBDB] rounded-[12px] p-3 text-[14px] text-black resize-none outline-none focus:border-black" />
+                className="border border-[#E5E7EB] rounded-[12px] p-3 text-[14px] text-black resize-none outline-none focus:border-black" />
               <div className="flex gap-2 justify-end">
                 <button type="button" onClick={() => setDressCodeDraft(null)}
-                  className="text-[#737373] text-[13px] font-medium px-3 h-8">Cancel</button>
+                  className="text-[#6B7280] text-[13px] font-medium px-3 h-8">Cancel</button>
                 <button type="button" onClick={handleSaveDressCode} disabled={savingDressCode}
                   className="bg-black text-white text-[13px] font-semibold px-4 h-8 rounded-[8px] disabled:opacity-60">
                   {savingDressCode ? 'Saving…' : 'Save'}
@@ -885,17 +928,17 @@ export function ShiftDetailScreen() {
               </div>
             </div>
           ) : (
-            <div className="border border-[#DBDBDB] rounded-[12px] p-4" role="list" aria-label="Dress code items">
+            <div className="border border-[#E5E7EB] rounded-[12px] p-4" role="list" aria-label="Dress code items">
               {shift.dressCodeItems.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {shift.dressCodeItems.map((item) => (
-                    <div key={item} role="listitem" className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-full px-3.5 py-1.5">
+                    <div key={item} role="listitem" className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-full px-3.5 py-1.5">
                       <span className="text-black text-[13px] font-medium">{item}</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-[#737373] text-[14px] leading-relaxed">{shift.dressCode || 'See shift details for dress code requirements.'}</p>
+                <p className="text-[#6B7280] text-[14px] leading-relaxed">{shift.dressCode || 'See shift details for dress code requirements.'}</p>
               )}
             </div>
           )}
@@ -904,8 +947,8 @@ export function ShiftDetailScreen() {
         {/* Description */}
         {shift.description && (
           <div className="px-5 pb-6">
-            <SectionHeading>About this Shift</SectionHeading>
-            <p className="text-[#737373] text-[14px] leading-[1.7]">{shift.description}</p>
+            <SectionHeading>About this shift</SectionHeading>
+            <p className="text-[#6B7280] text-[14px] leading-[1.7]">{shift.description}</p>
           </div>
         )}
 
@@ -917,7 +960,7 @@ export function ShiftDetailScreen() {
               {shift.requirements.map((req) => (
                 <li key={req} className="flex items-center gap-3">
                   <CheckCircle2 size={15} aria-hidden className="text-emerald-500 flex-shrink-0" />
-                  <span className="text-[#737373] text-[14px]">{req}</span>
+                  <span className="text-[#6B7280] text-[14px]">{req}</span>
                 </li>
               ))}
             </ul>
@@ -927,20 +970,20 @@ export function ShiftDetailScreen() {
         {/* Point of contact */}
         {shift.pointOfContact && (
           <div className="px-5 pb-6">
-            <SectionHeading>Point of Contact</SectionHeading>
-            <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-white border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+            <SectionHeading>Point of contact</SectionHeading>
+            <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-4 py-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-white border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
                 <span className="text-black font-bold text-[14px]">
                   {shift.pointOfContact.split(' ').map((n) => n[0]).join('')}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-black font-semibold text-[14px]">{shift.pointOfContact}</p>
-                <p className="text-[#737373] text-[12px] mt-0.5">{shift.contactPhone}</p>
+                <p className="text-[#6B7280] text-[12px] mt-0.5">{formatPhone(shift.contactPhone) || shift.contactPhone}</p>
               </div>
               {shift.contactPhone && (
                 <a href={`tel:${shift.contactPhone}`} aria-label={`Call ${shift.pointOfContact}`}
-                  className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center flex-shrink-0">
+                  className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
                   <Phone size={15} aria-hidden className="text-black" />
                 </a>
               )}
@@ -948,7 +991,7 @@ export function ShiftDetailScreen() {
           </div>
         )}
 
-        {/* Map — Apple Maps style block: address bar, dark map, Hide Map, distance footer */}
+        {/* Map — Apple Maps style block: address bar, dark map, Hide map, distance footer */}
         <div className="px-5 pb-6">
           <SectionHeading>Location</SectionHeading>
           <Suspense fallback={<div className="h-[52px] rounded-[12px] bg-[#F3F4F6] animate-pulse" aria-hidden />}>
@@ -966,7 +1009,7 @@ export function ShiftDetailScreen() {
           <button type="button" onClick={() => setDirectionsOpen(true)}
             className="mt-3 w-full h-[44px] rounded-[10px] bg-[#0A1628] text-white font-semibold text-[14px] flex items-center justify-center gap-2 active:scale-[0.99] transition-transform">
             <Navigation size={15} aria-hidden />
-            Get Directions
+            Get directions
           </button>
         </div>
 
@@ -991,10 +1034,10 @@ export function ShiftDetailScreen() {
                   <div className="flex items-center justify-between mb-1">
                     <p id={directionsTitleId} className="font-bold text-[16px] text-[#111827]">Get directions</p>
                     <button type="button" onClick={() => setDirectionsOpen(false)} aria-label="Close" className="w-11 h-11 -mr-3 flex items-center justify-center">
-                      <X size={18} aria-hidden className="text-[#737373]" />
+                      <X size={18} aria-hidden className="text-[#6B7280]" />
                     </button>
                   </div>
-                  <p className="text-[#737373] text-[13px] mb-4 break-words">{shift.location}</p>
+                  <p className="text-[#6B7280] text-[13px] mb-4 break-words">{shift.location}</p>
                   {opts.map((o) => (
                     <a key={o.label} href={o.href} target="_blank" rel="noreferrer"
                       onClick={() => setDirectionsOpen(false)}
@@ -1045,13 +1088,13 @@ export function ShiftDetailScreen() {
             : e.workerAck === 'disputed' ? 'Disputed · under review'
             : changed ? (e.workerAck === 'accepted' ? 'Updated by the poster · accepted' : 'Updated by the poster')
             : 'Approved';
-          const statusCls = !approved ? 'bg-[#FAFAFA] border-[#DBDBDB] text-[#737373]'
+          const statusCls = !approved ? 'bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280]'
             : e.workerAck === 'disputed' ? 'bg-red-50 border-red-200 text-red-600'
             : needsAnswer ? 'bg-amber-50 border-amber-200 text-amber-700'
             : 'bg-emerald-50 border-emerald-200 text-emerald-700';
           return (
             <div className="px-5 pb-4">
-              <div className="rounded-[12px] border border-[#DBDBDB] bg-white px-4 py-4">
+              <div className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <p className="text-[#111827] font-bold text-[15px]">Your hours</p>
                   <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${statusCls}`}>{statusLabel}</span>
@@ -1062,7 +1105,7 @@ export function ShiftDetailScreen() {
                   {(e.breakMinutes ?? 0) > 0 && (
                     <div className="flex justify-between"><span className="text-[#6B7280]">Unpaid break</span><span className="text-[#111827] font-semibold">{e.breakMinutes} min</span></div>
                   )}
-                  <div className="border-t border-[#EFEFEF] my-0.5" />
+                  <div className="border-t border-[#F3F4F6] my-0.5" />
                   <div className="flex justify-between">
                     <span className="text-[#6B7280]">Total hours</span>
                     <span className="text-[#111827] font-semibold">
@@ -1079,7 +1122,7 @@ export function ShiftDetailScreen() {
                 </div>
                 {/* Where the money is: Worked → Approved → Paid, stamped in the venue's zone. */}
                 {e.payTimeline && (
-                  <div className="mt-4 pt-3.5 border-t border-[#EFEFEF]">
+                  <div className="mt-4 pt-3.5 border-t border-[#F3F4F6]">
                     <PayTimeline timeline={e.payTimeline} tz={tz} />
                   </div>
                 )}
@@ -1122,7 +1165,7 @@ export function ShiftDetailScreen() {
         {isWorker && applicationStatus === 'accepted' && lifecycle === 'ended' && shift.status !== 'cancelled' && (
           <div className="px-5 pb-4">
             {myReview ? (
-              <div className="w-full h-[44px] rounded-[10px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center gap-1.5 text-[#6B7280] font-semibold text-[14px]"
+              <div className="w-full h-[44px] rounded-[10px] bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center gap-1.5 text-[#6B7280] font-semibold text-[14px]"
                 aria-label={`You rated this client ${myReview.rating} stars`}>
                 You rated <Star size={14} aria-hidden className="text-[#FFD700] fill-[#FFD700]" />{myReview.rating}
               </div>
@@ -1165,10 +1208,10 @@ export function ShiftDetailScreen() {
             ?? (matchScore >= 80 ? 'Strong fit for this role and day.'
               : matchScore >= 60 ? 'Good fit — check the role and your availability.'
               : 'Partial fit — the role or day may not line up.');
-          const tone = score >= 75 ? '#059669' : score >= 50 ? '#0095F6' : '#B45309';
+          const tone = score >= 75 ? '#059669' : score >= 50 ? '#0A1628' : '#B45309';
           return (
             <div className="px-5 pb-6">
-              <div className="bg-[#F0F7FF] border border-[#DBDBDB] rounded-[12px] px-5 py-4 flex items-center gap-4">
+              <div className="bg-[#F0F7FF] border border-[#E5E7EB] rounded-[12px] px-5 py-4 flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-white border flex items-center justify-center flex-shrink-0" style={{ borderColor: tone }}>
                   <span className="font-bold text-[15px]" style={{ color: tone }}>{score}</span>
                 </div>
@@ -1178,12 +1221,12 @@ export function ShiftDetailScreen() {
                       {score >= 75 ? 'Strong match' : score >= 50 ? 'Good match' : 'Partial match'}
                     </span>
                     {myMatch.insight?.source === 'claude' && (
-                      <span className="inline-flex items-center gap-1 bg-[#0095F6]/10 text-[#0095F6] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border border-[#0095F6]/20">
+                      <span className="inline-flex items-center gap-1 bg-[#0A1628]/10 text-[#0A1628] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border border-[#0A1628]/20">
                         <Sparkles size={10} aria-hidden /> Automated
                       </span>
                     )}
                   </div>
-                  <p className="text-[#737373] text-[13px] leading-snug">{reason}</p>
+                  <p className="text-[#6B7280] text-[13px] leading-snug">{reason}</p>
                 </div>
               </div>
             </div>
@@ -1193,15 +1236,15 @@ export function ShiftDetailScreen() {
         {/* Spots remaining */}
         <div className="px-5 pb-6">
           <div className="flex items-center justify-between mb-3">
-            <SectionHeading>Spots Remaining</SectionHeading>
+            <SectionHeading>Spots remaining</SectionHeading>
             <div className="flex items-center gap-1.5">
-              <Users size={13} aria-hidden className={spotsLow ? 'text-red-500' : 'text-[#737373]'} />
-              <span className={`text-[13px] font-semibold ${spotsLow ? 'text-red-500' : 'text-[#737373]'}`}>
+              <Users size={13} aria-hidden className={spotsLow ? 'text-red-500' : 'text-[#6B7280]'} />
+              <span className={`text-[13px] font-semibold ${spotsLow ? 'text-red-500' : 'text-[#6B7280]'}`}>
                 {shift.spotsAvailable} of {shift.spotsTotal} left{spotsLow && ' · Filling fast'}
               </span>
             </div>
           </div>
-          <div className="h-2 bg-[#EFEFEF] rounded-full overflow-hidden"
+          <div className="h-2 bg-[#F3F4F6] rounded-full overflow-hidden"
             role="progressbar" aria-valuenow={fillPct} aria-valuemin={0} aria-valuemax={100}
             aria-label={`${fillPct}% of spots filled`}>
             <motion.div initial={{ width: 0 }} animate={{ width: `${fillPct}%` }}
@@ -1209,7 +1252,7 @@ export function ShiftDetailScreen() {
               className={`h-full rounded-full ${spotsLow ? 'bg-red-500' : 'bg-black'}`} />
           </div>
           {spotsFilled > 0 && (
-            <p className="text-[#737373] text-[12px] mt-3">
+            <p className="text-[#6B7280] text-[12px] mt-3">
               {spotsFilled} worker{spotsFilled !== 1 ? 's' : ''} already booked
             </p>
           )}
@@ -1219,7 +1262,7 @@ export function ShiftDetailScreen() {
             day / event rates are a flat amount per worker */}
         {canManage && shift.payRate > 0 && (
           <div className="px-5 pb-6">
-            <SectionHeading>Cost Estimate</SectionHeading>
+            <SectionHeading>Cost estimate</SectionHeading>
             {(() => {
               const hourly  = shift.payPeriod === 'hr';
               const durHrs  = calcDurationHours(shift.startTime, shift.endTime);
@@ -1228,9 +1271,9 @@ export function ShiftDetailScreen() {
               const fmtUsd  = (n: number) =>
                 n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
               return (
-                <div className="bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-4">
-                  <div className="flex justify-between items-center py-2 border-b border-[#EFEFEF]">
-                    <p className="text-[#737373] text-[13px]">
+                <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-4 py-4">
+                  <div className="flex justify-between items-center py-2 border-b border-[#F3F4F6]">
+                    <p className="text-[#6B7280] text-[13px]">
                       {hourly
                         ? `${shift.spotsTotal} worker${shift.spotsTotal !== 1 ? 's' : ''} × ${durHrs.toFixed(1)}h × $${shift.payRate}/hr`
                         : `${shift.spotsTotal} worker${shift.spotsTotal !== 1 ? 's' : ''} × $${shift.payRate} per ${shift.payPeriod}`}
@@ -1258,12 +1301,12 @@ export function ShiftDetailScreen() {
           <div className="px-5 pb-6">
             <button type="button" onClick={() => navigate(`/shift/${shiftId}/applicants`)}
               aria-label="Open the roster"
-              className="w-full flex items-center justify-between bg-[#FAFAFA] border border-[#DBDBDB] rounded-[12px] px-4 py-3.5 text-left">
+              className="w-full flex items-center justify-between bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-4 py-3.5 text-left">
               <div className="min-w-0">
                 <p className="text-black font-semibold text-[14px]">
                   {acceptedWorkers.length} confirmed worker{acceptedWorkers.length === 1 ? '' : 's'}
                 </p>
-                <p className="text-[#737373] text-[12px]">
+                <p className="text-[#6B7280] text-[12px]">
                   {acceptedWorkers.filter((w) => w.attendance === 'on_site').length} on-site ·{' '}
                   {acceptedWorkers.filter((w) => w.attendance === 'done').length} done
                 </p>
@@ -1275,7 +1318,7 @@ export function ShiftDetailScreen() {
         {/* Event positions — other roles in this multi-position event */}
         {eventPositions.length > 1 && (
           <div className="px-5 pt-2 pb-4">
-            <p className="text-[13px] font-semibold text-[#737373] uppercase tracking-widest mb-2">
+            <p className="text-[13px] font-semibold text-[#6B7280] uppercase tracking-widest mb-2">
               Event positions ({eventPositions.length})
             </p>
             <div className="flex flex-col gap-2">
@@ -1307,7 +1350,7 @@ export function ShiftDetailScreen() {
         {/* Series dates — every shift created with this one (owner only) */}
         {isOwner && shift.seriesId && seriesShifts.length > 1 && (
           <div id="series-dates" className="px-5 pt-2 pb-4">
-            <p className="text-[13px] font-semibold text-[#737373] uppercase tracking-widest mb-2">
+            <p className="text-[13px] font-semibold text-[#6B7280] uppercase tracking-widest mb-2">
               Series dates ({seriesShifts.length})
             </p>
             <div className="flex flex-col gap-2">
@@ -1375,41 +1418,41 @@ export function ShiftDetailScreen() {
             <button type="button" onClick={() => navigate(`/shift/${shiftId}/updates`)}
               className="w-full h-[46px] rounded-[8px] border border-[#E5E7EB] text-[#0A1628] font-bold text-[14px] flex items-center justify-center gap-2">
               <MessageSquareText size={16} aria-hidden />
-              Updates &amp; Announcements
+              Updates &amp; announcements
             </button>
           </div>
         )}
 
         {/* Owner management — inline, scrolls with content (never overlaps) */}
         {canManage && (
-          <div className="px-5 pt-2 pb-8 flex flex-col gap-2 border-t border-[#DBDBDB] mt-2">
+          <div id="manage-more" className="px-5 pt-2 pb-8 flex flex-col gap-2 border-t border-[#E5E7EB] mt-2 scroll-mt-4">
             {lifecycle !== 'ended' && shift.status !== 'cancelled' && (
               <motion.button type="button" whileTap={{ scale: 0.97 }}
                 onClick={() => navigate(`/shift/${shiftId}/assign`)}
                 aria-label="Assign workers from your roster"
                 className="w-full h-[46px] rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[14px] tracking-wide flex items-center justify-center gap-2">
                 <UserPlus size={16} aria-hidden />
-                Assign Workers
+                Assign from my roster
               </motion.button>
             )}
             {(shift.status === 'open' || shift.status === 'filled') && lifecycle !== 'ended' && (
               <motion.button type="button" whileTap={{ scale: 0.97 }}
                 onClick={() => setConfirmBroadcast(true)} disabled={inviting}
-                aria-label="Request all workers for this shift"
-                className="w-full h-[46px] rounded-[8px] bg-[#0095F6] text-white font-bold text-[14px] tracking-wide flex items-center justify-center gap-2 disabled:opacity-60">
+                aria-label="Offer this shift to every matching worker"
+                className="w-full h-[46px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[14px] tracking-wide flex items-center justify-center gap-2 disabled:opacity-60">
                 <Send size={16} aria-hidden />
-                {inviting ? 'Sending invites…' : 'Request All Workers'}
+                {inviting ? 'Sending offers…' : 'Offer to all matching workers'}
               </motion.button>
             )}
             <motion.button type="button" whileTap={{ scale: 0.97 }}
               onClick={() => navigate(`/shift/${shiftId}/applicants`)}
-              aria-label={`View applicants${pendingApplicants.length > 0 ? `, ${pendingApplicants.length} pending` : ''}`}
+              aria-label={`View applicants${pendingCount > 0 ? `, ${pendingCount} pending` : ''}`}
               className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] tracking-wide flex items-center justify-center gap-2.5">
               <Users size={18} aria-hidden />
-              Manage Roster
-              {pendingApplicants.length > 0 && (
+              Crew &amp; applicants
+              {pendingCount > 0 && (
                 <span className="bg-white/20 text-white text-[12px] font-bold px-2 py-0.5 rounded-full">
-                  {pendingApplicants.length}
+                  {pendingCount}
                 </span>
               )}
             </motion.button>
@@ -1466,11 +1509,11 @@ export function ShiftDetailScreen() {
       {/* Fixed CTA — worker actions only (apply/claim/clock-in). Clients and
           staffers never apply or clock in; owners manage via the inline block. */}
       {profile.role === 'worker' && !isOwner && (
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+14px)] bg-white z-30 border-t border-[#EFEFEF] shadow-[0_-8px_24px_rgba(0,0,0,0.08)]">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+14px)] bg-white z-30 border-t border-[#F3F4F6] shadow-[0_-8px_24px_rgba(0,0,0,0.08)]">
         <AnimatePresence>
           {ctaState === 'pending' && (
             <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="text-center text-[#737373] text-[12px] mb-2">
+              className="text-center text-[#6B7280] text-[12px] mb-2">
               Application submitted · Awaiting client review
             </motion.p>
           )}
@@ -1481,7 +1524,7 @@ export function ShiftDetailScreen() {
           <div className="mb-2.5 rounded-[12px] border border-[#0A1628] bg-white px-3.5 py-3" role="status"
             aria-label="Shift swap offer">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center overflow-hidden flex-shrink-0" aria-hidden>
+              <div className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center overflow-hidden flex-shrink-0" aria-hidden>
                 {incomingSwap.from_photo_url
                   ? <img src={incomingSwap.from_photo_url} alt="" className="w-full h-full object-cover" />
                   : <span className="text-black font-bold text-[12px]">{(incomingSwap.from_username ?? 'W').slice(0, 2).toUpperCase()}</span>}
@@ -1522,7 +1565,7 @@ export function ShiftDetailScreen() {
           <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleCta} disabled={applying}
             aria-label={`Apply to ${shift.companyName}`}
             className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] tracking-wide disabled:opacity-70">
-            {applying ? 'Applying…' : 'Apply Now'}
+            {applying ? 'Applying…' : 'Apply now'}
           </motion.button>
         )}
 
@@ -1534,7 +1577,7 @@ export function ShiftDetailScreen() {
             {claiming
               ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
               : <Zap size={18} aria-hidden className="fill-white" />}
-            {claiming ? 'Claiming…' : 'Claim This Shift'}
+            {claiming ? 'Claiming…' : 'Claim this shift'}
           </motion.button>
         )}
 
@@ -1543,10 +1586,10 @@ export function ShiftDetailScreen() {
             {/* Disabled gray "Applied" button — spec requirement */}
             <button
               type="button" disabled aria-disabled="true" aria-label="Application already submitted"
-              className="w-full h-[52px] rounded-[8px] bg-[#F0F0F0] border border-[#DBDBDB] flex items-center justify-center gap-2 cursor-not-allowed"
+              className="w-full h-[52px] rounded-[8px] bg-[#F0F0F0] border border-[#E5E7EB] flex items-center justify-center gap-2 cursor-not-allowed"
             >
               <CheckCircle2 size={18} aria-hidden className="text-emerald-500" />
-              <span className="text-[#737373] font-semibold text-[15px]">Applied · awaiting approval</span>
+              <span className="text-[#6B7280] font-semibold text-[15px]">Applied · awaiting approval</span>
             </button>
             <button type="button" onClick={() => setConfirmDrop(true)} disabled={dropping}
               className="w-full h-9 text-[#6B7280] font-semibold text-[13px] disabled:opacity-50">
@@ -1556,8 +1599,8 @@ export function ShiftDetailScreen() {
         )}
 
         {ctaState === 'declined' && (
-          <div className="w-full h-[52px] rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center gap-2.5">
-            <span className="text-[#737373] font-semibold text-[15px]">Not Selected for This Shift</span>
+          <div className="w-full h-[52px] rounded-[8px] bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center gap-2.5">
+            <span className="text-[#6B7280] font-semibold text-[15px]">Not Selected for This Shift</span>
           </div>
         )}
 
@@ -1568,14 +1611,14 @@ export function ShiftDetailScreen() {
         )}
 
         {ctaState === 'past' && (
-          <div className="w-full h-[52px] rounded-[8px] bg-[#FAFAFA] border border-[#DBDBDB] flex items-center justify-center gap-2.5">
-            <span className="text-[#737373] font-semibold text-[15px]">This shift has ended</span>
+          <div className="w-full h-[52px] rounded-[8px] bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center gap-2.5">
+            <span className="text-[#6B7280] font-semibold text-[15px]">This shift has ended</span>
           </div>
         )}
 
         {ctaState === 'full' && !showIncomingSwap && (
           <div className="flex flex-col gap-2">
-            <p className="text-center text-[#737373] text-[12px]">
+            <p className="text-center text-[#6B7280] text-[12px]">
               This shift is full. Join the waitlist and you'll be booked automatically if a spot opens.
             </p>
             <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleCta} disabled={joiningWaitlist}
@@ -1604,7 +1647,7 @@ export function ShiftDetailScreen() {
               <AlarmClock size={20} aria-hidden />
             </motion.div>
             {!clockOpen ? `Clock in opens at ${clockOpensLabel}`
-              : withinClockInRange ? 'Clock In' : 'Get within 1 mi to Clock In'}
+              : withinClockInRange ? 'Clock in' : 'Get within 1 mi to clock in'}
           </motion.button>
         )}
 
@@ -1730,7 +1773,7 @@ export function ShiftDetailScreen() {
                   : 'Yes, drop shift'}
               </button>
               <button type="button" onClick={() => setConfirmDrop(false)} disabled={dropping}
-                className="w-full h-[50px] rounded-[10px] bg-white border border-[#DBDBDB] text-[#111827] font-semibold text-[15px] disabled:opacity-60">
+                className="w-full h-[50px] rounded-[10px] bg-white border border-[#E5E7EB] text-[#111827] font-semibold text-[15px] disabled:opacity-60">
                 Keep my spot
               </button>
             </div>
