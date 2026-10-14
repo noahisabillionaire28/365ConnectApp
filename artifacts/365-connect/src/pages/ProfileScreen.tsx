@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Star, ChevronRight, Settings,
   CreditCard, Bell, Shield, HelpCircle, LogOut,
-  Edit3, MapPin, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
+  Edit3, CalendarDays, LifeBuoy, AlertOctagon, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
   BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck, LayoutTemplate, Trash2, FileText, ShieldCheck,
   Receipt, Cookie, Download,
 } from 'lucide-react';
@@ -130,10 +130,11 @@ function ProfileSkeleton() {
 
 /* ── My Applications ─────────────────────────────────────────────────────── */
 const APPLICATION_STATUS_META: Record<string, { label: string; className: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
-  pending:   { label: 'Pending',  className: 'bg-amber-50 border-amber-200 text-amber-600',     Icon: Hourglass },
-  accepted:  { label: 'Accepted', className: 'bg-emerald-50 border-emerald-200 text-emerald-600', Icon: CheckCircle },
-  declined:  { label: 'Not Selected', className: 'bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280]', Icon: XCircle },
-  rejected:  { label: 'Not Selected', className: 'bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280]', Icon: XCircle },
+  pending:   { label: 'Applied',  className: 'bg-amber-50 border-amber-200 text-amber-600',     Icon: Hourglass },
+  accepted:  { label: 'Booked',   className: 'bg-emerald-50 border-emerald-200 text-emerald-600', Icon: CheckCircle },
+  standby:   { label: 'Standby',  className: 'bg-violet-50 border-violet-200 text-violet-700',   Icon: Hourglass },
+  declined:  { label: 'Not selected', className: 'bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280]', Icon: XCircle },
+  rejected:  { label: 'Not selected', className: 'bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280]', Icon: XCircle },
   withdrawn: { label: 'Withdrawn', className: 'bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280]',    Icon: XCircle },
 };
 
@@ -155,7 +156,7 @@ function ApplicationRow({ application, onTap }: { application: MyApplication; on
           <Clock3 size={11} aria-hidden className="text-[#6B7280] flex-shrink-0" />
           <p className="text-[#6B7280] text-[12px] truncate">
             {application.companyName ?? application.jobType}
-            {application.payRate ? ` · ${application.payRate}/${application.payPeriod}` : ''}
+            {application.payRate ? ` · $${application.payRate}/${application.payPeriod}` : ''}
           </p>
         </div>
       </div>
@@ -568,7 +569,7 @@ export function ProfileScreen() {
 
         {memberSince && (
           <div className="flex items-center gap-1.5 text-[#6B7280] text-[12px]">
-            <MapPin size={12} aria-hidden />
+            <CalendarDays size={12} aria-hidden />
             <span>Member since {memberSince}</span>
           </div>
         )}
@@ -831,11 +832,19 @@ export function ProfileScreen() {
                   </>
                 )}
 
-                {!profile.isPro && !isIOS() && (
+                {SHOW_PRO_BANNER && !profile.isPro && !isIOS() && (
                   <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden mb-4">
                     <SettingRow icon={Zap} label="365 Connect Pro (coming soon)" onTap={() => go('/pro-upgrade')} />
                   </div>
                 )}
+
+                <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Help</p>
+                <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden mb-4" data-testid="settings-help">
+                  <SettingRow icon={LifeBuoy} label="Contact support"
+                    onTap={() => { window.location.href = `mailto:support@join365connect.com?subject=${encodeURIComponent('365 Connect support')}&body=${encodeURIComponent(`\n\n—\nAccount: @${username ?? ''}`)}`; }} />
+                  <SettingRow icon={AlertOctagon} label="Report a safety issue"
+                    onTap={() => { window.location.href = `mailto:support@join365connect.com?subject=${encodeURIComponent('Safety report')}&body=${encodeURIComponent(`What happened, where and when:\n\n—\nAccount: @${username ?? ''}`)}`; }} />
+                </div>
 
                 <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Legal &amp; your data</p>
                 <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden" data-testid="settings-legal">

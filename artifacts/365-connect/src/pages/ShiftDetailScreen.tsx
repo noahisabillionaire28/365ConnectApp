@@ -4,13 +4,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChevronLeft, Heart, Sparkles, Calendar, Clock, Timer,
+  ChevronLeft, Share2, Sparkles, Calendar, Clock, Timer,
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, UserPlus,
   Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText, MessagesSquare, Repeat2, DollarSign, Star, CalendarPlus,
   BookmarkPlus,
   CalendarX2,
 } from 'lucide-react';
-import { useFeedStore, toggleSaved } from '@/store/feedStore';
+import { APP_ORIGIN } from '@/lib/calendar';
 import { useApplications } from '@/hooks/useApplications';
 import { useToast } from '@/contexts/ToastContext';
 import { useApplicationStatus } from '@/hooks/useApplicationStatus';
@@ -153,7 +153,6 @@ export function ShiftDetailScreen() {
   const { id }       = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { user }      = useAuth();
-  const store        = useFeedStore();
   // useApplications: 7 stable hooks (see hook/useApplications.ts inventory comment)
   const { submitApplication }             = useApplications();
   const {
@@ -285,7 +284,6 @@ export function ShiftDetailScreen() {
   const shiftId     = shift.id;
   // Completion is tracked per-worker via time_entries.clock_out.
   const hasCompleted = !!myEntry?.clock_out;
-  const saved       = store.isSaved(shiftId);
   const spotsLow    = shift.spotsAvailable < 3;
   const duration    = calcDuration(shift.startTime, shift.endTime);
   const spotsFilled = shift.spotsTotal - shift.spotsAvailable;
@@ -712,16 +710,16 @@ export function ShiftDetailScreen() {
             <ChevronLeft size={20} aria-hidden className="text-white" />
           </button>
 
-          <button type="button" aria-label={saved ? 'Remove from saved' : 'Save this shift'}
-            aria-pressed={saved} onClick={() => { if (!saved) showToast('Shift saved to your list.'); toggleSaved(shiftId); }}
+          {/* Share, not "save": the old heart saved to a list no screen showed. */}
+          <button type="button" aria-label="Share this shift"
+            onClick={() => {
+              const url = `${APP_ORIGIN}/shift/${shiftId}`;
+              const title = shiftHeadline(shift);
+              if (navigator.share) { void navigator.share({ title, text: `${title} on 365 Connect`, url }).catch(() => {}); return; }
+              void navigator.clipboard?.writeText(url).then(() => showToast('Link copied'), () => showToast("Couldn't copy the link.", 'error'));
+            }}
             className="absolute top-5 right-4 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 flex items-center justify-center">
-            <AnimatePresence mode="wait">
-              <motion.span key={saved ? 'on' : 'off'}
-                initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.5, opacity: 0 }} transition={{ duration: 0.14 }}>
-                <Heart size={18} aria-hidden className={saved ? 'text-white fill-white' : 'text-white'} />
-              </motion.span>
-            </AnimatePresence>
+            <Share2 size={18} aria-hidden className="text-white" />
           </button>
         </div>
 

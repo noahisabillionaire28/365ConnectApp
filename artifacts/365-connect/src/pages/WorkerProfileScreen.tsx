@@ -546,9 +546,9 @@ export function WorkerProfileScreen() {
 
         {/* Action buttons — Follow only exists for workers (the API rejects
             following a client or agency), and the bookmark is a client's list. */}
-        {(isWorkerProfile || authUser?.id !== profile.id) && (
+        {authUser?.id !== profile.id && (
         <div className="flex gap-3 mb-3">
-          {isWorkerProfile && (
+          {isWorkerProfile && authUser?.id !== profile.id && (
             <FollowButton profileId={profile.id} username={profile.username} asRoster={canRequestShift} />
           )}
           {authUser?.id !== profile.id && (
