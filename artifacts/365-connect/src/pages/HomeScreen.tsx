@@ -2,7 +2,7 @@ import { useState, lazy, Suspense } from 'react';
 import { useLocation, useSearch, Redirect } from 'wouter';
 import {
   Bell, Search, PlusCircle, SlidersHorizontal,
-  Briefcase, CalendarDays, Clock3, DollarSign, MapPin,
+  Briefcase, CalendarDays, Clock3, MapPin,
   Users, ChevronRight, CalendarPlus, Repeat2,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
@@ -729,8 +729,8 @@ function ClientShiftCard({
                 <Clock3 size={11} aria-hidden />{shift.startTime}
               </span>
               {(shift.payRate ?? 0) > 0 && (
-                <span className="text-[#6B7280] text-[12px] flex items-center gap-1">
-                  <DollarSign size={11} aria-hidden />{shift.payRate}/{shift.payPeriod}
+                <span className="text-[#6B7280] text-[12px]">
+                  ${shift.payRate}/{shift.payPeriod ?? 'hr'}
                 </span>
               )}
             </div>

@@ -172,7 +172,7 @@ router.get('/shifts', async (_req, res) => {
     const { data, error } = await adminDb
       .from('shifts')
       .select(
-        'id, title, job_type, company_name, status, pay_rate, ' +
+        'id, title, job_type, company_name, status, pay_rate, pay_period, ' +
           'spots_available, spots_filled, created_at, client_id, ' +
           'start_time, end_time, location, date',
       )
@@ -256,14 +256,16 @@ router.patch('/shifts/:id/reopen', async (req, res) => {
   try {
     const { id } = req.params;
     const { data: shift, error: sErr } = await adminDb
-      .from('shifts').select('id, status, end_time, client_id, title, job_type').eq('id', id).maybeSingle();
+      .from('shifts').select('id, status, start_time, end_time, client_id, title, job_type').eq('id', id).maybeSingle();
     if (sErr) throw sErr;
     if (!shift) return res.status(404).json({ error: 'Shift not found' });
     // A shift that has happened has a crew with hours and pay attached to it;
     // reopening it would detach them. Only future filled/cancelled shifts.
     if (shift.status === 'open') return res.status(409).json({ error: 'This shift is already open.' });
-    if (shift.status === 'completed' || (shift.end_time && new Date(shift.end_time as string).getTime() < Date.now())) {
-      return res.status(409).json({ error: "This shift has already happened, so it can't be reopened." });
+    // Once a shift starts its crew may be on site and clocked in; releasing
+    // them then would detach their hours and pay.
+    if (shift.status === 'completed' || (shift.start_time && new Date(shift.start_time as string).getTime() <= Date.now())) {
+      return res.status(409).json({ error: "This shift has already started, so it can't be reopened." });
     }
 
     const { data: booked, error: bErr } = await adminDb

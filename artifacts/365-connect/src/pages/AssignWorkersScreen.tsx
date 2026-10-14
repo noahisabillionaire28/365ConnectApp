@@ -172,7 +172,7 @@ export function AssignWorkersScreen() {
           <ChevronLeft size={18} aria-hidden className="text-[#0A1628]" />
         </button>
         <div className="min-w-0">
-          <h1 className="text-[#0A1628] font-bold text-[18px] leading-tight truncate">Assign Workers</h1>
+          <h1 className="text-[#0A1628] font-bold text-[18px] leading-tight truncate">Assign workers</h1>
           <p className="text-[#6B7280] text-[12px] truncate">{shift ? `${shiftHeadline(shift)} · ${shift.jobType}` : 'Loading…'}</p>
         </div>
       </div>

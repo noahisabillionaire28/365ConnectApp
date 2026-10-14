@@ -159,7 +159,7 @@ export function ReviewScreen() {
 
       <div className="flex-1 flex flex-col px-5 pt-4 pb-10 overflow-y-auto">
         <div className="text-center mb-8">
-          <h1 className="text-black font-bold text-[24px] tracking-tight">Rate Your Experience</h1>
+          <h1 className="text-black font-bold text-[24px] tracking-tight">Rate your experience</h1>
           <p className="text-[#6B7280] text-[14px] mt-1.5">
             {targetName ?? shift.companyName} · {shift.jobType}
           </p>

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Users, DollarSign, Calendar, XCircle, AlertCircle, MapPin } from 'lucide-react';
+import { Search, X, Users, Calendar, XCircle, AlertCircle, MapPin } from 'lucide-react';
 import { useAdminGate } from '@/hooks/useAdminGate';
 import { useAdminShifts, useCancelShift, useReopenShift } from '@/hooks/useAdminData';
 import { adminApi, type AdminShiftRow } from '@/lib/adminApi';
@@ -53,10 +53,10 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
   const cancelShift = useCancelShift();
   const reopenShift = useReopenShift();
   const { showToast } = useToast();
-  // Only a future shift that is filled or cancelled can be put back on the
-  // market; a shift that has happened has a crew with hours and pay on it.
+  // Only a shift that hasn't started, filled or cancelled, can be put back on
+  // the market: once it starts the crew may be on site and clocked in.
   const canReopen = (shift.status === 'filled' || shift.status === 'cancelled')
-    && new Date(shift.end_time).getTime() > Date.now();
+    && new Date(shift.start_time).getTime() > Date.now();
   const [confirm, setConfirm] = useState(false);
   const [reopenAsk, setReopenAsk] = useState(false);
 
@@ -109,10 +109,7 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
           {displayDate}
         </span>
         {(shift.pay_rate ?? 0) > 0 && (
-          <span className="flex items-center gap-1">
-            <DollarSign size={11} aria-hidden className="text-[#6B7280]" />
-            ${shift.pay_rate}/hr
-          </span>
+          <span>${shift.pay_rate}/{shift.pay_period ?? 'hr'}</span>
         )}
         <span className="flex items-center gap-1">
           <Users size={11} aria-hidden className="text-[#6B7280]" />

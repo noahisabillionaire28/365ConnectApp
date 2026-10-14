@@ -394,7 +394,7 @@ export function PostShiftStep5Screen() {
               {isEditing ? 'Saving…' : 'Posting…'}
             </>
           ) : (
-            isEditing ? 'Save Changes →' : isSeries ? `Post ${shiftCount} shifts →` : 'Post Shift →'
+            isEditing ? 'Save changes →' : isSeries ? `Post ${shiftCount} shifts →` : 'Post shift →'
           )}
         </motion.button>
         <p className="text-center text-[#6B7280] text-[11px] mt-2">

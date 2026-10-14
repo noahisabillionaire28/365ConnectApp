@@ -28,9 +28,9 @@ type FilterKey = 'all' | 'pay30' | 'near3' | 'tonight';
 
 const FILTER_PILLS: { key: FilterKey; label: string }[] = [
   { key: 'all',     label: 'All jobs'   },
-  { key: 'pay30',   label: 'Pay Rate: $30+/hr' },
-  { key: 'near3',   label: 'Distance: < 3 mi'  },
-  { key: 'tonight', label: 'Date: Tonight'     },
+  { key: 'pay30',   label: 'Pay: $30+/hr' },
+  { key: 'near3',   label: 'Under 3 mi'  },
+  { key: 'tonight', label: 'Tonight'     },
 ];
 
 /** What a shift pays per hour: day and event rates are spread over the shift's length. */

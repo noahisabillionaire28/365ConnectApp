@@ -115,6 +115,7 @@ export type AdminShiftRow = {
   company_name:    string | null;
   status:          'open' | 'filled' | 'cancelled' | 'completed';
   pay_rate:        number | null;
+  pay_period?:     string | null;
   spots_available: number;
   spots_filled:    number;
   created_at:      string;

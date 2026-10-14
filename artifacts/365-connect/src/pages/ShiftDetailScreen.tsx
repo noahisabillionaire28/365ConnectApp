@@ -947,7 +947,7 @@ export function ShiftDetailScreen() {
         {/* Description */}
         {shift.description && (
           <div className="px-5 pb-6">
-            <SectionHeading>About this Shift</SectionHeading>
+            <SectionHeading>About this shift</SectionHeading>
             <p className="text-[#6B7280] text-[14px] leading-[1.7]">{shift.description}</p>
           </div>
         )}
@@ -970,7 +970,7 @@ export function ShiftDetailScreen() {
         {/* Point of contact */}
         {shift.pointOfContact && (
           <div className="px-5 pb-6">
-            <SectionHeading>Point of Contact</SectionHeading>
+            <SectionHeading>Point of contact</SectionHeading>
             <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-4 py-4 flex items-center gap-4">
               <div className="w-10 h-10 rounded-full bg-white border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
                 <span className="text-black font-bold text-[14px]">
@@ -1236,7 +1236,7 @@ export function ShiftDetailScreen() {
         {/* Spots remaining */}
         <div className="px-5 pb-6">
           <div className="flex items-center justify-between mb-3">
-            <SectionHeading>Spots Remaining</SectionHeading>
+            <SectionHeading>Spots remaining</SectionHeading>
             <div className="flex items-center gap-1.5">
               <Users size={13} aria-hidden className={spotsLow ? 'text-red-500' : 'text-[#6B7280]'} />
               <span className={`text-[13px] font-semibold ${spotsLow ? 'text-red-500' : 'text-[#6B7280]'}`}>
@@ -1262,7 +1262,7 @@ export function ShiftDetailScreen() {
             day / event rates are a flat amount per worker */}
         {canManage && shift.payRate > 0 && (
           <div className="px-5 pb-6">
-            <SectionHeading>Cost Estimate</SectionHeading>
+            <SectionHeading>Cost estimate</SectionHeading>
             {(() => {
               const hourly  = shift.payPeriod === 'hr';
               const durHrs  = calcDurationHours(shift.startTime, shift.endTime);

@@ -195,7 +195,7 @@ function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onP
           <button type="button" disabled={busy} onClick={onApprove}
             className="flex-1 h-9 rounded-[8px] bg-[#0A1628] text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
             <Clock3 size={13} aria-hidden />
-            {forgotClockOut ? 'Set clock-out & approve' : w.workerAck === 'disputed' ? 'Adjust & re-approve' : 'Review & Approve'}
+            {forgotClockOut ? 'Set clock-out & approve' : w.workerAck === 'disputed' ? 'Adjust & re-approve' : 'Review & approve'}
           </button>
         )}
         {/* Paying is off the table while the worker disputes the hours: adjust and re-approve first. */}
@@ -641,7 +641,7 @@ export function ApplicantsScreen() {
             </div>
             <div className="w-full h-2 rounded-full bg-[#E5E7EB] animate-pulse" />
           </div>
-        ) : (
+        ) : (appsError || confError) ? null /* no "0 confirmed" for a crew that failed to load */ : (
         <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[14px] px-4 py-4 mb-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[#111827] font-bold text-[15px] flex items-center gap-1.5">
