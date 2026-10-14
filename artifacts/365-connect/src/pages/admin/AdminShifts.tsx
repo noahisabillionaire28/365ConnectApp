@@ -97,7 +97,7 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
             {shift.title || shift.job_type}
           </p>
           <p className="text-[#6B7280] text-[13px] mt-0.5 truncate">
-            {[shift.job_type, shift.company_name].filter(Boolean).join(' · ') || 'Private Client'}
+            {[shift.job_type, shift.company_name].filter(Boolean).join(' · ') || 'Private client'}
           </p>
         </div>
         <StatusBadge status={shift.status} />
@@ -126,7 +126,7 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
             <button type="button" onClick={() => setConfirm(false)}
               aria-label="Cancel — go back"
               className="flex-1 h-[38px] rounded-[8px] bg-white border border-[#E5E7EB] text-[#6B7280] text-[12px] font-semibold">
-              Go Back
+              Go back
             </button>
             <button type="button" disabled={cancelShift.isPending}
               onClick={handleCancel} aria-label="Confirm shift cancellation"
@@ -134,7 +134,7 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
               {cancelShift.isPending ? (
                 <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
               ) : (
-                <><XCircle size={13} aria-hidden />Confirm Cancel</>
+                <><XCircle size={13} aria-hidden />Confirm cancel</>
               )}
             </button>
           </div>
@@ -142,7 +142,7 @@ function ShiftCard({ shift }: { shift: AdminShiftRow }) {
           <button type="button" aria-label={`Cancel ${shift.job_type} shift`}
             onClick={() => setConfirm(true)}
             className="w-full h-[38px] rounded-[8px] bg-red-50 border border-red-200 text-red-600 text-[12px] font-semibold flex items-center justify-center gap-1.5">
-            <XCircle size={13} aria-hidden /> Cancel Shift
+            <XCircle size={13} aria-hidden /> Cancel shift
           </button>
         )
       )}

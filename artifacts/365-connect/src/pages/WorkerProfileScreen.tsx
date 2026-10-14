@@ -232,7 +232,7 @@ function FollowButton({ profileId, username, asRoster }: {
   }
 
   const label = asRoster
-    ? (isFollowing ? 'On Roster' : 'Add to Roster')
+    ? (isFollowing ? 'On roster' : 'Add to roster')
     : (isFollowing ? 'Following' : 'Follow');
 
   return (
@@ -322,7 +322,7 @@ function ReportSheet({
 
         <button type="button" onClick={() => void submit()} disabled={submitting}
           className="w-full h-[48px] rounded-[10px] bg-[#EF4444] text-white font-bold text-[15px] disabled:opacity-60">
-          {submitting ? 'Submitting…' : 'Submit Report'}
+          {submitting ? 'Submitting…' : 'Submit report'}
         </button>
       </div>
     </div>
@@ -350,7 +350,7 @@ export function WorkerProfileScreen() {
   const canRequestShift =
     !!authUser && !!profile && authUser.id !== profile.id &&
     (role === 'client' || role === 'staffer') && profile.role === 'worker';
-  // Agencies keep workers on their roster (Add to Roster); the separate
+  // Agencies keep workers on their roster (Add to roster); the separate
   // bookmark is a client's list, so it is hidden for staffers.
   const canSave = canRequestShift && role === 'client';
   const { saved, toggle: toggleSaved, isPending: savePending } = useSavedWorker(
@@ -391,9 +391,9 @@ export function WorkerProfileScreen() {
 
       const pastShifts: PastShift[] = (reviewData ?? []).map((r) => ({
         id:     r.id,
-        name:   r.shift_title ?? 'Unnamed Shift',
+        name:   r.shift_title ?? 'Untitled shift',
         date:   r.shift_start_time ? friendlyDate(r.shift_start_time) : '—',
-        client: r.reviewer_username ? `@${r.reviewer_username}` : 'Private Client',
+        client: r.reviewer_username ? `@${r.reviewer_username}` : 'Private client',
         rating: r.rating,
       }));
 
@@ -615,7 +615,7 @@ export function WorkerProfileScreen() {
         {profile.pastShifts.length > 0 ? (
           <div>
             <h2 className="text-[13px] font-semibold text-[#6B7280] uppercase tracking-widest mb-4">
-              {isWorkerProfile ? 'Past Shifts' : 'Reviews from workers'}
+              {isWorkerProfile ? 'Past shifts' : 'Reviews from workers'}
             </h2>
             <div className="flex flex-col gap-3">
               {profile.pastShifts.map((shift) => (

@@ -229,7 +229,7 @@ function MobileRouter() {
             <Route path="/post/:id"      component={PostScreen}          />
             <Route path="/hashtag/:tag"  component={HashtagScreen}        />
             <Route path="/saved"         component={SavedWorkersScreen}   />
-            {/* Legacy: availability is edited on the profile itself and in Edit Profile */}
+            {/* Legacy: availability is edited on the profile itself and in Edit profile */}
             <Route path="/availability">{() => <Redirect to="/profile/edit#availability" replace />}</Route>
             <Route path="/clock/:id"        component={ClockInScreen}        />
             <Route path="/review/:shiftId/:toUserId" component={ReviewScreen} />

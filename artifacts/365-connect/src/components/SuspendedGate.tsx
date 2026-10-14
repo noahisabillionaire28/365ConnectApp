@@ -31,7 +31,7 @@ export function SuspendedGate() {
       </p>
       <button type="button" onClick={() => void signOut()}
         className="h-[48px] px-8 rounded-[10px] bg-[#0A1628] text-white font-bold text-[15px] active:scale-[0.98] transition-transform">
-        Log Out
+        Log out
       </button>
     </div>
   );

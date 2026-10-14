@@ -260,7 +260,7 @@ export function PostShiftStep4Screen() {
           aria-label="Review shift before posting"
           className="w-full h-[52px] rounded-[12px] bg-[#0A1628] text-white font-bold text-[16px]"
         >
-          Review Shift
+          Review shift
         </motion.button>
       </div>
     </div>

@@ -201,7 +201,7 @@ export function RosterScreen() {
             <ChevronLeft size={18} aria-hidden className="text-[#0A1628]" />
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-[#0A1628] font-bold text-[18px] leading-tight">My Roster</h1>
+            <h1 className="text-[#0A1628] font-bold text-[18px] leading-tight">My roster</h1>
             <p className="text-[#6B7280] text-[12px] truncate">
               {isLoading ? 'Loading…' : `${workers.length} worker${workers.length !== 1 ? 's' : ''}`}
             </p>
@@ -240,7 +240,7 @@ export function RosterScreen() {
             <button type="button" onClick={() => navigate('/home?tab=browse')}
               className="mt-2 h-[40px] px-5 rounded-[8px] text-white text-[13px] font-bold"
               style={{ background: '#0A1628' }}>
-              Browse Workers
+              Find workers
             </button>
           </div>
         ) : filtered.length === 0 ? (

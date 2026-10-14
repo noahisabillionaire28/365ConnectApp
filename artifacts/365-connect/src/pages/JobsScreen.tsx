@@ -27,7 +27,7 @@ const NAVY = '#0A1628';
 type FilterKey = 'all' | 'pay30' | 'near3' | 'tonight';
 
 const FILTER_PILLS: { key: FilterKey; label: string }[] = [
-  { key: 'all',     label: 'All Jobs'   },
+  { key: 'all',     label: 'All jobs'   },
   { key: 'pay30',   label: 'Pay Rate: $30+/hr' },
   { key: 'near3',   label: 'Distance: < 3 mi'  },
   { key: 'tonight', label: 'Date: Tonight'     },
@@ -566,7 +566,7 @@ export function JobsScreen() {
           className="absolute bottom-[80px] right-4 z-50 flex items-center gap-2 h-[44px] px-4 bg-black text-white rounded-full shadow-lg font-bold text-[13px]"
         >
           <Plus size={16} aria-hidden className="flex-shrink-0" />
-          Post a Shift
+          Post a shift
         </motion.button>
       )}
 

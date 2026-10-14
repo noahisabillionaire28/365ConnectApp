@@ -883,7 +883,7 @@ function ClientMyShiftsView() {
           <p className="text-[#6B7280] text-[12px] mt-1">Post a shift to start finding workers.</p>
           <button type="button" onClick={() => { resetDraft(); navigate('/post-shift/name'); }}
             className="mt-4 h-[40px] px-5 bg-[#0A1628] text-white rounded-[10px] text-[13px] font-semibold">
-            Post a Shift
+            Post a shift
           </button>
         </div>
       </div>

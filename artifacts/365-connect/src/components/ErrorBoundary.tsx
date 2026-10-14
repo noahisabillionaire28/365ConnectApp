@@ -81,7 +81,7 @@ export class ErrorBoundary extends Component<Props, State> {
             onClick={this.goHome}
             className="w-full h-[48px] rounded-[8px] bg-white border border-[#E5E7EB] text-[#111827] font-semibold text-[14px]"
           >
-            {getCachedAccessToken() ? 'Go to Home' : 'Back to start'}
+            {getCachedAccessToken() ? 'Go to home' : 'Back to start'}
           </button>
         </div>
       </div>

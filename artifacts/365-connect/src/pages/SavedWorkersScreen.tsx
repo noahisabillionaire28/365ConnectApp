@@ -44,7 +44,7 @@ export function SavedWorkersScreen() {
           className="w-10 h-10 rounded-full bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} aria-hidden className="text-[#0A1628]" />
         </button>
-        <h1 className="text-[#111827] font-bold text-[20px]">Saved Workers</h1>
+        <h1 className="text-[#111827] font-bold text-[20px]">Saved workers</h1>
       </div>
 
       <main className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">

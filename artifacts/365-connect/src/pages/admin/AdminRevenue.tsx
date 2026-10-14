@@ -75,7 +75,7 @@ function PaymentRow({ payment }: { payment: AdminPaymentRow }) {
 
       <div className="flex-1 min-w-0">
         <p className="text-black font-semibold text-[13px] truncate">
-          {isSubscription ? 'Pro Subscription' : 'Shift Earnings'}
+          {isSubscription ? 'Pro Subscription' : 'Shift earnings'}
         </p>
         <p className="text-[#6B7280] text-[11px] mt-0.5">
           {fmtDate(payment.created_at)}
@@ -96,7 +96,7 @@ type RevFilter = 'all' | 'shift_payment' | 'pro_subscription';
 
 const FILTERS: { key: RevFilter; label: string }[] = [
   { key: 'all',              label: 'All'           },
-  { key: 'shift_payment',    label: 'Shift Earnings' },
+  { key: 'shift_payment',    label: 'Shift earnings' },
   { key: 'pro_subscription', label: 'Subscriptions' },
 ];
 

@@ -673,7 +673,7 @@ export function ShiftDetailScreen() {
             <button type="button" onClick={() => void handleCancelShift()}
               disabled={cancelling || cancellingFuture}
               className="w-full h-[50px] bg-[#EF4444] text-white font-bold text-[15px] rounded-[12px] disabled:opacity-60">
-              {cancelling ? 'Cancelling…' : shift.seriesId ? 'Cancel this shift only' : 'Yes, Cancel Shift'}
+              {cancelling ? 'Cancelling…' : shift.seriesId ? 'Cancel this shift only' : 'Yes, Cancel shift'}
             </button>
             {shift.seriesId && (
               <button type="button" onClick={() => void handleCancelSeriesFuture()}
@@ -686,7 +686,7 @@ export function ShiftDetailScreen() {
             <button type="button" onClick={() => setShowCancelConfirm(false)}
               disabled={cancelling || cancellingFuture}
               className="w-full h-[50px] border border-[#E5E7EB] text-[#6B7280] font-semibold text-[15px] rounded-[12px] disabled:opacity-60">
-              Keep Shift
+              Keep shift
             </button>
           </div>
         </div>
@@ -902,7 +902,7 @@ export function ShiftDetailScreen() {
             <SectionHeading>
               <span className="flex items-center gap-2 mb-0">
                 <Shirt size={16} aria-hidden className="text-[#6B7280]" />
-                Dress Code
+                Dress code
               </span>
             </SectionHeading>
             {isOwner && dressCodeDraft === null && (
@@ -991,7 +991,7 @@ export function ShiftDetailScreen() {
           </div>
         )}
 
-        {/* Map — Apple Maps style block: address bar, dark map, Hide Map, distance footer */}
+        {/* Map — Apple Maps style block: address bar, dark map, Hide map, distance footer */}
         <div className="px-5 pb-6">
           <SectionHeading>Location</SectionHeading>
           <Suspense fallback={<div className="h-[52px] rounded-[12px] bg-[#F3F4F6] animate-pulse" aria-hidden />}>
@@ -1009,7 +1009,7 @@ export function ShiftDetailScreen() {
           <button type="button" onClick={() => setDirectionsOpen(true)}
             className="mt-3 w-full h-[44px] rounded-[10px] bg-[#0A1628] text-white font-semibold text-[14px] flex items-center justify-center gap-2 active:scale-[0.99] transition-transform">
             <Navigation size={15} aria-hidden />
-            Get Directions
+            Get directions
           </button>
         </div>
 
@@ -1418,7 +1418,7 @@ export function ShiftDetailScreen() {
             <button type="button" onClick={() => navigate(`/shift/${shiftId}/updates`)}
               className="w-full h-[46px] rounded-[8px] border border-[#E5E7EB] text-[#0A1628] font-bold text-[14px] flex items-center justify-center gap-2">
               <MessageSquareText size={16} aria-hidden />
-              Updates &amp; Announcements
+              Updates &amp; announcements
             </button>
           </div>
         )}
@@ -1565,7 +1565,7 @@ export function ShiftDetailScreen() {
           <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={handleCta} disabled={applying}
             aria-label={`Apply to ${shift.companyName}`}
             className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] tracking-wide disabled:opacity-70">
-            {applying ? 'Applying…' : 'Apply Now'}
+            {applying ? 'Applying…' : 'Apply now'}
           </motion.button>
         )}
 
@@ -1577,7 +1577,7 @@ export function ShiftDetailScreen() {
             {claiming
               ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
               : <Zap size={18} aria-hidden className="fill-white" />}
-            {claiming ? 'Claiming…' : 'Claim This Shift'}
+            {claiming ? 'Claiming…' : 'Claim this shift'}
           </motion.button>
         )}
 
@@ -1647,7 +1647,7 @@ export function ShiftDetailScreen() {
               <AlarmClock size={20} aria-hidden />
             </motion.div>
             {!clockOpen ? `Clock in opens at ${clockOpensLabel}`
-              : withinClockInRange ? 'Clock In' : 'Get within 1 mi to Clock In'}
+              : withinClockInRange ? 'Clock in' : 'Get within 1 mi to clock in'}
           </motion.button>
         )}
 

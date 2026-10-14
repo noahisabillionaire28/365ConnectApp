@@ -150,7 +150,7 @@ function GeoFailScreen({ reason, distance, message, shiftLocation, onRetry, onCo
         <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={onRetry}
           aria-label="Try location check again"
           className="w-full h-[52px] rounded-[8px] bg-white border border-[#E5E7EB] text-black font-semibold text-[15px]">
-          Try Again
+          Try again
         </motion.button>
         <button type="button" aria-label="Message your shift manager" onClick={onContact} disabled={contacting}
           className="min-h-10 px-3 flex items-center justify-center text-[#6B7280] text-[13px] underline underline-offset-2 active:text-black disabled:opacity-50">
@@ -161,7 +161,7 @@ function GeoFailScreen({ reason, distance, message, shiftLocation, onRetry, onCo
   );
 }
 
-/* ── Active + On Break ───────────────────────────────────────────────────── */
+/* ── Active + On break ───────────────────────────────────────────────────── */
 function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBreak, onEndShift }: {
   shift: MockShift; phase: 'active' | 'on-break';
   shiftSecs: number; breakSecs: number;
@@ -189,7 +189,7 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
           <div className="flex flex-col items-center gap-8 relative z-10">
             <div className="text-center opacity-35" aria-label={`Shift time: ${fmtHMS(shiftSecs)}`}>
               <p className="text-[#6B7280] text-[10px] font-semibold uppercase tracking-[0.18em] mb-1.5">
-                Shift Time
+                Shift time
               </p>
               <p className="text-black font-bold tabular-nums leading-none" style={{ fontSize: 44 }}>
                 {fmtHMS(shiftSecs)}
@@ -198,7 +198,7 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
 
             <div className="text-center" aria-live="polite" aria-label={`Break time: ${fmtHMS(breakSecs)}`}>
               <p className="text-[#0A1628] text-[11px] font-semibold uppercase tracking-[0.18em] mb-2">
-                Break Time
+                Break time
               </p>
               <p className="font-bold tabular-nums leading-none text-[#0A1628]" style={{ fontSize: 72 }}>
                 {fmtHMS(breakSecs)}
@@ -221,13 +221,13 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
         {/* Status badge */}
         <div className={`flex items-center gap-2.5 mt-8 px-5 py-2.5 rounded-full border relative z-10 ${
           isBreak ? 'bg-blue-50 border-blue-200' : 'bg-emerald-50 border-emerald-200'
-        }`} aria-label={isBreak ? 'Status: On Break' : 'Status: On Shift'}>
+        }`} aria-label={isBreak ? 'Status: On break' : 'Status: On shift'}>
           <motion.div animate={{ opacity: [1, 0.25, 1] }} transition={{ repeat: Infinity, duration: 1.6 }}
             className={`w-2 h-2 rounded-full flex-shrink-0 ${isBreak ? 'bg-[#0A1628]' : 'bg-[#10B981]'}`} />
           <span className={`text-[13px] font-bold uppercase tracking-[0.14em] ${
             isBreak ? 'text-[#0A1628]' : 'text-[#10B981]'
           }`}>
-            {isBreak ? 'On Break' : 'On Shift'}
+            {isBreak ? 'On break' : 'On shift'}
           </span>
         </div>
       </div>
@@ -239,7 +239,7 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
             aria-label="End break and resume shift"
             className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] flex items-center justify-center gap-2.5">
             <AlarmClock size={18} aria-hidden />
-            End Break
+            End break
           </motion.button>
         ) : (
           <>
@@ -247,13 +247,13 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
               aria-label="Take a break"
               className="w-full h-[52px] rounded-[8px] bg-white border border-[#E5E7EB] text-black font-semibold text-[15px] flex items-center justify-center gap-2.5">
               <Coffee size={17} aria-hidden className="text-[#6B7280]" />
-              Take Break
+              Take break
             </motion.button>
             <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={onEndShift}
               aria-label="End shift"
               className="w-full h-[52px] rounded-[8px] border border-[#EF4444]/30 bg-red-50 text-[#EF4444] font-semibold text-[15px] flex items-center justify-center gap-2.5">
               <Square size={13} aria-hidden className="text-[#EF4444] fill-[#EF4444]" />
-              End Shift
+              End shift
             </motion.button>
           </>
         )}
@@ -284,7 +284,7 @@ function ConfirmEndOverlay({ companyName, onConfirm, onCancel }: {
         <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={onConfirm}
           aria-label="Confirm end shift"
           className="w-full h-[52px] rounded-[8px] bg-[#EF4444] text-white font-bold text-[15px] mb-3">
-          End Shift
+          End shift
         </motion.button>
         <button type="button" aria-label="Cancel and continue working" onClick={onCancel}
           className="w-full h-[44px] text-[#6B7280] font-medium text-[15px]">
@@ -422,7 +422,7 @@ function AlreadyDoneScreen({ shift, netPay, onDone }: { shift: MockShift; netPay
       </div>
       <button type="button" onClick={onDone}
         className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px]">
-        Back to Shift
+        Back to shift
       </button>
     </motion.div>
   );
@@ -442,10 +442,10 @@ function EndShiftErrorScreen({ message, onRetry, onBack }: { message: string | n
       </div>
       <button type="button" onClick={onRetry}
         className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px]">
-        Try Again
+        Try again
       </button>
       <button type="button" onClick={onBack} className="text-[#0A1628] font-semibold text-[14px]">
-        Back to Shift
+        Back to shift
       </button>
     </motion.div>
   );

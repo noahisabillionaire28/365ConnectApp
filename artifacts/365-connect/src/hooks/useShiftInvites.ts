@@ -15,7 +15,7 @@ export type ShiftInvite = {
 /**
  * The invites (shift_requests) the caller sent for one shift, newest first.
  * Used by the owner's Applicants screen to show who was requested and whether
- * they've accepted, so a broadcast ("Request All Workers") is trackable.
+ * they've accepted, so a broadcast ("Offer to all matching workers") is trackable.
  */
 export function useShiftInvites(shiftId: string | undefined) {
   const { user } = useAuth();

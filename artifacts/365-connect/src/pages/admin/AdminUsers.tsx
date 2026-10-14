@@ -209,7 +209,7 @@ function UserDetailSheet({
                 aria-label={`View @${user.username}'s public profile in the app`}
                 className="w-full h-[48px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[14px] flex items-center justify-center gap-2">
                 <ExternalLink size={15} aria-hidden />
-                View Public Profile
+                View public profile
               </a>
             )}
             <button type="button" disabled={busy}
@@ -217,21 +217,21 @@ function UserDetailSheet({
               onClick={() => setConfirmOp(isFlagged ? 'unflag' : 'flag')}
               className="w-full h-[48px] rounded-[8px] bg-amber-50 border border-amber-200 text-amber-600 font-semibold text-[14px] flex items-center justify-center gap-2">
               <Flag size={15} aria-hidden />
-              {isFlagged ? 'Remove Flag' : 'Flag User'}
+              {isFlagged ? 'Remove flag' : 'Flag user'}
             </button>
             <button type="button" disabled={busy}
               aria-label={isBanned ? 'Restore account' : 'Suspend account'}
               onClick={() => setConfirmOp(isBanned ? 'unban' : 'ban')}
               className="w-full h-[48px] rounded-[8px] bg-red-50 border border-red-200 text-red-600 font-bold text-[14px] flex items-center justify-center gap-2">
               <Ban size={15} aria-hidden />
-              {isBanned ? 'Restore Account' : 'Suspend Account'}
+              {isBanned ? 'Restore account' : 'Suspend account'}
             </button>
             <button type="button" disabled={busy}
               aria-label="Delete user permanently"
               onClick={() => setConfirmOp('delete')}
               className="w-full h-[44px] rounded-[8px] bg-white border border-[#E5E7EB] text-[#6B7280] font-semibold text-[13px] flex items-center justify-center gap-2">
               <Trash2 size={14} aria-hidden />
-              Delete User
+              Delete user
             </button>
             {delErr && <p className="text-red-500 text-[12px] text-center">{delErr}</p>}
           </div>
@@ -241,7 +241,7 @@ function UserDetailSheet({
       <AnimatePresence>
         {confirmOp === 'ban' && (
           <ConfirmOverlay key="ban"
-            message="This account will be suspended. The user will see 'Account Suspended' on login."
+            message="This account will be suspended. The user will see 'Account suspended' on login."
             confirmLabel="Suspend" confirmClass="bg-red-500 text-white"
             onConfirm={() => applyUpdate({ status: 'suspended' } as Parameters<typeof updateUser.mutateAsync>[0]['body'])}
             onCancel={() => setConfirmOp(null)} />
@@ -256,14 +256,14 @@ function UserDetailSheet({
         {confirmOp === 'flag' && (
           <ConfirmOverlay key="flag"
             message="Flag this user? A warning will be noted on their profile for review."
-            confirmLabel="Flag User" confirmClass="bg-amber-500 text-black"
+            confirmLabel="Flag user" confirmClass="bg-amber-500 text-black"
             onConfirm={() => applyUpdate({ status: 'flagged' } as Parameters<typeof updateUser.mutateAsync>[0]['body'])}
             onCancel={() => setConfirmOp(null)} />
         )}
         {confirmOp === 'unflag' && (
           <ConfirmOverlay key="unflag"
             message="Remove the flag from this user's account?"
-            confirmLabel="Remove Flag" confirmClass="bg-emerald-500 text-white"
+            confirmLabel="Remove flag" confirmClass="bg-emerald-500 text-white"
             onConfirm={() => applyUpdate({ status: 'active' } as Parameters<typeof updateUser.mutateAsync>[0]['body'])}
             onCancel={() => setConfirmOp(null)} />
         )}

@@ -27,7 +27,7 @@ export default function NotFound() {
           className="inline-flex items-center gap-2 h-[50px] px-7 rounded-[14px] bg-[#0A1628] text-white font-bold text-[15px]"
         >
           <ArrowLeft size={16} aria-hidden />
-          Back to Home
+          Back to home
         </button>
       </div>
     </div>

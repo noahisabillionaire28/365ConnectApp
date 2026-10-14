@@ -153,8 +153,8 @@ export function AdminDashboard() {
             <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.16em]">Quick Access</p>
           </div>
           {[
-            { label: 'Manage Users',   path: '/admin/users',    icon: Users,         sub: 'View, flag, or suspend accounts' },
-            { label: 'Monitor Shifts', path: '/admin/shifts',   icon: Briefcase,     sub: 'Track active and past shifts' },
+            { label: 'Manage users',   path: '/admin/users',    icon: Users,         sub: 'View, flag, or suspend accounts' },
+            { label: 'Monitor shifts', path: '/admin/shifts',   icon: Briefcase,     sub: 'Track active and past shifts' },
             { label: 'Revenue',        path: '/admin/revenue',  icon: DollarSign,    sub: 'All payments and platform fees' },
             { label: 'Disputes',       path: '/admin/disputes', icon: AlertTriangle, sub: 'Case management and moderation' },
           ].map(({ label, path, icon: Icon, sub }, i) => (

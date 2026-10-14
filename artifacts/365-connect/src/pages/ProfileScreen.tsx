@@ -610,12 +610,12 @@ export function ProfileScreen() {
         ))}
       </div>
 
-      {/* Edit Profile — Instagram-style */}
+      {/* Edit profile — Instagram-style */}
       <div className="px-4 mb-5">
         <button type="button" onClick={() => navigate(editProfilePath)}
           aria-label="Edit profile"
           className="w-full h-[38px] rounded-[10px] bg-[#FAFAFA] border border-[#E5E7EB] text-[#111827] text-[14px] font-semibold flex items-center justify-center gap-2">
-          <Edit3 size={14} aria-hidden /> Edit Profile
+          <Edit3 size={14} aria-hidden /> Edit profile
         </button>
       </div>
 
@@ -810,9 +810,9 @@ export function ProfileScreen() {
               <div className="flex-1 overflow-y-auto px-4 py-4">
                 <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Account</p>
                 <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden mb-4">
-                  <SettingRow icon={Edit3} label="Edit Profile" onTap={() => go(editProfilePath)} />
+                  <SettingRow icon={Edit3} label="Edit profile" onTap={() => go(editProfilePath)} />
                   {username && (
-                    <SettingRow icon={Eye} label="View My Public Profile" onTap={() => go(`/worker/${username}`)} />
+                    <SettingRow icon={Eye} label="View my public profile" onTap={() => go(`/worker/${username}`)} />
                   )}
                   <SettingRow icon={CreditCard} label={isPoster ? 'Payments' : 'Earnings'} onTap={() => go('/earnings')} />
                   {profile.role === 'worker' && (
@@ -825,8 +825,8 @@ export function ProfileScreen() {
                   <>
                     <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.18em] px-1 mb-3">Workforce</p>
                     <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden mb-4">
-                      <SettingRow icon={Bookmark} label="Saved Workers" onTap={() => go('/saved')} />
-                      <SettingRow icon={Users} label="My Roster" onTap={() => go('/roster')} />
+                      <SettingRow icon={Bookmark} label="Saved workers" onTap={() => go('/saved')} />
+                      <SettingRow icon={Users} label="My roster" onTap={() => go('/roster')} />
                       <SettingRow icon={LayoutTemplate} label="Shift templates" onTap={() => go('/templates')} />
                     </div>
                   </>
@@ -864,7 +864,7 @@ export function ProfileScreen() {
                 </p>
 
                 <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden">
-                  <SettingRow icon={LogOut} label="Log Out" onTap={handleSignOut} danger />
+                  <SettingRow icon={LogOut} label="Log out" onTap={handleSignOut} danger />
                   {/* The sheet sits below this panel's z-index, so the panel closes first. */}
                   <SettingRow icon={Trash2} label="Delete account" onTap={() => { setSettingsOpen(false); setDeleteWord(''); setDeleteError(null); setDeleteOpen(true); }} danger />
                 </div>

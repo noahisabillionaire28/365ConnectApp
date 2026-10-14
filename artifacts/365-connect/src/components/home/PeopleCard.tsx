@@ -10,7 +10,7 @@ const NAVY = '#0A1628';
 /**
  * Client/Staffer Home Feed card (spec B) — vertical Instagram-style worker
  * profile card: circular photo, @username + gold checkmark if is_pro,
- * primary job type, star rating, View Profile + Follow (writes to `follows`).
+ * primary job type, star rating, View profile + Follow (writes to `follows`).
  */
 export function PeopleCard({ person }: { person: WorkerPerson }) {
   const [, navigate] = useLocation();
@@ -70,7 +70,7 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
       <div className="flex flex-col gap-2 flex-shrink-0">
         <button type="button" onClick={() => navigate(`/worker/${person.username}`)}
           className="h-[34px] px-3.5 rounded-[8px] border border-[#E5E7EB] text-[#111827] text-[12px] font-semibold">
-          View Profile
+          View profile
         </button>
         <button type="button" disabled={isFollowPending}
           onClick={() => (isFollowing ? unfollow() : follow())}
@@ -78,7 +78,7 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
           aria-label={isFollowing ? `Remove @${person.username} from your roster` : `Add @${person.username} to your roster`}
           className="h-[34px] px-3.5 rounded-[8px] text-[12px] font-semibold text-white disabled:opacity-60 whitespace-nowrap"
           style={{ background: isFollowing ? '#6B7280' : NAVY }}>
-          {isFollowing ? 'On Roster' : 'Add to Roster'}
+          {isFollowing ? 'On roster' : 'Add to roster'}
         </button>
       </div>
     </div>

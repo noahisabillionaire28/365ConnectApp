@@ -170,7 +170,7 @@ function SimulatedCardInput({
         className="w-full text-white font-bold text-[16px] h-[52px] rounded-[12px] active:scale-[0.98] transition-transform disabled:opacity-30"
         style={{ background: NAVY }}
       >
-        {loading ? 'Saving…' : 'Confirm Card'}
+        {loading ? 'Saving…' : 'Confirm card'}
       </button>
 
       <p className="text-[11px] text-center" style={{ color: MUTED }}>

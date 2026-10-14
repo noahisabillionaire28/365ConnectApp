@@ -1,6 +1,6 @@
 /**
  * Weekly availability editor shared by the worker's Profile card (saves on
- * every tap) and Edit Profile (saves with the form).
+ * every tap) and Edit profile (saves with the form).
  *
  * Renders an "Available for work" master switch (`is_available`) and seven
  * tappable day chips (`availability`: { mon…sun: boolean }) with a one-line

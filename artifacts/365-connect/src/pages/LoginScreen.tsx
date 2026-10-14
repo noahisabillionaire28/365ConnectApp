@@ -336,7 +336,7 @@ export function LoginScreen() {
           style={{ background: NAVY }}
           data-testid="btn-login-submit"
         >
-          {loading ? 'Signing in…' : 'Log In'}
+          {loading ? 'Signing in…' : 'Log in'}
         </button>
       </div>
 
@@ -344,7 +344,7 @@ export function LoginScreen() {
         <p className="text-[14px]" style={{ color: MUTED }}>
           Don't have an account?{' '}
           <Link href="/signup" className="font-semibold" style={{ color: NAVY }} data-testid="link-signup">
-            Sign Up
+            Sign up
           </Link>
         </p>
         <p className="text-[12px] mt-4 flex items-center justify-center gap-1" style={{ color: MUTED }}>

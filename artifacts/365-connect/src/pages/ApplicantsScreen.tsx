@@ -570,7 +570,7 @@ export function ApplicantsScreen() {
         </p>
         <button type="button" onClick={() => navigate('/home')}
           className="mt-2 h-[40px] px-5 rounded-full bg-[#0A1628] text-white text-[13px] font-bold">
-          Back to Home
+          Back to home
         </button>
       </div>
     );
@@ -686,7 +686,7 @@ export function ApplicantsScreen() {
           <button type="button" onClick={() => setConfirmBroadcast(true)} disabled={inviting}
             className="flex-1 h-[46px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[13px] flex items-center justify-center gap-2 disabled:opacity-60">
             <Send size={15} aria-hidden />
-            {inviting ? 'Sending…' : 'Request All Workers'}
+            {inviting ? 'Sending…' : 'Offer to all matching workers'}
           </button>
           <ConfirmSheet
             open={confirmBroadcast}
@@ -701,7 +701,7 @@ export function ApplicantsScreen() {
             <button type="button" onClick={() => navigate(`/shift/${id}/assign`)}
               className="flex-1 h-[46px] rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[13px] flex items-center justify-center gap-2">
               <UserPlus size={15} aria-hidden />
-              Assign from Roster
+              Assign from roster
             </button>
           )}
         </div>
@@ -962,7 +962,7 @@ export function ApplicantsScreen() {
 
             {confirmed.length === 0 && pending.length === 0 && invitedPending.length === 0 && standby.length === 0 && pendingSwaps.length === 0 && (
               <div className="text-center py-10">
-                <p className="text-[#6B7280] text-[13px]">No one on the roster yet. Tap “Request All Workers” to invite people.</p>
+                <p className="text-[#6B7280] text-[13px]">No one on the roster yet. Tap “Offer to all matching workers” to invite people.</p>
               </div>
             )}
           </>

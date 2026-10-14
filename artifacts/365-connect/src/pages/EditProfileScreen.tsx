@@ -389,7 +389,7 @@ export function EditProfileScreen() {
           className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} aria-hidden className="text-black" />
         </button>
-        <h1 className="text-[#111827] font-bold text-[18px] leading-tight flex-1">Edit Profile</h1>
+        <h1 className="text-[#111827] font-bold text-[18px] leading-tight flex-1">Edit profile</h1>
         {dirty && !saving && <span className="text-[#6B7280] text-[12px] font-medium">Unsaved</span>}
       </header>
 

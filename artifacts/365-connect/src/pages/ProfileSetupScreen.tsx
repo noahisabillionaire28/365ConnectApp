@@ -373,7 +373,7 @@ export function ProfileSetupScreen() {
           <div className="flex flex-col gap-3">
             <button onClick={handleComplete} disabled={saving}
               className="w-full bg-black text-white font-bold text-[16px] py-[18px] rounded-[8px] active:scale-[0.98] transition-transform disabled:opacity-30 disabled:cursor-not-allowed">
-              {saving ? 'Saving profile…' : 'Complete Profile'}
+              {saving ? 'Saving profile…' : 'Complete profile'}
             </button>
             {!saving && !postPhotoPreview && (
               <button onClick={handleComplete}

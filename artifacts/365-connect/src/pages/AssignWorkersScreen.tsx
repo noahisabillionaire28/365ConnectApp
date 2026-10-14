@@ -219,7 +219,7 @@ export function AssignWorkersScreen() {
             <button type="button" onClick={() => navigate('/roster')}
               className="mt-2 h-[40px] px-5 rounded-[8px] text-white text-[13px] font-bold"
               style={{ background: '#0A1628' }}>
-              Go to My Roster
+              Go to My roster
             </button>
           </div>
         ) : (

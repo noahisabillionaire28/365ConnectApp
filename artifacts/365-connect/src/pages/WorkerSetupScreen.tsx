@@ -773,7 +773,7 @@ export function WorkerSetupScreen() {
           style={{ background: NAVY }}
           data-testid="btn-setup-continue"
         >
-          {saving ? 'Saving…' : step === TOTAL_STEPS ? 'Complete Profile' : 'Continue'}
+          {saving ? 'Saving…' : step === TOTAL_STEPS ? 'Complete profile' : 'Continue'}
         </button>
 
         {/* Optional-step skips */}
