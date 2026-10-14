@@ -682,12 +682,13 @@ function WorkerDiscoveryBody() {
 
 /* ─── Client: My Shifts view ─────────────────────────────────────────────────── */
 function ClientShiftCard({
-  shift, onTap, onApplicants, showCount,
+  shift, onTap, onApplicants, showCount, actionLabel = 'View applicants',
 }: {
   shift: ClientShift;
   onTap: () => void;
   onApplicants?: () => void;
   showCount?: boolean;
+  actionLabel?: string;
 }) {
   const dateStr = shift.startTimeISO
     ? new Date(shift.startTimeISO).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: shift.timezone || undefined })
@@ -777,7 +778,7 @@ function ClientShiftCard({
           <button type="button" onClick={onApplicants}
             className="flex items-center gap-1.5 text-[#0A1628] text-[12px] font-semibold">
             <Users size={13} aria-hidden />
-            View Applicants
+            {actionLabel}
             {shift.applicantCount > 0 && (
               <span className="bg-[#0A1628] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-0.5">
                 {shift.applicantCount}
@@ -791,7 +792,7 @@ function ClientShiftCard({
 }
 
 function ClientShiftGroup({
-  label, shifts, dotColor, onTap, onApplicants, showCount, emptyText,
+  label, shifts, dotColor, onTap, onApplicants, showCount, emptyText, actionLabel,
 }: {
   label: string;
   shifts: ClientShift[];
@@ -800,6 +801,7 @@ function ClientShiftGroup({
   onApplicants?: (s: ClientShift) => void;
   showCount?: boolean;
   emptyText?: string;
+  actionLabel?: string;
 }) {
   if (shifts.length === 0 && !emptyText) return null;
   return (
@@ -819,6 +821,7 @@ function ClientShiftGroup({
             onTap={() => onTap(s)}
             onApplicants={onApplicants ? () => onApplicants(s) : undefined}
             showCount={showCount}
+            actionLabel={actionLabel}
           />
         ))
         : (
@@ -832,7 +835,7 @@ function ClientShiftGroup({
 
 function ClientMyShiftsView() {
   const [, navigate] = useLocation();
-  const { shifts, isLoading, error } = useClientShiftsDashboard();
+  const { shifts, isLoading, error, refetch } = useClientShiftsDashboard();
   const now = Date.now();
 
   // A shift is "over" once it has ended, whatever its stored status — the
@@ -863,12 +866,10 @@ function ClientMyShiftsView() {
     );
   }
 
-  if (error) {
+  if (error && shifts.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto pt-4 pb-4">
-        <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-8 text-center">
-          <p className="text-[#6B7280] text-[14px]">Couldn't load your shifts right now.</p>
-        </div>
+        <LoadError what="your shifts" onRetry={() => void refetch()} />
       </div>
     );
   }
@@ -889,9 +890,46 @@ function ClientMyShiftsView() {
     );
   }
 
+  // What needs the poster today, so Home starts with decisions, not a list.
+  const upcoming = [...open, ...filled];
+  const waitingApplicants = upcoming.filter((s) => s.applicantCount > 0);
+  const applicantTotal = waitingApplicants.reduce((n, s) => n + s.applicantCount, 0);
+  const swaps = upcoming.filter((s) => s.swapCount > 0);
+  const soonUnfilled = open.filter((s) => {
+    const t = Date.parse(s.startTimeISO || '');
+    return Number.isFinite(t) && t - now < 48 * 3_600_000 && (s.spots_filled ?? 0) < (s.spots_available ?? 0);
+  });
+  const attention: { key: string; text: string; go: () => void }[] = [];
+  if (applicantTotal > 0) attention.push({
+    key: 'apps',
+    text: `${applicantTotal} applicant${applicantTotal === 1 ? '' : 's'} waiting${waitingApplicants.length > 1 ? ` across ${waitingApplicants.length} shifts` : ''}`,
+    go: () => navigate(`/shift/${waitingApplicants[0].id}/applicants`),
+  });
+  if (swaps.length) attention.push({
+    key: 'swaps',
+    text: `${swaps.length} swap request${swaps.length === 1 ? '' : 's'} to approve`,
+    go: () => navigate(`/shift/${swaps[0].id}/applicants`),
+  });
+  for (const s of soonUnfilled.slice(0, 2)) {
+    const left = (s.spots_available ?? 0) - (s.spots_filled ?? 0);
+    attention.push({ key: `fill-${s.id}`, text: `${s.title?.trim() || `${s.jobType ?? 'Event'} shift`} starts soon with ${left} spot${left === 1 ? '' : 's'} open`, go: () => navigate(`/shift/${s.id}/applicants`) });
+  }
+
   return (
     <div className="flex-1 overflow-y-auto pt-4 pb-4">
       <RatePromptCard role="poster" />
+      {attention.length > 0 && (
+        <section aria-label="Needs attention" className="mx-4 mb-5 rounded-[12px] border border-[#FDE68A] bg-[#FFFBEB] overflow-hidden">
+          <p className="px-4 pt-3 pb-1 text-[#92400E] text-[13px] font-semibold">Needs attention</p>
+          {attention.map((a) => (
+            <button key={a.key} type="button" onClick={a.go}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-left border-t border-[#FDE68A] first-of-type:border-t-0 active:bg-[#FEF3C7]">
+              <span className="flex-1 min-w-0 text-[#111827] text-[14px] font-medium leading-snug">{a.text}</span>
+              <ChevronRight size={16} aria-hidden className="text-[#B45309] flex-shrink-0" />
+            </button>
+          ))}
+        </section>
+      )}
       <ClientShiftGroup
         label="Open" shifts={open} dotColor="#10B981"
         onTap={(s) => navigate(`/shift/${s.id}`)}
@@ -903,10 +941,14 @@ function ClientMyShiftsView() {
         label="Confirmed" shifts={filled} dotColor="#0A1628"
         onTap={(s) => navigate(`/shift/${s.id}`)}
         onApplicants={(s) => navigate(`/shift/${s.id}/applicants`)}
+        actionLabel="Crew"
       />
       <ClientShiftGroup
         label="Completed" shifts={completed} dotColor="#6B7280"
         onTap={(s) => navigate(`/shift/${s.id}`)}
+        // Hours are approved and workers paid from the crew page.
+        onApplicants={(s) => navigate(`/shift/${s.id}/applicants`)}
+        actionLabel="Hours & pay"
       />
       <ClientShiftGroup
         label="Cancelled" shifts={cancelled} dotColor="#EF4444"
@@ -919,7 +961,8 @@ function ClientMyShiftsView() {
 /** Read the initial home tab from ?tab= (used after posting a shift). */
 function useInitialPosterTab(): 'browse' | 'my-shifts' {
   const search = useSearch();
-  return new URLSearchParams(search).get('tab') === 'my-shifts' ? 'my-shifts' : 'browse';
+  // Posters open on their own shifts; ?tab=browse jumps to finding workers.
+  return new URLSearchParams(search).get('tab') === 'browse' ? 'browse' : 'my-shifts';
 }
 
 /* ─── (B) Client Home Feed ───────────────────────────────────────────────────── */
@@ -928,11 +971,11 @@ function ClientHomeFeed() {
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
       <div className="bg-white sticky top-0 z-40 border-b border-[#E5E7EB]">
-        <FeedHeader subtitle={tab === 'browse' ? 'Discover workers' : 'Your posted shifts'} />
+        <FeedHeader subtitle={tab === 'browse' ? 'Find workers for your shifts' : 'Your shifts'} />
         <SegmentControl
           tabs={[
-            { value: 'browse', label: 'Browse Workers' },
-            { value: 'my-shifts', label: 'My Shifts' },
+            { value: 'my-shifts', label: 'My shifts' },
+            { value: 'browse', label: 'Find workers' },
           ]}
           value={tab}
           onChange={(v) => setTab(v as 'browse' | 'my-shifts')}
@@ -947,22 +990,17 @@ function ClientHomeFeed() {
 
 /* ─── (C) Staffer Home Feed ──────────────────────────────────────────────────── */
 function StafferHomeFeed() {
-  const [, navigate] = useLocation();
+  // Posting lives on the tab bar's "Post Shift"; no second header or floating button.
   const [tab, setTab] = useState<'browse' | 'my-shifts'>(useInitialPosterTab());
-
-  function handlePostShift() {
-    resetDraft();
-    navigate('/post-shift/name');
-  }
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
       <div className="bg-white sticky top-0 z-40 border-b border-[#E5E7EB]">
-        <FeedHeader subtitle={tab === 'browse' ? 'Discover workers' : 'Your posted shifts'} onPost={handlePostShift} />
+        <FeedHeader subtitle={tab === 'browse' ? 'Find workers for your shifts' : 'Your shifts'} />
         <SegmentControl
           tabs={[
-            { value: 'browse', label: 'Browse Workers' },
-            { value: 'my-shifts', label: 'My Shifts' },
+            { value: 'my-shifts', label: 'My shifts' },
+            { value: 'browse', label: 'Find workers' },
           ]}
           value={tab}
           onChange={(v) => setTab(v as 'browse' | 'my-shifts')}
@@ -971,16 +1009,6 @@ function StafferHomeFeed() {
       <div className="pt-3"><InstallBanner compact /></div>
       {tab === 'browse' ? <WorkerDiscoveryBody /> : <ClientMyShiftsView />}
 
-      <button
-        type="button"
-        onClick={handlePostShift}
-        aria-label="Post a shift"
-        style={{ animationDelay: '150ms' }}
-        className="anim-pop-in fixed bottom-[80px] right-4 z-50 flex items-center gap-2 h-[44px] px-4 bg-[#0A1628] text-white rounded-full shadow-lg font-bold text-[13px] active:scale-[0.93] transition-transform"
-      >
-        <PlusCircle size={16} aria-hidden className="flex-shrink-0" />
-        Post a Shift
-      </button>
 
       <BottomTabNav />
     </div>
