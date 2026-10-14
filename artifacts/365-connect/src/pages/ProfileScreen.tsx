@@ -813,7 +813,7 @@ export function ProfileScreen() {
                   {username && (
                     <SettingRow icon={Eye} label="View My Public Profile" onTap={() => go(`/worker/${username}`)} />
                   )}
-                  <SettingRow icon={CreditCard} label="Payments & Earnings" onTap={() => go('/earnings')} />
+                  <SettingRow icon={CreditCard} label={isPoster ? 'Payments' : 'Earnings'} onTap={() => go('/earnings')} />
                   {profile.role === 'worker' && (
                     <SettingRow icon={CalendarCheck} label="Availability" onTap={() => go('/profile/edit#availability')} />
                   )}

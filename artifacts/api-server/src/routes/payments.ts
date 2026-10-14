@@ -33,6 +33,16 @@ router.get('/', requireAuth, async (req, res) => {
     for (const s of shifts ?? []) shiftMap.set(s.id, s);
   }
 
+  // For payments the caller sent, name who received them.
+  const paidWorkerIds = [...new Set((payments ?? [])
+    .filter((p) => p.client_id === req.userId && p.worker_id !== req.userId)
+    .map((p) => p.worker_id as string).filter(Boolean))];
+  const workerNames = new Map<string, string | null>();
+  if (paidWorkerIds.length) {
+    const { data: ws } = await adminDb.from('users').select('id, username').in('id', paidWorkerIds);
+    for (const w of ws ?? []) workerNames.set(w.id as string, (w.username as string | null) ?? null);
+  }
+
   const rows = (payments ?? []).map((p) => {
     const s = p.shift_id ? shiftMap.get(p.shift_id) : undefined;
     // 'out' = the caller paid this (they are the client); 'in' = they earned it.
@@ -42,6 +52,7 @@ router.get('/', requireAuth, async (req, res) => {
       shift_title: s?.title ?? null,
       company_name: s?.company_name ?? null,
       direction,
+      worker_username: direction === 'out' ? workerNames.get(p.worker_id as string) ?? null : undefined,
     };
   });
   return res.json(rows);
@@ -209,7 +220,7 @@ router.post('/checkout', requireAuth, async (req, res) => {
     // A Checkout link that sits in a tab for a day must not still be payable
     // after the worker was paid another way: one hour, then Stripe expires it.
     form.set('expires_at', String(Math.floor(Date.now() / 1000) + 60 * 60));
-    form.set('success_url', `${origin}/earnings?paid=1&session_id={CHECKOUT_SESSION_ID}`);
+    form.set('success_url', `${origin}/earnings?paid=1&shift_id=${encodeURIComponent(shift_id)}&session_id={CHECKOUT_SESSION_ID}`);
     form.set('cancel_url', `${origin}/shift/${shift_id}/applicants`);
     form.append('line_items[0][quantity]', '1');
     form.append('line_items[0][price_data][currency]', 'usd');

@@ -15,7 +15,7 @@ import {
   MAX_SERIES_OCCURRENCES, WEEKDAY_LABELS, WEEKDAY_NAMES, type RepeatRule, type RepeatType,
 } from '@/lib/recurrence';
 import { MultiDatePicker } from '@/components/MultiDatePicker';
-import { browserTimeZone, zonedTimeToUtc } from '@/lib/timezone';
+import { browserTimeZone, utcToZonedParts, zonedTimeToUtc } from '@/lib/timezone';
 
 const REPEAT_OPTIONS: { value: RepeatType; label: string }[] = [
   { value: 'none',   label: "Doesn't repeat" },
@@ -101,9 +101,19 @@ export function PostShiftStep3Screen() {
   const [, navigate]  = useLocation();
   const initial       = getDraft();
 
-  const today = new Date().toISOString().split('T')[0];
+  // "Today" is the venue's (or this device's) calendar day, not UTC's: in the
+  // US evening UTC is already tomorrow, which blocked same-night posts.
+  const zone = initial.timezone || browserTimeZone();
+  const today = utcToZonedParts(new Date().toISOString(), zone).date;
+  const tomorrow = (() => {
+    const [y, m, d] = today.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+  })();
+  // Default to today unless the default start time has already gone by.
+  const defaultDate = initial.start_time
+    && Date.parse(zonedTimeToUtc(today, initial.start_time, zone)) <= Date.now() ? tomorrow : today;
 
-  const [date,      setDate]      = useState(initial.date || today);
+  const [date,      setDate]      = useState(initial.date || defaultDate);
   const [startTime, setStartTime] = useState(initial.start_time);
   const [endTime,   setEndTime]   = useState(initial.end_time);
   const [spots,     setSpots]     = useState(initial.spots_available);
