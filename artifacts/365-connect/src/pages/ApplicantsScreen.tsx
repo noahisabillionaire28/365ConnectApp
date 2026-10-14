@@ -399,6 +399,9 @@ export function ApplicantsScreen() {
   const pendingSwaps = swaps.filter((s) => isSwapActive(s.status));
 
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Actions that can't be taken back ask first, saying what will happen.
+  const [ask, setAsk] = useState<{ title: string; body: string; label: string; run: () => void } | null>(null);
+  const who = (u?: string | null) => (u ? `@${u}` : 'this worker');
   const [inviting, setInviting] = useState(false);
   const [openingChat, setOpeningChat] = useState(false);
 
@@ -609,6 +612,15 @@ export function ApplicantsScreen() {
       </div>
 
       <ConfirmSheet
+        open={!!ask}
+        title={ask?.title ?? ''}
+        body={ask?.body}
+        confirmLabel={ask?.label ?? 'Confirm'}
+        tone="danger"
+        onConfirm={() => { const a = ask; setAsk(null); a?.run(); }}
+        onCancel={() => setAsk(null)}
+      />
+      <ConfirmSheet
         open={!!markPaidFor}
         title="Mark as paid?"
         body={<>Confirm you paid <b>{markPaidFor?.username ? `@${markPaidFor.username}` : 'this worker'}</b> <b>${(markPaidFor?.approvedPay ?? 0).toFixed(2)}</b> outside the app (cash, Venmo, payroll). This records the shift as paid and tells them. 365 Connect adds no fee.</>}
@@ -786,8 +798,16 @@ export function ApplicantsScreen() {
                     onApprove={() => setReviewing(w)}
                     onPay={() => void handlePay(w)}
                     onMarkPaid={() => setMarkPaidFor(w)}
-                    onNoShow={() => void handleNoShow(w)}
-                    onRemove={() => void handleRemove(w)}
+                    onNoShow={() => setAsk({
+                      title: `Report ${who(w.username)} as a no-show?`,
+                      body: "It goes on their record and our team reviews it. If they're just running late, message them first.",
+                      label: 'Report no-show', run: () => void handleNoShow(w),
+                    })}
+                    onRemove={() => setAsk({
+                      title: `Remove ${who(w.username)} from this shift?`,
+                      body: 'Their booking is cancelled and they are notified. The spot opens up again.',
+                      label: 'Remove', run: () => void handleRemove(w),
+                    })}
                     onReview={() => navigate(`/review/${id}/${w.workerId}`)}
                     onMessage={() => void handleMessageWorker(w.workerId)} />
                 ))}
@@ -829,7 +849,11 @@ export function ApplicantsScreen() {
                         )}
                       </div>
                       <button type="button" aria-label="Decline" disabled={!!busyId}
-                        onClick={() => void handleDecide(a.applicationId, 'decline', 'Declined.')}
+                        onClick={() => setAsk({
+                          title: `Decline ${who(a.username)}?`,
+                          body: "They'll be told they weren't selected for this shift.",
+                          label: 'Decline', run: () => void handleDecide(a.applicationId, 'decline', 'Declined.'),
+                        })}
                         className="w-10 h-10 rounded-full border border-[#E5E7EB] flex items-center justify-center disabled:opacity-40">
                         <X size={16} aria-hidden className="text-[#6B7280]" />
                       </button>
@@ -875,7 +899,11 @@ export function ApplicantsScreen() {
                         {a.username ? `@${a.username}` : 'Worker'}
                       </p>
                       <button type="button" aria-label="Remove from waitlist" disabled={!!busyId}
-                        onClick={() => void handleDecide(a.applicationId, 'decline', 'Removed from waitlist.')}
+                        onClick={() => setAsk({
+                          title: `Remove ${who(a.username)} from the waitlist?`,
+                          body: "They won't be offered a spot if one opens up.",
+                          label: 'Remove', run: () => void handleDecide(a.applicationId, 'decline', 'Removed from waitlist.'),
+                        })}
                         className="w-10 h-10 rounded-full border border-[#E5E7EB] flex items-center justify-center disabled:opacity-40">
                         <X size={16} aria-hidden className="text-[#6B7280]" />
                       </button>

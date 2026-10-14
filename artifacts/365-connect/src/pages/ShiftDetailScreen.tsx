@@ -754,6 +754,51 @@ export function ShiftDetailScreen() {
           <h1 className="text-black font-bold text-[24px] leading-tight break-words">{shiftHeadline(shift)}</h1>
         </div>
 
+        {/* Owner at a glance: where the shift stands and the four things a
+            poster does most, before any of the job-ad content below. */}
+        {canManage && (() => {
+          const booked = Math.max(0, shift.spotsTotal - shift.spotsAvailable);
+          const live = (shift.status === 'open' || shift.status === 'filled') && lifecycle !== 'ended';
+          const tile = 'h-[52px] rounded-[12px] border border-[#E5E7EB] bg-white text-[#0A1628] text-[14px] font-semibold flex items-center justify-center gap-2 active:bg-[#F7F8FA] disabled:opacity-60';
+          return (
+            <section aria-label="Manage this shift" className="mx-5 mt-4 rounded-[14px] bg-[#F7F8FA] border border-[#E5E7EB] p-3" data-testid="owner-panel">
+              <p className="px-1 pb-2.5 text-[#111827] text-[14px] font-semibold">
+                {booked} of {shift.spotsTotal} booked
+                {pendingCount > 0 && <span className="text-[#B45309]"> · {pendingCount} applicant{pendingCount === 1 ? '' : 's'} waiting</span>}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => navigate(`/shift/${shiftId}/applicants`)}
+                  className="h-[52px] rounded-[12px] bg-[#0A1628] text-white text-[14px] font-semibold flex items-center justify-center gap-2 active:opacity-90">
+                  <Users size={16} aria-hidden />
+                  {lifecycle === 'ended' ? 'Hours & pay' : 'Crew'}
+                  {pendingCount > 0 && <span className="bg-white/20 text-[12px] font-bold px-1.5 py-0.5 rounded-full">{pendingCount}</span>}
+                </button>
+                <button type="button" onClick={() => void handleShiftChat()} disabled={openingChat} className={tile}>
+                  <MessagesSquare size={16} aria-hidden />{openingChat ? 'Opening…' : 'Shift chat'}
+                </button>
+                {live ? (
+                  <>
+                    <button type="button" onClick={() => navigate(`/shift/${shiftId}/assign`)} className={tile}>
+                      <UserPlus size={16} aria-hidden />Assign
+                    </button>
+                    <button type="button" onClick={() => void handleEditShift()} disabled={editLoading} className={tile}>
+                      <Edit3 size={15} aria-hidden />{editLoading ? 'Loading…' : 'Edit'}
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" onClick={() => void handleEditShift('clone')} disabled={editLoading} className={`${tile} col-span-2`}>
+                    <Repeat2 size={16} aria-hidden />{editLoading ? 'Loading…' : 'Post again'}
+                  </button>
+                )}
+              </div>
+              <button type="button" onClick={() => document.getElementById('manage-more')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className="w-full h-10 mt-1 text-[#6B7280] text-[13px] font-semibold">
+                More options
+              </button>
+            </section>
+          );
+        })()}
+
         {/* Job type + pay */}
         <div className="flex items-center justify-between px-5 pt-3 pb-4 border-b border-[#E5E7EB]">
           <div className="flex items-center gap-2 flex-wrap">
@@ -1380,23 +1425,23 @@ export function ShiftDetailScreen() {
 
         {/* Owner management — inline, scrolls with content (never overlaps) */}
         {canManage && (
-          <div className="px-5 pt-2 pb-8 flex flex-col gap-2 border-t border-[#E5E7EB] mt-2">
+          <div id="manage-more" className="px-5 pt-2 pb-8 flex flex-col gap-2 border-t border-[#E5E7EB] mt-2 scroll-mt-4">
             {lifecycle !== 'ended' && shift.status !== 'cancelled' && (
               <motion.button type="button" whileTap={{ scale: 0.97 }}
                 onClick={() => navigate(`/shift/${shiftId}/assign`)}
                 aria-label="Assign workers from your roster"
                 className="w-full h-[46px] rounded-[8px] border border-[#0A1628] text-[#0A1628] font-bold text-[14px] tracking-wide flex items-center justify-center gap-2">
                 <UserPlus size={16} aria-hidden />
-                Assign Workers
+                Assign from my roster
               </motion.button>
             )}
             {(shift.status === 'open' || shift.status === 'filled') && lifecycle !== 'ended' && (
               <motion.button type="button" whileTap={{ scale: 0.97 }}
                 onClick={() => setConfirmBroadcast(true)} disabled={inviting}
-                aria-label="Request all workers for this shift"
+                aria-label="Offer this shift to every matching worker"
                 className="w-full h-[46px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[14px] tracking-wide flex items-center justify-center gap-2 disabled:opacity-60">
                 <Send size={16} aria-hidden />
-                {inviting ? 'Sending invites…' : 'Request All Workers'}
+                {inviting ? 'Sending offers…' : 'Offer to all matching workers'}
               </motion.button>
             )}
             <motion.button type="button" whileTap={{ scale: 0.97 }}
@@ -1404,7 +1449,7 @@ export function ShiftDetailScreen() {
               aria-label={`View applicants${pendingCount > 0 ? `, ${pendingCount} pending` : ''}`}
               className="w-full h-[52px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[16px] tracking-wide flex items-center justify-center gap-2.5">
               <Users size={18} aria-hidden />
-              Manage Roster
+              Crew &amp; applicants
               {pendingCount > 0 && (
                 <span className="bg-white/20 text-white text-[12px] font-bold px-2 py-0.5 rounded-full">
                   {pendingCount}
