@@ -5,7 +5,8 @@
  */
 import { useEffect, useRef } from 'react';
 import type { MapMarker } from '@/components/LeafletMap';
-import { logoPinUrl, logoPinSize, userDotHtml } from '@/lib/mapStyles';
+import { logoPinUrl, logoPinSize, userDotHtml, LOGO_PIN_TIP_INSET } from '@/lib/mapStyles';
+import { usePrefersDark } from '@/hooks/usePrefersDark';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -72,13 +73,21 @@ export function AppleMap({
     map.setRegionAnimated(region, animate);
   }
 
+  // Follow the device's light/dark setting, live, like Apple Maps.
+  const prefersDark = usePrefersDark();
+  useEffect(() => {
+    const mk = window.mapkit; const map = mapRef.current;
+    if (!mk || !map) return;
+    map.colorScheme = prefersDark ? mk.Map.ColorSchemes.Dark : mk.Map.ColorSchemes.Light;
+  }, [prefersDark]);
+
   // Create the map once.
   useEffect(() => {
     const mk = window.mapkit;
     const el = boxRef.current;
     if (!mk || !el) return;
     const map = new mk.Map(el, {
-      colorScheme: mk.Map.ColorSchemes.Light,
+      colorScheme: prefersDark ? mk.Map.ColorSchemes.Dark : mk.Map.ColorSchemes.Light,
       showsCompass: mk.FeatureVisibility.Hidden,
       showsMapTypeControl: false,
       showsZoomControl: false,
@@ -133,7 +142,7 @@ export function AppleMap({
         () => (isMe ? userDotElement() : m.label ? priceElement(m.label, selected) : pinElement(selected)),
         {
           // A balloon's tip sits on the coordinate; a pill or dot is centered on it.
-          anchorOffset: m.label || isMe ? new DOMPoint(0, 0) : new DOMPoint(0, -h / 2),
+          anchorOffset: m.label || isMe ? new DOMPoint(0, 0) : new DOMPoint(0, -h / 2 + LOGO_PIN_TIP_INSET),
           displayPriority: selected ? 1000 : isMe ? 500 : 750,
           animates: false,
           enabled: !isMe,

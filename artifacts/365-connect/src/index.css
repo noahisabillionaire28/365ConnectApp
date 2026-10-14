@@ -218,6 +218,7 @@ body:has([aria-modal="true"]) [data-testid="storage-notice"] {
   isolation: isolate;
   background: #F2EFE9; /* map land colour: no flash while tiles load */
 }
+.map-dark .leaflet-container { background: #262626; }
 /* Apple MapKit JS draws its own chrome; keep it inside the map box too. */
 .apple-map .mk-map-view { position: absolute; inset: 0; }
 .apple-map { overflow: hidden; }

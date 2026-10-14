@@ -10,11 +10,14 @@ import 'leaflet/dist/leaflet.css';
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { logoPinUrl, logoPinSize, userDotHtml, USER_DOT_SIZE } from '@/lib/mapStyles';
+import { logoPinUrl, logoPinSize, userDotHtml, USER_DOT_SIZE, LOGO_PIN_TIP_INSET } from '@/lib/mapStyles';
+import { usePrefersDark } from '@/hooks/usePrefersDark';
 
 // CARTO "Voyager" (OpenStreetMap data) — the closest free match to Apple's
 // light map. Attribution is shown in the corner as their terms require.
 const TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+/** Same CARTO style family, dark variant, for devices in dark mode. */
+const TILE_URL_DARK = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 const TILE_SUBDOMAINS = 'abcd';
 const TILE_ATTR = '&copy; OpenStreetMap &copy; CARTO';
 const TILE_MAX_ZOOM = 20;
@@ -49,7 +52,7 @@ function pinIcon(selected: boolean): L.Icon {
   return L.icon({
     iconUrl: logoPinUrl(selected),
     iconSize: [w, h],
-    iconAnchor: [w / 2, h], // tip of the pointer
+    iconAnchor: [w / 2, h - LOGO_PIN_TIP_INSET], // tip of the pointer
     className: 'leaflet-logo-pin',
   });
 }
@@ -114,11 +117,12 @@ export function LeafletMap({
   style?: React.CSSProperties;
   ariaLabel?: string;
 }) {
+  const prefersDark = usePrefersDark();
   // Leaflet stacks its panes and controls at z-index 400–1000, which would
   // otherwise float above the app's fixed bars, sheets and bottom nav while
   // scrolling. An isolated stacking context keeps all of that inside the map box.
   return (
-    <div style={{ position: 'relative', zIndex: 0, isolation: 'isolate', width: '100%', height: '100%', background: '#F2EFE9', ...(style ?? {}) }}>
+    <div className={prefersDark ? 'map-dark' : undefined} style={{ position: 'relative', zIndex: 0, isolation: 'isolate', width: '100%', height: '100%', background: prefersDark ? '#262626' : '#F2EFE9', ...(style ?? {}) }}>
     <MapContainer
       center={[center.lat, center.lng]}
       zoom={zoom}
@@ -133,7 +137,7 @@ export function LeafletMap({
       keyboard={interactive}
       aria-label={ariaLabel}
     >
-      <TileLayer url={TILE_URL} subdomains={TILE_SUBDOMAINS} attribution={TILE_ATTR} maxZoom={TILE_MAX_ZOOM} />
+      <TileLayer key={prefersDark ? 'dark' : 'light'} url={prefersDark ? TILE_URL_DARK : TILE_URL} subdomains={TILE_SUBDOMAINS} attribution={TILE_ATTR} maxZoom={TILE_MAX_ZOOM} />
       <InvalidateSize />
       {recenter && <Recenter lat={center.lat} lng={center.lng} zoom={zoom} />}
       {markers.map((m) => (
@@ -148,7 +152,7 @@ export function LeafletMap({
       ))}
     </MapContainer>
     {/* Data credit (required by the tile provider). Apple's engine draws its own. */}
-    <span aria-hidden className="absolute left-2 bottom-1.5 z-[1] text-[9px] text-[#111827]/50 pointer-events-none select-none">
+    <span aria-hidden className={`absolute left-2 bottom-1.5 z-[1] text-[9px] pointer-events-none select-none ${prefersDark ? 'text-white/55' : 'text-[#111827]/50'}`}>
       © OpenStreetMap © CARTO
     </span>
     </div>
