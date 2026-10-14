@@ -8,6 +8,7 @@ import {
   MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, UserPlus,
   Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText, MessagesSquare, Repeat2, DollarSign, Star, CalendarPlus,
   BookmarkPlus,
+  CalendarX2,
 } from 'lucide-react';
 import { useFeedStore, toggleSaved } from '@/store/feedStore';
 import { useApplications } from '@/hooks/useApplications';
@@ -22,7 +23,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useMyLocation } from '@/hooks/useMyLocation';
 import { computeMatchScore } from '@/lib/matchScore';
 import { haversineMiles, formatTime, friendlyDate, shiftHeadline } from '@/lib/supabase';
-import { apiClient } from '@/lib/api';
+import { apiClient, isApiStatus } from '@/lib/api';
 import { resetDraft, setDraft, setEditShiftId, type TemplatePayload } from '@/store/postShiftStore';
 import { utcToZonedParts, DEFAULT_SHIFT_TZ } from '@/lib/timezone';
 import { useSeriesShifts, useCancelSeriesFuture } from '@/hooks/useShiftSeries';
@@ -45,6 +46,8 @@ import { SwapSheet, type SwapCandidate } from '@/components/SwapSheet';
 import { useOfferSwap, useRespondSwap, useCancelSwap, isSwapActive } from '@/hooks/useSwaps';
 import { AddToCalendarSheet } from '@/components/AddToCalendarSheet';
 import { useArrivalStatus, isDayOfWindow } from '@/hooks/useArrivalStatus';
+import { StateView, LoadError } from '@/components/StateView';
+import { formatPhone } from '@/lib/phone';
 
 /** Deep links to open a destination in each navigation app. */
 function directionsLinks(lat: number, lng: number, label: string) {
@@ -169,7 +172,7 @@ export function ShiftDetailScreen() {
   const { coords: myCoords, isDefault: myLocationIsDefault } = useMyLocation();
   // Distance (and therefore the AI Match Score's distance component) is
   // computed against the real viewer location, not a hardcoded fallback.
-  const { data: shift, isLoading, error } = useShiftById(id, myCoords);
+  const { data: shift, isLoading, error, refetch: refetchShift } = useShiftById(id, myCoords);
   const [dressCodeDraft, setDressCodeDraft] = useState<string | null>(null);
   const [savingDressCode, setSavingDressCode] = useState(false);
   // The worker's own timesheet for this shift (null until they clock in).
@@ -256,30 +259,25 @@ export function ShiftDetailScreen() {
 
   if (isLoading) return <ShiftDetailSkeleton />;
 
-  if (error) {
+  // A deleted or removed shift (404) is "no longer available", not a
+  // connection problem; anything else gets a real retry.
+  if (error && !isApiStatus(error, 404)) {
     return (
-      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-6 gap-4 text-center">
-        <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center mb-2">
-          <span className="text-[#6B7280] text-[24px]">⚠</span>
-        </div>
-        <p className="text-[#6B7280] text-[15px] font-medium">Couldn't load this shift</p>
-        <p className="text-[#6B7280] text-[12px]">Check your connection and try again.</p>
-        <button type="button" onClick={() => window.location.reload()}
-          className="mt-2 text-[#0A1628] font-semibold text-[14px]">Retry</button>
+      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center">
+        <LoadError what="this shift" onRetry={() => void refetchShift()} />
         <button type="button"
           onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/jobs'); }}
-          className="text-[#6B7280] text-[13px]">← Go back</button>
+          className="h-11 px-4 text-[#6B7280] text-[14px] font-semibold">Go back</button>
       </div>
     );
   }
 
   if (!shift) {
     return (
-      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-6 gap-4 text-center">
-        <p className="text-[#6B7280] text-[15px]">This shift is no longer available.</p>
-        <button type="button"
-          onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/jobs'); }}
-          className="text-[#0A1628] font-semibold text-[14px]">← Browse shifts</button>
+      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center">
+        <StateView icon={CalendarX2} title="This shift is no longer available"
+          body="The poster may have cancelled or removed it."
+          actionLabel="Browse other shifts" onAction={() => navigate('/jobs')} />
       </div>
     );
   }
@@ -938,7 +936,7 @@ export function ShiftDetailScreen() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-black font-semibold text-[14px]">{shift.pointOfContact}</p>
-                <p className="text-[#6B7280] text-[12px] mt-0.5">{shift.contactPhone}</p>
+                <p className="text-[#6B7280] text-[12px] mt-0.5">{formatPhone(shift.contactPhone) || shift.contactPhone}</p>
               </div>
               {shift.contactPhone && (
                 <a href={`tel:${shift.contactPhone}`} aria-label={`Call ${shift.pointOfContact}`}

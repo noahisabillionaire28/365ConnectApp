@@ -32,10 +32,13 @@ import { WeekEarningsCard } from '@/components/home/WeekEarningsCard';
 const AddToCalendarSheet = lazy(() => import('@/components/AddToCalendarSheet').then((m) => ({ default: m.AddToCalendarSheet })));
 import type { CalendarEvent } from '@/lib/calendar';
 import { isDayOfWindow } from '@/hooks/useArrivalStatus';
+import { LoadError } from '@/components/StateView';
+import { ConfirmSheet } from '@/components/ConfirmSheet';
 
 /* ─── Shared header ──────────────────────────────────────────────────────────── */
 function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => void }) {
   const [, navigate] = useLocation();
+  const { role } = useProfile();
   const { unreadCount } = useNotifications();
   return (
     <div className="flex items-center justify-between px-4 pt-4 pb-2">
@@ -50,7 +53,7 @@ function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => voi
             <PlusCircle size={16} aria-hidden className="text-black" />
           </button>
         )}
-        <button type="button" aria-label="Search" onClick={() => navigate('/explore')}
+        <button type="button" aria-label={role === 'worker' ? 'Search shifts' : 'Search'} onClick={() => navigate(role === 'worker' ? '/jobs' : '/explore')}
           className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
           <Search size={16} aria-hidden className="text-[#6B7280]" />
         </button>
@@ -174,6 +177,7 @@ function MyShiftRow({ app, onTap, onCalendar }: {
   // page (starts within 12 h or in progress, not ended), so a late-night
   // shift shows them on Home too, whatever the device's calendar day says.
   const dayOf = !cancelled && app.status === 'accepted' && isDayOfWindow(app.startTime, app.endTime, now);
+  const [, navigate] = useLocation();
 
   return (
     <div className="border-b border-[#E5E7EB] last:border-none">
@@ -206,14 +210,18 @@ function MyShiftRow({ app, onTap, onCalendar }: {
         <span className="flex-shrink-0 bg-red-50 border border-red-200 text-red-500 text-[11px] font-bold px-2.5 py-1 rounded-full">
           Cancelled
         </span>
-      ) : clockInNow ? (
-        <span className="flex-shrink-0 bg-[#FFD700] text-black text-[11px] font-bold px-2.5 py-1 rounded-full">
-          Clock in
-        </span>
-      ) : (
+      ) : clockInNow ? null : (
         <ChevronRight size={15} aria-hidden className="text-[#D1D5DB] flex-shrink-0" />
       )}
     </button>
+    {clockInNow && (
+      // A real button that opens the clock-in screen, not a label on the row.
+      <button type="button" onClick={() => navigate(`/clock/${app.shiftId}`)}
+        aria-label={`Clock in to ${app.shiftTitle ?? 'this shift'}`}
+        className="flex-shrink-0 mr-3 h-9 px-3.5 rounded-full bg-[#0A1628] text-white text-[13px] font-semibold active:scale-[0.97] transition-transform">
+        Clock in
+      </button>
+    )}
     {onCalendar && (
       <button type="button" onClick={onCalendar} aria-label={`Add ${app.shiftTitle ?? 'this shift'} to your calendar`}
         className="w-11 h-11 mr-2 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#F3F4F6] flex-shrink-0">
@@ -269,7 +277,7 @@ function MyShiftSection({
 
 function WorkerMyShiftsView() {
   const [, navigate] = useLocation();
-  const { applications, isLoading, error } = useMyApplications();
+  const { applications, isLoading, error, refetch } = useMyApplications();
   const { upcoming, applied, standby, completed, expired, swapped, dropped, notSelected, cancelled } = groupApplications(applications);
   const goToShift = (a: MyApplication) => navigate(`/shift/${a.shiftId}`);
   const [calendarEvent, setCalendarEvent] = useState<CalendarEvent | null>(null);
@@ -294,12 +302,10 @@ function WorkerMyShiftsView() {
     );
   }
 
-  if (error) {
+  if (error && applications.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto pt-4 pb-4">
-        <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-8 text-center">
-          <p className="text-[#6B7280] text-[14px]">Couldn't load your shifts right now.</p>
-        </div>
+        <LoadError what="your shifts" onRetry={() => void refetch()} />
       </div>
     );
   }
@@ -330,7 +336,7 @@ function WorkerMyShiftsView() {
 /* ─── Worker: Available shifts (open shifts near you) ────────────────────────── */
 function WorkerAvailableView() {
   const [, navigate] = useLocation();
-  const { shifts, isLoading, error, hasLocation } = useWorkerHomeShifts();
+  const { shifts, isLoading, error, hasLocation, refetch } = useWorkerHomeShifts();
   const { appliedShiftIds } = useApplications();
 
   return (
@@ -341,11 +347,7 @@ function WorkerAvailableView() {
             {[1, 2, 3].map((n) => <ShiftListCardSkeleton key={n} />)}
           </div>
         )}
-        {error && !isLoading && (
-          <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-10 text-center">
-            <p className="text-[#6B7280] text-[14px]">Couldn't load shifts right now.</p>
-          </div>
-        )}
+        {error && !isLoading && <LoadError what="shifts" onRetry={() => void refetch()} />}
         {!isLoading && !error && (
           <div className="flex flex-col gap-4" role="feed" aria-label="Available shifts near you">
             {shifts.map((shift, i) => (
@@ -418,7 +420,7 @@ function SwapOfferCard({ s, busy, onRespond }: {
   );
 }
 
-function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType<typeof useShiftRequests>) {
+function WorkerRequestsView({ requests, isLoading, error, refetch, accept, decline }: ReturnType<typeof useShiftRequests>) {
   const [, navigate] = useLocation();
   const { showToast } = useToast();
   const { user } = useAuth();
@@ -428,6 +430,8 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
   // Spots other workers want to hand to me.
   const { incoming: swapOffers } = useMySwaps();
   const { respond: respondSwap, busyId: swapBusyId } = useRespondSwap();
+  // Declining an offer can't be undone, so it asks first.
+  const [declineId, setDeclineId] = useState<string | null>(null);
 
   function answerSwap(s: MySwap, action: 'accept' | 'decline') {
     void respondSwap(s.id, action, s.shiftId).then((err) => {
@@ -442,6 +446,15 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
         {[1, 2].map((n) => (
           <div key={n} className="h-[120px] rounded-[14px] bg-[#FAFAFA] border border-[#E5E7EB] animate-pulse" />
         ))}
+      </div>
+    );
+  }
+
+  if (error && pending.length === 0 && swapOffers.length === 0) {
+    // A failed load must not read as "no offers": a worker could miss one.
+    return (
+      <div className="flex-1 overflow-y-auto pt-4 pb-4">
+        <LoadError what="your shift offers" onRetry={() => void refetch()} />
       </div>
     );
   }
@@ -475,15 +488,26 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
         <div key={r.id} className="rounded-[14px] border border-[#E5E7EB] p-4 bg-white">
           <button type="button" onClick={() => navigate(`/shift/${r.shift_id}`)} className="w-full text-left">
             <p className="text-[#111827] font-bold text-[15px] truncate">{r.shiftTitle ?? 'Shift'}</p>
-            <p className="text-[#6B7280] text-[12px] mt-[2px]">
+            <p className="text-[#6B7280] text-[13px] mt-[2px]">
               {r.companyName ? `${r.companyName} · ` : ''}
-              {r.startTime ? `${friendlyDate(r.startTime)} · ${formatTime(r.startTime)}` : ''}
-              {r.payRate != null ? ` · $${r.payRate}/${r.payPeriod ?? 'hr'}` : ''}
+              {r.startTime ? `${friendlyDate(r.startTime)} · ${formatTime(r.startTime)}${r.endTime ? `–${formatTime(r.endTime)}` : ''}` : ''}
             </p>
+            {(r.location || r.payRate != null) && (
+              <p className="text-[#6B7280] text-[13px] mt-[2px] truncate">
+                {r.payRate != null ? `$${r.payRate}/${r.payPeriod ?? 'hr'}` : ''}
+                {r.payRate != null && r.location ? ' · ' : ''}
+                {r.location ?? ''}
+              </p>
+            )}
+            {r.message?.trim() && (
+              <p className="mt-2.5 rounded-[10px] bg-[#F7F8FA] border border-[#E5E7EB] px-3 py-2 text-[#374151] text-[13px] leading-relaxed">
+                “{r.message.trim()}”
+              </p>
+            )}
           </button>
           <div className="flex gap-2 mt-3.5">
             <button type="button"
-              onClick={() => void decline(r.id).then((res) => showToast(res.ok ? 'Declined.' : (res.message ?? 'Could not decline.'), res.ok ? 'success' : 'error'))}
+              onClick={() => setDeclineId(r.id)}
               className="flex-1 h-10 rounded-[8px] border border-[#E5E7EB] bg-white text-[#111827] font-semibold text-[13px] flex items-center justify-center gap-1.5">
               <X size={15} aria-hidden />
               Decline
@@ -495,13 +519,25 @@ function WorkerRequestsView({ requests, isLoading, accept, decline }: ReturnType
                   ? "Shift is full — you're on standby. We'll notify you if a spot opens."
                   : "You're booked! Clock in when you arrive.");
               })}
-              className="flex-1 h-10 rounded-[8px] bg-[#10B981] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5">
+              className="flex-1 h-10 rounded-[8px] bg-[#0A1628] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5">
               <Check size={15} aria-hidden />
               Accept
             </button>
           </div>
         </div>
       ))}
+      <ConfirmSheet
+        open={!!declineId}
+        title="Decline this offer?"
+        body="The client will be told you can't make it. You can still apply to their other shifts."
+        confirmLabel="Decline offer"
+        tone="danger"
+        onConfirm={() => {
+          const id = declineId; setDeclineId(null);
+          if (id) void decline(id).then((res) => showToast(res.ok ? 'Offer declined.' : (res.message ?? 'Could not decline.'), res.ok ? 'success' : 'error'));
+        }}
+        onCancel={() => setDeclineId(null)}
+      />
     </div>
   );
 }

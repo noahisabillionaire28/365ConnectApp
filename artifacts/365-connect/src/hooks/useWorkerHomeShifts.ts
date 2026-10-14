@@ -35,6 +35,7 @@ export function useWorkerHomeShifts() {
     shifts: filtered,
     isLoading: query.isLoading || profile.isLoading || locLoading,
     error: query.error,
+    refetch: query.refetch,
     /** True when the radius filter applies (a real location is known). */
     hasLocation: !isDefault,
   };

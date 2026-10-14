@@ -33,9 +33,27 @@ const FILTER_PILLS: { key: FilterKey; label: string }[] = [
   { key: 'tonight', label: 'Date: Tonight'     },
 ];
 
+/** What a shift pays per hour: day and event rates are spread over the shift's length. */
+export function hourlyEquivalent(s: Pick<MockShift, 'payRate' | 'payPeriod' | 'startTimeISO' | 'endTimeISO'>): number {
+  if (s.payPeriod === 'hr') return s.payRate;
+  const hours = (Date.parse(s.endTimeISO) - Date.parse(s.startTimeISO)) / 3_600_000;
+  return Number.isFinite(hours) && hours > 0 ? s.payRate / hours : 0;
+}
+
+/** Lower-case and strip accents so "Gala", "gála" and "GALA" all match. */
+const fold = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/** Every word of the query must appear somewhere in the shift (title, role, event, client, place, details). */
+function matchesQuery(s: MockShift, query: string): boolean {
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = fold([shiftHeadline(s), s.jobType, ...(s.jobTypes ?? []), s.eventType ?? '', s.companyName, s.location, s.description ?? ''].join(' '));
+  return words.every((w) => hay.includes(w));
+}
+
 function applyFilter(shifts: MockShift[], f: FilterKey): MockShift[] {
   switch (f) {
-    case 'pay30':   return shifts.filter((s) => s.payRate >= 30);
+    case 'pay30':   return shifts.filter((s) => hourlyEquivalent(s) >= 30);
     case 'near3':   return shifts.filter((s) => s.distanceMiles < 3);
     case 'tonight': return shifts.filter((s) => s.date === 'Tonight');
     default:        return shifts;
@@ -367,11 +385,7 @@ export function JobsScreen() {
   const retryLoad = () => { void (isWorkerRole ? openShifts.refetch() : postedShifts.refetch()); };
   const { appliedShiftIds } = useApplications();
 
-  const textFiltered = shifts.filter((s) =>
-    !query || [s.jobType, s.companyName, s.location].some((f) =>
-      f.toLowerCase().includes(query.toLowerCase()),
-    ),
-  );
+  const textFiltered = shifts.filter((s) => matchesQuery(s, query));
   const jobTypeFiltered = jobTypeFilter
     ? textFiltered.filter((s) => s.jobTypes.includes(jobTypeFilter))
     : textFiltered;
@@ -508,7 +522,10 @@ export function JobsScreen() {
                   title={isWorkerRole ? 'No open shifts right now' : "You haven't posted any shifts yet"}
                   body={isWorkerRole ? 'New shifts appear here as soon as they are posted. Turn on alerts to hear first.' : 'Post a shift and it shows up here with its applicants.'} />
               ) : (
-                <StateView title="No shifts match your filters" body="Try another role or event type, or clear the search." />
+                <StateView title={query.trim() ? `No shifts match “${query.trim()}”` : 'No shifts match your filters'}
+                  body="Try another role or event type, or clear the search."
+                  actionLabel="Clear search and filters"
+                  onAction={() => { setQuery(''); setActiveFilter('all'); setJobTypeFilter(null); setEventTypeFilter(null); }} />
               )
             )}
 

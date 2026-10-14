@@ -6,6 +6,7 @@ import { useLocation } from 'wouter';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useNotifications, relativeTime, notificationDeepLink } from '@/hooks/useNotifications';
 import type { NotificationRow as NotificationRowType } from '@/lib/supabase';
+import { LoadError } from '@/components/StateView';
 
 type IconColor = 'blue' | 'green' | 'red' | 'gold' | 'navy';
 
@@ -148,7 +149,7 @@ function isThisWeek(iso: string): boolean {
 
 export function NotificationsScreen() {
   const [, navigate] = useLocation();
-  const { items, usernames, isLoading, unreadCount, markRead, markAllRead } = useNotifications();
+  const { items, usernames, isLoading, isError, refetch, unreadCount, markRead, markAllRead } = useNotifications();
 
   const today = items.filter((n) => !isThisWeek(n.created_at));
   const week  = items.filter((n) => isThisWeek(n.created_at));
@@ -185,6 +186,8 @@ export function NotificationsScreen() {
       <div className="flex-1 overflow-y-auto pb-[64px]" role="list" aria-label="Notifications">
         {isLoading ? (
           <NotificationsSkeleton />
+        ) : isError ? (
+          <LoadError what="your notifications" onRetry={() => void refetch()} />
         ) : items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 py-20 text-center">
             <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">

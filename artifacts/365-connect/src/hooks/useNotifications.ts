@@ -154,6 +154,7 @@ export function useNotifications() {
   return {
     items,
     isLoading: !!user?.id && q.isLoading,
+    isError: q.isError && !q.data,
     unreadCount,
     markRead,
     markAllRead,
