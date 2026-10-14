@@ -2,7 +2,7 @@
 
 Every map in the app (shift location, Jobs map, post-shift preview) goes through
 one component, `AppMap`. It renders the real Apple Maps (MapKit JS) when the API
-server has an Apple Maps key, and an Apple-styled dark fallback map otherwise.
+server has an Apple Maps key, and an Apple-styled fallback map otherwise.
 The layout around the map (address bar with ✕, logo pin, "Hide Map", distance
 and drive-time footer) is the same either way.
 
@@ -13,8 +13,13 @@ and drive-time footer) is the same either way.
 - `GET /api/maps/token` hands a token to signed-in users, or `404 {configured:false}`.
 - `artifacts/365-connect/src/lib/mapkit.ts` asks that endpoint once per tab, loads
   MapKit JS from Apple's CDN when configured, and refreshes tokens automatically.
-- `components/AppleMap.tsx` draws the Apple map in light mode with the app's own
-  pins; `components/LeafletMap.tsx` is the fallback with the same pins.
+- `components/AppleMap.tsx` draws the Apple map with the app's own pins and
+  follows the device's light/dark setting live (`hooks/usePrefersDark.ts`), like
+  Apple Maps inside other apps: a dark map at night under the app's light page.
+  `components/LeafletMap.tsx` is the fallback with the same pins, switching
+  between CARTO's light (Voyager) and dark basemaps the same way.
+- The venue pin (`lib/mapStyles.ts` `logoPinUrl`) is a white Apple-style balloon
+  with a navy "365" mark, readable on both schemes.
 - `/api/healthz` reports `"maps": "apple"` or `"maps": "fallback"`.
 
 ## One-time steps only the account owner can do
@@ -47,7 +52,7 @@ within an hour or on the next new tab.
 
 - Apple gives MapKit JS a free daily allowance (250,000 map views and 25,000
   service calls per day at the time of writing), far above the app's traffic.
-- The fallback map uses CARTO's free light (Voyager) basemap on OpenStreetMap data; its
+- The fallback map uses CARTO's free Voyager (light) and Dark Matter (dark) basemaps on OpenStreetMap data; its
   credit line is drawn in the map corner as their terms require. Apple's engine
   draws its own legal link.
 - Tokens never expose the private key; the browser only ever sees a 30-minute

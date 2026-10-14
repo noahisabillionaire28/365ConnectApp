@@ -38,22 +38,26 @@ export function blackPinUrl(selected: boolean): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+/** Pixels between the pin image's bottom edge and its tip (room for the shadow). */
+export const LOGO_PIN_TIP_INSET = 3;
+
 /** Pixel size of the logo pin (width, height) for a given selection state. */
 export function logoPinSize(selected: boolean): [number, number] {
   return selected ? [52, 66] : [42, 54];
 }
 
 /**
- * Branded venue pin, Apple Maps style: a navy teardrop (balloon) with the
- * 365 logo mark drawn in white, so it reads on the light map. Rendered as an SVG data-URI so the same
- * pin works in every map engine.
+ * Branded venue pin, Apple Maps style: a white teardrop (balloon) with the
+ * "365" mark in navy, so it stands out on both the light and dark map. An
+ * SVG data-URI can't use the page's web font, so the mark uses the system
+ * UI font (SF Pro on Apple devices). Same pin in every map engine.
  */
 export function logoPinUrl(selected: boolean): string {
   const [w, h] = logoPinSize(selected);
   const cx  = w / 2;
-  const r   = w / 2 - 2;     // balloon radius
-  const cy  = r + 2;         // balloon centre
-  const tip = h - 1;         // pointer tip (sits on the coordinate)
+  const r   = w / 2 - 4;     // balloon radius (room left for the shadow)
+  const cy  = r + 3;         // balloon centre
+  const tip = h - LOGO_PIN_TIP_INSET; // pointer tip (sits on the coordinate)
   const k   = 0.5523 * r;    // bezier constant for the round top
   // Round head that narrows into a pointer — the classic Apple balloon shape.
   const balloon =
@@ -62,12 +66,16 @@ export function logoPinUrl(selected: boolean): string {
     `C${cx - r} ${cy - k} ${cx - k} ${cy - r} ${cx} ${cy - r} ` +
     `C${cx + k} ${cy - r} ${cx + r} ${cy - k} ${cx + r} ${cy} ` +
     `C${cx + r} ${cy + r * 0.2} ${cx + r * 0.55} ${cy + r * 0.55} ${cx} ${tip} Z`;
-  const fs = Math.round(r * 1.25);
-  const svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg"
-    style="filter:drop-shadow(0 3px 6px rgba(0,0,0,0.35))">
-    <path d="${balloon}" fill="#0A1628" stroke="#FFFFFF" stroke-width="2"/>
-    <text x="${cx}" y="${cy + fs * 0.36}" font-family="Georgia,'Times New Roman',serif" font-size="${fs}"
-      font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
+  const fs = Math.round(r * 0.72);
+  // The shadow is an SVG filter inside the image: a CSS drop-shadow on the
+  // root drew a faint square around the pin in some engines.
+  const svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+    <defs><filter id="pinShadow" x="-20%" y="-15%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.6" flood-color="#000000" flood-opacity="0.35"/>
+    </filter></defs>
+    <path d="${balloon}" fill="#FFFFFF" stroke="rgba(10,22,40,0.12)" stroke-width="1" filter="url(#pinShadow)"/>
+    <text x="${cx}" y="${cy + fs * 0.36}" font-family="-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Arial,sans-serif"
+      font-size="${fs}" font-weight="800" letter-spacing="-0.5" fill="#0A1628" text-anchor="middle">365</text>
   </svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
