@@ -1,39 +1,25 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState } from 'react';
 import { useLocation, useSearch, Redirect } from 'wouter';
 import {
   Bell, Search, PlusCircle, SlidersHorizontal,
   Briefcase, CalendarDays, Clock3, MapPin,
-  Users, ChevronRight, CalendarPlus, Repeat2,
+  Users, ChevronRight, Repeat2,
 } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { InstallBanner } from '@/components/InstallBanner';
-import { ShiftListCard, ShiftListCardSkeleton } from '@/components/home/ShiftListCard';
+import { ShiftListCardSkeleton } from '@/components/home/ShiftListCard';
 import { PeopleCard, PeopleCardSkeleton } from '@/components/home/PeopleCard';
-import { useWorkerHomeShifts } from '@/hooks/useWorkerHomeShifts';
 import { usePeopleFeed } from '@/hooks/usePeopleFeed';
-import { useApplications } from '@/hooks/useApplications';
-import { useMyApplications, type MyApplication } from '@/hooks/useMyApplications';
 import { useClientShiftsDashboard, type ClientShift } from '@/hooks/useClientShiftsDashboard';
-import { useShiftRequests, isLiveOffer } from '@/hooks/useShiftRequests';
-import { useMySwaps, useRespondSwap, type MySwap } from '@/hooks/useSwaps';
 import { useProfile } from '@/hooks/useProfile';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useRole } from '@/contexts/RoleContext';
-import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { friendlyDate, formatTime } from '@/lib/supabase';
-import { Check, X, Inbox } from 'lucide-react';
 import { JOB_TYPES } from '@/lib/jobTypes';
 import { resetDraft } from '@/store/postShiftStore';
-import { ArrivalPills } from '@/components/ArrivalPills';
 import { RatePromptCard } from '@/components/home/RatePromptCard';
-import { WeekEarningsCard } from '@/components/home/WeekEarningsCard';
-// The calendar sheet (and its animation library) only loads when first opened.
-const AddToCalendarSheet = lazy(() => import('@/components/AddToCalendarSheet').then((m) => ({ default: m.AddToCalendarSheet })));
-import type { CalendarEvent } from '@/lib/calendar';
-import { isDayOfWindow } from '@/hooks/useArrivalStatus';
 import { LoadError } from '@/components/StateView';
-import { ConfirmSheet } from '@/components/ConfirmSheet';
+import { WorkerHomeScreen } from '@/pages/WorkerHomeScreen';
 
 /* ─── Shared header ──────────────────────────────────────────────────────────── */
 function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => void }) {
@@ -97,510 +83,6 @@ function SegmentControl({
           {tab.label}
         </button>
       ))}
-    </div>
-  );
-}
-
-/* ─── Worker: My Shifts view ─────────────────────────────────────────────────── */
-function groupApplications(apps: MyApplication[]) {
-  const now = Date.now();
-  // A booked shift stays "upcoming" until it ENDS (so it doesn't jump to
-  // Completed the moment it starts, while you're still working it).
-  const isOver = (a: MyApplication) => {
-    const ref = a.endTime ?? a.startTime;
-    return !!ref && Date.parse(ref) <= now;
-  };
-  // Soonest first for anything ahead; most recent first for what's done.
-  const soonest = (a: MyApplication, b: MyApplication) => Date.parse(a.startTime ?? '') - Date.parse(b.startTime ?? '');
-  const latest  = (a: MyApplication, b: MyApplication) => -soonest(a, b);
-  // A cancelled shift is never "upcoming", whatever the application says: it
-  // gets its own section so the worker sees what happened and nothing more.
-  const isCancelled = (a: MyApplication) => a.shiftStatus === 'cancelled';
-  const live = apps.filter((a) => !isCancelled(a));
-  return {
-    upcoming:  live.filter((a) => a.status === 'accepted' && !isOver(a)).sort(soonest),
-    applied:   live.filter((a) => a.status === 'pending' && !isOver(a)).sort(soonest),
-    standby:   live.filter((a) => a.status === 'standby' && !isOver(a)).sort(soonest),
-    completed: live.filter((a) => a.status === 'accepted' && isOver(a)).sort(latest),
-    // Applications that were never answered before the shift ended.
-    expired:   live.filter((a) => (a.status === 'pending' || a.status === 'standby') && isOver(a)),
-    // A spot handed to another worker through an approved swap is not a
-    // drop; it gets its own label so the worker is not told they bailed.
-    swapped:   live.filter((a) => a.status === 'withdrawn' && a.calloutReason === 'swap').sort(latest),
-    dropped:   live.filter((a) => a.status === 'withdrawn' && a.calloutReason !== 'swap'),
-    notSelected: live.filter((a) => a.status === 'declined' || a.status === 'rejected'),
-    // Shifts the organizer cancelled while this worker was booked, applied or waitlisted.
-    cancelled: apps.filter((a) => isCancelled(a) && ['accepted', 'pending', 'standby'].includes(a.status)).sort(latest),
-  };
-}
-
-/** What a booked application looks like on a calendar. */
-function calendarEventFor(app: MyApplication): CalendarEvent | null {
-  if (!app.startTime || !app.endTime) return null;
-  return {
-    shiftId: app.shiftId,
-    title: app.shiftTitle ?? null,
-    jobType: app.jobType || 'Shift',
-    companyName: app.companyName ?? '',
-    startTimeISO: app.startTime,
-    endTimeISO: app.endTime,
-    timezone: app.timezone,
-    location: app.location,
-    payRate: app.payRate,
-    payPeriod: app.payPeriod,
-    pointOfContact: app.pointOfContact,
-    contactPhone: app.contactPhone,
-  };
-}
-
-function MyShiftRow({ app, onTap, onCalendar }: {
-  app: MyApplication; onTap: () => void;
-  /** Upcoming rows only: opens the add-to-calendar sheet. */
-  onCalendar?: () => void;
-}) {
-  // Dates and times are shown in the venue's zone, like everywhere else.
-  const dateStr = app.startTime
-    ? new Date(app.startTime).toLocaleDateString('en-US', {
-        weekday: 'short', month: 'short', day: 'numeric', timeZone: app.timezone || undefined,
-      })
-    : null;
-  const timeStr = app.startTime ? formatTime(app.startTime, app.timezone) : null;
-  const cancelled = app.shiftStatus === 'cancelled';
-  // Clock-in window: opens an hour before the start, closes at the end — and
-  // never for a cancelled shift.
-  const now = Date.now();
-  const startMs = app.startTime ? Date.parse(app.startTime) : NaN;
-  const endMs = app.endTime ? Date.parse(app.endTime) : NaN;
-  const clockInNow = !cancelled && app.status === 'accepted' && Number.isFinite(startMs) &&
-    now >= startMs - 3_600_000 && (!Number.isFinite(endMs) || now <= endMs);
-  // Day-of pills ("On my way" / "Running late"): same window as the shift
-  // page (starts within 12 h or in progress, not ended), so a late-night
-  // shift shows them on Home too, whatever the device's calendar day says.
-  const dayOf = !cancelled && app.status === 'accepted' && isDayOfWindow(app.startTime, app.endTime, now);
-  const [, navigate] = useLocation();
-
-  return (
-    <div className="border-b border-[#E5E7EB] last:border-none">
-    <div className="flex items-center">
-    <button type="button" onClick={onTap}
-      className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3.5 text-left active:scale-[0.98] transition-transform">
-      <div className="w-10 h-10 rounded-[10px] bg-[#F3F4F6] flex items-center justify-center flex-shrink-0">
-        <Briefcase size={16} aria-hidden className="text-[#6B7280]" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[#111827] font-semibold text-[14px] leading-snug line-clamp-2 break-words">{app.shiftTitle}</p>
-        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          {app.companyName && (
-            <span className="text-[#6B7280] text-[12px] truncate">{app.companyName}</span>
-          )}
-          {dateStr && (
-            <span className="text-[#6B7280] text-[12px] flex items-center gap-0.5 flex-shrink-0">
-              <CalendarDays size={10} aria-hidden />
-              {dateStr}{timeStr ? ` · ${timeStr}` : ''}
-            </span>
-          )}
-          {app.payRate != null && (
-            <span className="text-[#6B7280] text-[12px] flex-shrink-0">
-              ${app.payRate}/{app.payPeriod}
-            </span>
-          )}
-        </div>
-      </div>
-      {cancelled ? (
-        <span className="flex-shrink-0 bg-red-50 border border-red-200 text-red-500 text-[11px] font-bold px-2.5 py-1 rounded-full">
-          Cancelled
-        </span>
-      ) : clockInNow ? null : (
-        <ChevronRight size={15} aria-hidden className="text-[#D1D5DB] flex-shrink-0" />
-      )}
-    </button>
-    {clockInNow && (
-      // A real button that opens the clock-in screen, not a label on the row.
-      <button type="button" onClick={() => navigate(`/clock/${app.shiftId}`)}
-        aria-label={`Clock in to ${app.shiftTitle ?? 'this shift'}`}
-        className="flex-shrink-0 mr-3 h-9 px-3.5 rounded-full bg-[#0A1628] text-white text-[13px] font-semibold active:scale-[0.97] transition-transform">
-        Clock in
-      </button>
-    )}
-    {onCalendar && (
-      <button type="button" onClick={onCalendar} aria-label={`Add ${app.shiftTitle ?? 'this shift'} to your calendar`}
-        className="w-11 h-11 mr-2 rounded-full flex items-center justify-center text-[#6B7280] active:bg-[#F3F4F6] flex-shrink-0">
-        <CalendarPlus size={17} aria-hidden />
-      </button>
-    )}
-    </div>
-    {dayOf && (
-      <div className="px-4 pb-3 -mt-1 flex items-center gap-2">
-        <span className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-wider flex-shrink-0">Today</span>
-        <ArrivalPills applicationId={app.applicationId} status={app.arrivalStatus} statusAt={app.arrivalStatusAt} compact />
-      </div>
-    )}
-    </div>
-  );
-}
-
-function MyShiftSection({
-  label, items, onTap, onCalendar, dotColor, emptyText,
-}: {
-  label: string;
-  items: MyApplication[];
-  onTap: (a: MyApplication) => void;
-  onCalendar?: (a: MyApplication) => void;
-  dotColor: string;
-  emptyText?: string;
-}) {
-  if (items.length === 0 && !emptyText) return null;
-  return (
-    <div className="mb-5">
-      <div className="flex items-center gap-2 px-4 mb-2">
-        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }} aria-hidden />
-        <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.16em]">
-          {label}
-          {items.length > 0 && (
-            <span className="ml-1.5 text-[#6B7280] font-semibold normal-case tracking-normal">({items.length})</span>
-          )}
-        </p>
-      </div>
-      <div className="mx-4 bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden">
-        {items.length > 0
-          ? items.map((a) => (
-            <MyShiftRow key={a.applicationId} app={a} onTap={() => onTap(a)}
-              onCalendar={onCalendar && calendarEventFor(a) ? () => onCalendar(a) : undefined} />
-          ))
-          : (
-            <p className="px-4 py-4 text-center text-[#6B7280] text-[13px]">{emptyText}</p>
-          )}
-      </div>
-    </div>
-  );
-}
-
-function WorkerMyShiftsView() {
-  const [, navigate] = useLocation();
-  const { applications, isLoading, error, refetch } = useMyApplications();
-  const { upcoming, applied, standby, completed, expired, swapped, dropped, notSelected, cancelled } = groupApplications(applications);
-  const goToShift = (a: MyApplication) => navigate(`/shift/${a.shiftId}`);
-  const [calendarEvent, setCalendarEvent] = useState<CalendarEvent | null>(null);
-
-  if (isLoading) {
-    return (
-      <div className="flex-1 overflow-y-auto pt-4 pb-4" aria-busy="true">
-        {[1, 2, 3].map((n) => (
-          <div key={n} className="mx-4 mb-4 bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden">
-            {[1, 2].map((r) => (
-              <div key={r} className="flex items-center gap-3 px-4 py-3.5 border-b border-[#E5E7EB] last:border-none">
-                <div className="w-10 h-10 rounded-[10px] bg-[#F3F4F6] animate-pulse flex-shrink-0" />
-                <div className="flex-1 space-y-1.5">
-                  <div className="w-2/3 h-3.5 rounded bg-[#F3F4F6] animate-pulse" />
-                  <div className="w-1/3 h-3 rounded bg-[#F3F4F6] animate-pulse" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (error && applications.length === 0) {
-    return (
-      <div className="flex-1 overflow-y-auto pt-4 pb-4">
-        <LoadError what="your shifts" onRetry={() => void refetch()} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 overflow-y-auto pt-4 pb-4">
-      <RatePromptCard role="worker" />
-      <WeekEarningsCard />
-      {calendarEvent && (
-        <Suspense fallback={null}>
-          <AddToCalendarSheet open={!!calendarEvent} event={calendarEvent} onClose={() => setCalendarEvent(null)} />
-        </Suspense>
-      )}
-      <MyShiftSection label="Upcoming"     items={upcoming}     onTap={goToShift} dotColor="#10B981" emptyText="No confirmed upcoming shifts."
-        onCalendar={(a) => setCalendarEvent(calendarEventFor(a))} />
-      <MyShiftSection label="Standby"      items={standby}      onTap={goToShift} dotColor="#F59E0B" />
-      <MyShiftSection label="Applied"      items={applied}      onTap={goToShift} dotColor="#F59E0B" emptyText="No pending applications. Browse Jobs to apply." />
-      <MyShiftSection label="Cancelled"    items={cancelled}    onTap={goToShift} dotColor="#EF4444" />
-      <MyShiftSection label="Completed"    items={completed}    onTap={goToShift} dotColor="#6B7280" />
-      <MyShiftSection label="Expired"      items={expired}      onTap={goToShift} dotColor="#D1D5DB" />
-      <MyShiftSection label="Swapped"      items={swapped}      onTap={goToShift} dotColor="#D1D5DB" />
-      <MyShiftSection label="Dropped"      items={dropped}      onTap={goToShift} dotColor="#D1D5DB" />
-      <MyShiftSection label="Not Selected" items={notSelected}  onTap={goToShift} dotColor="#D1D5DB" />
-    </div>
-  );
-}
-
-/* ─── Worker: Available shifts (open shifts near you) ────────────────────────── */
-function WorkerAvailableView() {
-  const [, navigate] = useLocation();
-  const { shifts, isLoading, error, hasLocation, refetch } = useWorkerHomeShifts();
-  const { appliedShiftIds } = useApplications();
-
-  return (
-    <main className="flex-1 overflow-y-auto" aria-label="Available shifts">
-      <div className="pt-4 pb-4">
-        {isLoading && (
-          <div className="flex flex-col gap-4" aria-busy="true">
-            {[1, 2, 3].map((n) => <ShiftListCardSkeleton key={n} />)}
-          </div>
-        )}
-        {error && !isLoading && <LoadError what="shifts" onRetry={() => void refetch()} />}
-        {!isLoading && !error && (
-          <div className="flex flex-col gap-4" role="feed" aria-label="Available shifts near you">
-            {shifts.map((shift, i) => (
-              <div key={shift.id} className="anim-rise-in" style={{ animationDelay: `${Math.min(i * 50, 300)}ms` }}>
-                <ShiftListCard shift={shift} applied={appliedShiftIds.has(shift.id)}
-                  onTap={() => navigate(`/shift/${shift.id}`)} />
-              </div>
-            ))}
-            {shifts.length === 0 && (
-              <div className="mx-4 rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] px-6 py-10 text-center">
-                <p className="text-[#6B7280] text-[14px]">
-                  {hasLocation ? 'No shifts match your job types within 25 miles right now.' : 'No shifts match your job types right now.'}
-                </p>
-                <div className="flex gap-2 justify-center mt-4">
-                  <button type="button" onClick={() => navigate('/jobs')}
-                    className="h-[38px] px-4 rounded-[10px] bg-[#0A1628] text-white text-[13px] font-semibold">
-                    Browse all jobs
-                  </button>
-                  <button type="button" onClick={() => navigate('/profile/edit#work')}
-                    className="h-[38px] px-4 rounded-[10px] border border-[#E5E7EB] text-[#111827] text-[13px] font-semibold">
-                    Update job types
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </main>
-  );
-}
-
-/* ─── Worker: Requests (direct shift offers to accept/decline) ───────────────── */
-/** Receives the single shared useShiftRequests() instance from WorkerHomeFeed so
- *  the tab badge and this list never disagree. */
-function SwapOfferCard({ s, busy, onRespond }: {
-  s: MySwap; busy: boolean; onRespond: (action: 'accept' | 'decline') => void;
-}) {
-  const [, navigate] = useLocation();
-  const from = s.counterpart.username ? `@${s.counterpart.username}` : 'A worker';
-  const sh = s.shift;
-  return (
-    <div className="rounded-[14px] border border-[#0A1628] p-4 bg-white">
-      <button type="button" onClick={() => navigate(`/shift/${s.shiftId}`)} className="w-full text-left">
-        <p className="text-[#111827] font-bold text-[15px] min-w-0 flex items-center gap-1.5">
-          <Repeat2 size={14} aria-hidden className="text-[#0A1628] flex-shrink-0" />
-          <span className="truncate">{from} offered you their spot</span>
-        </p>
-        <p className="text-[#6B7280] text-[12px] mt-[2px] truncate">
-          {[sh?.jobType, sh?.companyName].filter(Boolean).join(' · ')}
-          {sh?.startTime ? ` · ${friendlyDate(sh.startTime, sh.timezone)} · ${formatTime(sh.startTime, sh.timezone)}` : ''}
-          {sh?.payRate != null && sh.payRate > 0 ? ` · $${sh.payRate}/${sh.payPeriod ?? 'hr'}` : ''}
-        </p>
-        {s.note && <p className="text-[#6B7280] text-[12px] mt-1 italic line-clamp-2">“{s.note}”</p>}
-      </button>
-      <div className="flex gap-2 mt-3.5">
-        <button type="button" disabled={busy} onClick={() => onRespond('decline')}
-          className="flex-1 h-10 rounded-[8px] border border-[#E5E7EB] bg-white text-[#111827] font-semibold text-[13px] flex items-center justify-center gap-1.5 disabled:opacity-60">
-          <X size={15} aria-hidden />
-          Decline
-        </button>
-        <button type="button" disabled={busy} onClick={() => onRespond('accept')}
-          className="flex-1 h-10 rounded-[8px] bg-[#10B981] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5 disabled:opacity-60">
-          <Check size={15} aria-hidden />
-          {busy ? 'Working…' : 'Accept'}
-        </button>
-      </div>
-      <p className="text-[#6B7280] text-[11px] mt-2 text-center">The poster approves the swap before you are booked.</p>
-    </div>
-  );
-}
-
-function WorkerRequestsView({ requests, isLoading, error, refetch, accept, decline }: ReturnType<typeof useShiftRequests>) {
-  const [, navigate] = useLocation();
-  const { showToast } = useToast();
-  const { user } = useAuth();
-  // Only genuine offers TO this worker (not invites they sent) that can still
-  // be answered: not cancelled, not started.
-  const pending = requests.filter((r) => r.worker_id === user?.id && isLiveOffer(r));
-  // Spots other workers want to hand to me.
-  const { incoming: swapOffers } = useMySwaps();
-  const { respond: respondSwap, busyId: swapBusyId } = useRespondSwap();
-  // Declining an offer can't be undone, so it asks first.
-  const [declineId, setDeclineId] = useState<string | null>(null);
-
-  function answerSwap(s: MySwap, action: 'accept' | 'decline') {
-    void respondSwap(s.id, action, s.shiftId).then((err) => {
-      if (err) { showToast(err, 'error'); return; }
-      showToast(action === 'accept' ? 'Accepted! The poster needs to approve the swap.' : 'Offer declined.');
-    });
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex-1 overflow-y-auto pt-4 pb-4 px-4 flex flex-col gap-3" aria-busy="true">
-        {[1, 2].map((n) => (
-          <div key={n} className="h-[120px] rounded-[14px] bg-[#FAFAFA] border border-[#E5E7EB] animate-pulse" />
-        ))}
-      </div>
-    );
-  }
-
-  if (error && pending.length === 0 && swapOffers.length === 0) {
-    // A failed load must not read as "no offers": a worker could miss one.
-    return (
-      <div className="flex-1 overflow-y-auto pt-4 pb-4">
-        <LoadError what="your shift offers" onRetry={() => void refetch()} />
-      </div>
-    );
-  }
-
-  if (pending.length === 0 && swapOffers.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-8 pt-20">
-        <div className="w-16 h-16 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
-          <Inbox size={26} aria-hidden className="text-[#9CA3AF]" />
-        </div>
-        <p className="text-[#111827] font-semibold text-[16px]">No shift offers</p>
-        <p className="text-[#6B7280] text-[13px] max-w-[240px]">
-          When a client or agency requests you for a shift, or another worker offers you their spot, it shows up here to accept or decline.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 overflow-y-auto pt-4 pb-4 px-4 flex flex-col gap-3">
-      {swapOffers.length > 0 && (
-        <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.16em] px-1">Swap offers</p>
-      )}
-      {swapOffers.map((s) => (
-        <SwapOfferCard key={s.id} s={s} busy={swapBusyId === s.id} onRespond={(a) => answerSwap(s, a)} />
-      ))}
-      {swapOffers.length > 0 && pending.length > 0 && (
-        <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-[0.16em] px-1 mt-2">Shift offers</p>
-      )}
-      {pending.map((r) => (
-        <div key={r.id} className="rounded-[14px] border border-[#E5E7EB] p-4 bg-white">
-          <button type="button" onClick={() => navigate(`/shift/${r.shift_id}`)} className="w-full text-left">
-            <p className="text-[#111827] font-bold text-[15px] truncate">{r.shiftTitle ?? 'Shift'}</p>
-            <p className="text-[#6B7280] text-[13px] mt-[2px]">
-              {r.companyName ? `${r.companyName} · ` : ''}
-              {r.startTime ? `${friendlyDate(r.startTime)} · ${formatTime(r.startTime)}${r.endTime ? `–${formatTime(r.endTime)}` : ''}` : ''}
-            </p>
-            {(r.location || r.payRate != null) && (
-              <p className="text-[#6B7280] text-[13px] mt-[2px] truncate">
-                {r.payRate != null ? `$${r.payRate}/${r.payPeriod ?? 'hr'}` : ''}
-                {r.payRate != null && r.location ? ' · ' : ''}
-                {r.location ?? ''}
-              </p>
-            )}
-            {r.message?.trim() && (
-              <p className="mt-2.5 rounded-[10px] bg-[#F7F8FA] border border-[#E5E7EB] px-3 py-2 text-[#374151] text-[13px] leading-relaxed">
-                “{r.message.trim()}”
-              </p>
-            )}
-          </button>
-          <div className="flex gap-2 mt-3.5">
-            <button type="button"
-              onClick={() => setDeclineId(r.id)}
-              className="flex-1 h-10 rounded-[8px] border border-[#E5E7EB] bg-white text-[#111827] font-semibold text-[13px] flex items-center justify-center gap-1.5">
-              <X size={15} aria-hidden />
-              Decline
-            </button>
-            <button type="button"
-              onClick={() => void accept(r.id).then((res) => {
-                if (!res.ok) { showToast(res.message ?? 'Could not accept this offer.', 'error'); return; }
-                showToast(res.status === 'standby'
-                  ? "Shift is full — you're on standby. We'll notify you if a spot opens."
-                  : "You're booked! Clock in when you arrive.");
-              })}
-              className="flex-1 h-10 rounded-[8px] bg-[#0A1628] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5">
-              <Check size={15} aria-hidden />
-              Accept
-            </button>
-          </div>
-        </div>
-      ))}
-      <ConfirmSheet
-        open={!!declineId}
-        title="Decline this offer?"
-        body="The client will be told you can't make it. You can still apply to their other shifts."
-        confirmLabel="Decline offer"
-        tone="danger"
-        onConfirm={() => {
-          const id = declineId; setDeclineId(null);
-          if (id) void decline(id).then((res) => showToast(res.ok ? 'Offer declined.' : (res.message ?? 'Could not decline.'), res.ok ? 'success' : 'error'));
-        }}
-        onCancel={() => setDeclineId(null)}
-      />
-    </div>
-  );
-}
-
-/* ─── Nudge: a worker with no roles never matches a shift ─────────────────── */
-function WorkerRolesNudge() {
-  const [, navigate] = useLocation();
-  const profile = useProfile();
-  if (profile.isLoading || profile.primaryJobType) return null;
-  return (
-    <div className="mx-4 mb-3 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-3">
-      <div className="flex-1 min-w-0">
-        <p className="text-amber-800 font-bold text-[14px]">Add your roles to get matched</p>
-        <p className="text-amber-700 text-[12px] mt-0.5">Shifts, offers and reminders are matched on the roles you can work.</p>
-      </div>
-      <button type="button" onClick={() => navigate('/profile/edit#work')}
-        className="h-9 px-3.5 rounded-[8px] bg-[#0A1628] text-white text-[12px] font-bold flex-shrink-0">
-        Add roles
-      </button>
-    </div>
-  );
-}
-
-/* ─── (A) Worker Home Feed — Nowsta-style Schedule / Requests / Available ─────── */
-function WorkerHomeFeed() {
-  // Deep links (e.g. an offer notification) can open a specific tab.
-  const initialTab = new URLSearchParams(useSearch()).get('tab');
-  const [tab, setTab] = useState<'schedule' | 'requests' | 'available'>(
-    initialTab === 'requests' || initialTab === 'available' ? initialTab : 'schedule',
-  );
-  const { user } = useAuth();
-  const shiftRequests = useShiftRequests();
-  const { requests } = shiftRequests;
-  const { incoming: swapOffers } = useMySwaps();
-  const pendingCount = requests.filter((r) => r.worker_id === user?.id && isLiveOffer(r)).length + swapOffers.length;
-
-  const subtitle =
-    tab === 'schedule' ? 'Your upcoming shifts' :
-    tab === 'requests' ? 'Shift offers for you' :
-    'Shifts near you';
-
-  return (
-    <div className="min-h-[100dvh] bg-white flex flex-col pb-[64px]">
-      <div className="bg-white sticky top-0 z-40 border-b border-[#E5E7EB]">
-        <FeedHeader subtitle={subtitle} />
-        <SegmentControl
-          tabs={[
-            { value: 'schedule',  label: 'Schedule' },
-            { value: 'requests',  label: pendingCount > 0 ? `Requests (${pendingCount})` : 'Requests' },
-            { value: 'available', label: 'Available' },
-          ]}
-          value={tab}
-          onChange={(v) => setTab(v as 'schedule' | 'requests' | 'available')}
-        />
-      </div>
-      <div className="pt-3"><InstallBanner compact /></div>
-      <WorkerRolesNudge />
-
-      {tab === 'schedule'  && <WorkerMyShiftsView />}
-      {tab === 'requests'  && <WorkerRequestsView {...shiftRequests} />}
-      {tab === 'available' && <WorkerAvailableView />}
-
-      <BottomTabNav />
     </div>
   );
 }
@@ -1015,6 +497,17 @@ function StafferHomeFeed() {
   );
 }
 
+/* ─── (A) Worker Home ─────────────────────────────────────────────────────────
+   Worker lists (offers, applications, open shifts) live on the Job Board now;
+   old /home?tab=… links land on the matching Job Board tab. */
+function WorkerHomeRoute() {
+  const tab = new URLSearchParams(useSearch()).get('tab');
+  if (tab === 'requests') return <Redirect to="/jobs?tab=requests" replace />;
+  if (tab === 'available') return <Redirect to="/jobs?tab=open" replace />;
+  if (tab === 'schedule') return <Redirect to="/jobs?tab=confirmed" replace />;
+  return <WorkerHomeScreen />;
+}
+
 /* ─── HomeScreen — role router ────────────────────────────────────────────────── */
 export function HomeScreen() {
   const { role, roleLoading, roleError, refetchRole } = useRole();
@@ -1052,7 +545,7 @@ export function HomeScreen() {
   }
   if (!role) return <Redirect to="/role-select" />;
 
-  if (role === 'worker') return <WorkerHomeFeed />;
+  if (role === 'worker') return <WorkerHomeRoute />;
   if (role === 'staffer') return <StafferHomeFeed />;
   return <ClientHomeFeed />;
 }

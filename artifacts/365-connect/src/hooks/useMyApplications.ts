@@ -32,6 +32,10 @@ type RawApplication = {
   cover_image?: string | null;
   point_of_contact?: string | null;
   contact_phone?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  /** The poster's profile photo / logo. */
+  client_logo?: string | null;
 };
 
 export type MyApplication = RawApplication & {
@@ -55,6 +59,9 @@ export type MyApplication = RawApplication & {
   location: string | null;
   pointOfContact: string | null;
   contactPhone: string | null;
+  lat: number | null;
+  lng: number | null;
+  clientLogo: string | null;
 };
 
 /** @deprecated use MyApplication */
@@ -81,6 +88,9 @@ function toMyApplication(r: RawApplication): MyApplication {
     location:        r.location ?? null,
     pointOfContact:  r.point_of_contact ?? null,
     contactPhone:    r.contact_phone ?? null,
+    lat:             r.lat ?? null,
+    lng:             r.lng ?? null,
+    clientLogo:      r.client_logo ?? null,
   };
 }
 
@@ -104,5 +114,38 @@ export function useMyApplications() {
     isLoading: q.isLoading,
     error: q.error ? q.error.message : null,
     refetch: q.refetch,
+  };
+}
+
+/** A worker's applications sorted into what the schedule shows. */
+export function groupApplications(apps: MyApplication[]) {
+  const now = Date.now();
+  // A booked shift stays "upcoming" until it ENDS (so it doesn't jump to
+  // Completed the moment it starts, while you're still working it).
+  const isOver = (a: MyApplication) => {
+    const ref = a.endTime ?? a.startTime;
+    return !!ref && Date.parse(ref) <= now;
+  };
+  // Soonest first for anything ahead; most recent first for what's done.
+  const soonest = (a: MyApplication, b: MyApplication) => Date.parse(a.startTime ?? '') - Date.parse(b.startTime ?? '');
+  const latest  = (a: MyApplication, b: MyApplication) => -soonest(a, b);
+  // A cancelled shift is never "upcoming", whatever the application says: it
+  // gets its own section so the worker sees what happened and nothing more.
+  const isCancelled = (a: MyApplication) => a.shiftStatus === 'cancelled';
+  const live = apps.filter((a) => !isCancelled(a));
+  return {
+    upcoming:  live.filter((a) => a.status === 'accepted' && !isOver(a)).sort(soonest),
+    applied:   live.filter((a) => a.status === 'pending' && !isOver(a)).sort(soonest),
+    standby:   live.filter((a) => a.status === 'standby' && !isOver(a)).sort(soonest),
+    completed: live.filter((a) => a.status === 'accepted' && isOver(a)).sort(latest),
+    // Applications that were never answered before the shift ended.
+    expired:   live.filter((a) => (a.status === 'pending' || a.status === 'standby') && isOver(a)),
+    // A spot handed to another worker through an approved swap is not a
+    // drop; it gets its own label so the worker is not told they bailed.
+    swapped:   live.filter((a) => a.status === 'withdrawn' && a.calloutReason === 'swap').sort(latest),
+    dropped:   live.filter((a) => a.status === 'withdrawn' && a.calloutReason !== 'swap'),
+    notSelected: live.filter((a) => a.status === 'declined' || a.status === 'rejected'),
+    // Shifts the organizer cancelled while this worker was booked, applied or waitlisted.
+    cancelled: apps.filter((a) => isCancelled(a) && ['accepted', 'pending', 'standby'].includes(a.status)).sort(latest),
   };
 }

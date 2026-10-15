@@ -15,7 +15,7 @@ const router = Router();
 const BROADCAST_CAP = 200;
 
 /** Where a worker answers an offer: the Requests tab on Home. */
-const REQUESTS_URL = '/home?tab=requests';
+const REQUESTS_URL = '/jobs?tab=requests';
 
 /** GET /api/shift-requests?shift_id= — my shift requests (worker or client) */
 router.get('/', requireAuth, async (req, res) => {
@@ -31,13 +31,14 @@ router.get('/', requireAuth, async (req, res) => {
 
     const rows = requests ?? [];
     const shiftIds = [...new Set(rows.map((r: any) => r.shift_id).filter((id: any) => id != null))];
-    const workerIds = [...new Set(rows.map((r: any) => r.worker_id).filter((id: any) => id != null))];
+    // Workers (for the poster's view) and posters (their logo, for the worker's view).
+    const workerIds = [...new Set(rows.flatMap((r: any) => [r.worker_id, r.client_id]).filter((id: any) => id != null))];
 
     let shiftsById = new Map<string, any>();
     if (shiftIds.length) {
       const { data: shifts, error: shiftsError } = await adminDb
         .from('shifts')
-        .select('id, title, job_type, start_time, end_time, location, pay_rate, pay_period, company_name, status')
+        .select('id, title, job_type, start_time, end_time, timezone, location, pay_rate, pay_period, company_name, status')
         .in('id', shiftIds);
       if (shiftsError) return res.status(500).json({ error: shiftsError.message });
       shiftsById = new Map((shifts ?? []).map((s: any) => [s.id, s]));
@@ -56,6 +57,7 @@ router.get('/', requireAuth, async (req, res) => {
     const merged = rows.map((r: any) => {
       const s = shiftsById.get(r.shift_id);
       const w = workersById.get(r.worker_id);
+      const c = workersById.get(r.client_id);
       return {
         ...r,
         shift_title: s?.title ?? null,
@@ -65,12 +67,15 @@ router.get('/', requireAuth, async (req, res) => {
         job_type: s?.job_type ?? null,
         start_time: s?.start_time ?? null,
         end_time: s?.end_time ?? null,
+        timezone: s?.timezone ?? null,
         location: s?.location ?? null,
         pay_rate: s?.pay_rate ?? null,
         pay_period: s?.pay_period ?? null,
         company_name: s?.company_name ?? null,
         worker_username: w?.username ?? null,
         worker_photo: w?.photo_url ?? null,
+        client_username: c?.username ?? null,
+        client_photo: c?.photo_url ?? null,
       };
     });
     return res.json(merged);

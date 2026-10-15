@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
-import { useLocation } from 'wouter';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useLocation, useSearch } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   Search, MapPin, Plus, X,
-  List as ListIcon, Map as MapIcon, CalendarDays, Clock, Users, CheckCircle2, Zap, BellPlus,
+  List as ListIcon, Map as MapIcon, CalendarDays, Users, Check, Zap, BellPlus, Send, History,
 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
 import { useSavedSearches, savedSearchLabel, sameSearch, type SavedSearch, type SavedSearchInput } from '@/hooks/useSavedSearches';
@@ -20,6 +20,12 @@ import { resetDraft } from '@/store/postShiftStore';
 import { JOB_TYPES } from '@/lib/jobTypes';
 import { EVENT_TYPES } from '@/lib/eventTypes';
 import { StateView, LoadError } from '@/components/StateView';
+import { JobCard, JobCardSkeleton, type JobStatus } from '@/components/jobs/JobCard';
+import { WorkerRequestsView } from '@/components/home/WorkerOffers';
+import { useMyApplications, groupApplications, type MyApplication } from '@/hooks/useMyApplications';
+import { useShiftRequests, isLiveOffer } from '@/hooks/useShiftRequests';
+import { useMySwaps } from '@/hooks/useSwaps';
+import { useAuth } from '@/contexts/AuthContext';
 
 const NAVY = '#0A1628';
 
@@ -101,7 +107,7 @@ function SavedSearchRow({ current, searches, canSaveMore, saving, onSave, onAppl
   );
 }
 
-/* ── List card — clean Nowsta-style vertical row ─────────────────────────── */
+/* ── List card — the same job card as Home and the Job Board, plus pay ──── */
 function ShiftRow({ shift, applied, showDistance, onTap }: {
   shift: MockShift; applied: boolean;
   /** False when the viewer's location is unknown (a distance would be to a default point). */
@@ -109,77 +115,37 @@ function ShiftRow({ shift, applied, showDistance, onTap }: {
   onTap: () => void;
 }) {
   const spotsLow = shift.spotsAvailable < 3;
+  const chip = 'h-7 px-2.5 rounded-full text-[12px] font-semibold flex items-center gap-1 flex-shrink-0 whitespace-nowrap';
   return (
-    <div role="article" tabIndex={0} onClick={onTap}
-      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onTap())}
-      aria-label={`${shiftHeadline(shift)} at ${shift.companyName}, $${shift.payRate}/${shift.payPeriod}${applied ? ' — already applied' : ''}`}
-      className="rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-4 flex flex-col gap-3 cursor-pointer
-        transition-colors active:bg-[#FAFAFA] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A1628]">
-
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide flex-shrink-0"
-            style={{ background: NAVY }}>
-            {shift.jobType}
+    <JobCard startISO={shift.startTimeISO} endISO={shift.endTimeISO} timezone={shift.timezone}
+      title={shiftHeadline(shift)} company={shift.companyName} location={shift.location}
+      aside={<PayPill rate={shift.payRate} period={shift.payPeriod} />}
+      onTap={onTap}>
+      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+        {applied && <span className={`${chip} bg-[#0A1628] text-white`}><Check size={12} strokeWidth={2.75} aria-hidden /> Applied</span>}
+        <span className={`${chip} ${spotsLow ? 'bg-[#FEF2F2] text-[#B91C1C]' : 'bg-[#F3F4F6] text-[#374151]'}`}>
+          <Users size={12} aria-hidden />{shift.spotsAvailable} {shift.spotsAvailable === 1 ? 'spot' : 'spots'} left
+        </span>
+        {showDistance && <span className={`${chip} bg-[#F3F4F6] text-[#374151]`}><MapPin size={12} aria-hidden />{shift.distanceMiles} mi</span>}
+        {shift.instantClaim && (
+          <span className={`${chip} bg-[#ECFDF5] text-[#047857]`}><Zap size={11} aria-hidden className="fill-[#047857]" /> Instant claim</span>
+        )}
+        {shift.rosterOnly && (
+          <span className={`${chip} bg-[#EEF2F8] text-[#1E3A5F] max-w-[180px]`} title="Only workers on this poster's roster can take this shift">
+            <span className="truncate">Roster only{shift.clientUsername ? ` · @${shift.clientUsername}` : ''}</span>
           </span>
-          <span className={`text-[11px] font-semibold flex items-center gap-0.5 flex-shrink-0 ${
-            spotsLow ? 'text-[#EF4444]' : 'text-[#6B7280]'}`}>
-            <Users size={11} aria-hidden />
-            {shift.spotsAvailable} left
-          </span>
-          {shift.instantClaim && (
-            <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-0.5 flex-shrink-0">
-              <Zap size={9} aria-hidden className="fill-emerald-600 text-emerald-600" /> Claim
-            </span>
-          )}
-          {shift.rosterOnly && (
-            <span className="text-[10px] font-bold text-[#0A1628] bg-[#F3F4F6] border border-[#E5E7EB] px-2 py-0.5 rounded-full flex-shrink-0 truncate max-w-[140px]"
-              title="Only workers on this poster's roster can take this shift">
-              Roster only{shift.clientUsername ? ` · @${shift.clientUsername}` : ''}
-            </span>
-          )}
-        </div>
-        {applied && (
-          <div aria-label="Already applied" className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 size={13} aria-hidden className="text-white" strokeWidth={2.5} />
-          </div>
         )}
       </div>
-
-      <div>
-        <p className="text-[#111827] font-bold text-[16px] leading-tight line-clamp-2 break-words">{shiftHeadline(shift)}</p>
-        <p className="text-[#374151] text-[13px] font-medium truncate mt-0.5">{shift.companyName}</p>
-        <div className="flex items-center gap-1 mt-1">
-          <MapPin size={12} aria-hidden className="text-[#6B7280] flex-shrink-0" />
-          <p className="text-[#6B7280] text-[12px] truncate">{shift.location}{showDistance ? ` · ${shift.distanceMiles} mi` : ''}</p>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between pt-1 border-t border-[#F3F4F6]">
-        <div className="flex items-center gap-3">
-          <span className="text-[#6B7280] text-[12px] flex items-center gap-1">
-            <CalendarDays size={12} aria-hidden />{shift.date}
-          </span>
-          <span className="text-[#6B7280] text-[12px] flex items-center gap-1">
-            <Clock size={12} aria-hidden />{shift.startTime}
-          </span>
-        </div>
-        <div className="flex items-baseline">
-          <span className="text-[#111827] font-bold text-[19px]">${shift.payRate}</span>
-          <span className="text-[#6B7280] text-[12px] font-medium">/{shift.payPeriod}</span>
-        </div>
-      </div>
-    </div>
+    </JobCard>
   );
 }
 
-function ShiftRowSkeleton() {
+export function PayPill({ rate, period }: { rate: number | null | undefined; period: string | null | undefined }) {
+  if (rate == null || !(rate > 0)) return null;
   return (
-    <div className="rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-4 flex flex-col gap-3">
-      <div className="w-24 h-5 rounded-full bg-[#F3F4F6] animate-pulse" />
-      <div className="w-40 h-4 rounded bg-[#F3F4F6] animate-pulse" />
-      <div className="w-full h-4 rounded bg-[#F3F4F6] animate-pulse" />
-    </div>
+    <span className="h-7 px-3 rounded-full bg-[#ECFDF5] text-[#047857] text-[13px] font-semibold flex items-center whitespace-nowrap">
+      ${rate}/{period || 'hr'}
+    </span>
   );
 }
 
@@ -354,8 +320,8 @@ function ViewToggle({ view, onChange }: { view: 'list' | 'map'; onChange: (v: 'l
   );
 }
 
-/* ── JobsScreen ──────────────────────────────────────────────────────────── */
-export function JobsScreen() {
+/* ── Marketplace: every open shift (workers) or your posted shifts (posters) ── */
+function MarketplaceView({ header }: { header?: React.ReactNode }) {
   const [, navigate]    = useLocation();
   const [query, setQuery]                 = useState('');
   const [activeFilter, setActiveFilter]   = useState<FilterKey>('all');
@@ -433,7 +399,8 @@ export function JobsScreen() {
 
       {/* ── Header: search + filters + view toggle ───────────────────────── */}
       <div className="flex-shrink-0 bg-white border-b border-[#EAEAEA]">
-        <div className="px-4 pt-4 pb-2 flex items-center gap-2">
+        {header}
+        <div className={`px-4 ${header ? 'pt-1' : 'pt-4'} pb-2 flex items-center gap-2`}>
           <div className="flex-1 min-w-0 flex items-center gap-2 bg-[#F5F5F5] border border-[#E5E7EB] rounded-[12px] px-3.5 h-[44px]">
             <Search size={16} aria-hidden className="text-[#6B7280] flex-shrink-0" />
             <input
@@ -501,9 +468,9 @@ export function JobsScreen() {
 
       {/* ── Body ─────────────────────────────────────────────────────────── */}
       {view === 'list' ? (
-        <main className="flex-1 overflow-y-auto" aria-label="Shift list">
+        <main className="flex-1 overflow-y-auto bg-[#F7F8FA]" aria-label="Shift list">
           <div className="px-4 pt-3 pb-[88px] flex flex-col gap-3">
-            {isLoading && [1, 2, 3, 4].map((n) => <ShiftRowSkeleton key={n} />)}
+            {isLoading && [1, 2, 3, 4].map((n) => <JobCardSkeleton key={n} />)}
 
             {!isLoading && visibleShifts.map((shift, i) => (
               <motion.div key={shift.id}
@@ -573,4 +540,143 @@ export function JobsScreen() {
       <BottomTabNav />
     </div>
   );
+}
+
+/* ── Worker Job Board ─────────────────────────────────────────────────────
+   One place for every job a worker has: booked, offered, applied for, open
+   to apply, and done. Each tab is a ?tab= link so Home and notifications can
+   jump straight to it. */
+type BoardTab = 'confirmed' | 'requests' | 'applied' | 'open' | 'past';
+const BOARD_TABS: { key: BoardTab; label: string }[] = [
+  { key: 'confirmed', label: 'Confirmed' },
+  { key: 'requests',  label: 'Requests' },
+  { key: 'applied',   label: 'Applied' },
+  { key: 'open',      label: 'Open' },
+  { key: 'past',      label: 'Past' },
+];
+const isBoardTab = (t: string | null): t is BoardTab => BOARD_TABS.some((b) => b.key === t);
+
+function BoardHeader({ tab, counts, onTab }: {
+  tab: BoardTab; counts: Partial<Record<BoardTab, number>>; onTab: (t: BoardTab) => void;
+}) {
+  return (
+    <div className="pt-[calc(env(safe-area-inset-top)+14px)]">
+      <h1 className="px-4 text-[#111827] text-[28px] font-bold tracking-tight">Job board</h1>
+      <div role="tablist" aria-label="Job board" className="flex gap-1.5 px-4 pt-3 pb-3 overflow-x-auto scrollbar-none"
+        style={{ WebkitOverflowScrolling: 'touch' }}>
+        {BOARD_TABS.map((t) => {
+          const active = t.key === tab;
+          const n = counts[t.key];
+          return (
+            <button key={t.key} type="button" role="tab" aria-selected={active} data-testid={`board-tab-${t.key}`}
+              onClick={() => onTab(t.key)}
+              className={`flex-shrink-0 h-10 pl-3.5 ${n != null ? 'pr-1.5' : 'pr-3.5'} rounded-full text-[14px] font-semibold flex items-center gap-2 transition-colors ${
+                active ? 'bg-[#0A1628] text-white' : 'bg-[#F3F4F6] text-[#111827] active:bg-[#E5E7EB]'}`}>
+              {t.label}
+              {n != null && (
+                <span className={`min-w-7 h-7 px-2 rounded-full text-[12px] font-semibold flex items-center justify-center ${
+                  active ? 'bg-white/15 text-white' : 'bg-white text-[#374151]'}`}>{n}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const PAST_STATUS = (g: ReturnType<typeof groupApplications>) => [
+  ...g.completed.map((a) => [a, 'completed'] as const),
+  ...g.cancelled.map((a) => [a, 'cancelled'] as const),
+  ...g.expired.map((a) => [a, 'expired'] as const),
+  ...g.swapped.map((a) => [a, 'swapped'] as const),
+  ...g.dropped.map((a) => [a, 'dropped'] as const),
+  ...g.notSelected.map((a) => [a, 'not-selected'] as const),
+].sort(([a], [b]) => Date.parse(b.startTime ?? '') - Date.parse(a.startTime ?? '')) as [MyApplication, JobStatus][];
+
+function AppCard({ app, status, onTap }: { app: MyApplication; status: JobStatus; onTap: () => void }) {
+  return (
+    <JobCard startISO={app.startTime} endISO={app.endTime} timezone={app.timezone}
+      title={app.shiftTitle?.trim() || `${app.jobType ?? 'Event'} shift`} company={app.companyName}
+      location={app.location} logo={app.clientLogo} status={status} onTap={onTap} />
+  );
+}
+
+function WorkerJobBoard() {
+  const [, navigate] = useLocation();
+  const search = useSearch();
+  const { user } = useAuth();
+  const { applications, isLoading, error, refetch } = useMyApplications();
+  const groups = useMemo(() => groupApplications(applications), [applications]);
+  const requests = useShiftRequests();
+  const { incoming: swapOffers } = useMySwaps();
+
+  const offers = requests.requests.filter((r) => r.worker_id === user?.id && isLiveOffer(r)).length + swapOffers.length;
+  const waiting = [...groups.applied.map((a) => [a, 'applied'] as const), ...groups.standby.map((a) => [a, 'standby'] as const)]
+    .sort(([a], [b]) => Date.parse(a.startTime ?? '') - Date.parse(b.startTime ?? '')) as [MyApplication, JobStatus][];
+  const past = PAST_STATUS(groups);
+
+  // No ?tab= → open where the action is: booked jobs, then offers, then the marketplace.
+  const urlTab = new URLSearchParams(search).get('tab');
+  const tab: BoardTab = isBoardTab(urlTab) ? urlTab
+    : isLoading || groups.upcoming.length ? 'confirmed'
+    : offers ? 'requests'
+    : 'open';
+  const setTab = (t: BoardTab) => navigate(`/jobs?tab=${t}`, { replace: true });
+
+  const header = (
+    <BoardHeader tab={tab} onTab={setTab}
+      counts={{ confirmed: groups.upcoming.length, requests: offers, applied: waiting.length }} />
+  );
+
+  if (tab === 'open') return <MarketplaceView header={header} />;
+
+  const open = (a: MyApplication) => navigate(`/shift/${a.shiftId}`);
+  const listFailed = !!error && !applications.length;
+  let body: React.ReactNode;
+  if (tab === 'requests') {
+    body = <WorkerRequestsView {...requests} />;
+  } else if (isLoading) {
+    body = <div className="px-4 pt-3 flex flex-col gap-3" aria-busy="true">{[1, 2, 3].map((n) => <JobCardSkeleton key={n} />)}</div>;
+  } else if (listFailed) {
+    body = <LoadError what="your jobs" onRetry={() => void refetch()} />;
+  } else {
+    const rows: [MyApplication, JobStatus][] =
+      tab === 'confirmed' ? groups.upcoming.map((a) => [a, 'confirmed'])
+      : tab === 'applied' ? waiting
+      : past;
+    body = rows.length ? (
+      <div className="px-4 pt-3 flex flex-col gap-3">
+        {tab === 'applied' && groups.standby.length > 0 && (
+          <p className="text-[#6B7280] text-[13px] px-1">Standby means you're next in line if a spot opens up.</p>
+        )}
+        {rows.map(([a, st]) => <AppCard key={a.applicationId} app={a} status={st} onTap={() => open(a)} />)}
+      </div>
+    ) : tab === 'confirmed' ? (
+      <StateView icon={CalendarDays} title="No confirmed jobs yet"
+        body="When a poster books you, the job shows up here with its time and place."
+        actionLabel="Find open shifts" onAction={() => setTab('open')} />
+    ) : tab === 'applied' ? (
+      <StateView icon={Send} title="No applications waiting"
+        body="Apply to open shifts and you'll see where each one stands here."
+        actionLabel="Find open shifts" onAction={() => setTab('open')} />
+    ) : (
+      <StateView icon={History} title="No past jobs yet" body="Jobs you've worked, and ones that didn't go ahead, are kept here." />
+    );
+  }
+
+  return (
+    <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col">
+      <div className="sticky top-0 z-40 bg-white border-b border-[#EAEAEA]">{header}</div>
+      <main className="flex-1 pb-[88px]" aria-label={BOARD_TABS.find((t) => t.key === tab)?.label}>{body}</main>
+      <BottomTabNav />
+    </div>
+  );
+}
+
+/* ── JobsScreen ──────────────────────────────────────────────────────────── */
+export function JobsScreen() {
+  const { role } = useProfile();
+  // Workers get their Job Board; posters keep the list of shifts they posted.
+  return role === 'worker' || role === null ? <WorkerJobBoard /> : <MarketplaceView />;
 }

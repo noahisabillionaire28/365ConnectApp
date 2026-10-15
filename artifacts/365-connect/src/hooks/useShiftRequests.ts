@@ -19,6 +19,7 @@ export type ShiftRequestRow = {
   job_type?: string;
   start_time?: string;
   end_time?: string;
+  timezone?: string | null;
   location?: string;
   pay_rate?: number;
   pay_period?: string;
