@@ -20,6 +20,8 @@ export type SimpleUser = {
   id:       string;
   email:    string | undefined;
   imageUrl: string | undefined;
+  /** First name from the sign-in provider (Google/Apple), when it gave one. */
+  firstName: string | undefined;
 };
 
 type AuthContextType = {
@@ -42,10 +44,14 @@ function toSimpleUser(session: Session | null): SimpleUser | null {
     (meta.avatar_url as string | undefined) ??
     (meta.picture as string | undefined) ??
     undefined;
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+  const fullName = str(meta.full_name) ?? str(meta.name);
+  const firstName = str(meta.given_name) ?? str(meta.first_name) ?? fullName?.split(/\s+/)[0];
   return {
     id:       u.id,
     email:    u.email ?? undefined,
     imageUrl,
+    firstName,
   };
 }
 

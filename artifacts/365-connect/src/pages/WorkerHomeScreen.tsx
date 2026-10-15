@@ -37,10 +37,20 @@ import { isDayOfWindow } from '@/hooks/useArrivalStatus';
 import { shiftHeadline } from '@/lib/supabase';
 import { untilLabel, directionsUrl } from '@/lib/jobFormat';
 
-/** "maria.r" → "Maria"; a real first name once profiles have one. */
-function firstName(handle: string | null | undefined): string {
-  const w = (handle ?? '').replace(/^@/, '').split(/[^A-Za-z]/).find(Boolean) ?? '';
-  return w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : '';
+/**
+ * The signed-in worker's own first name for the greeting: the name their
+ * Google/Apple account gave us, else their handle when it reads like a name
+ * ("maria.r" → "Maria"). Generated or long handles ("user_8f3a2c",
+ * "partyking2024xyz") give null, and the greeting falls back to "Hi there!".
+ */
+function greetingName(providerFirst: string | undefined, handle: string | null | undefined): string | null {
+  const cap = (w: string) => w[0].toUpperCase() + w.slice(1).toLowerCase();
+  const given = providerFirst?.trim();
+  if (given && /^[\p{L}'-]{1,20}$/u.test(given)) return cap(given);
+  const h = (handle ?? '').replace(/^@/, '').trim();
+  if (!h || /^user[_-]?[0-9a-f]{4,}$/i.test(h)) return null;
+  const word = h.split(/[^A-Za-z]+/).find(Boolean) ?? '';
+  return word.length >= 2 && word.length <= 12 ? cap(word) : null;
 }
 
 /** Re-render every 30 s so countdowns and the clock-in window stay current. */
@@ -135,7 +145,7 @@ export function WorkerHomeScreen() {
   const openNearby = nearby.shifts.filter((s) => !appliedShiftIds.has(s.id) && !mine.has(s.id)).slice(0, 5);
   const waiting = applied.length + standby.length;
 
-  const name = firstName(profile.username ?? profile.displayName);
+  const name = greetingName(user?.firstName, profile.username);
   const today = new Date(now).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
@@ -144,7 +154,7 @@ export function WorkerHomeScreen() {
       <header className="bg-gradient-to-b from-[#0A1628] to-[#1E3A5F] text-white px-4 pt-[calc(env(safe-area-inset-top)+18px)] pb-6 rounded-b-[24px]">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-[26px] font-bold leading-tight truncate">{name ? `Hi, ${name}!` : 'Welcome back'}</h1>
+            <h1 className="text-[26px] font-bold leading-tight truncate">{name ? `Hi, ${name}!` : 'Hi there!'}</h1>
             <p className="text-white/75 text-[15px] mt-0.5">{today}</p>
           </div>
           <div className="flex gap-2.5 flex-shrink-0">
