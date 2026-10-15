@@ -276,12 +276,19 @@ router.get('/', requireAuth, async (req, res) => {
     const { data: shifts, error: sErr } = await adminDb
       .from('shifts')
       .select(
-        'id, title, job_type, status, start_time, end_time, timezone, location, pay_rate, pay_period, company_name, point_of_contact, contact_phone',
+        'id, title, job_type, status, start_time, end_time, timezone, location, lat, lng, pay_rate, pay_period, company_name, client_id, point_of_contact, contact_phone',
       )
       .in('id', shiftIds);
     if (sErr) return res.status(500).json({ error: sErr.message });
 
     const shiftMap = new Map((shifts ?? []).map((s) => [s.id, s]));
+    // The poster's logo (their profile photo), shown on job cards.
+    const clientIds = [...new Set((shifts ?? []).map((s) => s.client_id as string).filter(Boolean))];
+    const logoMap = new Map<string, string | null>();
+    if (clientIds.length) {
+      const { data: posters } = await adminDb.from('users').select('id, photo_url').in('id', clientIds);
+      for (const u of posters ?? []) logoMap.set(u.id as string, (u.photo_url as string | null) ?? null);
+    }
     const merged = (apps ?? []).map((a) => {
       const s = shiftMap.get(a.shift_id);
       // The on-site contact is for people who are booked (or next in line),
@@ -301,6 +308,9 @@ router.get('/', requireAuth, async (req, res) => {
         pay_rate: s?.pay_rate ?? null,
         pay_period: s?.pay_period ?? null,
         company_name: s?.company_name ?? null,
+        lat: s?.lat ?? null,
+        lng: s?.lng ?? null,
+        client_logo: s?.client_id ? logoMap.get(s.client_id as string) ?? null : null,
         point_of_contact: canContact ? (s?.point_of_contact ?? null) : null,
         contact_phone: canContact ? (s?.contact_phone ?? null) : null,
         arrival_status: a.arrival_status ?? null,

@@ -36,14 +36,14 @@ export function notificationDeepLink(
   if (n.type === 'booking') return n.shift_id ? `/shift/${n.shift_id}` : '/home';
   // A shift offer is accepted/declined on the Home → Requests tab, not on the
   // shift page (which would only show "Apply").
-  if (n.type === 'shift_invite' || n.type === 'direct_shift_request') return '/home?tab=requests';
+  if (n.type === 'shift_invite' || n.type === 'direct_shift_request') return '/jobs?tab=requests';
   // Money lands on the earnings screen; a review on the recipient's profile.
   if (n.type === 'payment_received') return '/earnings';
   if (n.type === 'new_review') return '/profile';
   if (n.type === 'saved_search') return n.shift_id ? `/shift/${n.shift_id}` : '/jobs';
   // Swaps: the poster approves from the roster; both workers act on the shift page.
   if (n.type === 'swap_pending') return n.shift_id ? `/shift/${n.shift_id}/applicants` : '/home';
-  if (n.type.startsWith('swap_')) return n.shift_id ? `/shift/${n.shift_id}` : '/home?tab=requests';
+  if (n.type.startsWith('swap_')) return n.shift_id ? `/shift/${n.shift_id}` : '/jobs?tab=requests';
   if (n.post_id) return `/post/${n.post_id}`;
   // "Rate them" opens the review flow for the poster who sent the prompt.
   if (n.shift_id && n.from_user_id && (n.type === 'rate_client' || n.type === 'rate_client_reminder')) {
