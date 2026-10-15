@@ -13,6 +13,7 @@ const router = Router();
 
 const OT_THRESHOLD = 8;    // hours per shift before overtime
 const OT_MULTIPLIER = 1.5; // overtime pay multiplier
+const CLOCK_IN_OPENS_BEFORE_MS = 10 * 60 * 1000; // same rule as the app's clockWindow.ts
 const MAX_LATE_CLOCK_OUT_MS = 24 * 60 * 60 * 1000; // manager-supplied clock_out ≤ 24h after clock_in
 /** Approved hours within this many hours of the clocked hours count as "unchanged". */
 const UNCHANGED_TOLERANCE_H = 5 / 60;
@@ -516,11 +517,11 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(409).json({ error: 'This shift was cancelled, so there is nothing to clock in to.' });
   }
   const now = Date.now();
-  // Clock-in window: not more than 1 hour before the shift's start (call
-  // time), and never once the shift has ended.
+  // Clock-in window: from 10 minutes before the shift's start (call time)
+  // until it ends; mid-shift is fine, after the end it is closed.
   const startMs = sh.start_time ? Date.parse(sh.start_time) : NaN;
   const endMs = sh.end_time ? Date.parse(sh.end_time) : NaN;
-  if (Number.isFinite(startMs) && now < startMs - 60 * 60 * 1000) {
+  if (Number.isFinite(startMs) && now < startMs - CLOCK_IN_OPENS_BEFORE_MS) {
     return res.status(409).json({ error: 'Clock-in has not opened for this shift yet.' });
   }
   if (Number.isFinite(endMs) && now > endMs) {

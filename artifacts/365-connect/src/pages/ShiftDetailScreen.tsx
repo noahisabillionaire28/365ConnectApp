@@ -1,4 +1,5 @@
 import { useState, useEffect, useId, lazy, Suspense } from 'react';
+import { CLOCK_IN_OPENS_BEFORE_MS } from '@/lib/clockWindow';
 import { useDialog } from '@/hooks/useDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useLocation } from 'wouter';
@@ -308,10 +309,10 @@ export function ShiftDetailScreen() {
   const distanceFromShift = haversineMiles(myCoords.lat, myCoords.lng, shiftCoords.lat, shiftCoords.lng);
   const distanceMilesLabel = Math.round(distanceFromShift * 10) / 10;
   const withinClockInRange = distanceFromShift <= 1;
-  // Clock-in time window: opens 1 hour before the shift's start (call time), so
-  // workers can't clock in days early. Nowsta-style.
+  // Clock-in time window: opens 10 minutes before the shift's start (call
+  // time), so workers can't clock in days early; stays open until the end.
   const startMs      = shift.startTimeISO ? Date.parse(shift.startTimeISO) : NaN;
-  const clockOpensMs = Number.isFinite(startMs) ? startMs - 60 * 60 * 1000 : NaN;
+  const clockOpensMs = Number.isFinite(startMs) ? startMs - CLOCK_IN_OPENS_BEFORE_MS : NaN;
   const clockOpen    = !Number.isFinite(clockOpensMs) || Date.now() >= clockOpensMs;
   const clockOpensLabel = Number.isFinite(clockOpensMs)
     ? new Date(clockOpensMs).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })

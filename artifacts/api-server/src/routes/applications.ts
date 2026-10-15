@@ -953,7 +953,7 @@ router.post('/:id/call-out', requireAuth, requireRole('worker'), async (req, res
     if (Number.isFinite(startMs) && Date.now() >= startMs) {
       return res.status(409).json({ error: 'This shift has already started. Please message the poster directly.' });
     }
-    // Clock-in opens an hour early; a worker who is already on the clock
+    // Clock-in opens 10 minutes early; a worker who is already on the clock
     // cannot call out (it would orphan their time entry).
     if (await hasClockedIn(app.shift_id, req.userId!)) {
       return res.status(409).json({ error: "You've already clocked in to this shift. Please message the poster directly." });
