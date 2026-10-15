@@ -75,7 +75,7 @@ export async function cancelActiveSwapsFor(shiftId: string, workerId: string): P
 }
 
 /**
- * Has this worker clocked in to the shift? Clock-in opens an hour before the
+ * Has this worker clocked in to the shift? Clock-in opens 10 minutes before the
  * start, so "not started yet" is not enough to allow a swap or a call-out:
  * once there is a time entry the worker is on site and the roster is fixed.
  */

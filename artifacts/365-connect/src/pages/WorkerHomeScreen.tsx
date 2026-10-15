@@ -34,8 +34,13 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { isDayOfWindow } from '@/hooks/useArrivalStatus';
+import { useMyTimeEntry, formatHoursMinutes, type TimeEntryRow } from '@/hooks/useTimeEntry';
+import { useStatusBarColor } from '@/hooks/useStatusBarColor';
 import { shiftHeadline } from '@/lib/supabase';
 import { untilLabel, directionsUrl } from '@/lib/jobFormat';
+import { clockWindow, CLOCK_IN_OPENS_BEFORE_MS } from '@/lib/clockWindow';
+
+const NAVY = '#0A1628';
 
 /**
  * The signed-in worker's own first name for the greeting: the name their
@@ -73,17 +78,39 @@ function SectionTitle({ children, action }: { children: React.ReactNode; action?
   );
 }
 
-/** The booked shift happening today (or the next one), with map, directions and clock-in. */
+/** "03:51:54" on the clock since clock-in, less breaks; ticks every second. */
+function ElapsedTimer({ entry }: { entry: TimeEntryRow }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const onBreak = !!entry.break_started_at;
+  const breakMs = entry.breakMinutes * 60_000 + (onBreak ? now - Date.parse(entry.break_started_at!) : 0);
+  const secs = Math.max(0, Math.floor((now - Date.parse(entry.clock_in) - breakMs) / 1000));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    <span className="tabular-nums text-[#0A1628] text-[24px] font-bold" aria-live="off">
+      {pad(Math.floor(secs / 3600))}:{pad(Math.floor((secs % 3600) / 60))}:{pad(secs % 60)}
+      {onBreak && <span className="ml-2 text-[13px] font-semibold text-[#B45309] align-middle">On break</span>}
+    </span>
+  );
+}
+
+/**
+ * The booked shift happening today (or the next one): map, directions, and
+ * the clock. Clock-in opens 10 minutes before call time and stays open until
+ * the shift ends; once the worker is on the clock the card shows the running
+ * time and takes them to clock out.
+ */
 function NextJobCard({ app, now }: { app: MyApplication; now: number }) {
   const [, navigate] = useLocation();
-  const start = app.startTime ? Date.parse(app.startTime) : NaN;
-  const end = app.endTime ? Date.parse(app.endTime) : NaN;
-  const opensAt = start - 60 * 60_000; // clock-in opens an hour before
-  const canClockIn = Number.isFinite(start) && now >= opensAt && (!Number.isFinite(end) || now <= end);
-  const opensIn = Number.isFinite(start) ? untilLabel(opensAt) : null;
+  const { entry } = useMyTimeEntry(app.shiftId);
+  const window_ = clockWindow(app.startTime, app.endTime, now);
+  const opensIn = app.startTime ? untilLabel(Date.parse(app.startTime) - CLOCK_IN_OPENS_BEFORE_MS) : null;
   const dayOf = isDayOfWindow(app.startTime, app.endTime, now);
   const hasMap = app.lat != null && app.lng != null;
   const title = app.shiftTitle?.trim() || `${app.jobType ?? 'Event'} shift`;
+  const onClock = !!entry && !entry.clock_out;
+  const clockedOut = !!entry && !!entry.clock_out;
+  const clockedInAt = entry ? new Date(entry.clock_in).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: app.timezone ?? undefined }).toLowerCase().replace(' ', '') : '';
 
   return (
     <JobCard
@@ -107,17 +134,34 @@ function NextJobCard({ app, now }: { app: MyApplication; now: number }) {
       ) : undefined}
     >
       <div className="flex flex-col gap-2.5">
-        {canClockIn ? (
+        {onClock ? (
+          <>
+            <div className="flex items-end justify-between gap-3">
+              <p className="text-[#374151] text-[15px]">Clocked in <span className="text-[#9CA3AF]">•</span> at {clockedInAt}</p>
+              <ElapsedTimer entry={entry!} />
+            </div>
+            <button type="button" onClick={() => navigate(`/clock/${app.shiftId}`)} data-testid="btn-home-clock-out"
+              className="h-12 rounded-[12px] bg-[#B91C1C] text-white text-[16px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
+              <Clock3 size={18} aria-hidden /> Clock out
+            </button>
+          </>
+        ) : clockedOut ? (
           <button type="button" onClick={() => navigate(`/clock/${app.shiftId}`)}
+            className="rounded-[12px] bg-[#ECFDF5] px-4 py-3 text-[#047857] text-[15px] text-left flex items-center justify-between gap-3">
+            <span>Clocked out <span className="text-[#6EE7B7]">•</span> {formatHoursMinutes(entry!.total_hours)} worked</span>
+            <span className="font-semibold flex items-center whitespace-nowrap flex-shrink-0">View hours<ChevronRight size={16} aria-hidden /></span>
+          </button>
+        ) : window_ === 'open' ? (
+          <button type="button" onClick={() => navigate(`/clock/${app.shiftId}`)} data-testid="btn-home-clock-in"
             className="h-12 rounded-[12px] bg-[#0A1628] text-white text-[16px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
             <Clock3 size={18} aria-hidden /> Clock in
           </button>
-        ) : opensIn ? (
+        ) : window_ === 'before' && opensIn ? (
           <p className="rounded-[12px] bg-[#EEF2F8] px-4 py-3 text-[#1E3A5F] text-[15px]">
             You'll be able to <span className="font-semibold">clock in</span> in {opensIn}.
           </p>
         ) : null}
-        {dayOf && <ArrivalPills applicationId={app.applicationId} status={app.arrivalStatus} statusAt={app.arrivalStatusAt} compact />}
+        {dayOf && !clockedOut && <ArrivalPills applicationId={app.applicationId} status={app.arrivalStatus} statusAt={app.arrivalStatusAt} compact />}
       </div>
     </JobCard>
   );
@@ -126,6 +170,7 @@ function NextJobCard({ app, now }: { app: MyApplication; now: number }) {
 export function WorkerHomeScreen() {
   const [, navigate] = useLocation();
   const now = useNow();
+  useStatusBarColor(NAVY);
   const { user } = useAuth();
   const profile = useProfile();
   const { unreadCount } = useNotifications();
