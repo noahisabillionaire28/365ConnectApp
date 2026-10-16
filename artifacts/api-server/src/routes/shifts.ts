@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { POSTER_COLS, posterLabel, shiftLabel } from '../lib/poster.js';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { adminDb } from '../lib/supabaseAdmin.js';
@@ -194,7 +195,7 @@ router.get('/', requireAuth, async (req, res) => {
   if (clientIds.length) {
     const { data: users, error: uErr } = await adminDb
       .from('users')
-      .select('id, username, company_name, photo_url')
+      .select(POSTER_COLS)
       .in('id', clientIds);
     if (uErr) return res.status(500).json({ error: uErr.message });
     for (const u of users ?? []) userMap.set(u.id, u);
@@ -208,6 +209,7 @@ router.get('/', requireAuth, async (req, res) => {
     const u = userMap.get(s.client_id);
     const row: Record<string, any> = {
       ...s,
+      company_name: shiftLabel(s, userMap),
       client_username: u?.username ?? null,
       client_company: u?.company_name ?? null,
       client_photo_url: u?.photo_url ?? null,
@@ -312,7 +314,7 @@ router.get('/:id', requireAuth, async (req, res) => {
   if (shift.client_id) {
     const { data: user, error: uErr } = await adminDb
       .from('users')
-      .select('id, username, company_name, photo_url, rating')
+      .select(`${POSTER_COLS}, rating`)
       .eq('id', shift.client_id)
       .maybeSingle();
     if (uErr) return res.status(500).json({ error: uErr.message });
@@ -333,20 +335,13 @@ router.get('/:id', requireAuth, async (req, res) => {
     ...shift,
     series_index,
     series_count,
-    company_name: shift.company_name || u?.company_name || (u?.username ? `@${u.username}` : null),
+    company_name: shift.company_name?.trim() || posterLabel(u),
     client_username: u?.username ?? null,
     client_company: u?.company_name ?? null,
     client_photo_url: u?.photo_url ?? null,
     client_rating: u?.rating ?? null,
   });
 });
-
-/** The poster's display name for a shift: their company, else their @username (never the bio). */
-async function posterCompanyName(userId: string): Promise<string | null> {
-  const { data } = await adminDb
-    .from('users').select('company_name, username').eq('id', userId).maybeSingle();
-  return data?.company_name || (data?.username ? `@${data.username}` : null);
-}
 
 type ShiftFields = z.infer<typeof shiftFields>;
 
@@ -380,8 +375,9 @@ async function createShiftRow(
     lat: b.lat ?? null,
     lng: b.lng ?? null,
     cover_image: b.cover_image ?? null,
-    // Never show "Private Client" for a real poster — default to their name.
-    company_name: b.company_name || await posterCompanyName(clientId),
+    // The poster's label is derived from their profile when the shift is
+    // read (see lib/poster), so a name change shows up on every shift.
+    company_name: b.company_name ?? null,
     requirements: b.requirements ?? [],
     dress_code: b.dress_code ?? null,
     dress_code_items: b.dress_code_items ?? [],
@@ -480,7 +476,7 @@ router.post('/series', requireAuth, requireRole('client', 'staffer'), async (req
     .single();
   if (sErr || !series) return res.status(500).json({ error: sErr?.message ?? 'Could not create the series' });
 
-  const companyName = b.company_name || await posterCompanyName(req.userId!);
+  const companyName = b.company_name ?? null;
   const rows = [];
   for (const w of windows) {
     rows.push(await createShiftRow(b, req.userId!, {
@@ -611,7 +607,7 @@ router.post('/event', requireAuth, requireRole('client', 'staffer'), async (req,
     lat: b.lat ?? null,
     lng: b.lng ?? null,
     cover_image: b.cover_image ?? null,
-    company_name: b.company_name || await posterCompanyName(req.userId!),
+    company_name: b.company_name ?? null,
     dress_code: b.dress_code ?? null,
     special_instructions: b.special_instructions ?? null,
     instant_claim: b.instant_claim ?? false,

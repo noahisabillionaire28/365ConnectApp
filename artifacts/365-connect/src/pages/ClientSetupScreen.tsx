@@ -3,7 +3,7 @@
  *
  * 4-step profile setup for clients.
  *
- * Step 1 — Full name (required) → stored in users.bio
+ * Step 1 — Full name (required) → stored in users.name
  * Step 2 — Company name (optional) → stored in users.company_name if column exists
  * Step 3 — Event types they host (multi-select tiles)
  * Step 4 — Billing card (simulated UI — generates a ref, never stores real card data)
@@ -232,17 +232,17 @@ export function ClientSetupScreen() {
   // ── Load & resume ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) { navigate('/'); return; }
-    apiClient(user.id).get<{ username?: string | null; bio?: string | null; company_name?: string | null; secondary_job_types?: string[] }>('/users/me')
+    apiClient(user.id).get<{ username?: string | null; name?: string | null; company_name?: string | null; secondary_job_types?: string[] }>('/users/me')
       .then((data) => {
         // Setup is done once the client has a name; the username is
         // auto-generated at role select so it cannot be the marker.
         if (posterSetupDone(data)) { navigate('/home'); return; }
-        if (data?.bio)                setFullName(data.bio);
+        if (data?.name)               setFullName(data.name);
         if (data?.company_name)       setCompanyName(data.company_name);
         if (Array.isArray(data?.secondary_job_types)) setEventTypes(data.secondary_job_types);
 
         let inferred = 1;
-        if (data?.bio) inferred = Math.max(inferred, 2);
+        if (data?.name) inferred = Math.max(inferred, 2);
         // secondary_job_types is written (even as []) once step 3 is completed,
         // so presence — not length — signals the step is done.
         if (Array.isArray(data?.secondary_job_types)) inferred = Math.max(inferred, 4);
@@ -275,9 +275,9 @@ export function ClientSetupScreen() {
 
   async function continueStep1() {
     if (!fullName.trim()) return;
-    // The display name is what workers see as the poster on every shift
-    // until a company name is set on the next step.
-    await saveAndAdvance({ bio: fullName.trim(), company_name: fullName.trim() }, 2);
+    // Workers see this name as the poster on every shift (the company name
+    // from the next step is shown alongside it when given).
+    await saveAndAdvance({ name: fullName.trim() }, 2);
   }
 
   async function continueStep2() {

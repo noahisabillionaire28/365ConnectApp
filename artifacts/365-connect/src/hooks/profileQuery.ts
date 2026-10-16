@@ -8,6 +8,8 @@ import { apiClient, isApiStatus } from '@/lib/api';
 export type UserProfileRow = {
   username:            string | null;
   photo_url:           string | null;
+  /** The person's name. Posters show it on shifts; the bio is never a label. */
+  name?:               string | null;
   bio:                 string | null;
   job_types:           string[];
   certifications:      string[];

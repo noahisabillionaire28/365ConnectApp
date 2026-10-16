@@ -6,7 +6,7 @@
  * apply to the role are shown:
  *
  *   Photo          all roles   avatar (workers) / logo (posters)
- *   Basics         all roles   handle, bio (workers) or name (posters)
+ *   Basics         all roles   name, handle, agency name (staffers), bio (workers)
  *   Account        all roles   email and password (each changed in its own
  *                              sheet, through the auth service), phone
  *   Work           worker      primary role, other roles, hourly rate,
@@ -44,7 +44,8 @@ import { AvailabilityEditor, normalizeAvailability, type WeekAvailability } from
 // ── Form model ─────────────────────────────────────────────────────────────────
 type Form = {
   username:      string;
-  bio:           string;          // worker bio; poster display / agency name
+  name:          string;          // the person's name (every role)
+  bio:           string;          // workers only; never shown as a label
   primaryJob:    string | null;
   secondaryJobs: string[];
   hourlyRate:    string;
@@ -167,6 +168,7 @@ export function EditProfileScreen() {
     if (initial || profile.isLoading || !row) return;
     const seeded: Form = {
       username:      row.username ?? '',
+      name:          row.name ?? '',
       bio:           row.bio ?? '',
       primaryJob:    row.primary_job_type ?? null,
       secondaryJobs: row.secondary_job_types ?? [],
@@ -295,7 +297,8 @@ export function EditProfileScreen() {
   // ── What changed → the PATCH body ───────────────────────────────────────────
   const rate = parseRate(form?.hourlyRate ?? '');
   const rateError = Number.isNaN(rate) ? 'Enter a number, e.g. 25.' : null;
-  const bioError = isPoster && form && !form.bio.trim() ? 'Please enter a name.' : null;
+  const nameError = form && form.name.trim().length < 2 ? 'Please enter your name.' : null;
+  const companyError = role === 'staffer' && form && !form.companyName.trim() ? 'Please enter your agency name.' : null;
   const phoneChanged = !!form && !!initial && form.phone.trim() !== initial.phone.trim();
   const phoneValue = phoneChanged ? normalizePhone(form!.phone) : null;
   const phoneError = phoneChanged && phoneValue === undefined
@@ -305,7 +308,8 @@ export function EditProfileScreen() {
     if (!form || !initial) return {};
     const p: ProfilePatch = {};
     if (form.username !== initial.username) p.username = form.username.trim().toLowerCase();
-    if (form.bio !== initial.bio) p.bio = form.bio.trim() || null;
+    if (form.name !== initial.name) p.name = form.name.trim() || null;
+    if (isWorker && form.bio !== initial.bio) p.bio = form.bio.trim() || null;
     if (phoneChanged && phoneValue !== undefined) p.phone = phoneValue;
     if (isWorker) {
       const primaryChanged = form.primaryJob !== initial.primaryJob;
@@ -322,12 +326,7 @@ export function EditProfileScreen() {
       if (form.isAvailable !== initial.isAvailable) p.is_available = form.isAvailable;
     }
     if (isPoster) {
-      if (role === 'staffer') {
-        // The agency name is both the display name (bio) and the company name.
-        if (form.bio !== initial.bio) p.company_name = form.bio.trim() || null;
-      } else if (form.companyName !== initial.companyName) {
-        p.company_name = form.companyName.trim() || null;
-      }
+      if (form.companyName !== initial.companyName) p.company_name = form.companyName.trim() || null;
       if (!sameList(form.eventTypes, initial.eventTypes)) p.secondary_job_types = form.eventTypes;
       if (form.lat !== initial.lat || form.lng !== initial.lng) { p.lat = form.lat; p.lng = form.lng; }
     }
@@ -335,7 +334,7 @@ export function EditProfileScreen() {
   }, [form, initial, isWorker, isPoster, role, rate, phoneChanged, phoneValue]);
 
   const dirty = Object.keys(patch).length > 0 || !!photoFile;
-  const blocked = !!handleError || handleChecking || !!rateError || !!bioError || !!phoneError;
+  const blocked = !!handleError || handleChecking || !!rateError || !!nameError || !!companyError || !!phoneError;
   const [saving, setSaving] = useState(false);
   const canSave = dirty && !blocked && !saving;
 
@@ -375,7 +374,6 @@ export function EditProfileScreen() {
 
   const currentPhoto = photoPreview ?? profile.photoUrl;
   const photoShape = isPoster ? 'rounded-[20px]' : 'rounded-full';
-  const posterNameLabel = role === 'staffer' ? 'Agency name' : 'Your name';
 
   return (
     <div className="min-h-[100dvh] bg-[#F9FAFB] flex flex-col">
@@ -424,13 +422,19 @@ export function EditProfileScreen() {
 
         {/* ── Basics ────────────────────────────────────────────────────── */}
         <Card id="basics" icon={User} title="Basics">
-          {isPoster && (
-            <Field label={posterNameLabel} htmlFor="poster-name" error={bioError}
-              hint={role === 'staffer' ? 'How clients and workers see your agency.' : 'Workers see this on your shift postings.'}>
-              <input id="poster-name" type="text" value={form.bio} maxLength={100} data-testid="input-name"
-                onChange={(e) => set('bio', e.target.value)}
-                aria-invalid={!!bioError} aria-describedby={bioError ? 'poster-name-error' : undefined}
-                className={`${INPUT} ${inputBorder(bioError)}`} placeholder={role === 'staffer' ? 'e.g. Elite Event Staffing' : 'Jane Smith'} />
+          <Field label="Your name" htmlFor="name" error={nameError}
+            hint={isWorker ? 'Posters see this when you apply and when you are booked.' : role === 'staffer' ? 'The person behind the agency account.' : 'Workers see this on your shift postings.'}>
+            <input id="name" type="text" value={form.name} maxLength={80} data-testid="input-name" autoComplete="name"
+              onChange={(e) => set('name', e.target.value)}
+              aria-invalid={!!nameError} aria-describedby={nameError ? 'name-error' : undefined}
+              className={`${INPUT} ${inputBorder(nameError)}`} placeholder="Jane Smith" />
+          </Field>
+          {role === 'staffer' && (
+            <Field label="Agency name" htmlFor="company" error={companyError} hint="How clients and workers see your agency on every shift.">
+              <input id="company" type="text" value={form.companyName} maxLength={100} data-testid="input-company" autoComplete="organization"
+                onChange={(e) => set('companyName', e.target.value)}
+                aria-invalid={!!companyError} aria-describedby={companyError ? 'company-error' : undefined}
+                className={`${INPUT} ${inputBorder(companyError)}`} placeholder="e.g. Elite Event Staffing" />
             </Field>
           )}
 

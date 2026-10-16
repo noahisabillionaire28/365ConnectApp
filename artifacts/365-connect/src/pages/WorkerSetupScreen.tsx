@@ -127,6 +127,9 @@ export function WorkerSetupScreen() {
   const [cropSrc,    setCropSrc]    = useState<string | null>(null);
   const [cropTarget, setCropTarget] = useState<'photo' | 'post' | null>(null);
 
+  // Step 1 — name (with the handle)
+  const [fullName, setFullName] = useState('');
+
   // Step 3 — bio
   const [bio, setBio] = useState('');
 
@@ -155,7 +158,7 @@ export function WorkerSetupScreen() {
   // ── Load & resume ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) { navigate('/'); return; }
-    apiClient(user.id).get<{ username?: string | null; photo_url?: string | null; bio?: string | null; primary_job_type?: string | null; secondary_job_types?: string[]; certifications?: string[]; availability?: unknown; hourly_rate?: number | null }>('/users/me')
+    apiClient(user.id).get<{ username?: string | null; name?: string | null; photo_url?: string | null; bio?: string | null; primary_job_type?: string | null; secondary_job_types?: string[]; certifications?: string[]; availability?: unknown; hourly_rate?: number | null }>('/users/me')
       .then(async (data) => {
         if (!data) { setInitialized(true); return; }
 
@@ -166,6 +169,7 @@ export function WorkerSetupScreen() {
 
         // Pre-populate state from saved DB data
         if (data.username)           setUsername(data.username);
+        if (data.name)               setFullName(data.name);
         if (data.photo_url)          setPhotoPreview(data.photo_url);
         if (data.bio)                setBio(data.bio);
         if (data.primary_job_type)   setPrimaryJob(data.primary_job_type);
@@ -240,8 +244,8 @@ export function WorkerSetupScreen() {
   // ── Per-step "Continue" handlers ─────────────────────────────────────────────
   async function continueStep1() {
     const val = username.trim().toLowerCase();
-    if (usernameStatus !== 'valid') return;
-    await saveAndAdvance(2, { username: val });
+    if (usernameStatus !== 'valid' || fullName.trim().length < 2) return;
+    await saveAndAdvance(2, { username: val, name: fullName.trim() });
   }
 
   async function continueStep2() {
@@ -424,18 +428,32 @@ export function WorkerSetupScreen() {
         {step === 1 && (
           <div className="flex flex-col">
             <h1 className="text-[26px] font-bold leading-tight mb-2" style={{ color: TEXT }}>
-              What's your @handle?
+              What's your name?
             </h1>
-            <p className="text-[14px] mb-8" style={{ color: MUTED }}>
-              This is how clients and other workers find you on 365 Connect.
+            <p className="text-[14px] mb-6" style={{ color: MUTED }}>
+              Posters see your name when you apply. Your @handle is how people find you.
             </p>
+            <label className="text-[12px] font-semibold ml-0.5 mb-1.5" style={{ color: MUTED }} htmlFor="worker-name">Full name</label>
+            <input
+              id="worker-name"
+              autoFocus
+              type="text"
+              autoComplete="name"
+              placeholder="Jane Smith"
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+              className="w-full rounded-[12px] px-4 h-[56px] outline-none text-[16px] font-medium placeholder:text-[#9CA3AF] mb-5"
+              style={{ border: `1px solid ${BORDER}`, color: TEXT }}
+              maxLength={80}
+              data-testid="input-fullname"
+            />
+            <label className="text-[12px] font-semibold ml-0.5 mb-1.5" style={{ color: MUTED }}>Handle</label>
             <div
               className="flex items-center rounded-[12px] px-4 h-[56px] transition-colors"
               style={{ border: `1px solid ${usernameStatus === 'invalid' || usernameStatus === 'taken' ? RED : usernameStatus === 'valid' ? GREEN : BORDER}` }}
             >
               <span className="font-semibold text-[18px] mr-1 select-none" style={{ color: TEXT }}>@</span>
               <input
-                autoFocus
                 type="text"
                 placeholder="yourhandle"
                 value={username}
@@ -766,7 +784,7 @@ export function WorkerSetupScreen() {
           }
           disabled={
             saving ||
-            (step === 1 && usernameStatus !== 'valid') ||
+            (step === 1 && (usernameStatus !== 'valid' || fullName.trim().length < 2)) ||
             (step === 4 && !primaryJob)
           }
           className="w-full text-white font-bold text-[16px] h-[52px] rounded-[12px] active:scale-[0.98] transition-transform disabled:opacity-30"

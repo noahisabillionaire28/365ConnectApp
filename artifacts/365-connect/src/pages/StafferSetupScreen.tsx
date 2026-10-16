@@ -3,7 +3,7 @@
  *
  * 4-step profile setup for staffing agencies.
  *
- * Step 1 — Agency name (required) → stored in users.bio
+ * Step 1 — Agency name (required) → stored in users.company_name
  * Step 2 — Logo upload (optional) → stored in users.photo_url
  * Step 3 — Types of events they staff (multi-select tiles) → users.secondary_job_types
  * Step 4 — Billing card (simulated — no real charges)
@@ -189,12 +189,12 @@ export function StafferSetupScreen() {
         // Setup is done once the agency has a name; the username is
         // auto-generated at role select so it cannot be the marker.
         if (posterSetupDone(data)) { navigate('/home'); return; }
-        if (data?.company_name || data?.bio) setAgencyName(data.company_name || data.bio || '');
+        if (data?.company_name) setAgencyName(data.company_name);
         if (data?.photo_url) setLogoPreview(data.photo_url);
         if (Array.isArray(data?.secondary_job_types)) setEventTypes(data.secondary_job_types);
 
         let inferred = 1;
-        if (data?.bio) inferred = Math.max(inferred, 2);
+        if (data?.company_name) inferred = Math.max(inferred, 2);
         if (data?.photo_url) inferred = Math.max(inferred, 3);
         // secondary_job_types is written (even as []) once step 3 is completed,
         // so presence — not length — signals the step is done.
@@ -229,7 +229,7 @@ export function StafferSetupScreen() {
   async function continueStep1() {
     if (!agencyName.trim()) return;
     // The agency name is what workers see as the poster on every shift.
-    await saveAndAdvance({ bio: agencyName.trim(), company_name: agencyName.trim() }, 2);
+    await saveAndAdvance({ company_name: agencyName.trim() }, 2);
   }
 
   async function continueStep2() {

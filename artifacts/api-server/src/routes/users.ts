@@ -43,7 +43,7 @@ async function assertNotBlocked(viewerId: string, profileId: string): Promise<vo
 // read via GET /me (select *), so they are intentionally NOT part of the
 // public column set.
 const PUBLIC_COLS =
-  'id, role, username, photo_url, bio, job_types, certifications, ' +
+  'id, role, username, name, photo_url, bio, job_types, certifications, ' +
   'rating, primary_job_type, secondary_job_types, availability, ' +
   'lat, lng, is_pro, company_name, hourly_rate, created_at';
 
@@ -63,6 +63,16 @@ async function publicView(row: Record<string, unknown>, viewerId: string | null)
  * requireAuth) on purpose: a suspended account must still be able to read its
  * own status so the app can render the suspended screen instead of a blank one.
  */
+
+/** A person's name: one line, trimmed, 2–80 characters; null clears it. */
+function normalizeName(v: unknown): string | null {
+  if (v === null || v === '') return null;
+  if (typeof v !== 'string') throw new HttpError(400, 'Name must be text.');
+  const name = v.replace(/\s+/g, ' ').trim();
+  if (name.length < 2 || name.length > 80) throw new HttpError(400, 'Please enter your name (2–80 characters).');
+  return name;
+}
+
 router.get('/me', requireSession, async (req, res) => {
   const { data, error } = await adminDb
     .from('users')
@@ -178,13 +188,16 @@ router.post('/', requireAuth, async (req, res) => {
   // never taken from the body: email comes from the auth account, is_pro from
   // a recorded subscription, status from an admin.
   const optional = [
-    'username', 'photo_url', 'bio', 'job_types', 'certifications',
+    'username', 'name', 'photo_url', 'bio', 'job_types', 'certifications',
     'primary_job_type', 'secondary_job_types', 'availability',
     'lat', 'lng', 'company_name', 'hourly_rate',
   ];
   const payload: Record<string, unknown> = { id: req.userId };
   for (const f of optional) {
     if (body[f] !== undefined && body[f] !== null) payload[f] = body[f];
+  }
+  if (payload.name !== undefined) {
+    try { payload.name = normalizeName(payload.name); } catch (e) { return sendError(res, e); }
   }
 
   const { data: existing } = await adminDb
@@ -245,7 +258,7 @@ router.patch('/me', requireAuth, async (req, res) => {
   // email (verified by auth), is_pro (subscription) and status (admin) are
   // deliberately not here.
   const allowed = [
-    'username', 'photo_url', 'bio', 'job_types', 'certifications',
+    'username', 'name', 'photo_url', 'bio', 'job_types', 'certifications',
     'primary_job_type', 'secondary_job_types', 'availability',
     'lat', 'lng', 'company_name', 'is_available',
     'in_app_notifications', 'email_notifications', 'hourly_rate',
@@ -262,6 +275,9 @@ router.patch('/me', requireAuth, async (req, res) => {
   }
   if ('phone' in updates) {
     try { updates.phone = normalizePhone(updates.phone); } catch (e) { return sendError(res, e); }
+  }
+  if ('name' in updates) {
+    try { updates.name = normalizeName(updates.name); } catch (e) { return sendError(res, e); }
   }
 
   const { data, error } = await adminDb

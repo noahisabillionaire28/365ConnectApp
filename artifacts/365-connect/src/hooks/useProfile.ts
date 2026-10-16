@@ -6,6 +6,7 @@ import { profileQueryKey, profileQueryOptions, type UserProfileRow } from './pro
 
 function deriveDisplayName(authUser: SimpleUser, row: UserProfileRow | null): string {
   return (
+    row?.name?.trim() ||
     row?.username?.trim() ||
     authUser.email?.split('@')[0] ||
     'User'
@@ -16,6 +17,8 @@ export type ProfileResult = {
   isLoading:         boolean;
   isError:           boolean;
   displayName:       string;
+  /** The person's own name, when they have given one. */
+  name:              string | null;
   username:          string | null;
   photoUrl:          string | null;
   bio:               string | null;
@@ -71,6 +74,7 @@ export function useProfile(): ProfileResult {
     isLoading,
     isError: !authLoading && !!user && isError,
     displayName,
+    name:              row?.name              ?? null,
     username:          row?.username          ?? null,
     photoUrl,
     bio:               row?.bio               ?? null,
@@ -95,7 +99,7 @@ export function useProfile(): ProfileResult {
 
 /** The columns PATCH /users/me accepts from the profile editors. */
 export type ProfilePatch = Partial<Pick<UserProfileRow,
-  'username' | 'photo_url' | 'bio' | 'job_types' | 'certifications' |
+  'username' | 'name' | 'photo_url' | 'bio' | 'job_types' | 'certifications' |
   'primary_job_type' | 'secondary_job_types' | 'availability' |
   'lat' | 'lng' | 'company_name' | 'is_available' | 'hourly_rate' | 'phone'
 >>;
