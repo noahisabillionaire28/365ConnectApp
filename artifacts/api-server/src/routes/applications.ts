@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { posterMap, shiftLabel as posterShiftLabel } from '../lib/poster.js';
 import { z } from 'zod';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
@@ -282,13 +283,10 @@ router.get('/', requireAuth, async (req, res) => {
     if (sErr) return res.status(500).json({ error: sErr.message });
 
     const shiftMap = new Map((shifts ?? []).map((s) => [s.id, s]));
-    // The poster's logo (their profile photo), shown on job cards.
-    const clientIds = [...new Set((shifts ?? []).map((s) => s.client_id as string).filter(Boolean))];
+    // The poster's name and logo (their profile photo), shown on job cards.
+    const posters = await posterMap(adminDb, (shifts ?? []).map((s) => s.client_id as string | null));
     const logoMap = new Map<string, string | null>();
-    if (clientIds.length) {
-      const { data: posters } = await adminDb.from('users').select('id, photo_url').in('id', clientIds);
-      for (const u of posters ?? []) logoMap.set(u.id as string, (u.photo_url as string | null) ?? null);
-    }
+    for (const [id, u] of posters) logoMap.set(id, u.photo_url ?? null);
     const merged = (apps ?? []).map((a) => {
       const s = shiftMap.get(a.shift_id);
       // The on-site contact is for people who are booked (or next in line),
@@ -307,7 +305,7 @@ router.get('/', requireAuth, async (req, res) => {
         location: s?.location ?? null,
         pay_rate: s?.pay_rate ?? null,
         pay_period: s?.pay_period ?? null,
-        company_name: s?.company_name ?? null,
+        company_name: s ? posterShiftLabel(s, posters) : null,
         lat: s?.lat ?? null,
         lng: s?.lng ?? null,
         client_logo: s?.client_id ? logoMap.get(s.client_id as string) ?? null : null,

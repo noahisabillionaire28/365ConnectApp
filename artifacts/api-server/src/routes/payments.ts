@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { posterMap, shiftLabel } from '../lib/poster.js';
 import { z } from 'zod';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -27,10 +28,11 @@ router.get('/', requireAuth, async (req, res) => {
   if (shiftIds.length) {
     const { data: shifts, error: sErr } = await adminDb
       .from('shifts')
-      .select('id, title, company_name')
+      .select('id, client_id, title, company_name')
       .in('id', shiftIds);
     if (sErr) return res.status(500).json({ error: sErr.message });
-    for (const s of shifts ?? []) shiftMap.set(s.id, s);
+    const posters = await posterMap(adminDb, (shifts ?? []).map((s) => s.client_id as string | null));
+    for (const s of shifts ?? []) shiftMap.set(s.id, { title: s.title ?? null, company_name: shiftLabel(s, posters) });
   }
 
   // For payments the caller sent, name who received them.

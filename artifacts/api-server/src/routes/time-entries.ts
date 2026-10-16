@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { posterMap, shiftLabel } from '../lib/poster.js';
 import { z } from 'zod';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -206,13 +207,14 @@ router.get('/mine', requireAuth, async (req, res) => {
     let paidMap = new Map<string, PaidRow>();
     if (shiftIds.length) {
       const [{ data: shifts, error: sErr }, pays] = await Promise.all([
-        adminDb.from('shifts').select('id, title, company_name, start_time, end_time, pay_rate, pay_period').in('id', shiftIds),
+        adminDb.from('shifts').select('id, client_id, title, company_name, start_time, end_time, pay_rate, pay_period').in('id', shiftIds),
         paidByShift(req.userId!, shiftIds),
       ]);
       if (sErr) return res.status(500).json({ error: sErr.message });
+      const posters = await posterMap(adminDb, (shifts ?? []).map((s) => s.client_id as string | null));
       for (const s of shifts ?? []) {
         shiftMap.set(s.id, {
-          title: s.title ?? null, company_name: s.company_name ?? null, start_time: s.start_time ?? null, end_time: s.end_time ?? null,
+          title: s.title ?? null, company_name: shiftLabel(s, posters), start_time: s.start_time ?? null, end_time: s.end_time ?? null,
           pay_rate: s.pay_rate ?? null, pay_period: s.pay_period ?? null,
         });
       }

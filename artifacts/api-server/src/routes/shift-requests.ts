@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { POSTER_COLS, posterLabel } from '../lib/poster.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
@@ -48,7 +49,7 @@ router.get('/', requireAuth, async (req, res) => {
     if (workerIds.length) {
       const { data: workers, error: workersError } = await adminDb
         .from('users')
-        .select('id, username, photo_url')
+        .select(POSTER_COLS)
         .in('id', workerIds);
       if (workersError) return res.status(500).json({ error: workersError.message });
       workersById = new Map((workers ?? []).map((w: any) => [w.id, w]));
@@ -71,7 +72,7 @@ router.get('/', requireAuth, async (req, res) => {
         location: s?.location ?? null,
         pay_rate: s?.pay_rate ?? null,
         pay_period: s?.pay_period ?? null,
-        company_name: s?.company_name ?? null,
+        company_name: s?.company_name?.trim() || posterLabel(c),
         worker_username: w?.username ?? null,
         worker_photo: w?.photo_url ?? null,
         client_username: c?.username ?? null,

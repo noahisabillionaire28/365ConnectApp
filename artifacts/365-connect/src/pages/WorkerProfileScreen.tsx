@@ -22,6 +22,7 @@ type PublicUserRow = {
   role: 'worker' | 'client' | 'staffer';
   username: string;
   photo_url: string | null;
+  name?: string | null;
   bio: string | null;
   job_types: string[];
   certifications: string[];
@@ -468,10 +469,13 @@ export function WorkerProfileScreen() {
 
         {/* Handle. There is no identity verification, so no "verified" tick. */}
         <div className="flex items-center gap-2 mb-[2px] min-w-0">
-          <h1 className="text-[22px] font-bold text-black min-w-0 break-words [overflow-wrap:anywhere]">@{profile.username}</h1>
+          <h1 className="text-[22px] font-bold text-black min-w-0 break-words [overflow-wrap:anywhere]">
+            {profile.name?.trim() || `@${profile.username}`}
+          </h1>
         </div>
 
         <p className="text-[#6B7280] text-[13px] font-medium mb-1">
+          {profile.name?.trim() && <>@{profile.username} · </>}
           {profile.role !== 'worker' && profile.company_name
             ? <><span className="text-black font-semibold">{profile.company_name}</span> · <span className="capitalize">{profile.role === 'staffer' ? 'Agency' : profile.role}</span></>
             : <span className="capitalize">{profile.role === 'staffer' ? 'Agency' : profile.role}</span>}

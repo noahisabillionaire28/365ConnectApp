@@ -19,7 +19,7 @@ router.get('/roster', requireAuth, async (req, res) => {
   if (ids.length) {
     const { data: users, error: uErr } = await adminDb
       .from('users')
-      .select('id, username, photo_url, role, rating, job_types, primary_job_type, certifications, is_pro, company_name')
+      .select('id, username, name, photo_url, role, rating, job_types, primary_job_type, certifications, is_pro, company_name')
       .in('id', ids);
     if (uErr) return res.status(500).json({ error: uErr.message });
     for (const u of users ?? []) userMap.set(u.id, u);
@@ -63,7 +63,7 @@ router.get('/followers/:userId', requireAuth, async (req, res) => {
 
   const { data: users, error: uErr } = await adminDb
     .from('users')
-    .select('id, username, photo_url, role, company_name')
+    .select('id, username, name, photo_url, role, company_name')
     .in('id', ids);
   if (uErr) return res.status(500).json({ error: uErr.message });
   const byId = new Map((users ?? []).map((u) => [u.id, u]));

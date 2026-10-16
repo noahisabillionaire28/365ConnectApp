@@ -216,7 +216,7 @@ function MyApplicationsSection() {
 /* ── Rosters you're on (worker) ──────────────────────────────────────────── */
 type RosterOwner = {
   id: string; username: string | null; photo_url: string | null;
-  role: 'client' | 'staffer' | 'worker' | 'admin' | null; company_name: string | null; followed_at?: string;
+  role: 'client' | 'staffer' | 'worker' | 'admin' | null; name?: string | null; company_name: string | null; followed_at?: string;
 };
 
 /**
@@ -256,7 +256,7 @@ function RostersOnSection() {
     } finally { setBusy(false); }
   }
 
-  const labelFor = (o: RosterOwner) => o.company_name || (o.username ? `@${o.username}` : 'this poster');
+  const labelFor = (o: RosterOwner) => (o.role === 'staffer' ? o.company_name || o.name : o.name || o.company_name) || (o.username ? `@${o.username}` : 'this poster');
 
   if (q.isError || (!q.isLoading && owners.length === 0)) return null;
 

@@ -14,6 +14,7 @@
  * shift_requests are kept in step; capacity is re-derived.
  */
 import { Router } from 'express';
+import { posterMap, shiftLabel } from '../lib/poster.js';
 import { z } from 'zod';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
@@ -107,10 +108,11 @@ async function assertSwapTarget(workerId: string, actorId: string, shift: ShiftR
 }
 
 /** "Bartender shift on Sat, Oct 4 · 5:00 PM PDT at Corbin Events" */
-function shiftBlurb(shift: SwapShift | ShiftRow): string {
+async function shiftBlurb(shift: SwapShift | ShiftRow): Promise<string> {
   const role = shift.job_type || shift.title || 'shift';
   const when = formatShiftInstant(shift.start_time, shift.timezone);
-  const company = 'company_name' in shift && shift.company_name ? ` at ${shift.company_name}` : '';
+  const label = shiftLabel(shift, await posterMap(adminDb, [shift.client_id]));
+  const company = label ? ` at ${label}` : '';
   return `${role} shift${when ? ` on ${when}` : ''}${company}`;
 }
 
@@ -186,7 +188,7 @@ router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
       fromUserId: me,
       type: 'swap_offer',
       title: 'Shift swap offer',
-      body: `${meName} wants you to take their ${shiftBlurb((full as SwapShift | null) ?? shift)}.${note ? ` "${note}"` : ''}`,
+      body: `${meName} wants you to take their ${await shiftBlurb((full as SwapShift | null) ?? shift)}.${note ? ` "${note}"` : ''}`,
       shiftId: shift_id,
       url: `/shift/${shift_id}`,
     });
