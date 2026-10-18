@@ -478,6 +478,8 @@ export function ClockInScreen() {
   const startedRef = useRef(false);
   /** Set when we resumed an entry that has a server-side break still open. */
   const resumeOnBreakRef = useRef(false);
+  /** Set when the clock was already running on the server (left and came back). */
+  const resumedRef = useRef(false);
 
   /** Opens (or creates) a direct chat with whoever posted the shift. */
   async function handleContactManager() {
@@ -530,6 +532,7 @@ export function ClockInScreen() {
             return;
           }
           setEntryId(entry.id);
+          resumedRef.current = !!entry.resumed;
           if (entry.resumed) {
             const elapsedSinceClockIn = Math.max(0, Math.floor((Date.now() - new Date(entry.clockInISO).getTime()) / 1000));
             // Open server-side break: count its elapsed time and resume on-break.
@@ -598,7 +601,8 @@ export function ClockInScreen() {
       }
       setPhase('active');
       shiftRef.current = setInterval(() => setShiftSecs((s) => s + 1), 1000);
-      showToast('Clocked in. Your timer has started.');
+      // Coming back mid-shift picks the running clock up; it does not start a new one.
+      showToast(resumedRef.current ? "You're still on the clock." : 'Clocked in. Your timer has started.');
     }, 1600);
     return () => clearTimeout(t);
   // showToast is stable (useCallback with [] deps) — safe to omit from deps
