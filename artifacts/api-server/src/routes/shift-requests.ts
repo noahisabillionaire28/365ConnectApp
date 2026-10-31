@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { limitUser } from '../lib/rateLimit.js';
 import { POSTER_COLS, posterLabel } from '../lib/poster.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
@@ -92,7 +93,7 @@ router.get('/', requireAuth, async (req, res) => {
  * a live (pending / accepted / standby) request already. A declined offer can
  * be sent again: the old row goes back to pending and the worker is told.
  */
-router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
+router.post('/', limitUser(60, 3600000), requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const { shift_id, worker_id, message } = req.body as Record<string, string>;
   if (!shift_id || !worker_id) {
     return res.status(400).json({ error: 'shift_id and worker_id are required' });
@@ -195,7 +196,7 @@ function matchesJobTypes(
  * already has a request or application for the shift, caps at 200 per call,
  * and only notifies the workers whose request rows were newly created.
  */
-router.post('/broadcast', requireAuth, requireRole('client', 'staffer'), async (req, res) => {
+router.post('/broadcast', limitUser(6, 3600000, 'You can send a few broadcasts an hour. Please wait a bit.'), requireAuth, requireRole('client', 'staffer'), async (req, res) => {
   const { shift_id, message } = req.body as Record<string, string>;
   if (!shift_id) return res.status(400).json({ error: 'shift_id is required' });
   try {

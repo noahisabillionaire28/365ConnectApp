@@ -69,6 +69,11 @@ const PRO_SUBSCRIPTION_PRICE = 17.0;
 
 /** POST /api/payments — record the (simulated) Pro subscription payment */
 router.post('/', requireAuth, async (req, res) => {
+  // Pro is not on sale yet: this test-only route stays closed unless the
+  // deployment opts in. Granting is_pro must never be free for the asking.
+  if (process.env['ALLOW_SIMULATED_PRO'] !== 'true') {
+    return res.status(403).json({ error: "Pro subscriptions aren't available yet." });
+  }
   const { payment_type } = req.body as Record<string, unknown>;
   if (payment_type !== 'pro_subscription') {
     return res.status(400).json({

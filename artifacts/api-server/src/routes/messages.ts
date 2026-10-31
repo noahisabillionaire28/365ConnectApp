@@ -1,4 +1,7 @@
 import { Router } from 'express';
+import { limitUser } from '../lib/rateLimit.js';
+import { isUuid } from '../lib/validate.js';
+import { isOurUploadUrl } from '../lib/media.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { broadcastToUser } from '../lib/sseManager.js';
@@ -19,7 +22,10 @@ const ALLOWED_REACTIONS = ['👍', '❤️', '😂', '‼️', '❓', '🙌', '�
  *   ?q=<text>       search within the thread
  *   ?limit=30
  */
-router.get('/:conversationId', requireAuth, async (req, res) => {
+router.get('/:conversationId',
+  // GET /flush-scheduled (the daily cron) is a different route further down.
+  (req, _res, next) => (req.params.conversationId === 'flush-scheduled' ? next('route') : next()),
+  requireAuth, async (req, res) => {
   const { before, limit = '30', q } = req.query as Record<string, string>;
   const conv = await conversationForUser(String(req.params.conversationId), req.userId!);
   if (!conv) return res.status(403).json({ error: 'Not a participant' });
@@ -71,19 +77,22 @@ router.get('/:conversationId/readers', requireAuth, async (req, res) => {
 });
 
 /** POST /api/messages — send a message */
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', limitUser(60, 60000), requireAuth, async (req, res) => {
   const b = req.body as Record<string, unknown>;
   const conversation_id = typeof b.conversation_id === 'string' ? b.conversation_id : null;
   if (!conversation_id) return res.status(400).json({ error: 'conversation_id required' });
   const text       = typeof b.text === 'string' && b.text.trim() ? b.text.trim().slice(0, 4000) : null;
-  const image_url  = typeof b.image_url === 'string' ? b.image_url : null;
-  const video_url  = typeof b.video_url === 'string' ? b.video_url : null;
-  const voice_url  = typeof b.voice_url === 'string' ? b.voice_url : null;
-  const file_url   = typeof b.file_url === 'string' ? b.file_url : null;
+  // Attachments must be files the app uploaded to our own bucket: a message
+  // can never carry a link to a tracking pixel or a look-alike download.
+  const media = (k: string) => (b[k] == null || b[k] === '' ? null : isOurUploadUrl(b[k]) ? (b[k] as string) : undefined);
+  const image_url = media('image_url'), video_url = media('video_url'), voice_url = media('voice_url'), file_url = media('file_url');
+  if ([image_url, video_url, voice_url, file_url].includes(undefined)) {
+    return res.status(400).json({ error: "That attachment isn't one of your uploads. Pick it from your device and try again." });
+  }
   const file_name  = typeof b.file_name === 'string' ? b.file_name.slice(0, 200) : null;
-  const file_size  = typeof b.file_size === 'number' ? Math.round(b.file_size) : null;
-  const shift_card_id = typeof b.shift_card_id === 'string' ? b.shift_card_id : null;
-  const reply_to_id   = typeof b.reply_to_id === 'string' ? b.reply_to_id : null;
+  const file_size  = typeof b.file_size === 'number' && Number.isFinite(b.file_size) ? Math.max(0, Math.round(b.file_size)) : null;
+  const shift_card_id = isUuid(b.shift_card_id) ? b.shift_card_id : null;
+  const reply_to_id   = isUuid(b.reply_to_id) ? b.reply_to_id : null;
   const client_key    = typeof b.client_key === 'string' ? b.client_key.slice(0, 80) : null;
   if (!text && !image_url && !video_url && !voice_url && !file_url && !shift_card_id) {
     return res.status(400).json({ error: 'Message must have content' });
@@ -149,28 +158,29 @@ router.patch('/read', requireAuth, async (req, res) => {
     const readAt = new Date().toISOString();
     let convId = conversation_id ?? null;
 
-    if (!message_ids?.length && !convId) return res.json({ ok: true, read_at: readAt, message_ids: [] });
-    const base = adminDb.from('messages').update({ read_at: readAt }).neq('sender_id', req.userId).is('read_at', null);
-    const { data: updated, error } = message_ids?.length
-      ? await base.in('id', message_ids).select('id, conversation_id, sender_id')
-      : await base.eq('conversation_id', convId!).select('id, conversation_id, sender_id');
-    if (error) return res.status(500).json({ error: error.message });
-    if (!convId && updated?.length) convId = updated[0].conversation_id;
-    if (!convId && message_ids?.length) {
-      const { data: any1 } = await adminDb.from('messages').select('conversation_id').eq('id', message_ids[0]).maybeSingle();
+    const ids = Array.isArray(message_ids) ? message_ids.filter(isUuid).slice(0, 500) : [];
+    if (!ids.length && !convId) return res.json({ ok: true, read_at: readAt, message_ids: [] });
+    if (convId && !isUuid(convId)) return res.status(400).json({ error: 'Invalid conversation.' });
+    // Work out which thread this is about, and that the caller is in it,
+    // BEFORE anything is written: only messages in that thread get stamped.
+    if (!convId && ids.length) {
+      const { data: any1 } = await adminDb.from('messages').select('conversation_id').eq('id', ids[0]).maybeSingle();
       convId = any1?.conversation_id ?? null;
     }
+    if (!convId) return res.json({ ok: true, read_at: readAt, message_ids: [] });
+    const conv: ConversationRow | null = await conversationForUser(convId, req.userId!);
+    if (!conv) return res.status(403).json({ error: 'Not in this conversation.' });
 
-    let conv: ConversationRow | null = null;
-    if (convId) {
-      conv = await conversationForUser(convId, req.userId!);
-      if (conv) {
-        await adminDb.from('conversation_reads').upsert(
-          { conversation_id: convId, user_id: req.userId!, last_read_at: readAt },
-          { onConflict: 'conversation_id,user_id' },
-        );
-      }
-    }
+    const base = adminDb.from('messages').update({ read_at: readAt })
+      .eq('conversation_id', convId).neq('sender_id', req.userId).is('read_at', null);
+    const { data: updated, error } = ids.length
+      ? await base.in('id', ids).select('id, conversation_id, sender_id')
+      : await base.select('id, conversation_id, sender_id');
+    if (error) return res.status(500).json({ error: error.message });
+    await adminDb.from('conversation_reads').upsert(
+      { conversation_id: convId, user_id: req.userId!, last_read_at: readAt },
+      { onConflict: 'conversation_id,user_id' },
+    );
 
     // Per-sender receipts (DM read_at) …
     const bySender = new Map<string, { conversationId: string; ids: string[] }>();

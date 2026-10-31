@@ -40,71 +40,6 @@ function friendlyProviderError(err: unknown): string {
   return msg;
 }
 
-/* ── Quick Test Login (dev-only) ──────────────────────────────────────────── */
-interface QuickLoginAccount {
-  label:     string;
-  emailKey:  keyof ImportMetaEnv;
-  passKey:   keyof ImportMetaEnv;
-}
-
-const QUICK_ACCOUNTS: QuickLoginAccount[] = [
-  { label: 'Worker',  emailKey: 'VITE_TEST_WORKER_EMAIL',  passKey: 'VITE_TEST_WORKER_PASSWORD'  },
-  { label: 'Client',  emailKey: 'VITE_TEST_CLIENT_EMAIL',  passKey: 'VITE_TEST_CLIENT_PASSWORD'  },
-  { label: 'Staffer', emailKey: 'VITE_TEST_STAFFER_EMAIL', passKey: 'VITE_TEST_STAFFER_PASSWORD' },
-  { label: 'Admin',   emailKey: 'VITE_TEST_ADMIN_EMAIL',   passKey: 'VITE_TEST_ADMIN_PASSWORD'   },
-];
-
-function QuickTestLogin({
-  onFill,
-}: {
-  onFill: (email: string, password: string) => void;
-}) {
-  if (import.meta.env['VITE_APP_ENV'] !== 'development') return null;
-
-  return (
-    <div className="mt-8 pt-6 border-t" style={{ borderColor: BORDER }}>
-      <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-center"
-        style={{ color: MUTED }}>
-        Quick Test Login — tap to fill, then tap Log In
-      </p>
-
-      <div className="grid grid-cols-2 gap-2">
-        {QUICK_ACCOUNTS.map(({ label, emailKey, passKey }) => {
-          const email    = import.meta.env[emailKey] as string | undefined;
-          const password = import.meta.env[passKey]  as string | undefined;
-          const disabled = !email || !password;
-
-          return (
-            <button
-              key={label}
-              type="button"
-              disabled={disabled}
-              onClick={() => { if (email && password) onFill(email, password); }}
-              aria-label={`Fill ${label} credentials`}
-              style={{
-                borderRadius: '12px',
-                border:       `1px solid ${disabled ? BORDER : NAVY}`,
-                background:   disabled ? '#F9FAFB' : NAVY,
-                color:        disabled ? MUTED : '#FFFFFF',
-                fontFamily:   "'Space Grotesk Variable', 'Space Grotesk', system-ui, sans-serif",
-                fontSize:     '13px',
-                fontWeight:   600,
-                padding:      '12px 8px',
-                opacity:      disabled ? 0.4 : 1,
-                cursor:       disabled ? 'not-allowed' : 'pointer',
-                transition:   'opacity 0.15s',
-                lineHeight:   1.3,
-                textAlign:    'center' as const,
-              }}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 /* ── LoginScreen ─────────────────────────────────────────────────────────── */
 export function LoginScreen() {
@@ -158,12 +93,6 @@ export function LoginScreen() {
   }
 
   // Fill form fields with test credentials so user can review and tap Log In
-  function handleFill(loginEmail: string, loginPassword: string) {
-    setEmail(loginEmail);
-    setPassword(loginPassword);
-    setError(null);
-    setInfo(null);
-  }
 
   async function handleForgotPassword() {
     if (!email) { setError('Enter your email above first, then tap Forgot password.'); return; }
@@ -355,7 +284,6 @@ export function LoginScreen() {
       </div>
 
       {/* Dev-only quick login — only visible when VITE_APP_ENV === 'development' */}
-      <QuickTestLogin onFill={handleFill} />
     </div>
   );
 }

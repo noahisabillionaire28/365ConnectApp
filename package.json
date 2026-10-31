@@ -12,5 +12,12 @@
   "devDependencies": {
     "prettier": "^3.8.4",
     "typescript": "~5.9.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "qs": ">=6.16.1",
+      "proxy-addr": ">=2.0.8",
+      "body-parser": ">=2.4.0"
+    }
   }
 }

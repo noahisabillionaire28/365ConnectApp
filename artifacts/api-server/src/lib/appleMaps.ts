@@ -30,10 +30,16 @@ export function mapsConfigured(): boolean {
   return !!(KEY_ID && KEY_PEM && TEAM_ID);
 }
 
-/** Whether a browser origin may receive a token (open when no allow-list is set). */
+/** The app's own origins: the web app and the native shell. */
+function defaultOrigins(): string[] {
+  const out = ['https://app.365connect.local', 'capacitor://localhost'];
+  try { if (process.env['APP_URL']) out.unshift(new URL(process.env['APP_URL']).origin); } catch { /* unset or malformed */ }
+  return out;
+}
+/** Whether a browser origin may receive a token: the allow-list, else the app's own origins. */
 export function originAllowed(origin: string | undefined): boolean {
-  if (ORIGINS.length === 0) return true;
-  return !!origin && ORIGINS.includes(origin);
+  const allowed = ORIGINS.length ? ORIGINS : defaultOrigins();
+  return !!origin && allowed.includes(origin);
 }
 
 let keyPromise: Promise<CryptoKey> | null = null;

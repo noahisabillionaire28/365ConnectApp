@@ -19,7 +19,10 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || '/messages';
+  // Only paths inside the app: a push payload must never be able to send
+  // the person to another site.
+  const raw = (event.notification.data && event.notification.data.url) || '/messages';
+  const url = typeof raw === 'string' && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/messages';
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const client of list) {

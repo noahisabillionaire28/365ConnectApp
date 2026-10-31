@@ -318,7 +318,8 @@ router.post('/approve', requireAuth, async (req, res) => {
       : (entry.break_minutes ?? 0);
     let billable: number;
     if (typeof body.total_hours === 'number' && Number.isFinite(body.total_hours)) {
-      billable = round2(Math.max(0, body.total_hours));
+      // A shift is at most a day long; anything bigger is a typo or a fake timesheet.
+      billable = round2(Math.min(24, Math.max(0, body.total_hours)));
     } else {
       billable = billableHours(clockIn, clockOut, breakMin);
     }

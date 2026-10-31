@@ -17,8 +17,8 @@ function linkErrorFromHash(): string | null {
   if (!err && !code) return null;
   if (/expired/i.test(code)) return 'This reset link has expired. Links only work for a short while — send yourself a new one below.';
   if (/invalid|otp/i.test(code) || /access_denied/i.test(err ?? '')) return 'This reset link is invalid or has already been used. Send yourself a new one below.';
-  const description = params.get('error_description');
-  return description ? description.replace(/\+/g, ' ') : 'This reset link could not be used. Send yourself a new one below.';
+  // Only our own wording: a crafted link must not be able to put a message on this page.
+  return 'This reset link could not be used. Send yourself a new one below.';
 }
 
 export function ResetPasswordScreen() {
@@ -52,8 +52,8 @@ export function ResetPasswordScreen() {
       setError("Passwords don't match.");
       return;
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
       return;
     }
     setLoading(true);
@@ -135,7 +135,7 @@ export function ResetPasswordScreen() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               disabled={!hasSession}
-              placeholder="Min. 6 characters"
+              placeholder="Min. 8 characters"
               className="w-full rounded-[14px] px-4 py-4 font-medium text-[15px] outline-none transition-colors placeholder:text-[#6B7280] disabled:opacity-40"
               style={{ background: '#FFFFFF', border: `1px solid ${BORDER}`, color: TEXT }}
             />
