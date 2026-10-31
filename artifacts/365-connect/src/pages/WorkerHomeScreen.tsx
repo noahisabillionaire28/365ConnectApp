@@ -16,7 +16,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
-import { Bell, Wallet, Navigation, SearchCheck, ChevronRight, Repeat2, Send, Clock3 } from 'lucide-react';
+import { Bell, Wallet, Navigation, SearchCheck, ChevronRight, Repeat2, Send, Clock3, Compass } from 'lucide-react';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { InstallBanner } from '@/components/InstallBanner';
 import { AppMap } from '@/components/AppMap';
@@ -203,6 +203,10 @@ export function WorkerHomeScreen() {
             <p className="text-white/75 text-[15px] mt-0.5">{today}</p>
           </div>
           <div className="flex gap-2.5 flex-shrink-0">
+            <button type="button" onClick={() => navigate('/explore')} aria-label="Explore the community"
+              className="w-11 h-11 rounded-full flex items-center justify-center active:bg-white/20" style={{ background: 'rgba(255,255,255,0.12)' }}>
+              <Compass size={20} aria-hidden />
+            </button>
             <button type="button" onClick={() => navigate('/notifications')}
               aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
               className="relative w-11 h-11 rounded-full bg-white/12 flex items-center justify-center active:bg-white/20" style={{ background: 'rgba(255,255,255,0.12)' }}>

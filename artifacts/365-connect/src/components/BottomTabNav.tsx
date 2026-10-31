@@ -1,12 +1,14 @@
 /**
- * Role-driven bottom tab bar.
- * Workers  → Home | Jobs | Explore | Messages | Profile
- * Clients  → Home | Post Shift | Explore | Messages | Profile
- * Staffers → Home | Post Shift | Explore | Messages | Profile
+ * Role-driven bottom tab bar: four tabs, the things a person does every day.
+ * Workers  → Home | Jobs | Messages | Profile
+ * Clients  → Home | Post Shift | Messages | Profile
+ * Staffers → Home | Post Shift | Messages | Profile
  * Admin    → null (admin uses the left sidebar instead)
+ * Explore (the community feed) and an agency's Roster open from the Home
+ * header and from Profile → Settings.
  */
 import { Link, useLocation } from 'wouter';
-import { Home, Briefcase, Compass, MessageSquare, User, PlusCircle, Users } from 'lucide-react';
+import { Home, Briefcase, MessageSquare, User, PlusCircle } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { useRole } from '@/contexts/RoleContext';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
@@ -32,29 +34,18 @@ type Tab = {
 };
 
 const WORKER_TABS: Tab[] = [
-  { name: 'Home',     path: '/home',     activeFor: '/home',         icon: Home          },
-  { name: 'Jobs',     path: '/jobs',     activeFor: '/jobs',         icon: Briefcase     },
-  { name: 'Explore',  path: '/explore',  activeFor: '/explore',      icon: Compass       },
-  { name: 'Messages', path: '/messages', activeFor: '/messages',     icon: MessageSquare },
-  { name: 'Profile',  path: '/profile',  activeFor: '/profile',      icon: User          },
+  { name: 'Home',     path: '/home',     activeFor: '/home',     icon: Home          },
+  { name: 'Jobs',     path: '/jobs',     activeFor: '/jobs',     icon: Briefcase     },
+  { name: 'Messages', path: '/messages', activeFor: '/messages', icon: MessageSquare },
+  { name: 'Profile',  path: '/profile',  activeFor: '/profile',  icon: User          },
 ];
 
-const CLIENT_TABS: Tab[] = [
-  { name: 'Home',       path: '/home',             activeFor: '/home',        icon: Home          },
-  { name: 'Post Shift', path: '/post-shift/name', activeFor: '/post-shift',  icon: PlusCircle    },
-  { name: 'Explore',    path: '/explore',           activeFor: '/explore',     icon: Compass       },
-  { name: 'Messages',   path: '/messages',          activeFor: '/messages',    icon: MessageSquare },
-  { name: 'Profile',    path: '/profile',           activeFor: '/profile',     icon: User          },
-];
-
-// An agency runs on its roster, so it gets a Roster tab; worker discovery
-// lives on Home → Browse Workers (and /explore stays reachable from there).
-const STAFFER_TABS: Tab[] = [
-  { name: 'Home',       path: '/home',                activeFor: '/home',           icon: Home          },
-  { name: 'Post Shift', path: '/post-shift/name', activeFor: '/post-shift',  icon: PlusCircle    },
-  { name: 'Roster',     path: '/roster',               activeFor: '/roster',         icon: Users         },
-  { name: 'Messages',   path: '/messages',             activeFor: '/messages',       icon: MessageSquare },
-  { name: 'Profile',    path: '/profile',              activeFor: '/profile',        icon: User          },
+// Clients and agencies share one bar; an agency's roster is a tap away on Home.
+const POSTER_TABS: Tab[] = [
+  { name: 'Home',       path: '/home',            activeFor: '/home',       icon: Home          },
+  { name: 'Post shift', path: '/post-shift/name', activeFor: '/post-shift', icon: PlusCircle    },
+  { name: 'Messages',   path: '/messages',        activeFor: '/messages',   icon: MessageSquare },
+  { name: 'Profile',    path: '/profile',         activeFor: '/profile',    icon: User          },
 ];
 
 const ACTIVE_COLOR   = '#0A1628';
@@ -68,10 +59,7 @@ export function BottomTabNav() {
   // Admin has a sidebar — no bottom bar
   if (role === 'admin') return null;
 
-  const tabs =
-    role === 'staffer' ? STAFFER_TABS :
-    role === 'client'  ? CLIENT_TABS  :
-    WORKER_TABS;
+  const tabs = role === 'staffer' || role === 'client' ? POSTER_TABS : WORKER_TABS;
 
   return (
     <div

@@ -6,7 +6,7 @@ import {
   CreditCard, Bell, Shield, HelpCircle, LogOut,
   Edit3, CalendarDays, LifeBuoy, AlertOctagon, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
   BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck, LayoutTemplate, Trash2, FileText, ShieldCheck,
-  Receipt, Cookie, Download,
+  Receipt, Cookie, Download, Compass,
 } from 'lucide-react';
 import { LEGAL } from '@/legal/config';
 import { downloadMyData } from '@/lib/dataExport';
@@ -819,6 +819,7 @@ export function ProfileScreen() {
                     <SettingRow icon={CalendarCheck} label="Availability" onTap={() => go('/profile/edit#availability')} />
                   )}
                   <SettingRow icon={Bell} label="Notifications" onTap={() => go('/notification-settings')} />
+                  <SettingRow icon={Compass} label="Explore the community" onTap={() => go('/explore')} />
                 </div>
 
                 {(profile.role === 'client' || profile.role === 'staffer') && (

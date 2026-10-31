@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation, useSearch, Redirect } from 'wouter';
 import {
-  Bell, Search, PlusCircle, SlidersHorizontal,
+  Bell, Compass, PlusCircle, SlidersHorizontal,
   Briefcase, CalendarDays, Clock3, MapPin,
   Users, ChevronRight, Repeat2,
 } from 'lucide-react';
@@ -39,9 +39,15 @@ function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => voi
             <PlusCircle size={16} aria-hidden className="text-black" />
           </button>
         )}
-        <button type="button" aria-label={role === 'worker' ? 'Search shifts' : 'Search'} onClick={() => navigate(role === 'worker' ? '/jobs' : '/explore')}
+        {role === 'staffer' && (
+          <button type="button" aria-label="My roster" onClick={() => navigate('/roster')}
+            className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
+            <Users size={16} aria-hidden className="text-[#6B7280]" />
+          </button>
+        )}
+        <button type="button" aria-label="Explore the community" onClick={() => navigate('/explore')}
           className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
-          <Search size={16} aria-hidden className="text-[#6B7280]" />
+          <Compass size={16} aria-hidden className="text-[#6B7280]" />
         </button>
         <button type="button"
           aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
