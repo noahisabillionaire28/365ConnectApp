@@ -58,7 +58,7 @@ router.post('/', requireAuth, requireRole('client', 'staffer'), async (req, res)
 
     const { data, error } = await adminDb
       .from('shift_updates')
-      .insert({ shift_id, author_id: req.userId, kind: k, body: body.trim() })
+      .insert({ shift_id, author_id: req.userId, kind: k, body: body.trim().slice(0, 2000) })
       .select().single();
     if (error) return res.status(500).json({ error: error.message });
 

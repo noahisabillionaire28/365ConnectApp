@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { limitUser } from '../lib/rateLimit.js';
+import { isUuid } from '../lib/validate.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { broadcastToUser } from '../lib/sseManager.js';
@@ -116,11 +118,14 @@ router.get('/unread-count', requireAuth, async (req, res) => {
  * thread already exists, it is re-pinned to that shift instead of a second
  * thread being created.
  */
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', limitUser(30, 3600000), requireAuth, async (req, res) => {
   const { other_user_id, shift_id } = req.body as Record<string, string | undefined>;
   const myId = req.userId!;
   const otherId = other_user_id;
   if (!otherId) return res.status(400).json({ error: 'other_user_id required' });
+  // Both ids are interpolated into a PostgREST filter below: anything that
+  // is not a UUID is refused before it can change the query's shape.
+  if (!isUuid(otherId) || (shift_id != null && !isUuid(shift_id))) return res.status(400).json({ error: 'Invalid id.' });
   if (otherId === myId) return res.status(400).json({ error: "You can't message yourself" });
   if (await isBlockedEitherWay(myId, otherId)) return res.status(403).json({ error: "You can't message this person." });
 

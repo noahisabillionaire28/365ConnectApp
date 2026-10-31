@@ -97,7 +97,7 @@ export function SignUpScreen() {
   async function handleSignUp() {
     const address = email.trim().toLowerCase();
     if (!address) { setError('Enter your email address.'); return; }
-    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (password.length < 8) { setError('Password must be at least 8 characters.'); return; }
     if (!agreed) { setError('Please confirm you are 18 or older and agree to the Terms of Service and Privacy Policy.'); return; }
     setLoading(true); setError(null);
     try {
@@ -290,7 +290,7 @@ export function SignUpScreen() {
               onKeyDown={e => e.key === 'Enter' && handleSignUp()}
               className="w-full rounded-[12px] px-4 py-3.5 pr-12 outline-none font-medium text-[15px] transition-colors placeholder:text-[#9CA3AF]"
               style={{ border: `1px solid ${BORDER}`, color: TEXT, background: '#FFFFFF' }}
-              placeholder="Min. 6 characters"
+              placeholder="Min. 8 characters"
               data-testid="input-password"
             />
             <button type="button" onClick={() => setShowPw(v => !v)} aria-label={showPw ? 'Hide password' : 'Show password'} aria-pressed={showPw}

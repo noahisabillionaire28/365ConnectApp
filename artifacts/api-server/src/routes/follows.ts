@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { limitUser } from '../lib/rateLimit.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
@@ -99,7 +100,7 @@ router.get('/counts/:userId', requireAuth, async (req, res) => {
 });
 
 /** POST /api/follows — follow a worker (self-follow and non-workers are rejected) */
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', limitUser(60, 3600000), requireAuth, async (req, res) => {
   const { following_id } = req.body as { following_id?: string };
   if (!following_id || typeof following_id !== 'string') {
     return res.status(400).json({ error: 'following_id is required' });

@@ -63,6 +63,7 @@ function priceIcon(label: string, selected: boolean): L.DivIcon {
   const bg = selected ? '#0A1628' : '#FFFFFF';
   const fg = selected ? '#FFFFFF' : '#0A1628';
   const bd = selected ? '#0A1628' : '#D1D5DB';
+  const text = label.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
   const w = Math.max(44, Math.round(18 + label.length * 8.5));
   const h = 28;
   return L.divIcon({
@@ -70,7 +71,7 @@ function priceIcon(label: string, selected: boolean): L.DivIcon {
     html:
       `<div style="width:${w}px;height:${h}px;display:flex;align-items:center;justify-content:center;` +
       `background:${bg};color:${fg};border:1.5px solid ${bd};border-radius:9999px;font-weight:800;` +
-      `font-size:12px;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,0.35);cursor:pointer;">${label}</div>`,
+      `font-size:12px;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,0.35);cursor:pointer;">${text}</div>`,
     iconSize: [w, h],
     iconAnchor: [w / 2, h / 2],
   });

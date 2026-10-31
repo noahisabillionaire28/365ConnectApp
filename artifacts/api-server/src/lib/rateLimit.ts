@@ -71,3 +71,14 @@ export function rateLimit(opts: RateLimitOptions) {
     next();
   };
 }
+
+/**
+ * Per-user limiter for signed-in routes (falls back to the IP before auth
+ * runs). `max` requests per `windowMs` per account.
+ */
+export function limitUser(max: number, windowMs: number, message?: string) {
+  return rateLimit({
+    windowMs, max, message,
+    keys: (req) => [`u:${(req as Request & { userId?: string }).userId ?? clientIp(req)}`],
+  });
+}

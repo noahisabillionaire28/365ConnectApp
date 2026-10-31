@@ -1,21 +1,3 @@
-/** Light map style for white-theme screens (Post Shift Step 3, etc.) */
-export const LIGHT_MAP_STYLES: google.maps.MapTypeStyle[] = [
-  { elementType: 'geometry',              stylers: [{ color: '#f5f5f5' }] },
-  { elementType: 'labels.icon',           stylers: [{ visibility: 'off' }] },
-  { elementType: 'labels.text.fill',      stylers: [{ color: '#6B7280' }] },
-  { elementType: 'labels.text.stroke',    stylers: [{ color: '#f5f5f5' }] },
-  { featureType: 'administrative',        elementType: 'geometry',            stylers: [{ color: '#e8e8e8' }] },
-  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#6B7280' }] },
-  { featureType: 'poi',                   stylers: [{ visibility: 'off' }] },
-  { featureType: 'road',                 elementType: 'geometry',            stylers: [{ color: '#ffffff' }] },
-  { featureType: 'road',                 elementType: 'geometry.stroke',     stylers: [{ color: '#e8e8e8' }] },
-  { featureType: 'road',                 elementType: 'labels.text.fill',    stylers: [{ color: '#9e9e9e' }] },
-  { featureType: 'road.highway',         elementType: 'geometry',            stylers: [{ color: '#dadada' }] },
-  { featureType: 'road.highway',         elementType: 'labels.text.fill',    stylers: [{ color: '#6B7280' }] },
-  { featureType: 'transit',              stylers: [{ visibility: 'off' }] },
-  { featureType: 'water',               elementType: 'geometry',            stylers: [{ color: '#c9c9c9' }] },
-  { featureType: 'water',               elementType: 'labels.text.fill',    stylers: [{ color: '#9e9e9e' }] },
-];
 
 /** Build a black teardrop pin SVG data-URI for light-theme maps */
 export function blackPinUrl(selected: boolean): string {
@@ -116,26 +98,7 @@ export function navyPinUrl(selected: boolean): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-/** Shared Google Maps dark night-mode style for 365 Connect */
-export const DARK_MAP_STYLES: google.maps.MapTypeStyle[] = [
-  { elementType: 'geometry',            stylers: [{ color: '#0d0d0d' }] },
-  { elementType: 'labels.icon',         stylers: [{ visibility: 'off' }] },
-  { elementType: 'labels.text.fill',    stylers: [{ color: '#555555' }] },
-  { elementType: 'labels.text.stroke',  stylers: [{ color: '#0d0d0d' }] },
-  { featureType: 'administrative',      elementType: 'geometry',            stylers: [{ color: '#111111' }] },
-  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#555555' }] },
-  { featureType: 'poi',                 stylers: [{ visibility: 'off' }] },
-  { featureType: 'road',               elementType: 'geometry',            stylers: [{ color: '#1a1a1a' }] },
-  { featureType: 'road',               elementType: 'geometry.stroke',     stylers: [{ color: '#090909' }] },
-  { featureType: 'road',               elementType: 'labels.text.fill',    stylers: [{ color: '#3d3d3d' }] },
-  { featureType: 'road.highway',       elementType: 'geometry',            stylers: [{ color: '#252525' }] },
-  { featureType: 'road.highway',       elementType: 'labels.text.fill',    stylers: [{ color: '#555555' }] },
-  { featureType: 'transit',            stylers: [{ visibility: 'off' }] },
-  { featureType: 'water',              elementType: 'geometry',            stylers: [{ color: '#000000' }] },
-  { featureType: 'water',              elementType: 'labels.text.fill',    stylers: [{ color: '#111111' }] },
-];
 
-/** Build a gold teardrop pin SVG data-URI for use as a google.maps.Marker icon */
 export function goldPinUrl(selected: boolean): string {
   const size   = selected ? 38 : 30;
   const height = Math.round(size * 1.28);

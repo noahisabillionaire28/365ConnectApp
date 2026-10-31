@@ -88,7 +88,7 @@ router.get('/', requireAuth, async (req, res) => {
       .eq('user_id', req.userId)
       .eq('hidden', false)
       .order('created_at', { ascending: false })
-      .limit(parseInt(limit));
+      .limit(Math.min(Math.max(parseInt(limit) || 50, 1), 100));
     if (error) return res.status(500).json({ error: error.message });
 
     const rows = notifications ?? [];

@@ -16,6 +16,7 @@
  * tick still catches everything; dedupe makes the overlap harmless.
  */
 import { Router } from 'express';
+import { timingSafeEqual } from 'node:crypto';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { createNotification } from './notifications.js';
 import { logger } from '../lib/logger.js';
@@ -31,7 +32,10 @@ export function cronAuthorized(authHeader: unknown): boolean {
     logger.warn('CRON_SECRET is not set — scheduled routes are disabled');
     return false;
   }
-  return typeof authHeader === 'string' && authHeader === `Bearer ${secret}`;
+  if (typeof authHeader !== 'string') return false;
+  const given = Buffer.from(authHeader);
+  const want = Buffer.from(`Bearer ${secret}`);
+  return given.length === want.length && timingSafeEqual(given, want);
 }
 
 function whenLabel(iso: string, tz: string | null | undefined): string {

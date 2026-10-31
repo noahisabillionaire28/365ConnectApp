@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { limitUser } from '../lib/rateLimit.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { sendError } from '../lib/httpError.js';
@@ -203,7 +204,7 @@ async function hasParticipantApplication(shiftId: string, workerId: string): Pro
  * (accepted / no_show), or they were booked on it and the reviewee is the
  * shift owner. 403 otherwise.
  */
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', limitUser(20, 3600000), requireAuth, async (req, res) => {
   const { shift_id, reviewee_id, rating, comment, positive_tags, negative_tags } = req.body as Record<string, unknown>;
   if (!shift_id || typeof shift_id !== 'string' || !reviewee_id || typeof reviewee_id !== 'string') {
     return res.status(400).json({ error: 'shift_id and reviewee_id are required' });
@@ -242,7 +243,7 @@ router.post('/', requireAuth, async (req, res) => {
       reviewer_id: req.userId,
       reviewee_id,
       rating: ratingNum,
-      comment: typeof comment === 'string' ? comment : null,
+      comment: typeof comment === 'string' ? comment.trim().slice(0, 1000) || null : null,
       positive_tags: Array.isArray(positive_tags) ? positive_tags : [],
       negative_tags: Array.isArray(negative_tags) ? negative_tags : [],
     };

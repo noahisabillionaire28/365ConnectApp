@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { limitUser } from '../lib/rateLimit.js';
 import { posterMap, shiftLabel as posterShiftLabel } from '../lib/poster.js';
 import { z } from 'zod';
 import { adminDb } from '../lib/supabaseAdmin.js';
@@ -419,7 +420,7 @@ router.get('/my-shift-ids', requireAuth, async (req, res) => {
  * has a live (pending/accepted/standby) application. A withdrawn/declined row
  * is reused so the worker can apply again.
  */
-router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
+router.post('/', limitUser(30, 3600000), requireAuth, requireRole('worker'), async (req, res) => {
   const { shift_id, match_score, message } = req.body as Record<string, unknown>;
   if (!shift_id || typeof shift_id !== 'string') {
     return res.status(400).json({ error: 'shift_id is required' });
@@ -474,7 +475,7 @@ router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
         .update({
           status: newStatus,
           match_score: typeof match_score === 'number' ? match_score : null,
-          message: typeof message === 'string' ? message : null,
+          message: typeof message === 'string' ? message.trim().slice(0, 1000) || null : null,
         })
         .eq('id', existing.id)
         .select()
@@ -489,7 +490,7 @@ router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
           worker_id: req.userId,
           status: newStatus,
           match_score: typeof match_score === 'number' ? match_score : null,
-          message: typeof message === 'string' ? message : null,
+          message: typeof message === 'string' ? message.trim().slice(0, 1000) || null : null,
         })
         .select()
         .maybeSingle();
@@ -774,7 +775,7 @@ router.post('/withdraw', requireAuth, requireRole('worker'), async (req, res) =>
  * No approval step: if the shift is marked instant_claim and has an open spot,
  * the worker is confirmed immediately (first-come, first-served).
  */
-router.post('/claim', requireAuth, requireRole('worker'), async (req, res) => {
+router.post('/claim', limitUser(30, 3600000), requireAuth, requireRole('worker'), async (req, res) => {
   const { shift_id } = req.body as Record<string, string>;
   if (!shift_id) return res.status(400).json({ error: 'shift_id is required' });
   try {

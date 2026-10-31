@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { cleanLabel } from '../lib/validate.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getRoleInfo } from '../lib/roleCache.js';
@@ -54,9 +55,10 @@ router.get('/', requireAuth, async (req, res) => {
 
     // "all" lists every non-admin account (admin tooling); anything else is a role.
     if (role !== 'all') q = q.eq('role', role);
-    if (job_type) {
+    const jobType = cleanLabel(job_type, 'job_type');
+    if (jobType) {
       q = q.or(
-        `primary_job_type.eq.${job_type},job_types.cs.{${job_type}},secondary_job_types.cs.{${job_type}}`,
+        `primary_job_type.eq.${jobType},job_types.cs.{${jobType}},secondary_job_types.cs.{${jobType}}`,
       );
     }
     // Name search for pickers (swap sheet). Pattern characters are stripped so

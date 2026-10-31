@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { limitUser } from '../lib/rateLimit.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { pushConfigured, pushPublicKey, pushToUser } from '../lib/push.js';
@@ -67,7 +68,7 @@ router.get('/status', requireAuth, async (req, res) => {
 });
 
 /** POST /api/push/test — send myself a test notification. */
-router.post('/test', requireAuth, async (req, res) => {
+router.post('/test', limitUser(5, 3600000), requireAuth, async (req, res) => {
   if (!pushConfigured() && !apnsConfigured()) return res.status(503).json({ error: 'Push is not configured on the server yet.' });
   await pushToUser(req.userId!, { title: '365 Connect', body: 'Push notifications are working 🎉', url: '/messages', tag: 'test' });
   return res.json({ ok: true });

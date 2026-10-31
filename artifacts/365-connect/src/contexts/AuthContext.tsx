@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (uid) await forgetPushSubscription(uid);
     clearQueryCache();
     queryClient.clear();
-    try { localStorage.removeItem('admin_preview_role'); } catch { /* ignore */ }
+    try { localStorage.removeItem('admin_preview_role'); localStorage.removeItem('365connect:chat-outbox'); } catch { /* ignore */ }
     setAppBadgeCount(0);
     await supabase.auth.signOut();
   };

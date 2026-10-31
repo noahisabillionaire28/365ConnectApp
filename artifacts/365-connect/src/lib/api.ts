@@ -36,7 +36,9 @@ async function makeHeaders(
   userId: string | null | undefined,
 ): Promise<Record<string, string>> {
   const h: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (userId) h['x-user-id'] = userId;
+  // Identity is the bearer token; `userId` only tells callers whether a
+  // session exists. No id header is sent.
+  void userId;
   const token = await getAccessToken();
   if (token) {
     h['Authorization'] = `Bearer ${token}`;

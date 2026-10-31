@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { cleanLabel } from '../lib/validate.js';
 import { POSTER_COLS, posterLabel, shiftLabel } from '../lib/poster.js';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
@@ -175,8 +176,10 @@ router.get('/', requireAuth, async (req, res) => {
   } else {
     q = q.order('created_at', { ascending: false });
   }
-  if (job_type) {
-    q = q.or(`job_type.eq.${job_type},job_types.cs.{${job_type}}`);
+  let jobType: string | null;
+  try { jobType = cleanLabel(job_type, 'job_type'); } catch (e) { return sendError(res, e); }
+  if (jobType) {
+    q = q.or(`job_type.eq.${jobType},job_types.cs.{${jobType}}`);
   }
   const { data: rawShifts, error } = await q.range(off, off + lim - 1);
   if (error) return res.status(500).json({ error: error.message });

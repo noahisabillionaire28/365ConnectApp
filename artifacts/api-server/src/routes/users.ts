@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { isOurUploadUrl } from '../lib/media.js';
+import { cleanText } from '../lib/validate.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { invalidateRole, getRoleInfo } from '../lib/roleCache.js';
 import { requireAuth, requireSession } from '../middleware/auth.js';
@@ -63,6 +65,50 @@ async function publicView(row: Record<string, unknown>, viewerId: string | null)
  * requireAuth) on purpose: a suspended account must still be able to read its
  * own status so the app can render the suspended screen instead of a blank one.
  */
+
+/** Photo URLs may be our own uploads or the avatar a Google/Apple sign-in handed us. */
+const AVATAR_HOSTS = /(^|\.)googleusercontent\.com$/i;
+function cleanPhotoUrl(v: unknown): string | null {
+  if (v == null || v === '') return null;
+  if (isOurUploadUrl(v)) return v;
+  try {
+    const u = new URL(String(v));
+    if (u.protocol === 'https:' && AVATAR_HOSTS.test(u.hostname)) return u.toString();
+  } catch { /* fall through */ }
+  throw new HttpError(400, "That photo isn't one of your uploads. Pick it from your device and try again.");
+}
+const strList = (v: unknown, max: number, each: number, field: string): string[] => {
+  if (!Array.isArray(v) || v.length > max || v.some((x) => typeof x !== 'string' || x.length > each)) {
+    throw new HttpError(400, `${field} must be a list of up to ${max} short entries.`);
+  }
+  return v.map((x: string) => x.trim()).filter(Boolean);
+};
+const numIn = (v: unknown, lo: number, hi: number, field: string): number | null => {
+  if (v == null) return null;
+  const n = typeof v === 'number' ? v : Number(v);
+  if (!Number.isFinite(n) || n < lo || n > hi) throw new HttpError(400, `${field} is out of range.`);
+  return n;
+};
+/** Shape- and length-check the profile fields a user may write; throws HttpError. */
+function cleanProfileFields(u: Record<string, unknown>): void {
+  if ('photo_url' in u) u.photo_url = cleanPhotoUrl(u.photo_url);
+  if ('bio' in u) u.bio = cleanText(u.bio, 300, 'Bio');
+  if ('company_name' in u) u.company_name = cleanText(u.company_name, 120, 'Company name');
+  if ('primary_job_type' in u) u.primary_job_type = cleanText(u.primary_job_type, 60, 'Job type');
+  if ('job_types' in u) u.job_types = strList(u.job_types, 10, 60, 'Job types');
+  if ('secondary_job_types' in u) u.secondary_job_types = strList(u.secondary_job_types, 10, 60, 'Job types');
+  if ('certifications' in u) u.certifications = strList(u.certifications, 20, 80, 'Certifications');
+  if ('quick_replies' in u) u.quick_replies = strList(u.quick_replies, 10, 200, 'Quick replies');
+  if ('hourly_rate' in u) u.hourly_rate = numIn(u.hourly_rate, 0, 1000, 'Hourly rate');
+  if ('lat' in u) u.lat = numIn(u.lat, -90, 90, 'Location');
+  if ('lng' in u) u.lng = numIn(u.lng, -180, 180, 'Location');
+  if ('availability' in u && u.availability != null && (typeof u.availability !== 'object' || Array.isArray(u.availability))) {
+    throw new HttpError(400, 'Availability must be a set of days.');
+  }
+  for (const k of ['is_available', 'in_app_notifications', 'email_notifications']) {
+    if (k in u && u[k] != null && typeof u[k] !== 'boolean') throw new HttpError(400, `${k} must be true or false.`);
+  }
+}
 
 /** A person's name: one line, trimmed, 2–80 characters; null clears it. */
 function normalizeName(v: unknown): string | null {
@@ -196,9 +242,10 @@ router.post('/', requireAuth, async (req, res) => {
   for (const f of optional) {
     if (body[f] !== undefined && body[f] !== null) payload[f] = body[f];
   }
-  if (payload.name !== undefined) {
-    try { payload.name = normalizeName(payload.name); } catch (e) { return sendError(res, e); }
-  }
+  try {
+    if (payload.name !== undefined) payload.name = normalizeName(payload.name);
+    cleanProfileFields(payload);
+  } catch (e) { return sendError(res, e); }
 
   const { data: existing } = await adminDb
     .from('users').select('role, username, email').eq('id', req.userId).maybeSingle();
@@ -276,9 +323,10 @@ router.patch('/me', requireAuth, async (req, res) => {
   if ('phone' in updates) {
     try { updates.phone = normalizePhone(updates.phone); } catch (e) { return sendError(res, e); }
   }
-  if ('name' in updates) {
-    try { updates.name = normalizeName(updates.name); } catch (e) { return sendError(res, e); }
-  }
+  try {
+    if ('name' in updates) updates.name = normalizeName(updates.name);
+    cleanProfileFields(updates);
+  } catch (e) { return sendError(res, e); }
 
   const { data, error } = await adminDb
     .from('users')

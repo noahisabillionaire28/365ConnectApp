@@ -5,6 +5,7 @@
  * Add ?refresh=1 to bypass the cache.
  */
 import { Router } from 'express';
+import { limitUser } from '../lib/rateLimit.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { assertShiftOwner } from '../lib/shiftAccess.js';
@@ -43,7 +44,7 @@ router.get('/shift/:id', requireAuth, async (req, res) => {
   } catch (e) { return sendError(res, e); }
 });
 
-router.get('/me/:id', requireAuth, async (req, res) => {
+router.get('/me/:id', limitUser(30, 3600000), requireAuth, async (req, res) => {
   const id = String(req.params.id);
   try {
     const shift = await loadFull(id);

@@ -4,6 +4,7 @@
  * Mounted at /admin/* under the /api prefix → full paths: /api/admin/*
  */
 import { Router } from 'express';
+import { limitUser } from '../lib/rateLimit.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { invalidateRole } from '../lib/roleCache.js';
 import { sendEmailDetailed, renderNotificationEmail, appUrl } from '../lib/email.js';
@@ -211,7 +212,7 @@ router.post('/shifts/backfill-coords', async (req, res) => {
 /* ── POST /api/admin/test-email ──────────────────────────────────────────────
  * Sends a test email to the admin's own address to verify Resend is configured.
  * Returns { sent, to, configured }. Admin-only. */
-router.post('/test-email', async (req, res) => {
+router.post('/test-email', limitUser(10, 3600000), async (req, res) => {
   try {
     const override = typeof req.body?.to === 'string' ? req.body.to.trim() : '';
     let to = override || undefined;

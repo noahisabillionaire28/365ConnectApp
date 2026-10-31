@@ -3,6 +3,7 @@
  * enrichment, previews, blocks, system messages, and scheduled-message flush.
  */
 import { adminDb } from './supabaseAdmin.js';
+import { isUuid } from './validate.js';
 import { broadcastToUser } from './sseManager.js';
 import { pushToUsers } from './push.js';
 
@@ -157,6 +158,8 @@ export function notifyConversationUpdate(conv: ConversationRow): void {
 
 /** Has either user blocked the other? */
 export async function isBlockedEitherWay(a: string, b: string): Promise<boolean> {
+  // Ids are placed in a filter string; a malformed one is treated as blocked.
+  if (!isUuid(a) || !isUuid(b)) return true;
   const { count } = await adminDb
     .from('user_blocks')
     .select('*', { count: 'exact', head: true })
@@ -166,6 +169,7 @@ export async function isBlockedEitherWay(a: string, b: string): Promise<boolean>
 
 /** Ids of everyone I've blocked or who blocked me. */
 export async function blockedIdsFor(userId: string): Promise<Set<string>> {
+  if (!isUuid(userId)) return new Set();
   const { data } = await adminDb
     .from('user_blocks')
     .select('blocker_id, blocked_id')

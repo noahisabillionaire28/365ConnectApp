@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { limitUser } from '../lib/rateLimit.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -9,7 +10,7 @@ const VALID_TYPES = [
 ];
 
 /** POST /api/disputes — file a report against another user */
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', limitUser(5, 3600000), requireAuth, async (req, res) => {
   const { reported_user_id, type, reason, shift_id } = req.body as Record<string, unknown>;
   if (!reported_user_id || typeof reported_user_id !== 'string') {
     return res.status(400).json({ error: 'reported_user_id is required' });
@@ -28,7 +29,7 @@ router.post('/', requireAuth, async (req, res) => {
       reported_user_id,
       reported_by_user_id: req.userId,
       type: safeType,
-      reason: reason.trim(),
+      reason: reason.trim().slice(0, 2000),
       shift_id: (typeof shift_id === 'string' ? shift_id : null) ?? null,
       status: 'open',
     })
