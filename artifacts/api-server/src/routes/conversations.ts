@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { PERSON_COLS, personLabel } from '../lib/poster.js';
 import { limitUser } from '../lib/rateLimit.js';
 import { isUuid } from '../lib/validate.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
@@ -13,7 +14,7 @@ import {
 
 const router = Router();
 
-type Member = { id: string; username: string | null; photo_url: string | null; role: string | null };
+type Member = { id: string; username: string | null; photo_url: string | null; role: string | null; name?: string | null; company_name?: string | null; display_name?: string | null };
 
 /**
  * Attach the people and shift behind each conversation. DMs keep the flat
@@ -29,8 +30,8 @@ async function enrichConversations(convs: ConversationRow[], viewerId: string): 
   }
   const userMap = new Map<string, Member>();
   if (userIds.size) {
-    const { data: users } = await adminDb.from('users').select('id, username, photo_url, role').in('id', [...userIds]);
-    for (const u of users ?? []) userMap.set(u.id, u as Member);
+    const { data: users } = await adminDb.from('users').select(PERSON_COLS).in('id', [...userIds]);
+    for (const u of users ?? []) userMap.set(u.id, { ...(u as Member), display_name: personLabel(u) });
   }
   const shiftMap = new Map<string, any>();
   if (shiftIds.size) {
@@ -46,9 +47,11 @@ async function enrichConversations(convs: ConversationRow[], viewerId: string): 
     return {
       ...c,
       participant_a_username: pa?.username ?? null,
+      participant_a_name: pa?.display_name ?? null,
       participant_a_photo: pa?.photo_url ?? null,
       participant_a_role: pa?.role ?? null,
       participant_b_username: pb?.username ?? null,
+      participant_b_name: pb?.display_name ?? null,
       participant_b_photo: pb?.photo_url ?? null,
       participant_b_role: pb?.role ?? null,
       shift_title: s?.title ?? null,

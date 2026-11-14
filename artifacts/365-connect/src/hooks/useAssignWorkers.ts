@@ -6,6 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 export type AssignableWorker = {
   id: string;
   username: string | null;
+  /** The worker's own name, when they gave one. */
+  name?: string | null;
   photo_url: string | null;
   photoUrl: string | null;
   rating: number;

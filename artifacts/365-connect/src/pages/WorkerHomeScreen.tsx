@@ -190,7 +190,7 @@ export function WorkerHomeScreen() {
   const openNearby = nearby.shifts.filter((s) => !appliedShiftIds.has(s.id) && !mine.has(s.id)).slice(0, 5);
   const waiting = applied.length + standby.length;
 
-  const name = greetingName(user?.firstName, profile.username);
+  const name = greetingName(profile.name?.split(/\s+/)[0] || user?.firstName, profile.username);
   const today = new Date(now).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
@@ -287,7 +287,7 @@ export function WorkerHomeScreen() {
 
           {nearby.isLoading ? <JobCardSkeleton /> : openNearby.map((s) => (
             <JobCard key={s.id} startISO={s.startTimeISO} endISO={s.endTimeISO} timezone={s.timezone}
-              title={shiftHeadline(s)} company={s.companyName} location={s.location}
+              title={shiftHeadline(s)} company={s.companyName} location={s.location} logo={s.clientPhotoUrl}
               aside={<span className="h-7 px-3 rounded-full bg-[#ECFDF5] text-[#047857] text-[13px] font-semibold flex items-center whitespace-nowrap">${s.payRate}/{s.payPeriod}</span>}
               onTap={() => navigate(`/shift/${s.id}`)} />
           ))}

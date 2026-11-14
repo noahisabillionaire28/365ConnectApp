@@ -72,6 +72,7 @@ export function directionsUrl(lat: number, lng: number, label: string): string {
 
 /** Two-letter monogram for a business without a logo. */
 export function initials(name: string | null | undefined): string {
-  const words = (name ?? '').replace(/^@/, '').split(/[\s._-]+/).filter(Boolean);
+  // Words that start with a letter only, so "user_05d30c" gives "U", not "U0".
+  const words = (name ?? '').replace(/^@/, '').split(/[\s._-]+/).filter((w) => /^\p{L}/u.test(w));
   return ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase() || '·';
 }

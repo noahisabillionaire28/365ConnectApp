@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { limitUser } from '../lib/rateLimit.js';
-import { POSTER_COLS, posterLabel } from '../lib/poster.js';
+import { POSTER_COLS, posterLabel, labelFor } from '../lib/poster.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
@@ -75,6 +75,7 @@ router.get('/', requireAuth, async (req, res) => {
         pay_period: s?.pay_period ?? null,
         company_name: s?.company_name?.trim() || posterLabel(c),
         worker_username: w?.username ?? null,
+        worker_name: w?.name ?? null,
         worker_photo: w?.photo_url ?? null,
         client_username: c?.username ?? null,
         client_photo: c?.photo_url ?? null,
@@ -149,7 +150,7 @@ router.post('/', limitUser(60, 3600000), requireAuth, requireRole('client', 'sta
     }
     if (!data) return res.status(409).json({ error: 'Request already exists' });
 
-    const { data: w } = await adminDb.from('users').select('username').eq('id', worker_id).maybeSingle();
+    const workerLabel = await labelFor(adminDb, worker_id, 'a worker');
     const label = shift.title ? `"${shift.title}"` : 'a shift';
     // Notify the invited worker.
     await createNotification({
@@ -167,7 +168,7 @@ router.post('/', limitUser(60, 3600000), requireAuth, requireRole('client', 'sta
       fromUserId: worker_id,
       type: 'receipt',
       title: 'Request sent',
-      body: `You requested ${w?.username ? `@${w.username}` : 'a worker'} for ${label}.`,
+      body: `You requested ${workerLabel} for ${label}.`,
       shiftId: shift_id,
     });
     return res.status(201).json(data);
@@ -315,8 +316,8 @@ router.patch('/:id', requireAuth, async (req, res) => {
         .eq('id', reqRow.id).select().maybeSingle();
       if (error) return res.status(500).json({ error: error.message });
       if (reqRow.client_id) {
-        const [{ data: me }, { data: sh }] = await Promise.all([
-          adminDb.from('users').select('username').eq('id', req.userId).maybeSingle(),
+        const [meLabel, { data: sh }] = await Promise.all([
+          labelFor(adminDb, req.userId, 'A worker'),
           adminDb.from('shifts').select('title').eq('id', reqRow.shift_id).maybeSingle(),
         ]);
         await createNotification({
@@ -324,7 +325,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
           fromUserId: req.userId,
           type: 'invite_declined',
           title: 'Invite declined',
-          body: `${me?.username ? `@${me.username}` : 'A worker'} declined your invite to ${sh?.title ? `"${sh.title}"` : 'a shift'}.`,
+          body: `${meLabel} declined your invite to ${sh?.title ? `"${sh.title}"` : 'a shift'}.`,
           shiftId: reqRow.shift_id,
           url: `/shift/${reqRow.shift_id}/applicants`,
         });
@@ -398,14 +399,13 @@ router.patch('/:id', requireAuth, async (req, res) => {
     });
     // Tell the owner someone accepted.
     if (shift.client_id) {
-      const { data: me } = await adminDb
-        .from('users').select('username').eq('id', req.userId).maybeSingle();
+      const meLabel = await labelFor(adminDb, req.userId, 'A worker');
       await createNotification({
         userId: shift.client_id,
         fromUserId: req.userId,
         type: 'receipt',
         title: 'Invite accepted',
-        body: `${me?.username ? `@${me.username}` : 'A worker'} accepted ${label}.`,
+        body: `${meLabel} accepted ${label}.`,
         shiftId: reqRow.shift_id,
       });
     }

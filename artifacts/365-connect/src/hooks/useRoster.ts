@@ -6,6 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 export type RosterWorker = {
   id: string;
   username: string | null;
+  /** The worker's own name, when they gave one. */
+  name?: string | null;
   photo_url: string | null;
   /** camelCase alias */
   photoUrl: string | null;

@@ -4,6 +4,8 @@
  * shown to a worker who hasn't picked any roles yet.
  */
 import { useState } from 'react';
+import { Avatar } from '@/components/Avatar';
+import { personName } from '@/lib/person';
 import { useLocation } from 'wouter';
 import { Check, X, Inbox, Repeat2 } from 'lucide-react';
 import { useShiftRequests, isLiveOffer } from '@/hooks/useShiftRequests';
@@ -23,14 +25,15 @@ function SwapOfferCard({ s, busy, onRespond }: {
   s: MySwap; busy: boolean; onRespond: (action: 'accept' | 'decline') => void;
 }) {
   const [, navigate] = useLocation();
-  const from = s.counterpart.username ? `@${s.counterpart.username}` : 'A worker';
+  const from = personName(s.counterpart, 'A worker');
   const sh = s.shift;
   return (
     <div className="rounded-[16px] border border-[#0A1628] p-4 bg-white">
       <button type="button" onClick={() => navigate(`/shift/${s.shiftId}`)} className="w-full text-left">
-        <p className="text-[#111827] font-bold text-[15px] min-w-0 flex items-center gap-1.5">
-          <Repeat2 size={14} aria-hidden className="text-[#0A1628] flex-shrink-0" />
+        <p className="text-[#111827] font-bold text-[15px] min-w-0 flex items-center gap-2">
+          <Avatar src={s.counterpart.photoUrl} name={from} size={28} />
           <span className="truncate">{from} offered you their spot</span>
+          <Repeat2 size={14} aria-hidden className="text-[#0A1628] flex-shrink-0" />
         </p>
         <p className="text-[#6B7280] text-[12px] mt-[2px] truncate">
           {[sh?.jobType, sh?.companyName].filter(Boolean).join(' · ')}

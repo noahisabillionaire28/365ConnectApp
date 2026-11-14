@@ -2,6 +2,7 @@ import {
   MapPin, CheckCheck, XCircle, Bell, DollarSign, Star, UserPlus, Send, AlarmClock, Ban, Settings,
   Heart, MessageCircle, Clock3, FileClock, AlertTriangle, BellRing, UserMinus, Pencil, Repeat2,
 } from 'lucide-react';
+import { Avatar } from '@/components/Avatar';
 import { useLocation } from 'wouter';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { useNotifications, relativeTime, notificationDeepLink } from '@/hooks/useNotifications';
@@ -68,10 +69,21 @@ const COLOR_CLASSES: Record<IconColor, { bg: string; icon: string }> = {
   navy:  { bg: 'bg-slate-50 border-[#E5E7EB]',     icon: 'text-[#0A1628]' },
 };
 
-function SystemAvatar({ type }: { type: string }) {
+function SystemAvatar({ type, photo, name }: { type: string; photo?: string | null; name?: string | null }) {
   const meta   = ICON_META[type] ?? { icon: Bell, color: 'navy' as IconColor };
   const styles = COLOR_CLASSES[meta.color];
   const Icon   = meta.icon;
+  // From a person with a photo: their face, with what happened as a small badge.
+  if (photo) {
+    return (
+      <div className="relative w-11 h-11 flex-shrink-0" aria-hidden>
+        <Avatar src={photo} name={name} size={44} />
+        <span className={`absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] rounded-full border border-white flex items-center justify-center ${styles.bg}`}>
+          <Icon size={10} className={styles.icon} />
+        </span>
+      </div>
+    );
+  }
   return (
     <div className={`w-11 h-11 rounded-full border flex items-center justify-center flex-shrink-0 ${styles.bg}`} aria-hidden>
       <Icon size={19} className={styles.icon} />
@@ -97,7 +109,7 @@ function NotificationCard({ item, index, onOpen }: { item: NotificationRowType; 
       <div className="w-2 flex-shrink-0 flex items-center justify-center self-center">
         {isUnread && <div aria-label="Unread" className="w-2 h-2 rounded-full bg-[#0A1628]" />}
       </div>
-      <SystemAvatar type={item.type} />
+      <SystemAvatar type={item.type} photo={item.from_photo_url} name={item.from_name || item.from_username} />
       <div className="flex-1 min-w-0">
         <p className="text-black font-semibold text-[14px] leading-[1.4] break-words">{item.title}</p>
         {item.body && <p className="text-[#6B7280] text-[13px] leading-[1.4] mt-0.5 break-words">{item.body}</p>}

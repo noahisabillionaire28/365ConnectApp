@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { PERSON_COLS, personLabel, type PosterRow } from '../lib/poster.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
@@ -37,12 +38,13 @@ router.get('/:shiftId', requireAuth, async (req, res) => {
 
   const authorIds = [...new Set((rows ?? []).map((r) => r.author_id))];
   const { data: authors } = authorIds.length
-    ? await adminDb.from('users').select('id, username, photo_url').in('id', authorIds)
+    ? await adminDb.from('users').select(PERSON_COLS).in('id', authorIds)
     : { data: [] as Array<Record<string, unknown>> };
   const map = new Map((authors ?? []).map((u) => [u.id, u]));
   return res.json((rows ?? []).map((r) => ({
     ...r,
     author_username: map.get(r.author_id)?.username ?? null,
+    author_name: personLabel(map.get(r.author_id) as PosterRow | undefined),
     author_photo_url: map.get(r.author_id)?.photo_url ?? null,
   })));
 });

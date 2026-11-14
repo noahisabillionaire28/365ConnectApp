@@ -20,7 +20,7 @@ router.get('/', requireAuth, async (req, res) => {
 
   const { data: users, error: uErr } = await adminDb
     .from('users')
-    .select('id, username, photo_url, role, rating, primary_job_type, job_types, hourly_rate, bio, is_pro')
+    .select('id, username, name, photo_url, role, rating, primary_job_type, job_types, hourly_rate, bio, is_pro')
     .in('id', ids);
   if (uErr) return res.status(500).json({ error: uErr.message });
   const map = new Map((users ?? []).map((u) => [u.id, u]));

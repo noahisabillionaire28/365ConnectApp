@@ -1,4 +1,5 @@
 import { useParams, useLocation } from 'wouter';
+import { initials as monogram } from '@/lib/jobFormat';
 import { Award, Star, ChevronLeft, Heart, CalendarPlus, X, CheckCircle2, Flag, Bookmark } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api';
@@ -383,7 +384,7 @@ export function WorkerProfileScreen() {
 
       type ReviewRow = {
         id: string; rating: number; created_at: string;
-        shift_title?: string | null; shift_start_time?: string | null; reviewer_username?: string | null;
+        shift_title?: string | null; shift_start_time?: string | null; reviewer_username?: string | null; reviewer_name?: string | null;
       };
       let reviewData: ReviewRow[] = [];
       try {
@@ -394,7 +395,7 @@ export function WorkerProfileScreen() {
         id:     r.id,
         name:   r.shift_title ?? 'Untitled shift',
         date:   r.shift_start_time ? friendlyDate(r.shift_start_time) : '—',
-        client: r.reviewer_username ? `@${r.reviewer_username}` : 'Private client',
+        client: r.reviewer_name || (r.reviewer_username ? `@${r.reviewer_username}` : 'A 365 Connect member'),
         rating: r.rating,
       }));
 
@@ -433,7 +434,7 @@ export function WorkerProfileScreen() {
     );
   }
 
-  const initials  = (profile.username ?? '??').slice(0, 2).toUpperCase();
+  const initials  = monogram(profile.name || profile.username);
 
   return (
     <div className="flex flex-col h-full bg-white text-black overflow-y-auto">

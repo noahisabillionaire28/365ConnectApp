@@ -8,6 +8,7 @@ export type ShiftInvite = {
   worker_id: string;
   status: 'pending' | 'accepted' | 'declined' | 'standby' | 'cancelled' | 'expired';
   worker_username: string | null;
+  worker_name?: string | null;
   worker_photo: string | null;
   created_at: string;
 };

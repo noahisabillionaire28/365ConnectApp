@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import { Avatar } from '@/components/Avatar';
+import { personName, handleLine } from '@/lib/person';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, X, Ban, Flag, ChevronRight, Star, BadgeCheck, AlertCircle, Trash2, ExternalLink,
@@ -145,16 +147,7 @@ function UserDetailSheet({
           <div className="flex items-start justify-between mb-5">
             <div className="flex items-center gap-3">
               <div className="relative">
-                {user.photo_url ? (
-                  <img src={user.photo_url} alt={user.username ?? 'User'} loading="lazy"
-                    className="w-14 h-14 rounded-full object-cover border border-[#E5E7EB]" />
-                ) : (
-                  <div className="w-14 h-14 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
-                    <span className="text-black font-bold text-[18px]">
-                      {(user.username ?? user.email ?? 'U').slice(0, 1).toUpperCase()}
-                    </span>
-                  </div>
-                )}
+                <Avatar src={user.photo_url} name={personName(user) || user.email} size={56} />
                 {isBanned && (
                   <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center border border-white">
                     <Ban size={10} aria-hidden className="text-white" />
@@ -169,11 +162,11 @@ function UserDetailSheet({
               <div>
                 <div className="flex items-center gap-1.5">
                   <p className="text-black font-bold text-[17px]">
-                    {user.username ? `@${user.username}` : user.email}
+                    {personName(user) || user.email}
                   </p>
                   {user.is_pro && <BadgeCheck size={16} aria-hidden className="text-[#FFD700]" />}
                 </div>
-                <p className="text-[#6B7280] text-[12px]">{user.email}</p>
+                <p className="text-[#6B7280] text-[12px]">{[handleLine(user), user.email].filter(Boolean).join(' · ')}</p>
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   <RoleBadge role={user.role} />
                   <StatusBadge status={user.status ?? 'active'} />
@@ -299,16 +292,7 @@ function UserListRow({ user, onOpen }: { user: AdminUserRow; onOpen: (u: AdminUs
       className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-[#E5E7EB] text-left"
     >
       <div className="relative flex-shrink-0">
-        {user.photo_url ? (
-          <img src={user.photo_url} alt={user.username ?? ''} loading="lazy"
-            className="w-10 h-10 rounded-full object-cover border border-[#E5E7EB]" />
-        ) : (
-          <div className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
-            <span className="text-black font-bold text-[13px]">
-              {(user.username ?? user.email ?? 'U').slice(0, 1).toUpperCase()}
-            </span>
-          </div>
-        )}
+        <Avatar src={user.photo_url} name={personName(user) || user.email} size={40} />
         {isLockedStatus(user.status) && (
           <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full border border-white flex items-center justify-center">
             <Ban size={8} aria-hidden className="text-white" />
@@ -324,7 +308,7 @@ function UserListRow({ user, onOpen }: { user: AdminUserRow; onOpen: (u: AdminUs
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
           <p className="text-black text-[14px] font-semibold truncate">
-            {user.username ? `@${user.username}` : user.email}
+            {personName(user) || user.email}
           </p>
           {user.is_pro && <BadgeCheck size={13} aria-hidden className="text-[#FFD700] flex-shrink-0" />}
         </div>

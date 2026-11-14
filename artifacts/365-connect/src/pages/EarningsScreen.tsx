@@ -73,7 +73,7 @@ function StatusChip({ status }: { status: string }) {
 function typeLabel(row: PaymentRow): string {
   if (row.payment_type === 'pro_subscription') return 'Pro subscription';
   if (row.direction === 'out') {
-    const who = row.worker_username ? `@${row.worker_username}` : 'Worker';
+    const who = row.worker_name || (row.worker_username ? `@${row.worker_username}` : 'Worker');
     return row.shift_title ? `${who} · ${row.shift_title}` : `Paid ${who}`;
   }
   const title = row.shift_title || row.company_name;

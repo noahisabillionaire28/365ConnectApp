@@ -20,6 +20,7 @@ export function isSwapActive(status: string | null | undefined): boolean {
 export type SwapPerson = {
   id: string;
   username: string | null;
+  name?: string | null;
   photoUrl: string | null;
   rating: number | null;
   /** Shifts clocked out on (poster view only). */
@@ -69,7 +70,7 @@ export type ShiftSwap = {
   toWorker: SwapPerson;
 };
 
-type RawPerson = { id: string; username: string | null; photo_url: string | null; rating: number | string | null; shifts_worked?: number | null };
+type RawPerson = { id: string; username: string | null; name?: string | null; photo_url: string | null; rating: number | string | null; shifts_worked?: number | null };
 type RawShift = {
   id: string; title: string | null; job_type: string | null; company_name: string | null;
   start_time: string | null; end_time: string | null; timezone: string | null; location: string | null;
@@ -96,6 +97,7 @@ function toPerson(p: RawPerson | null | undefined, fallbackId = ''): SwapPerson 
   return {
     id: p?.id ?? fallbackId,
     username: p?.username ?? null,
+    name: p?.name ?? null,
     photoUrl: p?.photo_url ?? null,
     rating: num(p?.rating),
     shiftsWorked: p?.shifts_worked ?? null,

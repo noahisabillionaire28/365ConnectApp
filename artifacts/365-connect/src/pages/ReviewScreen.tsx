@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { personName } from '@/lib/person';
 import { useParams, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -33,10 +34,10 @@ function useTargetName(userId: string | undefined) {
   useEffect(() => {
     let cancelled = false;
     if (!userId) return;
-    void apiClient(null).get<{ username: string | null; company_name: string | null; role: string }>(`/users/${userId}`)
+    void apiClient(null).get<{ username: string | null; name?: string | null; company_name: string | null; role: string }>(`/users/${userId}`)
       .then((data) => {
         if (cancelled) return;
-        setName(data?.company_name || (data?.username ? `@${data.username}` : null));
+        setName(personName(data) || null);
       }).catch(() => {});
     return () => { cancelled = true; };
   }, [userId]);

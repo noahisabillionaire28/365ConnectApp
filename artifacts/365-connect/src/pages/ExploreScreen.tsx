@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useId } from 'react';
+import { AvatarFill } from '@/components/Avatar';
+import { personName, matchesPerson } from '@/lib/person';
 import { useLocation } from 'wouter';
 import { useDialog } from '@/hooks/useDialog';
 import { Search, BadgeCheck, ImagePlus } from 'lucide-react';
@@ -16,23 +18,16 @@ const GOLD = '#FFD700';
 
 function ExploreTile({ person, onTap }: { person: WorkerPerson; onTap: () => void }) {
   return (
-    <button type="button" onClick={onTap} aria-label={`View @${person.username}'s profile`}
+    <button type="button" onClick={onTap} aria-label={`View ${personName(person)}'s profile`}
       className="relative aspect-square w-full overflow-hidden bg-[#F3F4F6]">
-      {person.photoUrl ? (
-        <img src={person.photoUrl} alt="" aria-hidden loading="lazy" decoding="async"
-          className="w-full h-full object-cover" />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <span className="text-[#6B7280] font-bold text-[20px]">{(person.username ?? '??').slice(0, 2).toUpperCase()}</span>
-        </div>
-      )}
+      <AvatarFill src={person.photoUrl} name={personName(person)} className="text-[#6B7280] font-bold text-[20px]" />
       {person.isPro && (
         <div className="absolute top-1.5 right-1.5 bg-black/60 rounded-full p-0.5">
           <BadgeCheck size={13} aria-label="Pro member" style={{ color: GOLD }} />
         </div>
       )}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 py-1">
-        <p className="text-white text-[10px] font-semibold truncate">@{person.username}</p>
+        <p className="text-white text-[10px] font-semibold truncate">{personName(person)}</p>
       </div>
     </button>
   );
@@ -54,7 +49,7 @@ export function ExploreScreen() {
   const [jobType, setJobType] = useState<string | null>(null);
   const filtered = people.filter((p) => {
     if (jobType && p.primaryJobType !== jobType) return false;
-    if (query && !(p.username ?? '').toLowerCase().includes(query.toLowerCase())) return false;
+    if (query && !matchesPerson(p, query)) return false;
     return true;
   });
 

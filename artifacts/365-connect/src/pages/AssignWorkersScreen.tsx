@@ -1,4 +1,6 @@
 import { shiftHeadline } from '@/lib/supabase';
+import { AvatarFill } from '@/components/Avatar';
+import { personName } from '@/lib/person';
 import { useEffect } from 'react';
 import { useParams, useLocation, useSearch } from 'wouter';
 import { ChevronLeft, Star, BadgeCheck, UserPlus, CheckCircle2, Users, Send } from 'lucide-react';
@@ -32,7 +34,6 @@ function AssignCard({ worker, shiftFull, shiftStarted, shiftJobTypes, isAssignin
   isAssigning: boolean; isOffering: boolean;
   onAssign: (id: string) => void; onOffer: (id: string) => void;
 }) {
-  const initials = (worker.username ?? 'W').replace('@', '').slice(0, 2).toUpperCase();
   const alreadyAssigned = worker.applicationStatus === 'accepted';
   const onStandby = worker.applicationStatus === 'standby';
   const offerPending = worker.requestStatus === 'pending' && !shiftStarted;
@@ -49,18 +50,13 @@ function AssignCard({ worker, shiftFull, shiftStarted, shiftJobTypes, isAssignin
   return (
     <div className="rounded-[12px] border border-[#E5E7EB] bg-white p-4 flex items-center gap-3">
       <div className="w-14 h-14 rounded-full overflow-hidden bg-[#F3F4F6] flex items-center justify-center flex-shrink-0">
-        {worker.photoUrl ? (
-          <img src={worker.photoUrl} alt="" aria-hidden loading="lazy" decoding="async"
-            className="w-full h-full object-cover" />
-        ) : (
-          <span className="text-[#6B7280] font-bold text-[16px]">{initials}</span>
-        )}
+        <AvatarFill src={worker.photoUrl} name={personName(worker)} />
       </div>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <p className="text-[#0A1628] font-bold text-[15px] truncate">
-            {worker.username ? `@${worker.username}` : 'Worker'}
+            {personName(worker, 'Worker')}
           </p>
           {worker.isPro && (
             <BadgeCheck size={15} aria-label="Pro member" style={{ color: GOLD }} fill={GOLD}
@@ -91,7 +87,7 @@ function AssignCard({ worker, shiftFull, shiftStarted, shiftJobTypes, isAssignin
           <>
             <button type="button" disabled={disabled} aria-disabled={disabled}
               onClick={() => onAssign(worker.id)}
-              aria-label={`Assign ${worker.username ? `@${worker.username}` : 'worker'} — books them immediately`}
+              aria-label={`Assign ${personName(worker, 'worker')} — books them immediately`}
               className="h-10 px-3.5 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 text-white disabled:opacity-50"
               style={{ background: '#0A1628' }}>
               {isAssigning ? 'Assigning…' : (<><UserPlus size={14} /> Assign</>)}
@@ -102,7 +98,7 @@ function AssignCard({ worker, shiftFull, shiftStarted, shiftJobTypes, isAssignin
               <span className="text-[11px] font-semibold text-[#6B7280]">Offer expired · no reply</span>
             ) : (
               <button type="button" disabled={busy || shiftFull || shiftStarted} onClick={() => onOffer(worker.id)}
-                aria-label={`Send ${worker.username ? `@${worker.username}` : 'worker'} an offer they can accept or decline`}
+                aria-label={`Send ${personName(worker, 'worker')} an offer they can accept or decline`}
                 className="h-10 px-3 rounded-[8px] text-[11px] font-bold flex items-center gap-1 border border-[#E5E7EB] text-[#0A1628] disabled:opacity-50">
                 <Send size={12} aria-hidden /> {isOffering ? 'Sending…' : offerDeclined ? 'Offer again' : 'Send offer'}
               </button>

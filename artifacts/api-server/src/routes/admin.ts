@@ -4,6 +4,7 @@
  * Mounted at /admin/* under the /api prefix → full paths: /api/admin/*
  */
 import { Router } from 'express';
+import { posterMap, shiftLabel, posterLabel } from '../lib/poster.js';
 import { limitUser } from '../lib/rateLimit.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { invalidateRole } from '../lib/roleCache.js';
@@ -87,7 +88,7 @@ router.get('/users', async (_req, res) => {
   try {
     const { data, error } = await adminDb
       .from('users')
-      .select('id, email, role, username, photo_url, is_pro, rating, status, is_banned, created_at')
+      .select('id, email, role, username, name, company_name, photo_url, is_pro, rating, status, is_banned, created_at')
       .order('created_at', { ascending: false });
     if (error) throw error;
     // A ban set through a dispute stores is_banned=true; surface it as the
@@ -179,7 +180,10 @@ router.get('/shifts', async (_req, res) => {
       )
       .order('created_at', { ascending: false });
     if (error) throw error;
-    res.json(data ?? []);
+    // The poster's live label, as everywhere else a shift is shown.
+    const shiftRows = (data ?? []) as unknown as Array<{ company_name?: string | null; client_id?: string | null }>;
+    const posters = await posterMap(adminDb, shiftRows.map((s) => s.client_id));
+    res.json(shiftRows.map((s) => ({ ...s, company_name: shiftLabel(s, posters) })));
   } catch (err) {
     console.error('[admin/shifts]', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -338,10 +342,10 @@ router.get('/disputes', async (_req, res) => {
     if (error) { res.json([]); return; }
     const rows = (data ?? []) as Array<Record<string, unknown>>;
     const ids = [...new Set(rows.flatMap((d) => [d.reported_user_id, d.reported_by_user_id]).filter((v): v is string => typeof v === 'string'))];
-    const byId = new Map<string, { username: string | null; email: string | null; photo_url: string | null; role: string | null }>();
+    const byId = new Map<string, { username: string | null; name: string | null; email: string | null; photo_url: string | null; role: string | null }>();
     if (ids.length) {
-      const { data: users } = await adminDb.from('users').select('id, username, email, photo_url, role').in('id', ids);
-      for (const u of users ?? []) byId.set(u.id as string, { username: u.username ?? null, email: u.email ?? null, photo_url: u.photo_url ?? null, role: u.role ?? null });
+      const { data: users } = await adminDb.from('users').select('id, username, name, company_name, email, photo_url, role').in('id', ids);
+      for (const u of users ?? []) byId.set(u.id as string, { username: u.username ?? null, name: posterLabel(u), email: u.email ?? null, photo_url: u.photo_url ?? null, role: u.role ?? null });
     }
     const who = (id: unknown) => (typeof id === 'string' ? byId.get(id) ?? null : null);
     res.json(rows.map((d) => ({ ...d, reported_user: who(d.reported_user_id), reported_by_user: who(d.reported_by_user_id) })));

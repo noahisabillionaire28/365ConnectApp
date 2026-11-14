@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { Avatar as SharedAvatar } from '@/components/Avatar';
+import { personName } from '@/lib/person';
 import { useParams, useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
@@ -34,14 +36,7 @@ function isHourly(payPeriod: string | null | undefined): boolean {
 
 /* ── Small UI atoms ──────────────────────────────────────────────────────── */
 function Avatar({ url, name, size = 40 }: { url: string | null; name: string | null; size?: number }) {
-  const initials = (name ?? 'W').replace('@', '').slice(0, 2).toUpperCase();
-  return (
-    <div style={{ width: size, height: size }}
-      className="rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center overflow-hidden flex-shrink-0">
-      {url ? <img src={url} alt="" className="w-full h-full object-cover" />
-           : <span className="text-black font-bold text-[13px]">{initials}</span>}
-    </div>
-  );
+  return <SharedAvatar src={url} name={name} size={size} />;
 }
 
 const ATTENDANCE: Record<Attendance, { label: string; cls: string }> = {
@@ -86,10 +81,10 @@ function dayOfSummary(workers: AcceptedWorker[]): string {
 function SwapPersonCell({ p, muted }: { p: SwapPerson; muted?: boolean }) {
   return (
     <div className="flex-1 min-w-0 flex items-center gap-2">
-      <Avatar url={p.photoUrl} name={p.username} size={32} />
+      <Avatar url={p.photoUrl} name={personName(p)} size={32} />
       <div className="min-w-0">
         <p className={`font-semibold text-[13px] truncate ${muted ? 'text-[#6B7280]' : 'text-[#111827]'}`}>
-          {p.username ? `@${p.username}` : 'Worker'}
+          {personName(p, 'Worker')}
         </p>
         <p className="text-[#6B7280] text-[11px] flex items-center gap-1 truncate">
           {(p.rating ?? 0) > 0 && (
@@ -131,14 +126,14 @@ function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onP
   return (
     <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 flex flex-col gap-2.5">
       <div className="flex items-center gap-3">
-        <Avatar url={w.photoUrl} name={w.username} />
-        <button type="button" aria-label={`Message ${w.username ? `@${w.username}` : 'worker'}`} onClick={onMessage}
+        <Avatar url={w.photoUrl} name={personName(w)} />
+        <button type="button" aria-label={`Message ${personName(w, 'worker')}`} onClick={onMessage}
           className="order-last w-10 h-10 rounded-full border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 text-[#0A1628]">
           <MessageCircle size={15} aria-hidden />
         </button>
         <div className="flex-1 min-w-0">
           <p className="text-[#111827] font-semibold text-[14px] truncate">
-            {w.username ? `@${w.username}` : 'Worker'}
+            {personName(w, 'Worker')}
           </p>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
             {Number(w.rating) > 0 && (
@@ -298,12 +293,12 @@ function ReviewSheet({ w, payRate, payPeriod, timezone, shiftEndISO, busy, onApp
         <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-4" />
         <p className="text-[#111827] font-bold text-[17px] mb-1">Review timesheet</p>
         <p className="text-[#6B7280] text-[13px] mb-4">
-          {w.username ? `@${w.username}` : 'Worker'} · {payRate ? (hourly ? `$${payRate}/hr` : `$${payRate} flat per ${payPeriod}`) : ''}
+          {personName(w, 'Worker')} · {payRate ? (hourly ? `$${payRate}/hr` : `$${payRate} flat per ${payPeriod}`) : ''}
         </p>
 
         {disputed && (
           <div className="rounded-[12px] bg-amber-50 border border-amber-200 px-4 py-3 mb-4" role="note">
-            <p className="text-amber-800 text-[13px] font-semibold">{w.username ? `@${w.username}` : 'The worker'} disputed these hours</p>
+            <p className="text-amber-800 text-[13px] font-semibold">{personName(w, 'The worker')} disputed these hours</p>
             {w.dispute_note
               ? <p className="text-amber-900 text-[14px] leading-relaxed mt-1">“{w.dispute_note}”</p>
               : <p className="text-amber-800 text-[13px] mt-1">They didn't leave a note. Message them if you're not sure what to change.</p>}
@@ -465,7 +460,7 @@ export function ApplicantsScreen() {
   async function handleSwapDecision(s: ShiftSwap, action: 'approve' | 'decline') {
     const err = await decideSwap(s.id, action, id);
     if (err) { showToast(err, 'error'); return; }
-    const to = s.toWorker.username ? `@${s.toWorker.username}` : 'the new worker';
+    const to = personName(s.toWorker, 'the new worker');
     showToast(action === 'approve' ? `Swap approved — ${to} is now confirmed.` : 'Swap declined.');
     refetchAll();
   }
@@ -524,7 +519,7 @@ export function ApplicantsScreen() {
     const err = await markPaid(id, w.workerId);
     if (err) { showToast(err, 'error'); return; }
     setMarkPaidFor(null);
-    showToast(`Marked as paid. ${w.username ? `@${w.username}` : 'The worker'} has been told.`);
+    showToast(`Marked as paid. ${personName(w, 'The worker')} has been told.`);
     refetchAll();
   }
 
@@ -741,7 +736,7 @@ export function ApplicantsScreen() {
                 <SectionHeader label="Swap requests" count={pendingSwaps.length} />
                 <div className="flex flex-col gap-2">
                   {pendingSwaps.map((s) => {
-                    const toName = s.toWorker.username ? `@${s.toWorker.username}` : 'the worker';
+                    const toName = personName(s.toWorker, 'the worker');
                     const busy = swapBusyId === s.id;
                     return (
                       <div key={s.id} className="bg-white border border-amber-200 rounded-[12px] px-3.5 py-3 flex flex-col gap-2.5">
@@ -824,15 +819,15 @@ export function ApplicantsScreen() {
                     const score = m?.score ?? a.matchScore;
                     return (
                     <div key={a.applicationId} className="bg-white border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 flex items-center gap-3">
-                      <Avatar url={a.photoUrl} name={a.username} />
-                      <button type="button" aria-label={`Message ${a.username ? `@${a.username}` : 'applicant'}`}
+                      <Avatar url={a.photoUrl} name={personName(a)} />
+                      <button type="button" aria-label={`Message ${personName(a, 'applicant')}`}
                         onClick={() => void handleMessageWorker(a.worker_id)}
                         className="w-10 h-10 rounded-full border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 text-[#0A1628]">
                         <MessageCircle size={15} aria-hidden />
                       </button>
                       <div className="flex-1 min-w-0">
                         <p className="text-[#111827] font-semibold text-[14px] truncate">
-                          {a.username ? `@${a.username}` : 'Applicant'}
+                          {personName(a, 'Applicant')}
                         </p>
                         {/* The match score gets its own line so it stays
                             visible whatever the handle length. */}
@@ -889,14 +884,14 @@ export function ApplicantsScreen() {
                 <div className="flex flex-col gap-2">
                   {standby.map((a) => (
                     <div key={a.applicationId} className="bg-white border border-amber-200 rounded-[12px] px-3.5 py-3 flex items-center gap-3">
-                      <Avatar url={a.photoUrl} name={a.username} />
-                      <button type="button" aria-label={`Message ${a.username ? `@${a.username}` : 'applicant'}`}
+                      <Avatar url={a.photoUrl} name={personName(a)} />
+                      <button type="button" aria-label={`Message ${personName(a, 'applicant')}`}
                         onClick={() => void handleMessageWorker(a.worker_id)}
                         className="w-10 h-10 rounded-full border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 text-[#0A1628]">
                         <MessageCircle size={15} aria-hidden />
                       </button>
                       <p className="flex-1 min-w-0 text-[#111827] font-semibold text-[14px] truncate">
-                        {a.username ? `@${a.username}` : 'Worker'}
+                        {personName(a, 'Worker')}
                       </p>
                       <button type="button" aria-label="Remove from waitlist" disabled={!!busyId}
                         onClick={() => setAsk({
@@ -909,7 +904,7 @@ export function ApplicantsScreen() {
                       </button>
                       <button type="button"
                         disabled={isFull || !!busyId}
-                        aria-label={isFull ? 'Shift is full — remove someone to confirm a standby worker' : `Confirm ${a.username ? `@${a.username}` : 'worker'}`}
+                        aria-label={isFull ? 'Shift is full — remove someone to confirm a standby worker' : `Confirm ${personName(a, 'worker')}`}
                         onClick={() => void handleDecide(a.applicationId, 'approve', 'Worker confirmed!')}
                         className="h-9 px-3 rounded-full bg-[#10B981] text-white text-[12px] font-bold flex items-center gap-1 disabled:opacity-40">
                         <Check size={14} aria-hidden /> {busyId === a.applicationId ? 'Confirming…' : 'Confirm'}
@@ -927,9 +922,9 @@ export function ApplicantsScreen() {
                 <div className="flex flex-col gap-2">
                   {invitedPending.map((inv: ShiftInvite) => (
                     <div key={inv.id} className="bg-white border border-[#E5E7EB] rounded-[12px] px-3.5 py-3 flex items-center gap-3">
-                      <Avatar url={inv.worker_photo} name={inv.worker_username} />
+                      <Avatar url={inv.worker_photo} name={inv.worker_name || inv.worker_username} />
                       <p className="flex-1 min-w-0 text-[#111827] font-semibold text-[14px] truncate">
-                        {inv.worker_username ? `@${inv.worker_username}` : 'Worker'}
+                        {inv.worker_name || (inv.worker_username ? `@${inv.worker_username}` : 'Worker')}
                       </p>
                       <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-[#FAFAFA] border-[#E5E7EB] text-[#6B7280] flex items-center gap-1">
                         <AlarmClock size={11} aria-hidden /> Invited
@@ -947,9 +942,9 @@ export function ApplicantsScreen() {
                 <div className="flex flex-col gap-2 opacity-70">
                   {invitedDeclined.map((inv: ShiftInvite) => (
                     <div key={inv.id} className="bg-[#FAFAFA] border border-[#F3F4F6] rounded-[12px] px-3.5 py-3 flex items-center gap-3">
-                      <Avatar url={inv.worker_photo} name={inv.worker_username} />
+                      <Avatar url={inv.worker_photo} name={inv.worker_name || inv.worker_username} />
                       <p className="flex-1 min-w-0 text-[#6B7280] font-semibold text-[14px] truncate">
-                        {inv.worker_username ? `@${inv.worker_username}` : 'Worker'}
+                        {inv.worker_name || (inv.worker_username ? `@${inv.worker_username}` : 'Worker')}
                       </p>
                       <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-white border-[#E5E7EB] text-[#6B7280]">
                         Declined

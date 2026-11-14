@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AvatarFill } from '@/components/Avatar';
 import { useParams, useLocation } from 'wouter';
 import { ChevronLeft, Send, Trash2 } from 'lucide-react';
 import { usePost, useToggleLike } from '@/hooks/useFeed';
@@ -13,20 +14,17 @@ function CommentRow({ c, canDelete, onDelete }: {
 }) {
   const [, navigate] = useLocation();
   const [confirming, setConfirming] = useState(false);
-  const initials = (c.author_username ?? 'W').slice(0, 2).toUpperCase();
   const goAuthor = () => { if (c.author_username) navigate(`/worker/${c.author_username}`); };
   return (
     <div className="flex items-start gap-2.5 px-4 py-3 group">
       <button type="button" onClick={goAuthor}
         className="w-8 h-8 rounded-full overflow-hidden bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
-        {c.author_photo_url
-          ? <img src={c.author_photo_url} alt={c.author_username ?? 'Worker'} className="w-full h-full object-cover" />
-          : <span className="text-[11px] font-bold text-[#0A1628]">{initials}</span>}
+        <AvatarFill src={c.author_photo_url} name={c.author_username} className="text-[11px] font-bold text-[#0A1628]" />
       </button>
       <div className="min-w-0 flex-1">
         <p className="text-[13px] text-[#111827] leading-snug">
           <button type="button" onClick={goAuthor} className="font-semibold">
-            @{c.author_username ?? 'worker'}
+            {c.author_username ? `@${c.author_username}` : 'Member'}
           </button>{' '}
           {c.body}
         </p>

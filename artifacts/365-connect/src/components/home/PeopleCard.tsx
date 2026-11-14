@@ -1,4 +1,6 @@
 import { useLocation } from 'wouter';
+import { AvatarFill } from '@/components/Avatar';
+import { personName, handleLine } from '@/lib/person';
 import { BadgeCheck, Star } from 'lucide-react';
 import type { WorkerPerson } from '@/hooks/usePeopleFeed';
 import { useFollow } from '@/hooks/useFollow';
@@ -18,8 +20,8 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
   // For clients/staffers, following a worker is what puts them on your roster
   // (the list you assign shifts from) — so the button says exactly that.
   const { isFollowing, follow, unfollow, isFollowPending } = useFollow(person.id, {
-    onFollowSuccess:   () => showToast(`@${person.username} added to your roster`),
-    onUnfollowSuccess: () => showToast(`@${person.username} removed from your roster`),
+    onFollowSuccess:   () => showToast(`${personName(person)} added to your roster`),
+    onUnfollowSuccess: () => showToast(`${personName(person)} removed from your roster`),
     onError:           (msg) => showToast(msg, 'error'),
     // The directory already tells us — no extra request per card.
     initialFollowing:  person.isFollowed,
@@ -28,24 +30,19 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
 
   return (
     <div className="mx-4 rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-4 flex items-center gap-4">
-      <button type="button" aria-label={`View ${person.username}'s profile`}
+      <button type="button" aria-label={`View ${personName(person)}'s profile`}
         onClick={() => navigate(`/worker/${person.username}`)}
         className="w-16 h-16 rounded-full overflow-hidden bg-[#F3F4F6] flex-shrink-0 flex items-center justify-center">
-        {person.photoUrl ? (
-          <img src={person.photoUrl} alt="" aria-hidden loading="lazy" decoding="async"
-            className="w-full h-full object-cover" />
-        ) : (
-          <span className="text-[#6B7280] font-bold text-[18px]">{(person.username ?? '??').slice(0, 2).toUpperCase()}</span>
-        )}
+        <AvatarFill src={person.photoUrl} name={personName(person)} className="text-[#6B7280] font-bold text-[18px]" />
       </button>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <p className="text-[#111827] font-bold text-[15px] truncate">@{person.username}</p>
+          <p className="text-[#111827] font-bold text-[15px] truncate">{personName(person)}</p>
           {person.isPro && <BadgeCheck size={15} aria-label="Pro member" style={{ color: GOLD }} className="flex-shrink-0" />}
         </div>
-        {person.primaryJobType && (
-          <p className="text-[#6B7280] text-[13px] mt-0.5 truncate">{person.primaryJobType}</p>
+        {(person.primaryJobType || handleLine(person)) && (
+          <p className="text-[#6B7280] text-[13px] mt-0.5 truncate">{[person.primaryJobType, handleLine(person)].filter(Boolean).join(' · ')}</p>
         )}
         <div className="flex items-center gap-1 mt-1">
           <Star size={12} aria-hidden className="text-amber-400 fill-amber-400" />

@@ -1,4 +1,8 @@
 import { useState, useEffect, useId, lazy, Suspense } from 'react';
+import { AvatarFill } from '@/components/Avatar';
+import { initials } from '@/lib/jobFormat';
+import { personName } from '@/lib/person';
+import { ClientLogo } from '@/components/jobs/JobCard';
 import { CLOCK_IN_OPENS_BEFORE_MS } from '@/lib/clockWindow';
 import { useDialog } from '@/hooks/useDialog';
 import { useQueryClient } from '@tanstack/react-query';
@@ -124,16 +128,6 @@ function ShiftDetailSkeleton() {
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return <h2 className="text-black font-bold text-[17px] mb-3 tracking-tight">{children}</h2>;
-}
-
-function ClientLogo({ name }: { name: string }) {
-  const initials = name.split(' ').slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
-  return (
-    <div aria-hidden
-      className="w-[52px] h-[52px] rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
-      <span className="text-black font-bold text-[17px] tracking-tight">{initials}</span>
-    </div>
-  );
 }
 
 function StatTile({ icon, label, value, sub, accent }: {
@@ -383,7 +377,7 @@ export function ShiftDetailScreen() {
   // An open offer TO this worker for this shift.
   const showIncomingSwap = isWorker && !isOwner && !!incomingSwap
     && lifecycle === 'upcoming' && shift.status !== 'cancelled' && applicationStatus !== 'accepted';
-  const swapName = mySwap?.to_username ? `@${mySwap.to_username}` : 'the worker';
+  const swapName = mySwap?.to_name || (mySwap?.to_username ? `@${mySwap.to_username}` : 'the worker');
   // The fixed worker bar grows with the swap cards; keep the content clear of it.
   const workerBarPad = showArrivalPills || showIncomingSwap || swapActive || swapDeclined ? 'pb-[240px]' : 'pb-[150px]';
 
@@ -433,7 +427,7 @@ export function ShiftDetailScreen() {
     const err = await offerSwap(shiftId, worker.id, note);
     if (err) { showToast(err, 'error'); return; }
     setSwapOpen(false);
-    showToast(`Swap offer sent to ${worker.username ? `@${worker.username}` : 'the worker'}. You keep your spot until the poster approves.`);
+    showToast(`Swap offer sent to ${personName(worker, 'the worker')}. You keep your spot until the poster approves.`);
   }
 
   /** Accept / decline a swap offered to me for this shift. */
@@ -814,7 +808,7 @@ export function ShiftDetailScreen() {
             {shift.rosterOnly && (
               <span className="bg-[#F3F4F6] text-[#0A1628] text-[12px] font-bold px-3 py-1.5 rounded-full border border-[#E5E7EB]"
                 title="Only workers on this poster's roster can take this shift">
-                Roster only{shift.clientUsername ? ` · @${shift.clientUsername}` : ''}
+                Roster only{shift.companyName ? ` · ${shift.companyName}` : ''}
               </span>
             )}
             {lifecycle === 'in_progress' && (
@@ -844,7 +838,7 @@ export function ShiftDetailScreen() {
           const profileHref = shift.clientUsername && !isOwner ? `/worker/${shift.clientUsername}` : null;
           const inner = (
             <>
-              <ClientLogo name={shift.companyName} />
+              <ClientLogo name={shift.companyName} src={shift.clientPhotoUrl} size={52} shape="tile" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <p className="text-black font-bold text-[17px] leading-tight truncate">{shift.companyName}</p>
@@ -974,9 +968,7 @@ export function ShiftDetailScreen() {
             <SectionHeading>Point of contact</SectionHeading>
             <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] px-4 py-4 flex items-center gap-4">
               <div className="w-10 h-10 rounded-full bg-white border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
-                <span className="text-black font-bold text-[14px]">
-                  {shift.pointOfContact.split(' ').map((n) => n[0]).join('')}
-                </span>
+                <span className="text-black font-bold text-[14px]">{initials(shift.pointOfContact)}</span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-black font-semibold text-[14px]">{shift.pointOfContact}</p>
@@ -1526,9 +1518,7 @@ export function ShiftDetailScreen() {
             aria-label="Shift swap offer">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center overflow-hidden flex-shrink-0" aria-hidden>
-                {incomingSwap.from_photo_url
-                  ? <img src={incomingSwap.from_photo_url} alt="" className="w-full h-full object-cover" />
-                  : <span className="text-black font-bold text-[12px]">{(incomingSwap.from_username ?? 'W').slice(0, 2).toUpperCase()}</span>}
+                <AvatarFill src={incomingSwap.from_photo_url} name={incomingSwap.from_name || incomingSwap.from_username} className="text-black font-bold text-[12px]" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[#111827] font-bold text-[14px] truncate">

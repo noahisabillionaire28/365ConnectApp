@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { Avatar as SharedAvatar } from '@/components/Avatar';
 import { motion } from 'framer-motion';
 import { Search, MessageCircle, Users, BellOff, Pin, PinOff, Archive, ArchiveRestore, Trash2, Bell, MoreHorizontal } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -11,12 +12,7 @@ import { LoadError } from '@/components/StateView';
 type Filter = 'all' | 'groups' | 'archived';
 
 function Avatar({ photoUrl, alt, size = 48 }: { photoUrl: string | null; alt: string; size?: number }) {
-  return photoUrl
-    ? <img src={photoUrl} alt={alt} loading="lazy" decoding="async" style={{ width: size, height: size }}
-        className="rounded-full object-cover flex-shrink-0 border border-[#E5E7EB]" />
-    : <div aria-hidden style={{ width: size, height: size }} className="rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
-        <span className="text-[#6B7280] font-bold text-[16px]">{alt.replace('@', '').slice(0, 1).toUpperCase()}</span>
-      </div>;
+  return <SharedAvatar src={photoUrl} name={alt} size={size} />;
 }
 
 /** Stacked member avatars for a shift group chat. */
@@ -29,7 +25,7 @@ function GroupAvatar({ conv }: { conv: ConversationWithOther }) {
     <div className="relative w-12 h-12 flex-shrink-0">
       {shown.map((m, i) => (
         <div key={m.id} className="absolute" style={{ left: i * 12, top: i === 1 ? 14 : i === 2 ? 0 : 6 }}>
-          <Avatar photoUrl={m.photo_url} alt={m.username ?? '?'} size={30} />
+          <Avatar photoUrl={m.photo_url} alt={m.display_name || m.username || ''} size={30} />
         </div>
       ))}
     </div>

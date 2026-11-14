@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { PERSON_COLS, personLabel } from '../lib/poster.js';
 import { limitUser } from '../lib/rateLimit.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -126,8 +127,8 @@ router.post('/', limitUser(60, 3600000), requireAuth, async (req, res) => {
   // A new roster entry: tell the worker who listed them (once, not on re-follows).
   if (inserted) {
     const { data: me } = await adminDb
-      .from('users').select('username, company_name, role').eq('id', req.userId).maybeSingle();
-    const who = me?.company_name || (me?.username ? `@${me.username}` : me?.role === 'staffer' ? 'An agency' : 'A client');
+      .from('users').select(PERSON_COLS).eq('id', req.userId).maybeSingle();
+    const who = personLabel(me) ?? (me?.role === 'staffer' ? 'An agency' : 'A client');
     await createNotification({
       userId: following_id,
       fromUserId: req.userId,

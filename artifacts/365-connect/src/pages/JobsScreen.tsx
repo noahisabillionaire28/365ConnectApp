@@ -20,7 +20,7 @@ import { resetDraft } from '@/store/postShiftStore';
 import { JOB_TYPES } from '@/lib/jobTypes';
 import { EVENT_TYPES } from '@/lib/eventTypes';
 import { StateView, LoadError } from '@/components/StateView';
-import { JobCard, JobCardSkeleton, type JobStatus } from '@/components/jobs/JobCard';
+import { JobCard, JobCardSkeleton, ClientLogo, type JobStatus } from '@/components/jobs/JobCard';
 import { WorkerRequestsView } from '@/components/home/WorkerOffers';
 import { useMyApplications, groupApplications, type MyApplication } from '@/hooks/useMyApplications';
 import { useShiftRequests, isLiveOffer } from '@/hooks/useShiftRequests';
@@ -118,7 +118,7 @@ function ShiftRow({ shift, applied, showDistance, onTap }: {
   const chip = 'h-7 px-2.5 rounded-full text-[12px] font-semibold flex items-center gap-1 flex-shrink-0 whitespace-nowrap';
   return (
     <JobCard startISO={shift.startTimeISO} endISO={shift.endTimeISO} timezone={shift.timezone}
-      title={shiftHeadline(shift)} company={shift.companyName} location={shift.location}
+      title={shiftHeadline(shift)} company={shift.companyName} location={shift.location} logo={shift.clientPhotoUrl}
       aside={<PayPill rate={shift.payRate} period={shift.payPeriod} />}
       onTap={onTap}>
       <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
@@ -132,7 +132,7 @@ function ShiftRow({ shift, applied, showDistance, onTap }: {
         )}
         {shift.rosterOnly && (
           <span className={`${chip} bg-[#EEF2F8] text-[#1E3A5F] max-w-[180px]`} title="Only workers on this poster's roster can take this shift">
-            <span className="truncate">Roster only{shift.clientUsername ? ` · @${shift.clientUsername}` : ''}</span>
+            <span className="truncate">Roster only{shift.companyName ? ` · ${shift.companyName}` : ''}</span>
           </span>
         )}
       </div>
@@ -272,12 +272,15 @@ function MapPane({ shifts, selectedId, userCoords, onPinClick, onOpenShift }: {
                       )}
                       {shift.rosterOnly && (
                         <span className="text-[#0A1628] bg-[#F3F4F6] border border-[#E5E7EB] text-[9px] font-bold px-1.5 py-0.5 rounded-full truncate max-w-[120px]">
-                          Roster only{shift.clientUsername ? ` · @${shift.clientUsername}` : ''}
+                          Roster only{shift.companyName ? ` · ${shift.companyName}` : ''}
                         </span>
                       )}
                     </div>
                     <p className="text-[#111827] font-bold text-[15px] truncate">{shiftHeadline(shift)}</p>
-                    <p className="text-[#374151] text-[12px] font-medium truncate">{shift.companyName}</p>
+                    <p className="text-[#374151] text-[12px] font-medium min-w-0 flex items-center gap-1.5 mt-0.5">
+                      <ClientLogo name={shift.companyName} src={shift.clientPhotoUrl} size={16} />
+                      <span className="truncate">{shift.companyName}</span>
+                    </p>
                     <p className="text-[#6B7280] text-[11px] min-w-0 flex items-center gap-1">
                       <MapPin size={10} aria-hidden className="flex-shrink-0" /><span className="truncate">{shift.location}{userCoords ? ` · ${shift.distanceMiles} mi` : ''}</span>
                     </p>

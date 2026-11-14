@@ -61,6 +61,8 @@ export type MockShift = {
   clientId: string;
   /** The poster's @username (links to their public profile); null when unknown. */
   clientUsername: string | null;
+  /** The poster's profile photo / logo; null when they have none. */
+  clientPhotoUrl: string | null;
   /** The poster's average rating; null when they have none yet. */
   clientRating: number | null;
   status: 'open' | 'filled' | 'cancelled' | 'completed';
@@ -218,6 +220,7 @@ export type ShiftRow = {
   series_count?: number | null;
   // Poster fields the API joins onto a shift
   client_username?: string | null;
+  client_photo_url?: string | null;
   client_rating?: number | string | null;
 };
 
@@ -290,6 +293,10 @@ export type NotificationRow = {
   amount: number | null;
   read_at: string | null;
   created_at: string;
+  /** Who the notification is from, joined by the API (not DB columns). */
+  from_username?: string | null;
+  from_name?: string | null;
+  from_photo_url?: string | null;
 };
 
 export type TimeEntryRow = {
@@ -329,6 +336,8 @@ export type ConversationMember = {
   username: string | null;
   photo_url: string | null;
   role: string | null;
+  /** Name to show for this member (their name, or agency name), from the server. */
+  display_name?: string | null;
 };
 
 export type ConversationRow = {
@@ -362,6 +371,8 @@ export type MessageReplyPreview = {
   id: string;
   sender_id: string;
   sender_username: string | null;
+  /** The sender's name as the server labels them (name, or agency name). */
+  sender_name?: string | null;
   preview: string;
 };
 
@@ -403,6 +414,7 @@ export type MessageRow = {
   created_at: string;
   /** Flattened sender info from the API (not a DB column). */
   sender_username?: string | null;
+  sender_name?: string | null;
   sender_photo?: string | null;
   reply_to?: MessageReplyPreview | null;
   shift_card?: MessageShiftCard | null;
@@ -555,7 +567,7 @@ export function shiftRowToMockShift(
     spotsTotal:     row.spots_available ?? 1,
     instantClaim:   !!row.instant_claim,
     rosterOnly:     row.visibility === 'roster',
-    location:       row.location        ?? 'Miami, FL',
+    location:       row.location        ?? 'Location to be confirmed',
     aiMatchPct:     row.ai_match_pct    ?? 85,
     description:    row.description     ?? '',
     requirements:   row.requirements    ?? [],
@@ -567,6 +579,7 @@ export function shiftRowToMockShift(
     lng,
     clientId:       row.client_id,
     clientUsername: row.client_username ?? null,
+    clientPhotoUrl: row.client_photo_url ?? null,
     clientRating:   row.client_rating != null && Number(row.client_rating) > 0 ? Number(row.client_rating) : null,
     status:         row.status,
   };
@@ -620,6 +633,7 @@ export function hardenShift(s: MockShift): MockShift {
     lng:            Number.isFinite(raw.lng) ? (raw.lng as number) : MIAMI_BEACH.lng,
     clientId:       raw.clientId ?? '',
     clientUsername: raw.clientUsername ?? null,
+    clientPhotoUrl: raw.clientPhotoUrl ?? null,
     clientRating:   Number.isFinite(raw.clientRating) && (raw.clientRating as number) > 0 ? (raw.clientRating as number) : null,
     status:         raw.status ?? 'open',
   };
