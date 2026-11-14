@@ -118,7 +118,7 @@ function ShiftRow({ shift, applied, showDistance, onTap }: {
   const chip = 'h-7 px-2.5 rounded-full text-[12px] font-semibold flex items-center gap-1 flex-shrink-0 whitespace-nowrap';
   return (
     <JobCard startISO={shift.startTimeISO} endISO={shift.endTimeISO} timezone={shift.timezone}
-      title={shiftHeadline(shift)} company={shift.companyName} location={shift.location}
+      title={shiftHeadline(shift)} company={shift.companyName} location={shift.location} logo={shift.clientPhotoUrl}
       aside={<PayPill rate={shift.payRate} period={shift.payPeriod} />}
       onTap={onTap}>
       <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">

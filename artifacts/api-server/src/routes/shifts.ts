@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { cleanLabel } from '../lib/validate.js';
-import { POSTER_COLS, posterLabel, shiftLabel } from '../lib/poster.js';
+import { POSTER_COLS, posterLabel, shiftLabel, type PosterRow } from '../lib/poster.js';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { adminDb } from '../lib/supabaseAdmin.js';
@@ -272,8 +272,16 @@ router.get('/my', requireAuth, async (req, res) => {
     list.sort((a, b) => a.start_time.localeCompare(b.start_time));
     list.forEach((s, i) => seriesPos.set(s.id, { index: i + 1, count: list.length }));
   }
+  // The label and logo other people see on these shifts (derived from the
+  // poster's profile, as on the feed and the shift page).
+  const { data: me } = await adminDb.from('users').select(`${POSTER_COLS}, rating`).eq('id', req.userId).maybeSingle();
+  const meRow = me as unknown as (PosterRow & { photo_url?: string | null; rating?: number | null }) | null;
   return res.json((data ?? []).map((s) => ({
     ...s,
+    company_name: s.company_name?.trim() || posterLabel(meRow),
+    client_username: meRow?.username ?? null,
+    client_photo_url: meRow?.photo_url ?? null,
+    client_rating: meRow?.rating ?? null,
     pending_count: pending.get(s.id) ?? 0,
     swap_count: swaps.get(s.id) ?? 0,
     series_index: seriesPos.get(s.id)?.index ?? null,

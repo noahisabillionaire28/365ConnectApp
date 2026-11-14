@@ -10,6 +10,7 @@
  * pay on an open shift). `children` render under the card body (countdown,
  * clock-in, accept/decline).
  */
+import { useState } from 'react';
 import { Check } from 'lucide-react';
 import { dayParts, timeRange, shortPlace, initials } from '@/lib/jobFormat';
 
@@ -40,13 +41,23 @@ export function StatusBadge({ status }: { status: JobStatus }) {
   );
 }
 
-export function ClientLogo({ name, src, size = 24 }: { name: string | null | undefined; src?: string | null; size?: number }) {
-  return src ? (
-    <img src={src} alt="" width={size} height={size} loading="lazy"
-      className="rounded-full object-cover flex-shrink-0 bg-[#F3F4F6]" style={{ width: size, height: size }} />
+/**
+ * A poster's logo: their profile photo when they have one, else a navy
+ * monogram from their name. `shape="tile"` is the rounded square used on
+ * detail pages; the default is the small circle on cards. A photo that
+ * fails to load falls back to the monogram instead of a broken image.
+ */
+export function ClientLogo({ name, src, size = 24, shape = 'circle' }: {
+  name: string | null | undefined; src?: string | null; size?: number; shape?: 'circle' | 'tile';
+}) {
+  const [failed, setFailed] = useState(false);
+  const radius = shape === 'tile' ? Math.round(size * 0.23) : size;
+  return src && !failed ? (
+    <img src={src} alt="" width={size} height={size} loading="lazy" onError={() => setFailed(true)}
+      className="object-cover flex-shrink-0 bg-[#F3F4F6]" style={{ width: size, height: size, borderRadius: radius }} />
   ) : (
-    <span aria-hidden className="rounded-full bg-[#0A1628] text-white font-semibold flex items-center justify-center flex-shrink-0"
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}>
+    <span aria-hidden className="bg-[#0A1628] text-white font-semibold flex items-center justify-center flex-shrink-0"
+      style={{ width: size, height: size, borderRadius: radius, fontSize: Math.round(size * 0.4) }}>
       {initials(name)}
     </span>
   );

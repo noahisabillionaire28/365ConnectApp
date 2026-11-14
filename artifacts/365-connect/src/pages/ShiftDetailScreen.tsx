@@ -1,4 +1,5 @@
 import { useState, useEffect, useId, lazy, Suspense } from 'react';
+import { ClientLogo } from '@/components/jobs/JobCard';
 import { CLOCK_IN_OPENS_BEFORE_MS } from '@/lib/clockWindow';
 import { useDialog } from '@/hooks/useDialog';
 import { useQueryClient } from '@tanstack/react-query';
@@ -124,16 +125,6 @@ function ShiftDetailSkeleton() {
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return <h2 className="text-black font-bold text-[17px] mb-3 tracking-tight">{children}</h2>;
-}
-
-function ClientLogo({ name }: { name: string }) {
-  const initials = name.split(' ').slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
-  return (
-    <div aria-hidden
-      className="w-[52px] h-[52px] rounded-[12px] bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
-      <span className="text-black font-bold text-[17px] tracking-tight">{initials}</span>
-    </div>
-  );
 }
 
 function StatTile({ icon, label, value, sub, accent }: {
@@ -844,7 +835,7 @@ export function ShiftDetailScreen() {
           const profileHref = shift.clientUsername && !isOwner ? `/worker/${shift.clientUsername}` : null;
           const inner = (
             <>
-              <ClientLogo name={shift.companyName} />
+              <ClientLogo name={shift.companyName} src={shift.clientPhotoUrl} size={52} shape="tile" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <p className="text-black font-bold text-[17px] leading-tight truncate">{shift.companyName}</p>
