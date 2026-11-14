@@ -6,6 +6,8 @@ import { useMyLocation } from './useMyLocation';
 export type WorkerPerson = {
   id: string;
   username: string;
+  /** The person's own name, when they gave one. */
+  name?: string | null;
   photo_url: string | null;
   photoUrl: string | null;
   role: string;

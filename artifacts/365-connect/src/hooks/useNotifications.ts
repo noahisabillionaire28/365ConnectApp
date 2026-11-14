@@ -7,6 +7,7 @@ import type { NotificationRow } from '@/lib/supabase';
 
 type NotificationWithSender = NotificationRow & {
   from_username?: string | null;
+  from_name?: string | null;
   from_photo_url?: string | null;
 };
 

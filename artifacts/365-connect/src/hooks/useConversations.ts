@@ -13,7 +13,7 @@ export type ConversationWithOther = ConversationRow & {
   shiftTitle: string | null;
   unread: boolean;
   isGroup: boolean;
-  /** Display name: @username for DMs, the shift title for groups. */
+  /** Display name: the other person's name (agency name for an agency) for DMs, the shift title for groups. */
   displayName: string;
   members: ConversationMember[];
   participant_a_username?: string | null;
@@ -23,6 +23,8 @@ export type ConversationWithOther = ConversationRow & {
 };
 
 type ApiConversation = ConversationRow & {
+  participant_a_name?: string | null;
+  participant_b_name?: string | null;
   participant_a_username?: string | null;
   participant_a_photo?: string | null;
   participant_a_role?: string | null;
@@ -36,6 +38,7 @@ export function shapeConversation(c: ApiConversation, myId: string): Conversatio
   const isA = c.participant_a_id === myId;
   const otherId       = isGroup ? null : (isA ? c.participant_b_id : c.participant_a_id);
   const otherUsername = isA ? c.participant_b_username : c.participant_a_username;
+  const otherName     = isA ? c.participant_b_name     : c.participant_a_name;
   const otherPhoto    = isA ? c.participant_b_photo    : c.participant_a_photo;
   const otherRole     = isA ? c.participant_b_role     : c.participant_a_role;
   const other = otherId ? {
@@ -48,7 +51,7 @@ export function shapeConversation(c: ApiConversation, myId: string): Conversatio
     isGroup,
     members: c.members ?? [],
     shiftTitle: c.shift_title ?? null,
-    displayName: isGroup ? (c.title || c.shift_title || 'Shift chat') : (other?.username ? `@${other.username}` : 'Unknown user'),
+    displayName: isGroup ? (c.title || c.shift_title || 'Shift chat') : (otherName || (other?.username ? `@${other.username}` : 'Unknown user')),
     unread: (c.unread_count ?? 0) > 0,
   };
 }

@@ -40,9 +40,10 @@ router.get('/', requireAuth, async (req, res) => {
     .filter((p) => p.client_id === req.userId && p.worker_id !== req.userId)
     .map((p) => p.worker_id as string).filter(Boolean))];
   const workerNames = new Map<string, string | null>();
+  const workerRealNames = new Map<string, string | null>();
   if (paidWorkerIds.length) {
-    const { data: ws } = await adminDb.from('users').select('id, username').in('id', paidWorkerIds);
-    for (const w of ws ?? []) workerNames.set(w.id as string, (w.username as string | null) ?? null);
+    const { data: ws } = await adminDb.from('users').select('id, username, name').in('id', paidWorkerIds);
+    for (const w of ws ?? []) { workerNames.set(w.id as string, (w.username as string | null) ?? null); workerRealNames.set(w.id as string, (w.name as string | null) ?? null); }
   }
 
   const rows = (payments ?? []).map((p) => {
@@ -55,6 +56,7 @@ router.get('/', requireAuth, async (req, res) => {
       company_name: s?.company_name ?? null,
       direction,
       worker_username: direction === 'out' ? workerNames.get(p.worker_id as string) ?? null : undefined,
+      worker_name: direction === 'out' ? workerRealNames.get(p.worker_id as string) ?? null : undefined,
     };
   });
   return res.json(rows);

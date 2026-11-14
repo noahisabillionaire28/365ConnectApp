@@ -690,8 +690,8 @@ router.patch('/:id', requireAuth, requireRole('client', 'staffer'), async (req, 
         if (await findTimeConflictInWindow(workerId, id, newStart, newEnd)) clashing.push(workerId);
       }
       if (clashing.length) {
-        const { data: names } = await adminDb.from('users').select('id, username').in('id', clashing);
-        const handles = (names ?? []).map((u) => (u.username ? `@${u.username}` : 'a worker'));
+        const { data: names } = await adminDb.from('users').select(POSTER_COLS).in('id', clashing);
+        const handles = (names ?? []).map((u) => posterLabel(u as unknown as PosterRow) ?? 'a worker');
         return res.status(409).json({
           error: `That time overlaps another shift for ${handles.join(', ')}. Remove them from this shift first or pick another time.`,
         });

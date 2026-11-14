@@ -46,7 +46,7 @@ router.get('/', requireAuth, async (req, res) => {
     let q = adminDb
       .from('users')
       .select(
-        'id, username, photo_url, role, bio, rating, is_pro, is_available, availability, ' +
+        'id, username, name, photo_url, role, bio, rating, is_pro, is_available, availability, ' +
           'job_types, primary_job_type, secondary_job_types, certifications, ' +
           'lat, lng, company_name, created_at, status',
       )
@@ -63,8 +63,9 @@ router.get('/', requireAuth, async (req, res) => {
     }
     // Name search for pickers (swap sheet). Pattern characters are stripped so
     // a typed "%" or "_" cannot widen the match.
-    const term = (search ?? '').trim().replace(/^@/, '').replace(/[%_,().\\*]/g, '').slice(0, 40);
-    if (term) q = q.ilike('username', `%${term}%`);
+    const term = (search ?? '').trim().replace(/^@/, '').replace(/[%_,().\\*"':]/g, '').slice(0, 40);
+    // By handle or by name ("noah" finds @noah.w and Noah Fernando).
+    if (term) q = q.or(`username.ilike.%${term}%,name.ilike.%${term}%`);
     if (exclude_self === '1' || exclude_self === 'true') q = q.neq('id', req.userId);
 
     const { data: raw, error } = await q

@@ -101,6 +101,8 @@ export type AdminUserRow = {
   email:      string;
   role:       'worker' | 'client' | 'admin' | 'staffer';
   username:   string | null;
+  name?:      string | null;
+  company_name?: string | null;
   photo_url:  string | null;
   is_pro:     boolean;
   rating:     number;
@@ -140,6 +142,8 @@ export type AdminPaymentRow = {
 
 export type AdminDisputeUser = {
   username:  string | null;
+  /** Name as the app labels them (name, or agency name). */
+  name?:     string | null;
   email:     string | null;
   photo_url: string | null;
   role:      string | null;

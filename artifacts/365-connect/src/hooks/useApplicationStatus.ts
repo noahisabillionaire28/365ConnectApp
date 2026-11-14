@@ -10,6 +10,7 @@ export type ApplicationSwap = {
   status: SwapStatus;
   to_worker_id: string;
   to_username: string | null;
+  to_name?: string | null;
   note: string | null;
   created_at: string;
   responded_at: string | null;
@@ -22,6 +23,7 @@ export type IncomingSwap = {
   status: 'offered';
   from_worker_id: string;
   from_username: string | null;
+  from_name?: string | null;
   from_photo_url: string | null;
   from_rating: number | string | null;
   note: string | null;

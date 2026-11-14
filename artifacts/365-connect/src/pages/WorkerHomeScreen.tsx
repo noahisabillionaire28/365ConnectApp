@@ -190,7 +190,7 @@ export function WorkerHomeScreen() {
   const openNearby = nearby.shifts.filter((s) => !appliedShiftIds.has(s.id) && !mine.has(s.id)).slice(0, 5);
   const waiting = applied.length + standby.length;
 
-  const name = greetingName(user?.firstName, profile.username);
+  const name = greetingName(profile.name?.split(/\s+/)[0] || user?.firstName, profile.username);
   const today = new Date(now).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (

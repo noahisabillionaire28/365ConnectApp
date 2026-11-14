@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Avatar as SharedAvatar } from '@/components/Avatar';
 import { useParams, useLocation } from 'wouter';
 import {
   ChevronLeft, Image as ImageIcon, Video, Mic, Send, Square, Trash2, Reply, Copy, Pencil,
@@ -251,11 +252,7 @@ function useLongPress(onLongPress: () => void, ms = 420) {
 }
 
 function Avatar({ url, name, size = 28 }: { url: string | null | undefined; name: string | null | undefined; size?: number }) {
-  return url
-    ? <img src={url} alt="" style={{ width: size, height: size }} className="rounded-full object-cover border border-[#E5E7EB] flex-shrink-0" />
-    : <div style={{ width: size, height: size }} className="rounded-full bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
-        <span className="text-[#6B7280] font-bold" style={{ fontSize: Math.max(10, size * 0.4) }}>{(name ?? '?').replace('@', '').slice(0, 1).toUpperCase()}</span>
-      </div>;
+  return <SharedAvatar src={url} name={name} size={size} />;
 }
 
 type Receipt = { kind: 'read'; at: string } | { kind: 'delivered' } | { kind: 'group'; readBy: string[]; total: number } | null;
@@ -314,7 +311,7 @@ function Bubble({ msg, isMine, isGroup, senderName, senderPhoto, receipt, myId, 
             <button type="button" onClick={(e) => { e.stopPropagation(); onScrollToReply(msg.reply_to!.id); }}
               className={`w-full text-left mb-1.5 pl-2.5 pr-2 py-1.5 rounded-[8px] border-l-2 ${isMine ? 'border-white/60 bg-white/10' : 'border-[#0A1628] bg-white'}`}>
               <p className={`text-[11px] font-bold ${isMine ? 'text-white/90' : 'text-[#0A1628]'}`}>
-                {msg.reply_to.sender_id === myId ? 'You' : `@${msg.reply_to.sender_username ?? 'user'}`}
+                {msg.reply_to.sender_id === myId ? 'You' : (msg.reply_to.sender_name || (msg.reply_to.sender_username ? `@${msg.reply_to.sender_username}` : 'Someone'))}
               </p>
               <p className={`text-[12px] truncate ${isMine ? 'text-white/75' : 'text-[#6B7280]'}`}>{msg.reply_to.preview}</p>
             </button>
@@ -466,7 +463,7 @@ function ForwardSheet({ excludeId, onPick, onClose }: { excludeId: string; onPic
           className="w-full flex items-center gap-3 py-2.5 border-b border-[#F3F4F6] text-left">
           {c.isGroup
             ? <div className="w-10 h-10 rounded-full bg-[#0A1628] flex items-center justify-center"><Users size={16} className="text-white" /></div>
-            : <Avatar url={c.other?.photo_url} name={c.other?.username} size={36} />}
+            : <Avatar url={c.other?.photo_url} name={c.displayName} size={36} />}
           <div className="min-w-0 flex-1">
             <p className="text-[#111827] font-semibold text-[14px] truncate">{c.displayName}</p>
             {c.isGroup && <p className="text-[#6B7280] text-[11px]">{c.members.length} members</p>}
@@ -646,7 +643,7 @@ function InfoSheet({ conv, myId, blocked, onClose, onChanged, onOpenGallery, onO
       <div className="flex items-center gap-3 mb-4">
         {conv.isGroup
           ? <div className="w-12 h-12 rounded-full bg-[#0A1628] flex items-center justify-center"><Users size={20} className="text-white" /></div>
-          : <Avatar url={conv.other?.photo_url} name={conv.other?.username} size={48} />}
+          : <Avatar url={conv.other?.photo_url} name={conv.displayName} size={48} />}
         <div className="min-w-0">
           <p className="text-[#111827] font-bold text-[17px] truncate">{conv.displayName}</p>
           <p className="text-[#6B7280] text-[12px] truncate">
@@ -663,8 +660,8 @@ function InfoSheet({ conv, myId, blocked, onClose, onChanged, onOpenGallery, onO
             {conv.members.map((m) => (
               <button key={m.id} type="button" onClick={() => m.username && navigate(`/worker/${m.username}`)}
                 className="flex items-center gap-2.5 py-1 text-left">
-                <Avatar url={m.photo_url} name={m.username} size={30} />
-                <span className="text-[#111827] text-[13px] font-semibold">{m.username ? `@${m.username}` : 'Member'}{m.id === myId ? ' (you)' : ''}</span>
+                <Avatar url={m.photo_url} name={m.display_name || m.username} size={30} />
+                <span className="text-[#111827] text-[13px] font-semibold">{m.display_name || (m.username ? `@${m.username}` : 'Member')}{m.id === myId ? ' (you)' : ''}</span>
                 {m.id === conv.shift_owner_id && <span className="text-[10px] font-bold text-[#0A1628] bg-[#0A1628]/10 rounded-full px-2 py-0.5">Manager</span>}
               </button>
             ))}
@@ -1028,7 +1025,7 @@ export function ChatScreen() {
   // ── Derived ────────────────────────────────────────────────────────────────
   const memberMap = useMemo(() => new Map<string, ConversationMember>((conv?.members ?? []).map((m) => [m.id, m])), [conv]);
   const isGroup = !!conv?.isGroup;
-  const otherName = conv?.other?.username ? `@${conv.other.username}` : 'They';
+  const otherName = conv && !conv.isGroup && conv.displayName ? conv.displayName : 'They';
   const lastMine = [...messages].reverse().find((m) => m.sender_id === user?.id && !m.deleted_at && !m._status && m.kind !== 'system');
   const canShareShift = profile.role === 'client' || profile.role === 'staffer';
   const otherMembers = (conv?.members ?? []).filter((m) => m.id !== user?.id);
@@ -1036,14 +1033,15 @@ export function ChatScreen() {
   function receiptFor(m: MessageRow): Receipt {
     if (!lastMine || m.id !== lastMine.id) return null;
     if (!isGroup) return m.read_at ? { kind: 'read', at: m.read_at } : { kind: 'delivered' };
-    const readBy = otherMembers.filter((mem) => { const at = readers[mem.id]; return at && at >= m.created_at; }).map((mem) => (mem.username ? `@${mem.username}` : 'Member'));
+    const readBy = otherMembers.filter((mem) => { const at = readers[mem.id]; return at && at >= m.created_at; }).map((mem) => mem.display_name || (mem.username ? `@${mem.username}` : 'Member'));
     return { kind: 'group', readBy, total: otherMembers.length };
   }
 
   function senderOf(m: MessageRow): { name: string; photo: string | null | undefined } {
     const mem = memberMap.get(m.sender_id);
-    const name = m.sender_username ?? mem?.username ?? (m.sender_id === conv?.other?.id ? conv?.other?.username : null);
-    return { name: name ? `@${name}` : 'Member', photo: m.sender_photo ?? mem?.photo_url ?? (m.sender_id === conv?.other?.id ? conv?.other?.photo_url : null) };
+    const handle = m.sender_username ?? mem?.username ?? (m.sender_id === conv?.other?.id ? conv?.other?.username : null);
+    const name = m.sender_name || mem?.display_name || (handle ? `@${handle}` : null);
+    return { name: name ?? 'Member', photo: m.sender_photo ?? mem?.photo_url ?? (m.sender_id === conv?.other?.id ? conv?.other?.photo_url : null) };
   }
 
   function autoGrow() {
@@ -1089,7 +1087,7 @@ export function ChatScreen() {
               <>
               {isGroup
                 ? <div className="w-10 h-10 rounded-full bg-[#0A1628] flex items-center justify-center flex-shrink-0"><Users size={16} className="text-white" /></div>
-                : <Avatar url={conv.other?.photo_url} name={conv.other?.username} size={36} />}
+                : <Avatar url={conv.other?.photo_url} name={conv.displayName} size={36} />}
               <div className="min-w-0">
                 <p className="text-black font-bold text-[15px] min-w-0 flex items-center gap-1.5">
                   <span className="truncate">{conv.displayName ?? 'Conversation'}</span>

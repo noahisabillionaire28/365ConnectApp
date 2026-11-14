@@ -1,4 +1,5 @@
 import { Router, type Response } from 'express';
+import { PERSON_COLS, personLabel } from '../lib/poster.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { broadcastToUser } from '../lib/sseManager.js';
@@ -99,7 +100,7 @@ router.get('/', requireAuth, async (req, res) => {
     if (fromIds.length) {
       const { data: users, error: usersError } = await adminDb
         .from('users')
-        .select('id, username, photo_url')
+        .select(PERSON_COLS)
         .in('id', fromIds);
       if (usersError) return res.status(500).json({ error: usersError.message });
       usersById = new Map((users ?? []).map((u: any) => [u.id, u]));
@@ -110,6 +111,7 @@ router.get('/', requireAuth, async (req, res) => {
       return {
         ...n,
         from_username: u?.username ?? null,
+        from_name: personLabel(u),
         from_photo_url: u?.photo_url ?? null,
       };
     });

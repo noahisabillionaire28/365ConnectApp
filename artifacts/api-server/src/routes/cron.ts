@@ -16,6 +16,7 @@
  * tick still catches everything; dedupe makes the overlap harmless.
  */
 import { Router } from 'express';
+import { PERSON_COLS, personLabel } from '../lib/poster.js';
 import { timingSafeEqual } from 'node:crypto';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { createNotification } from './notifications.js';
@@ -345,11 +346,11 @@ async function promptRatings(fromH: number, toH: number, types: { worker: string
     acceptedByShift(ids),
     adminDb.from('time_entries').select('shift_id, worker_id').in('shift_id', ids).not('clock_in', 'is', null),
     adminDb.from('reviews').select('shift_id, reviewer_id').in('shift_id', ids),
-    adminDb.from('users').select('id, username, company_name').in('id', [...new Set(list.map((s) => s.client_id))]),
+    adminDb.from('users').select(PERSON_COLS).in('id', [...new Set(list.map((s) => s.client_id))]),
   ]);
   const clockedIn = new Set((entries ?? []).map((e) => `${e.worker_id}:${e.shift_id}`));
   const reviewed = new Set((reviews ?? []).map((r) => `${r.reviewer_id}:${r.shift_id}`));
-  const posterName = new Map((posters ?? []).map((u) => [u.id, u.company_name || (u.username ? `@${u.username}` : 'the poster')]));
+  const posterName = new Map((posters ?? []).map((u) => [u.id as string, personLabel(u) ?? 'the poster']));
 
   let sent = 0;
   for (const s of list) {

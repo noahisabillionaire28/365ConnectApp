@@ -29,8 +29,8 @@ function UpdateCard({ u }: { u: ShiftUpdate }) {
         <span className="text-[#6B7280] text-[11px] ml-auto">{timeAgo(u.created_at)}</span>
       </div>
       <p className="text-[#111827] text-[14px] leading-snug whitespace-pre-wrap">{u.body}</p>
-      {u.author_username && (
-        <p className="text-[#6B7280] text-[11px] mt-2">— @{u.author_username}</p>
+      {(u.author_name || u.author_username) && (
+        <p className="text-[#6B7280] text-[11px] mt-2">— {u.author_name || `@${u.author_username}`}</p>
       )}
     </div>
   );

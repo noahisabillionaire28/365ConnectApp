@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { ClientLogo } from '@/components/jobs/JobCard';
 import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -179,7 +180,10 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
           {shift.jobType}
         </p>
         <p className="text-black font-bold text-[20px] leading-tight">{shiftHeadline(shift)}</p>
-        <p className="text-[#374151] text-[13px] font-medium mt-0.5">{shift.companyName}</p>
+        <p className="text-[#374151] text-[13px] font-medium mt-1.5 flex items-center justify-center gap-1.5">
+          <ClientLogo name={shift.companyName} src={shift.clientPhotoUrl} size={18} />
+          {shift.companyName}
+        </p>
         <p className="text-[#6B7280] text-[12px] mt-0.5">{shift.location}</p>
       </div>
 

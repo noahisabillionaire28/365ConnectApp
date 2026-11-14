@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export type SavedWorker = {
   id: string;
   username: string | null;
+  name?: string | null;
   photo_url: string | null;
   role: string;
   rating: number;

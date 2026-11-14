@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { AvatarFill } from '@/components/Avatar';
 import { X, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { StoryGroup } from '@/hooks/useStories';
 
@@ -99,7 +100,6 @@ export function StoryViewer({
 
   if (!group || !story) return null;
 
-  const initials = (group.username ?? '??').slice(0, 2).toUpperCase();
 
   return (
     <div data-no-pull className="fixed inset-0 z-[120] bg-black flex items-center justify-center select-none">
@@ -135,13 +135,11 @@ export function StoryViewer({
         {/* Header */}
         <div className="absolute top-5 left-3 right-3 flex items-center gap-2.5 z-20">
           <div className="w-8 h-8 rounded-full overflow-hidden bg-white/20 flex items-center justify-center flex-shrink-0 ring-1 ring-white/40">
-            {group.photo_url
-              ? <img src={group.photo_url} alt="" className="w-full h-full object-cover" />
-              : <span className="text-white text-[11px] font-bold">{initials}</span>}
+            <AvatarFill src={group.photo_url} name={group.username} className="text-white text-[11px] font-bold" />
           </div>
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="text-white font-semibold text-[14px] truncate">
-              {group.is_me ? 'Your story' : `@${group.username ?? 'user'}`}
+              {group.is_me ? 'Your story' : (group.username ? `@${group.username}` : 'Member')}
             </span>
             <span className="text-white/70 text-[12px] flex-shrink-0">{timeAgo(story.created_at)}</span>
           </div>

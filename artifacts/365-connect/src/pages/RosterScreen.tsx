@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AvatarFill } from '@/components/Avatar';
+import { matchesPerson } from '@/lib/person';
+import { personName } from '@/lib/person';
 import { useLocation } from 'wouter';
 import { ChevronLeft, Star, BadgeCheck, Users, UserMinus, Search, MessageCircle, CalendarPlus, X } from 'lucide-react';
 import { useRoster, type RosterWorker } from '@/hooks/useRoster';
@@ -32,25 +35,20 @@ function RosterCard({ worker, onOpen, onMessage, onAssign, onRemove }: {
   onAssign: () => void;
   onRemove: () => void;
 }) {
-  const initials = (worker.username ?? 'W').replace('@', '').slice(0, 2).toUpperCase();
   const jobs = [worker.primaryJobType, ...(worker.job_types ?? [])].filter((j, i, a): j is string => !!j && a.indexOf(j) === i);
 
   return (
     <div className="rounded-[12px] border border-[#E5E7EB] bg-white p-3.5">
       <div className="flex items-center gap-3">
-        <button type="button" onClick={onOpen} aria-label={`Open ${worker.username ?? 'worker'}'s profile`}
+        <button type="button" onClick={onOpen} aria-label={`Open ${personName(worker, 'worker')}'s profile`}
           className="w-14 h-14 rounded-full overflow-hidden bg-[#F3F4F6] flex items-center justify-center flex-shrink-0">
-          {worker.photoUrl ? (
-            <img src={worker.photoUrl} alt="" aria-hidden loading="lazy" decoding="async" className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-[#6B7280] font-bold text-[16px]">{initials}</span>
-          )}
+          <AvatarFill src={worker.photoUrl} name={personName(worker)} />
         </button>
 
         <button type="button" onClick={onOpen} className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-1.5">
             <p className="text-[#0A1628] font-bold text-[15px] truncate">
-              {worker.username ? `@${worker.username}` : 'Worker'}
+              {personName(worker, 'Worker')}
             </p>
             {worker.isPro && (
               <BadgeCheck size={15} aria-label="Pro member" style={{ color: GOLD }} fill={GOLD} className="flex-shrink-0 text-white" />
@@ -98,7 +96,7 @@ function AssignSheet({ worker, shifts, onPick, onClose }: {
         onClick={(e) => e.stopPropagation()}>
         <div className="w-10 h-1 rounded-full bg-[#E5E7EB] mx-auto mb-4" />
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[#111827] font-bold text-[17px]">Assign {worker.username ? `@${worker.username}` : 'worker'} to…</p>
+          <p className="text-[#111827] font-bold text-[17px]">Assign {personName(worker, 'worker')} to…</p>
           <button type="button" aria-label="Close" onClick={onClose} className="w-8 h-8 rounded-full bg-[#F3F4F6] flex items-center justify-center">
             <X size={16} aria-hidden />
           </button>
@@ -159,7 +157,7 @@ export function RosterScreen() {
     const q = query.trim().toLowerCase();
     if (!q) return workers;
     return workers.filter((w) =>
-      (w.username ?? '').toLowerCase().includes(q) ||
+      matchesPerson(w, q) ||
       (w.primaryJobType ?? '').toLowerCase().includes(q) ||
       (w.job_types ?? []).some((j) => j.toLowerCase().includes(q)));
   }, [workers, query]);

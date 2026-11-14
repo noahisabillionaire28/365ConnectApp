@@ -1,9 +1,10 @@
 /**
- * How a shift's poster is named on job cards, chats and receipts.
+ * How a person or business is named everywhere: job cards, chats, rosters,
+ * receipts and notification text.
  *
- * An agency (staffer) is known by its agency name; a client by their own
- * name, or their company when that is all they gave. The handle is the
- * last resort. The bio is never a label.
+ * An agency (staffer) is known by its agency name; everyone else by their
+ * own name (a client's company when that is all they gave). The @handle is
+ * the last resort. The bio is never a label.
  */
 export type PosterRow = {
   id?: string;
@@ -36,4 +37,17 @@ export async function posterMap(db: { from: (t: string) => any }, clientIds: (st
 /** The label a shift shows: one typed for the shift itself, else the poster's. */
 export function shiftLabel(shift: { company_name?: string | null; client_id?: string | null }, posters: Map<string, PosterRow>): string | null {
   return shift.company_name?.trim() || posterLabel(shift.client_id ? posters.get(shift.client_id) : null);
+}
+
+/** The same rule under the name used for people who are not posting a shift. */
+export const personLabel = posterLabel;
+
+/** Columns personLabel needs, plus the photo. */
+export const PERSON_COLS = POSTER_COLS;
+
+/** One account's label by id, for notification copy; `fallback` when the account is gone. */
+export async function labelFor(db: { from: (t: string) => any }, id: string | null | undefined, fallback: string): Promise<string> {
+  if (!id) return fallback;
+  const { data } = await db.from('users').select(POSTER_COLS).eq('id', id).maybeSingle();
+  return posterLabel(data) ?? fallback;
 }

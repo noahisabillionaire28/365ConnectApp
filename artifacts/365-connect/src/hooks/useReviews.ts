@@ -14,6 +14,7 @@ export type ReviewRow = {
   negative_tags: string[];
   created_at: string;
   reviewer_username?: string | null;
+  reviewer_name?: string | null;
   reviewer_photo?: string | null;
 };
 

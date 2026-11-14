@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { labelFor } from '../lib/poster.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
@@ -11,8 +12,7 @@ const router = Router();
 
 /** A user's @handle for notification copy, or a neutral fallback. */
 async function handleFor(id: string): Promise<string> {
-  const { data } = await adminDb.from('users').select('username').eq('id', id).maybeSingle();
-  return data?.username ? `@${data.username}` : 'Someone';
+  return labelFor(adminDb, id, 'Someone');
 }
 
 /**

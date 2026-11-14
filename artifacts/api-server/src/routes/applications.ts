@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { limitUser } from '../lib/rateLimit.js';
-import { posterMap, shiftLabel as posterShiftLabel } from '../lib/poster.js';
+import { posterMap, shiftLabel as posterShiftLabel, labelFor } from '../lib/poster.js';
 import { z } from 'zod';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
@@ -16,10 +16,9 @@ import { cancelActiveSwapsFor, hasClockedIn } from '../lib/swaps.js';
 
 const router = Router();
 
-/** A worker's @handle for use in notification copy, or a neutral fallback. */
+/** A worker's name (their @handle if they gave none) for notification copy. */
 export async function workerName(id: string): Promise<string> {
-  const { data } = await adminDb.from('users').select('username').eq('id', id).maybeSingle();
-  return data?.username ? `@${data.username}` : 'the worker';
+  return labelFor(adminDb, id, 'the worker');
 }
 
 /** The day-of statuses a worker can set on their booked shift. */
@@ -154,7 +153,7 @@ router.get('/', requireAuth, async (req, res) => {
       const [usersRes, entriesRes, revsRes, paysRes] = await Promise.all([
         adminDb
           .from('users')
-          .select('id, username, photo_url, rating, job_types, primary_job_type, certifications, bio')
+          .select('id, username, name, photo_url, rating, job_types, primary_job_type, certifications, bio')
           .in('id', workerIds),
         workerIds.length
           ? adminDb
@@ -234,6 +233,7 @@ router.get('/', requireAuth, async (req, res) => {
         return {
           ...a,
           username: u?.username ?? null,
+          name: u?.name ?? null,
           photo_url: u?.photo_url ?? null,
           rating: u?.rating ?? null,
           job_types: u?.job_types ?? null,
@@ -366,19 +366,20 @@ router.get('/status/:shiftId', requireAuth, async (req, res) => {
     const offer = offerRes.data as { from_worker_id: string } & Record<string, unknown> | null;
 
     const peopleIds = [...new Set([s?.to_worker_id, offer?.from_worker_id].filter((x): x is string => !!x))];
-    const people = new Map<string, { username: string | null; photo_url: string | null; rating: number | null }>();
+    const people = new Map<string, { username: string | null; name: string | null; photo_url: string | null; rating: number | null }>();
     if (peopleIds.length) {
-      const { data: us } = await adminDb.from('users').select('id, username, photo_url, rating').in('id', peopleIds);
+      const { data: us } = await adminDb.from('users').select('id, username, name, photo_url, rating').in('id', peopleIds);
       for (const u of us ?? []) people.set(u.id, u);
     }
 
     const swap: Record<string, unknown> | null = s
-      ? { ...s, to_username: people.get(s.to_worker_id)?.username ?? null }
+      ? { ...s, to_username: people.get(s.to_worker_id)?.username ?? null, to_name: people.get(s.to_worker_id)?.name ?? null }
       : null;
     const incoming: Record<string, unknown> | null = offer
       ? {
         ...offer,
         from_username: people.get(offer.from_worker_id)?.username ?? null,
+        from_name: people.get(offer.from_worker_id)?.name ?? null,
         from_photo_url: people.get(offer.from_worker_id)?.photo_url ?? null,
         from_rating: people.get(offer.from_worker_id)?.rating ?? null,
       }

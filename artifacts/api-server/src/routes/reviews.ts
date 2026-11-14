@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { PERSON_COLS, personLabel, labelFor, type PosterRow } from '../lib/poster.js';
 import { limitUser } from '../lib/rateLimit.js';
 import { adminDb } from '../lib/supabaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -55,8 +56,8 @@ router.get('/pending', requireAuth, async (req, res) => {
         const rated = new Set((mine ?? []).map((r) => r.shift_id));
         const posterIds = [...new Set(list.map((s) => s.client_id).filter(Boolean))];
         const { data: posters } = posterIds.length
-          ? await adminDb.from('users').select('id, username, company_name').in('id', posterIds)
-          : { data: [] as { id: string; username: string | null; company_name: string | null }[] };
+          ? await adminDb.from('users').select(PERSON_COLS).in('id', posterIds)
+          : { data: [] as PosterRow[] };
         const posterMap = new Map((posters ?? []).map((u) => [u.id, u]));
         for (const s of list) {
           if (!s.client_id || s.client_id === me || rated.has(s.id)) continue;
@@ -64,7 +65,7 @@ router.get('/pending', requireAuth, async (req, res) => {
           items.push({
             shift_id: s.id, title: s.title ?? null, date: s.start_time ?? null,
             counterpart_id: s.client_id,
-            counterpart_name: s.company_name || p?.company_name || (p?.username ? `@${p.username}` : null),
+            counterpart_name: s.company_name?.trim() || personLabel(p),
             role: 'worker',
           });
         }
@@ -94,16 +95,15 @@ router.get('/pending', requireAuth, async (req, res) => {
       }
       const workerIds = [...new Set(unrated.values())];
       const { data: workers } = workerIds.length
-        ? await adminDb.from('users').select('id, username').in('id', workerIds)
-        : { data: [] as { id: string; username: string | null }[] };
-      const nameMap = new Map((workers ?? []).map((u) => [u.id, u.username]));
+        ? await adminDb.from('users').select(PERSON_COLS).in('id', workerIds)
+        : { data: [] as PosterRow[] };
+      const nameMap = new Map((workers ?? []).map((u) => [u.id as string, personLabel(u)]));
       for (const s of postedList) {
         const w = unrated.get(s.id);
         if (!w) continue;
-        const username = nameMap.get(w);
         items.push({
           shift_id: s.id, title: s.title ?? null, date: s.start_time ?? null,
-          counterpart_id: w, counterpart_name: username ? `@${username}` : null, role: 'poster',
+          counterpart_id: w, counterpart_name: nameMap.get(w) ?? null, role: 'poster',
         });
       }
     }
@@ -140,15 +140,15 @@ router.get('/:userId', requireAuth, async (req, res) => {
   // Flatten the reviewer (users) columns via a second query + merge, so the
   // response keeps the flat reviewer_username / reviewer_photo field names.
   const reviewerIds = [...new Set(rows.map((r) => r.reviewer_id).filter((id) => id != null))];
-  const reviewerMap = new Map<string, { username: string | null; photo_url: string | null }>();
+  const reviewerMap = new Map<string, { username: string | null; photo_url: string | null; name: string | null; role: string | null }>();
   if (reviewerIds.length) {
     const { data: reviewers, error: rErr } = await adminDb
       .from('users')
-      .select('id, username, photo_url')
+      .select(PERSON_COLS)
       .in('id', reviewerIds);
     if (rErr) return res.status(500).json({ error: rErr.message });
     for (const u of reviewers ?? []) {
-      reviewerMap.set(u.id, { username: u.username, photo_url: u.photo_url });
+      reviewerMap.set(u.id, { username: u.username, photo_url: u.photo_url, name: personLabel(u), role: u.role ?? null });
     }
   }
 
@@ -179,6 +179,8 @@ router.get('/:userId', requireAuth, async (req, res) => {
       negative_tags: isClientOrStaffer ? r.negative_tags : [],
       created_at: r.created_at,
       reviewer_username: reviewer?.username ?? null,
+      reviewer_name: reviewer?.name ?? null,
+      reviewer_role: reviewer?.role ?? null,
       reviewer_photo: reviewer?.photo_url ?? null,
     };
   });
@@ -256,8 +258,7 @@ router.post('/', limitUser(20, 3600000), requireAuth, async (req, res) => {
     if (!data) return res.status(409).json({ error: 'Review already submitted' });
 
     // Tell the person who was rated. Their own reviews live on their profile.
-    const { data: reviewer } = await adminDb.from('users').select('username').eq('id', req.userId).maybeSingle();
-    const who = reviewer?.username ? `@${reviewer.username}` : (shift.client_id === req.userId ? 'The organizer' : 'A worker');
+    const who = await labelFor(adminDb, req.userId, shift.client_id === req.userId ? 'The organizer' : 'A worker');
     const stars = `${ratingNum} star${ratingNum === 1 ? '' : 's'}`;
     await createNotification({
       userId: reviewee_id,

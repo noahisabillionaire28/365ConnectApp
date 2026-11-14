@@ -3,6 +3,7 @@
  * enrichment, previews, blocks, system messages, and scheduled-message flush.
  */
 import { adminDb } from './supabaseAdmin.js';
+import { PERSON_COLS, personLabel, labelFor } from './poster.js';
 import { isUuid } from './validate.js';
 import { broadcastToUser } from './sseManager.js';
 import { pushToUsers } from './push.js';
@@ -140,8 +141,7 @@ export async function refreshConversationPreview(conversationId: string, conv?: 
   if (!latest) return;
   let senderName: string | null = null;
   if (conv?.is_group && latest.kind !== 'system') {
-    const { data: u } = await adminDb.from('users').select('username').eq('id', latest.sender_id).maybeSingle();
-    senderName = u?.username ? `@${u.username}` : null;
+    senderName = await labelFor(adminDb, latest.sender_id, '') || null;
   }
   await adminDb
     .from('conversations')
@@ -190,7 +190,7 @@ export async function enrichMessages(msgs: MessageRow[]): Promise<Record<string,
   const shiftIds  = [...new Set(msgs.map((m) => m.shift_card_id).filter((x): x is string => !!x))];
 
   const [senders, replies, shifts] = await Promise.all([
-    senderIds.length ? adminDb.from('users').select('id, username, photo_url').in('id', senderIds) : Promise.resolve({ data: [] }),
+    senderIds.length ? adminDb.from('users').select(PERSON_COLS).in('id', senderIds) : Promise.resolve({ data: [] }),
     replyIds.length  ? adminDb.from('messages').select('id, sender_id, text, image_url, video_url, voice_url, file_name, shift_card_id, deleted_at').in('id', replyIds) : Promise.resolve({ data: [] }),
     shiftIds.length  ? adminDb.from('shifts').select('id, title, job_type, start_time, end_time, pay_rate, pay_period, location, status, spots_available, spots_filled').in('id', shiftIds) : Promise.resolve({ data: [] }),
   ]);
@@ -201,7 +201,7 @@ export async function enrichMessages(msgs: MessageRow[]): Promise<Record<string,
   // Reply previews need the quoted sender's name too.
   const replySenderIds = [...new Set((replies.data ?? []).map((r: any) => r.sender_id).filter((id: string) => !senderMap.has(id)))];
   if (replySenderIds.length) {
-    const { data: more } = await adminDb.from('users').select('id, username, photo_url').in('id', replySenderIds as string[]);
+    const { data: more } = await adminDb.from('users').select(PERSON_COLS).in('id', replySenderIds as string[]);
     for (const u of more ?? []) senderMap.set(u.id, u);
   }
 
@@ -212,11 +212,13 @@ export async function enrichMessages(msgs: MessageRow[]): Promise<Record<string,
     return {
       ...m,
       sender_username: u?.username ?? null,
+      sender_name: personLabel(u),
       sender_photo: u?.photo_url ?? null,
       reply_to: r ? {
         id: r.id,
         sender_id: r.sender_id,
         sender_username: ru?.username ?? null,
+        sender_name: personLabel(ru),
         preview: previewOf(r),
       } : null,
       shift_card: m.shift_card_id ? shiftMap.get(m.shift_card_id) ?? null : null,
@@ -286,8 +288,7 @@ export async function addWorkerToShiftChat(shiftId: string, workerId: string): P
     members.add(workerId);
     const updated = { ...conv, participant_ids: [...members] };
     await adminDb.from('conversations').update({ participant_ids: [...members] }).eq('id', conv.id);
-    const { data: u } = await adminDb.from('users').select('username').eq('id', workerId).maybeSingle();
-    await insertSystemMessage(updated, `${u?.username ? `@${u.username}` : 'A worker'} joined the shift chat`, workerId);
+    await insertSystemMessage(updated, `${await labelFor(adminDb, workerId, 'A worker')} joined the shift chat`, workerId);
     broadcastToUser(workerId, 'conversation_update', { conversationId: conv.id });
   } catch (e) {
     console.error('[chat] addWorkerToShiftChat failed:', e);
@@ -303,8 +304,7 @@ export async function removeWorkerFromShiftChat(shiftId: string, workerId: strin
     if (!conv || !(conv.participant_ids ?? []).includes(workerId)) return;
     const members = (conv.participant_ids ?? []).filter((id) => id !== workerId);
     await adminDb.from('conversations').update({ participant_ids: members }).eq('id', conv.id);
-    const { data: u } = await adminDb.from('users').select('username').eq('id', workerId).maybeSingle();
-    await insertSystemMessage({ ...conv, participant_ids: members }, `${u?.username ? `@${u.username}` : 'A worker'} left the shift chat`, conv.created_by ?? members[0]);
+    await insertSystemMessage({ ...conv, participant_ids: members }, `${await labelFor(adminDb, workerId, 'A worker')} left the shift chat`, conv.created_by ?? members[0]);
     broadcastToUser(workerId, 'conversation_update', { conversationId: conv.id });
   } catch (e) {
     console.error('[chat] removeWorkerFromShiftChat failed:', e);
@@ -331,8 +331,7 @@ export async function fanOutMessage(conv: ConversationRow, msg: Record<string, u
   const muted = new Set(conv.muted_by ?? []);
   const pushTo = others.filter((id) => !muted.has(id));
   if (pushTo.length) {
-    const { data: sender } = await adminDb.from('users').select('username').eq('id', senderId).maybeSingle();
-    const name = sender?.username ? `@${sender.username}` : 'New message';
+    const name = await labelFor(adminDb, senderId, 'New message');
     const title = conv.is_group ? `${conv.title ?? 'Shift chat'}` : name;
     const body = conv.is_group ? previewOf(msg as Partial<MessageRow>, name) : previewOf(msg as Partial<MessageRow>);
     await pushToUsers(pushTo, { title, body: body.slice(0, 140), url: `/messages/${conv.id}`, tag: `conv-${conv.id}` });

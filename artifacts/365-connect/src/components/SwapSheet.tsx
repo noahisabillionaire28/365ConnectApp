@@ -4,6 +4,8 @@
  * the roster until the other worker accepts and the poster approves.
  */
 import { useEffect, useId, useState } from 'react';
+import { Avatar as SharedAvatar } from '@/components/Avatar';
+import { personName } from '@/lib/person';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Search, Star, Check, Info, X } from 'lucide-react';
 import { apiClient } from '@/lib/api';
@@ -13,6 +15,7 @@ import { useDialog } from '@/hooks/useDialog';
 export type SwapCandidate = {
   id: string;
   username: string | null;
+  name?: string | null;
   photo_url: string | null;
   rating: number | string | null;
   primary_job_type: string | null;
@@ -20,14 +23,7 @@ export type SwapCandidate = {
 };
 
 function Avatar({ url, name, size = 36 }: { url: string | null; name: string | null; size?: number }) {
-  const initials = (name ?? 'W').replace('@', '').slice(0, 2).toUpperCase();
-  return (
-    <div style={{ width: size, height: size }}
-      className="rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center overflow-hidden flex-shrink-0">
-      {url ? <img src={url} alt="" className="w-full h-full object-cover" />
-           : <span className="text-black font-bold text-[12px]">{initials}</span>}
-    </div>
-  );
+  return <SharedAvatar src={url} name={name} size={size} />;
 }
 
 export function SwapSheet({ open, shiftLabel, busy, onSend, onCancel }: {
@@ -95,9 +91,9 @@ export function SwapSheet({ open, shiftLabel, busy, onSend, onCancel }: {
         {/* Who */}
         {selected ? (
           <div className="mt-4 flex items-center gap-3 rounded-[12px] border border-[#0A1628] bg-[#0A1628]/5 px-3.5 py-3">
-            <Avatar url={selected.photo_url} name={selected.username} />
+            <Avatar url={selected.photo_url} name={personName(selected)} />
             <div className="flex-1 min-w-0">
-              <p className="text-[#111827] font-semibold text-[14px] truncate">{selected.username ? `@${selected.username}` : 'Worker'}</p>
+              <p className="text-[#111827] font-semibold text-[14px] truncate">{personName(selected, 'Worker')}</p>
               <p className="text-[#6B7280] text-[12px] truncate">
                 {[selected.primary_job_type, Number(selected.rating) > 0 ? `${Number(selected.rating).toFixed(1)} rating` : null].filter(Boolean).join(' · ') || 'Worker'}
               </p>
@@ -127,9 +123,9 @@ export function SwapSheet({ open, shiftLabel, busy, onSend, onCancel }: {
                 <button key={w.id} type="button" role="option" aria-selected={false} disabled={busy}
                   onClick={() => setSelected(w)}
                   className="flex items-center gap-3 rounded-[12px] border border-[#E5E7EB] px-3.5 py-2.5 text-left active:bg-[#FAFAFA]">
-                  <Avatar url={w.photo_url} name={w.username} />
+                  <Avatar url={w.photo_url} name={personName(w)} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[#111827] font-semibold text-[14px] truncate">{w.username ? `@${w.username}` : 'Worker'}</p>
+                    <p className="text-[#111827] font-semibold text-[14px] truncate">{personName(w, 'Worker')}</p>
                     <p className="text-[#6B7280] text-[12px] truncate">{w.primary_job_type ?? 'Worker'}{w.is_followed ? ' · On a roster with you' : ''}</p>
                   </div>
                   {Number(w.rating) > 0 && (

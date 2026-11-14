@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import { ClientLogo } from '@/components/jobs/JobCard';
+import { Avatar } from '@/components/Avatar';
+import { personName } from '@/lib/person';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -146,8 +149,8 @@ function ApplicationRow({ application, onTap }: { application: MyApplication; on
       aria-label={`${application.shiftTitle} at ${application.companyName ?? 'client'} — ${label}`}
       className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-[#E5E7EB] text-left last:border-none">
       <div className="w-11 h-11 rounded-[10px] bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0 overflow-hidden">
-        {application.coverImage
-          ? <img src={application.coverImage} alt="" className="w-full h-full object-cover" />
+        {application.clientLogo || application.companyName
+          ? <ClientLogo name={application.companyName} src={application.clientLogo} size={44} shape="tile" />
           : <Briefcase size={16} aria-hidden className="text-[#6B7280]" />}
       </div>
       <div className="flex-1 min-w-0">
@@ -256,7 +259,7 @@ function RostersOnSection() {
     } finally { setBusy(false); }
   }
 
-  const labelFor = (o: RosterOwner) => (o.role === 'staffer' ? o.company_name || o.name : o.name || o.company_name) || (o.username ? `@${o.username}` : 'this poster');
+  const labelFor = (o: RosterOwner) => (o.role === 'staffer' ? o.company_name || o.name : o.name || o.company_name) || (personName(o, 'this poster'));
 
   if (q.isError || (!q.isLoading && owners.length === 0)) return null;
 
@@ -719,13 +722,9 @@ export function ProfileScreen() {
               <div key={r.id} className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[12px] p-4">
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
-                    {r.reviewer_photo ? (
-                      <img src={r.reviewer_photo} alt="" className="w-6 h-6 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-[#E5E7EB]" />
-                    )}
+                    <Avatar src={r.reviewer_photo} name={r.reviewer_name || r.reviewer_username} size={24} />
                     <span className="text-black text-[13px] font-semibold">
-                      {r.reviewer_username ? `@${r.reviewer_username}` : 'Client'}
+                      {r.reviewer_name || (r.reviewer_username ? `@${r.reviewer_username}` : isPoster ? 'A worker' : 'Client')}
                     </span>
                   </div>
                   <StarRow rating={r.rating} size={11} />

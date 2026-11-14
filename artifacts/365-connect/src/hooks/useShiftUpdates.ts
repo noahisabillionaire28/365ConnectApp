@@ -10,6 +10,7 @@ export type ShiftUpdate = {
   body: string;
   created_at: string;
   author_username: string | null;
+  author_name?: string | null;
   author_photo_url: string | null;
 };
 

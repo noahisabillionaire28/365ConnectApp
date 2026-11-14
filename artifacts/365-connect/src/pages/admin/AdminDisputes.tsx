@@ -97,6 +97,7 @@ function SkeletonCard() {
 
 /** A person on a case: handle (linked to their public profile) + email. */
 function personLabel(user: AdminDisputeRow['reported_user'], id: string | null) {
+  if (user?.name) return user.name;
   if (user?.username) return `@${user.username}`;
   if (user?.email) return user.email;
   return id ? `Deleted user (${id.slice(0, 8)})` : 'Unknown user';

@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { AvatarFill } from '@/components/Avatar';
 import { Heart, MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useDialog } from '@/hooks/useDialog';
 import { useLocation } from 'wouter';
@@ -27,7 +28,6 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
   const menuRef = useDialog<HTMLDivElement>(menuOpen, () => setMenuOpen(false));
 
   const goAuthor = () => { if (post.author_username) navigate(`/worker/${post.author_username}`); };
-  const initials = (post.author_username ?? 'W').slice(0, 2).toUpperCase();
   const canDelete = post.user_id === user?.id || isAdmin;
 
   function handleDelete() {
@@ -42,9 +42,7 @@ export function PostCard({ post, onLike, onOpenComments, onDeleted }: {
       <div className="flex items-center gap-2.5 px-4 py-3">
         <button type="button" onClick={goAuthor}
           className="w-10 h-10 rounded-full overflow-hidden bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
-          {post.author_photo_url
-            ? <img src={post.author_photo_url} alt={post.author_username ?? 'Worker'} width={36} height={36} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-            : <span className="text-[12px] font-bold text-[#0A1628]">{initials}</span>}
+          <AvatarFill src={post.author_photo_url} name={post.author_username} className="text-[12px] font-bold text-[#0A1628]" />
         </button>
         <button type="button" onClick={goAuthor} className="min-w-0 text-left">
           <p className="text-[#111827] font-semibold text-[13px] truncate">

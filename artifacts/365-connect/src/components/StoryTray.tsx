@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { AvatarFill } from '@/components/Avatar';
 import { Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/contexts/RoleContext';
@@ -11,7 +12,6 @@ import { StoryViewer } from '@/components/StoryViewer';
 
 /** One avatar with a gradient (unseen) or grey (seen) ring. */
 function Ring({ group, onTap }: { group: StoryGroup; onTap: () => void }) {
-  const initials = (group.username ?? '??').slice(0, 2).toUpperCase();
   return (
     <button type="button" onClick={onTap}
       aria-label={group.is_me ? 'View your story' : `View @${group.username}'s story`}
@@ -23,17 +23,13 @@ function Ring({ group, onTap }: { group: StoryGroup; onTap: () => void }) {
             : 'bg-[#E5E7EB]'
         }`}>
         <span className="w-full h-full rounded-full bg-white p-[2px] flex items-center justify-center overflow-hidden">
-          {group.photo_url ? (
-            <img src={group.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
-          ) : (
-            <span className="w-full h-full rounded-full bg-[#F3F4F6] flex items-center justify-center text-[#6B7280] font-bold text-[15px]">
-              {initials}
-            </span>
-          )}
+          <span className="w-full h-full rounded-full overflow-hidden bg-[#F3F4F6] block">
+            <AvatarFill src={group.photo_url} name={group.username} className="text-[#6B7280] font-bold text-[15px]" />
+          </span>
         </span>
       </span>
       <span className="text-[11px] text-[#111827] font-medium truncate max-w-[64px]">
-        {group.is_me ? 'Your story' : group.username}
+        {group.is_me ? 'Your story' : (group.username ? `@${group.username}` : 'Member')}
       </span>
     </button>
   );

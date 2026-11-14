@@ -1,21 +1,20 @@
 import { useLocation } from 'wouter';
+import { AvatarFill } from '@/components/Avatar';
+import { personName } from '@/lib/person';
 import { ChevronLeft, Bookmark, Star, BadgeCheck } from 'lucide-react';
 import { useSavedWorkers, type SavedWorker } from '@/hooks/useSavedWorkers';
 import { BottomTabNav } from '@/components/BottomTabNav';
 
 function SavedCard({ w, onTap }: { w: SavedWorker; onTap: () => void }) {
-  const initials = (w.username ?? 'W').slice(0, 2).toUpperCase();
   return (
     <button type="button" onClick={onTap}
       className="w-full flex items-center gap-3 bg-white border border-[#E5E7EB] rounded-[14px] px-4 py-3 text-left active:bg-[#FAFAFA]">
       <div className="w-12 h-12 rounded-full overflow-hidden bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center flex-shrink-0">
-        {w.photo_url
-          ? <img src={w.photo_url} alt={w.username ?? 'Worker'} className="w-full h-full object-cover" />
-          : <span className="text-[14px] font-bold text-[#0A1628]">{initials}</span>}
+        <AvatarFill src={w.photo_url} name={personName(w)} className="text-[14px] font-bold text-[#0A1628]" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <p className="text-[#111827] font-bold text-[14px] truncate">@{w.username ?? 'worker'}</p>
+          <p className="text-[#111827] font-bold text-[14px] truncate">{personName(w, 'Worker')}</p>
           {w.is_pro && <BadgeCheck size={14} aria-label="Pro" className="text-[#FFD700] flex-shrink-0" />}
         </div>
         <p className="text-[#6B7280] text-[12px] truncate">

@@ -4,6 +4,7 @@
  * cron sweep (a swap dies when its shift starts).
  */
 import { adminDb } from './supabaseAdmin.js';
+import { labelFor } from './poster.js';
 import { createNotification } from '../routes/notifications.js';
 import { shiftDayLabel } from './shiftLabel.js';
 
@@ -27,10 +28,9 @@ export type SwapRow = {
   decided_by: string | null;
 };
 
-/** A worker's @handle for copy, or a neutral fallback. */
+/** A worker's name (their @handle if they gave none) for copy. */
 async function handle(id: string): Promise<string> {
-  const { data } = await adminDb.from('users').select('username').eq('id', id).maybeSingle();
-  return data?.username ? `@${data.username}` : 'the worker';
+  return labelFor(adminDb, id, 'the worker');
 }
 
 /**

@@ -53,7 +53,7 @@ type SwapShift = {
   pay_period: string | null; status: string | null;
 };
 
-type UserSummary = { id: string; username: string | null; photo_url: string | null; rating: number | null };
+type UserSummary = { id: string; username: string | null; name?: string | null; photo_url: string | null; rating: number | null };
 
 /** Why a swap cannot be started / moved on this shift right now, or null. */
 function swapBlocker(shift: Pick<ShiftRow, 'status' | 'start_time'>): string | null {
@@ -74,7 +74,7 @@ async function loadSwap(id: string): Promise<SwapRow> {
 async function usersById(ids: string[]): Promise<Map<string, UserSummary>> {
   const unique = [...new Set(ids)];
   if (!unique.length) return new Map();
-  const { data, error } = await adminDb.from('users').select('id, username, photo_url, rating').in('id', unique);
+  const { data, error } = await adminDb.from('users').select('id, username, name, photo_url, rating').in('id', unique);
   if (error) throw new HttpError(500, error.message);
   return new Map((data ?? []).map((u) => [u.id, u as UserSummary]));
 }
@@ -84,7 +84,10 @@ async function shiftsById(ids: string[]): Promise<Map<string, SwapShift>> {
   if (!unique.length) return new Map();
   const { data, error } = await adminDb.from('shifts').select(SWAP_SHIFT_COLUMNS).in('id', unique);
   if (error) throw new HttpError(500, error.message);
-  return new Map((data ?? []).map((s) => [s.id, s as SwapShift]));
+  // The business shown on a swap card is the poster's live label, as on job cards.
+  const rows = (data ?? []) as unknown as SwapShift[];
+  const posters = await posterMap(adminDb, rows.map((s) => s.client_id));
+  return new Map(rows.map((s) => [s.id, { ...s, company_name: shiftLabel(s, posters) }]));
 }
 
 /**

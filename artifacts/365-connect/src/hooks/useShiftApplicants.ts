@@ -14,6 +14,7 @@ export type RawApplicant = {
   created_at: string;
   // Joined user fields
   username: string | null;
+  name?: string | null;
   photo_url: string | null;
   rating: number;
   job_types: string[];
