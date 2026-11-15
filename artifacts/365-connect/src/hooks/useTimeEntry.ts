@@ -259,3 +259,54 @@ export function useTimeEntry(shiftId: string | undefined) {
 
   return { entry, isLoading, clockIn, startOrResume, startBreak, stopBreak, clockOut, completeEntry, refetch: load };
 }
+
+/** The device's current position, or a reason it could not be read. */
+export function currentPosition(): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) { reject(new Error('This device cannot share its location.')); return; }
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      (err) => reject(new Error(err.code === err.PERMISSION_DENIED
+        ? 'Location is off for 365 Connect. Turn it on in Settings to clock in.'
+        : "We couldn't get your location. Try again outdoors or near a window.")),
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 },
+    );
+  });
+}
+
+/**
+ * Clock in, take and end a break, and clock out for one shift from any
+ * screen. Each action talks to the server (which keeps the real clock),
+ * then refreshes every view of this shift's time entry. Errors are thrown
+ * with the server's message so the caller can show it.
+ */
+export function useClockActions(shiftId: string | undefined) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState<null | 'in' | 'break' | 'out'>(null);
+  const refresh = useCallback(() => {
+    void qc.invalidateQueries({ queryKey: [TIME_ENTRY_KEY] });
+    void qc.invalidateQueries({ queryKey: PAYMENTS_QUERY_KEY });
+  }, [qc]);
+  const run = useCallback(async <T,>(kind: 'in' | 'break' | 'out', fn: () => Promise<T>): Promise<T> => {
+    setBusy(kind);
+    try { const r = await fn(); refresh(); return r; } finally { setBusy(null); }
+  }, [refresh]);
+
+  const clockIn = useCallback(() => run('in', async () => {
+    if (!shiftId || !user?.id) throw new Error('Sign in again to clock in.');
+    const pos = await currentPosition();
+    return toEntry(await apiClient(user.id).post<RawEntry>('/time-entries', { shift_id: shiftId, ...pos }));
+  }), [run, shiftId, user?.id]);
+
+  const startBreak = useCallback((entryId: string) => run('break', async () =>
+    toEntry(await apiClient(user!.id).post<RawEntry>(`/time-entries/${entryId}/break/start`, {}))), [run, user]);
+
+  const endBreak = useCallback((entryId: string) => run('break', async () =>
+    toEntry(await apiClient(user!.id).post<RawEntry>(`/time-entries/${entryId}/break/stop`, {}))), [run, user]);
+
+  const clockOut = useCallback((entryId: string) => run('out', async () =>
+    toEntry(await apiClient(user!.id).patch<RawEntry>(`/time-entries/${entryId}`, { clock_out: new Date().toISOString() }))), [run, user]);
+
+  return { busy, clockIn, startBreak, endBreak, clockOut };
+}

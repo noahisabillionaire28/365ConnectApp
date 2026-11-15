@@ -34,7 +34,9 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { isDayOfWindow } from '@/hooks/useArrivalStatus';
-import { useMyTimeEntry, formatHoursMinutes, type TimeEntryRow } from '@/hooks/useTimeEntry';
+import { useMyTimeEntry, useClockActions, formatHoursMinutes, type TimeEntryRow } from '@/hooks/useTimeEntry';
+import { ConfirmSheet } from '@/components/ConfirmSheet';
+import { useToast } from '@/contexts/ToastContext';
 import { useStatusBarColor } from '@/hooks/useStatusBarColor';
 import { shiftHeadline } from '@/lib/supabase';
 import { untilLabel, directionsUrl } from '@/lib/jobFormat';
@@ -109,6 +111,16 @@ function NextJobCard({ app, now }: { app: MyApplication; now: number }) {
   const hasMap = app.lat != null && app.lng != null;
   const title = app.shiftTitle?.trim() || `${app.jobType ?? 'Event'} shift`;
   const onClock = !!entry && !entry.clock_out;
+  const onBreak = onClock && !!entry!.break_started_at;
+  const { busy, clockIn, startBreak, endBreak, clockOut } = useClockActions(app.shiftId);
+  const { showToast } = useToast();
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [confirmOut, setConfirmOut] = useState(false);
+  async function act(fn: () => Promise<unknown>, done: string) {
+    setActionError(null);
+    try { await fn(); showToast(done); }
+    catch (e) { setActionError(e instanceof Error ? e.message : 'Something went wrong. Try again.'); }
+  }
   const clockedOut = !!entry && !!entry.clock_out;
   const clockedInAt = entry ? new Date(entry.clock_in).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: app.timezone ?? undefined }).toLowerCase().replace(' ', '') : '';
 
@@ -137,32 +149,50 @@ function NextJobCard({ app, now }: { app: MyApplication; now: number }) {
         {onClock ? (
           <>
             <div className="flex items-end justify-between gap-3">
-              <p className="text-[#374151] text-[15px]">Clocked in <span className="text-[#9CA3AF]">•</span> at {clockedInAt}</p>
+              <p className="text-[#374151] text-[15px]">
+                {onBreak ? 'On break' : 'Clocked in'} <span className="text-[#9CA3AF]">•</span> at {clockedInAt}
+              </p>
               <ElapsedTimer entry={entry!} />
             </div>
-            <button type="button" onClick={() => navigate(`/clock/${app.shiftId}`)} data-testid="btn-home-clock-out"
-              className="h-12 rounded-[12px] bg-[#B91C1C] text-white text-[16px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
-              <Clock3 size={18} aria-hidden /> Clock out
-            </button>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button type="button" onClick={() => setConfirmOut(true)} disabled={!!busy} data-testid="btn-home-clock-out"
+                className="h-12 rounded-[12px] bg-[#B91C1C] text-white text-[16px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60">
+                {busy === 'out' ? 'Clocking out…' : 'Clock out'}
+              </button>
+              <button type="button" disabled={!!busy} data-testid="btn-home-break"
+                onClick={() => void act(onBreak ? () => endBreak(entry!.id) : () => startBreak(entry!.id), onBreak ? 'Break ended. Welcome back.' : 'Break started. Your shift time is paused.')}
+                className="h-12 rounded-[12px] border border-[#0A1628] bg-white text-[#0A1628] text-[16px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60">
+                {busy === 'break' ? 'Saving…' : onBreak ? 'End break' : 'Start break'}
+              </button>
+            </div>
           </>
         ) : clockedOut ? (
-          <button type="button" onClick={() => navigate(`/clock/${app.shiftId}`)}
+          <button type="button" onClick={() => navigate(`/shift/${app.shiftId}`)}
             className="rounded-[12px] bg-[#ECFDF5] px-4 py-3 text-[#047857] text-[15px] text-left flex items-center justify-between gap-3">
             <span>Clocked out <span className="text-[#6EE7B7]">•</span> {formatHoursMinutes(entry!.total_hours)} worked</span>
             <span className="font-semibold flex items-center whitespace-nowrap flex-shrink-0">View hours<ChevronRight size={16} aria-hidden /></span>
           </button>
         ) : window_ === 'open' ? (
-          <button type="button" onClick={() => navigate(`/clock/${app.shiftId}`)} data-testid="btn-home-clock-in"
-            className="h-12 rounded-[12px] bg-[#0A1628] text-white text-[16px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
-            <Clock3 size={18} aria-hidden /> Clock in
+          <button type="button" disabled={!!busy} data-testid="btn-home-clock-in"
+            onClick={() => void act(clockIn, "Clocked in. Your time is running.")}
+            className="h-12 rounded-[12px] bg-[#0A1628] text-white text-[16px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60">
+            <Clock3 size={18} aria-hidden /> {busy === 'in' ? 'Checking your location…' : 'Clock in'}
           </button>
         ) : window_ === 'before' && opensIn ? (
           <p className="rounded-[12px] bg-[#EEF2F8] px-4 py-3 text-[#1E3A5F] text-[15px]">
             You'll be able to <span className="font-semibold">clock in</span> in {opensIn}.
           </p>
         ) : null}
-        {dayOf && !clockedOut && <ArrivalPills applicationId={app.applicationId} status={app.arrivalStatus} statusAt={app.arrivalStatusAt} compact />}
+        {actionError && (
+          <p role="alert" className="rounded-[12px] bg-[#FEF2F2] px-4 py-3 text-[#B91C1C] text-[14px]">{actionError}</p>
+        )}
+        {dayOf && !clockedOut && !onClock && <ArrivalPills applicationId={app.applicationId} status={app.arrivalStatus} statusAt={app.arrivalStatusAt} compact />}
       </div>
+      <ConfirmSheet open={confirmOut} title="Clock out now?"
+        body={<>Your timesheet goes to <b>{app.companyName ?? 'the organizer'}</b> for approval. You can't clock back in to this shift.</>}
+        confirmLabel="Clock out" tone="danger" busy={busy === 'out'}
+        onCancel={() => setConfirmOut(false)}
+        onConfirm={() => { setConfirmOut(false); void act(() => clockOut(entry!.id), 'Clocked out. Timesheet sent for approval.'); }} />
     </JobCard>
   );
 }
