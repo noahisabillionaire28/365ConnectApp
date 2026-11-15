@@ -448,7 +448,7 @@ export function EditProfileScreen() {
                 aria-invalid={!!handleError} aria-describedby={handleError ? 'handle-error' : undefined}
                 className="flex-1 min-w-0 bg-transparent outline-none text-[14px] text-[#111827] font-medium placeholder:text-[#6B7280]"
                 placeholder="yourhandle" />
-              {handleChanged && !handleChecking && !handleError && <CheckCircle2 size={16} aria-hidden className="text-[#10B981] flex-shrink-0" />}
+              {handleChanged && !handleChecking && !handleError && <CheckCircle2 size={16} aria-hidden className="text-[#059669] flex-shrink-0" />}
               {handleError && <AlertCircle size={16} aria-hidden className="text-[#EF4444] flex-shrink-0" />}
             </div>
           </Field>

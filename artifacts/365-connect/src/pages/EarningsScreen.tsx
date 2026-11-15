@@ -54,7 +54,7 @@ function rowBucket(p: PaymentRow): Bucket | null {
 // ─── Status chip (non-timesheet rows) ────────────────────────────────────────
 function StatusChip({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
-    completed:  { label: 'Completed',  cls: 'bg-[#ECFDF5] text-[#065F46] border-[#10B981]/30', icon: <CheckCircle2 size={11} aria-hidden className="text-[#10B981]" /> },
+    completed:  { label: 'Completed',  cls: 'bg-[#ECFDF5] text-[#065F46] border-[#10B981]/30', icon: <CheckCircle2 size={11} aria-hidden className="text-[#059669]" /> },
     simulated:  { label: 'Simulated',  cls: 'bg-[#FFF7ED] text-[#92400E] border-[#FED7AA]',    icon: <Zap size={11} aria-hidden className="text-[#F59E0B]" /> },
     pending:    { label: 'Pending',    cls: 'bg-[#F3F4F6] text-[#6B7280] border-[#E5E7EB]',    icon: <Clock3 size={11} aria-hidden className="text-[#9CA3AF]" /> },
     failed:     { label: 'Failed',     cls: 'bg-red-50 text-[#DC2626] border-red-200',          icon: <AlertCircle size={11} aria-hidden className="text-[#EF4444]" /> },
@@ -299,7 +299,7 @@ export function EarningsScreen() {
     <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[72px]">
 
       {/* Header */}
-      <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
+      <div className="bg-white px-5 pt-[calc(env(safe-area-inset-top)+20px)] pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <button
             type="button" aria-label="Go back"

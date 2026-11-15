@@ -49,7 +49,7 @@ function SwapOfferCard({ s, busy, onRespond }: {
           Decline
         </button>
         <button type="button" disabled={busy} onClick={() => onRespond('accept')}
-          className="flex-1 h-10 rounded-[8px] bg-[#10B981] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5 disabled:opacity-60">
+          className="flex-1 h-10 rounded-[8px] bg-[#059669] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5 disabled:opacity-60">
           <Check size={15} aria-hidden />
           {busy ? 'Working…' : 'Accept'}
         </button>

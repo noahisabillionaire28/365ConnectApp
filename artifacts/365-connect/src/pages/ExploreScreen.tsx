@@ -14,7 +14,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { uploadPostPhoto } from '@/lib/storage';
 import { JOB_TYPES } from '@/lib/jobTypes';
 
-const GOLD = '#FFD700';
+const GOLD = '#E8A800';
 
 function ExploreTile({ person, onTap }: { person: WorkerPerson; onTap: () => void }) {
   return (
@@ -23,7 +23,7 @@ function ExploreTile({ person, onTap }: { person: WorkerPerson; onTap: () => voi
       <AvatarFill src={person.photoUrl} name={personName(person)} className="text-[#6B7280] font-bold text-[20px]" />
       {person.isPro && (
         <div className="absolute top-1.5 right-1.5 bg-black/60 rounded-full p-0.5">
-          <BadgeCheck size={13} aria-label="Pro member" style={{ color: GOLD }} />
+          <BadgeCheck size={13} aria-label="Pro member" fill={GOLD} className="flex-shrink-0 text-white" />
         </div>
       )}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 py-1">
@@ -109,7 +109,7 @@ export function ExploreScreen() {
     <div className="min-h-[100dvh] bg-white flex flex-col pb-[56px]">
       <div className="sticky top-0 z-20 bg-white border-b border-[#E5E7EB]">
         {/* Feed / People toggle */}
-        <div className="flex items-center gap-2 px-4 pt-4 pb-3">
+        <div className="flex items-center gap-2 px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3">
           <div className="flex bg-[#F3F4F6] rounded-full p-[3px] flex-1" role="tablist" aria-label="Explore view">
             <button type="button" role="tab" aria-selected={tab === 'feed'} onClick={() => setTab('feed')}
               className={`flex-1 h-10 rounded-full text-[13px] font-bold transition-all ${

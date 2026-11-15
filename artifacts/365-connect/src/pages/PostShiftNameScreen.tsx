@@ -176,7 +176,7 @@ export function PostShiftNameScreen() {
           aria-disabled={!canContinue}
           aria-label="Continue to event type"
           className={`w-full h-[52px] rounded-[12px] font-bold text-[16px] transition-all duration-200 ${
-            canContinue ? 'bg-[#0A1628] text-white' : 'bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed'}`}
+            canContinue ? 'bg-[#0A1628] text-white' : 'bg-[#E5E7EB] text-[#6B7280] cursor-not-allowed'}`}
         >
           Continue
         </motion.button>

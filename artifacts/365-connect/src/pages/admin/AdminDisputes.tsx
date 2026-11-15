@@ -39,7 +39,7 @@ function ActionConfirm({
   action: 'resolve' | 'warn' | 'ban'; onConfirm: () => void; onCancel: () => void;
 }) {
   const META = {
-    resolve: { title: 'Resolve dispute?',     body: 'Mark as resolved — no further action.',               btnLabel: 'Resolve',      btnClass: 'bg-emerald-500 text-white' },
+    resolve: { title: 'Resolve dispute?',     body: 'Mark as resolved — no further action.',               btnLabel: 'Resolve',      btnClass: 'bg-emerald-600 text-white' },
     warn:    { title: 'Issue a warning?',     body: 'A formal warning is recorded on the user\'s profile.', btnLabel: 'Send Warning', btnClass: 'bg-amber-500 text-black'  },
     ban:     { title: 'Ban this user?',       body: 'Account will be suspended immediately.',               btnLabel: 'Ban User',     btnClass: 'bg-red-500 text-white'    },
   };

@@ -6,7 +6,7 @@ import type { WorkerPerson } from '@/hooks/usePeopleFeed';
 import { useFollow } from '@/hooks/useFollow';
 import { useToast } from '@/contexts/ToastContext';
 
-const GOLD = '#FFD700';
+const GOLD = '#E8A800';
 const NAVY = '#0A1628';
 
 /**
@@ -39,7 +39,7 @@ export function PeopleCard({ person }: { person: WorkerPerson }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <p className="text-[#111827] font-bold text-[15px] truncate">{personName(person)}</p>
-          {person.isPro && <BadgeCheck size={15} aria-label="Pro member" style={{ color: GOLD }} className="flex-shrink-0" />}
+          {person.isPro && <BadgeCheck size={15} aria-label="Pro member" fill={GOLD} className="flex-shrink-0 text-white" />}
         </div>
         {(person.primaryJobType || handleLine(person)) && (
           <p className="text-[#6B7280] text-[13px] mt-0.5 truncate">{[person.primaryJobType, handleLine(person)].filter(Boolean).join(' · ')}</p>

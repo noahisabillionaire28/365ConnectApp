@@ -150,7 +150,7 @@ export function AdminRevenue() {
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
               className="bg-white border border-[#E5E7EB] rounded-[12px] p-4">
               <p className="text-[#6B7280] text-[10px] font-bold uppercase tracking-wider mb-1">Platform Fees</p>
-              <p className="text-[#10B981] font-bold text-[22px]">{fmtUsd(stats.platformFeeRev)}</p>
+              <p className="text-[#059669] font-bold text-[22px]">{fmtUsd(stats.platformFeeRev)}</p>
               <p className="text-[#6B7280] text-[11px] mt-0.5">8% of gross</p>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}

@@ -27,7 +27,7 @@ function FeedHeader({ subtitle, onPost }: { subtitle: string; onPost?: () => voi
   const { role } = useProfile();
   const { unreadCount } = useNotifications();
   return (
-    <div className="flex items-center justify-between px-4 pt-4 pb-2">
+    <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-2">
       <div>
         <h1 className="text-black font-bold text-[22px] leading-tight">365 Connect</h1>
         <p className="text-[#6B7280] text-[12px] font-medium mt-[1px]">{subtitle}</p>

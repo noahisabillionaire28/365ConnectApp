@@ -109,14 +109,14 @@ export function ImageCropper({
     // Full-screen modal — sits above all content
     <div
       data-no-pull
-      className="fixed inset-0 z-50 flex flex-col"
+      className="fixed inset-0 z-[130] flex flex-col"
       style={{ background: '#000' }}
       aria-modal="true"
       role="dialog"
       aria-label="Crop image"
     >
       {/* ── Top bar ────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-5 pt-12 pb-3 flex-shrink-0">
+      <div className="flex items-center justify-between px-5 pt-[calc(env(safe-area-inset-top)+12px)] pb-3 flex-shrink-0">
         <button
           type="button"
           onClick={onCancel}
@@ -130,7 +130,7 @@ export function ImageCropper({
           type="button"
           onClick={handleDone}
           disabled={applying}
-          className="text-[#0A1628] text-[15px] font-bold py-2 pl-4 disabled:opacity-40"
+          className="h-9 px-4 rounded-full bg-white text-black text-[15px] font-bold disabled:opacity-50"
           aria-label="Confirm crop"
         >
           {applying ? 'Saving…' : 'Done'}

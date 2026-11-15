@@ -82,7 +82,7 @@ function ReadinessItem({ label, done }: { label: string; done: boolean }) {
   return (
     <div className="flex items-center gap-2.5 py-1.5">
       {done
-        ? <CheckCircle2 size={15} aria-hidden className="text-[#10B981] flex-shrink-0" />
+        ? <CheckCircle2 size={15} aria-hidden className="text-[#059669] flex-shrink-0" />
         : <AlertCircle  size={15} aria-hidden className="text-[#9CA3AF] flex-shrink-0" />}
       <span className={`text-[13px] ${done ? 'text-[#374151]' : 'text-[#6B7280]'}`}>{label}</span>
     </div>
@@ -216,7 +216,7 @@ export function PostShiftStep5Screen() {
     <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[calc(env(safe-area-inset-bottom)+112px)]">
 
       {/* Header */}
-      <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
+      <div className="bg-white px-5 pt-[calc(env(safe-area-inset-top)+20px)] pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
         <div className="flex items-center gap-3 mb-4">
           <button
             type="button" aria-label="Back to pay and details"
@@ -384,7 +384,7 @@ export function PostShiftStep5Screen() {
           aria-busy={isPosting}
           className={`w-full h-[52px] rounded-[12px] font-bold text-[16px] transition-all flex items-center justify-center gap-2.5 ${
             isPosting || !allReady
-              ? 'bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed'
+              ? 'bg-[#E5E7EB] text-[#6B7280] cursor-not-allowed'
               : 'bg-[#0A1628] text-white'
           }`}
         >

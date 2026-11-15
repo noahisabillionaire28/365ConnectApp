@@ -11,7 +11,8 @@ import { markClockedIn } from '@/store/feedStore';
 import { useShiftById } from '@/hooks/useShifts';
 import { useAuth } from '@/contexts/AuthContext';
 import { haversineMiles, shiftHeadline } from '@/lib/supabase';
-import { useTimeEntry } from '@/hooks/useTimeEntry';
+import { useTimeEntry, useMyTimeEntry, type TimeEntryRow } from '@/hooks/useTimeEntry';
+import { TimesheetCard } from '@/components/TimesheetCard';
 import { useToast } from '@/contexts/ToastContext';
 import { getOrCreateDirectConversation } from '@/hooks/useConversations';
 import { geocodeAddress } from '@/lib/geocode';
@@ -80,19 +81,19 @@ function GeoSuccessScreen({ locationLabel }: { locationLabel: string }) {
       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
         transition={{ type: 'spring', stiffness: 320, damping: 18, delay: 0.08 }}
         className="w-24 h-24 rounded-full bg-emerald-50 border-2 border-[#10B981] flex items-center justify-center">
-        <CheckCircle2 size={44} aria-hidden className="text-[#10B981]" />
+        <CheckCircle2 size={44} aria-hidden className="text-[#059669]" />
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.18 }} className="text-center">
-        <p className="text-[#10B981] font-bold text-[26px]">You're on-site!</p>
+        <p className="text-[#059669] font-bold text-[26px]">You're on-site!</p>
         <p className="text-[#6B7280] text-[15px] mt-1.5">Clock in confirmed</p>
       </motion.div>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
         className="bg-emerald-50 border border-emerald-200 rounded-[12px] px-5 py-3 flex items-center gap-2.5">
-        <MapPin size={14} aria-hidden className="text-[#10B981] flex-shrink-0" />
-        <p className="text-[#10B981] text-[13px] font-medium">Location verified · {locationLabel}</p>
+        <MapPin size={14} aria-hidden className="text-[#059669] flex-shrink-0" />
+        <p className="text-[#047857] text-[13px] font-medium">Location verified · {locationLabel}</p>
       </motion.div>
     </motion.div>
   );
@@ -132,7 +133,7 @@ function GeoFailScreen({ reason, distance, message, shiftLocation, onRetry, onCo
         <div>
           <p className="text-[#6B7280] text-[11px] font-semibold uppercase tracking-widest mb-1">Required</p>
           <div className="flex items-center gap-2">
-            <MapPin size={13} aria-hidden className="text-[#10B981] flex-shrink-0" />
+            <MapPin size={13} aria-hidden className="text-[#059669] flex-shrink-0" />
             <p className="text-black text-[14px] font-medium">{shiftLocation}</p>
           </div>
         </div>
@@ -229,7 +230,7 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
           <motion.div animate={{ opacity: [1, 0.25, 1] }} transition={{ repeat: Infinity, duration: 1.6 }}
             className={`w-2 h-2 rounded-full flex-shrink-0 ${isBreak ? 'bg-[#0A1628]' : 'bg-[#10B981]'}`} />
           <span className={`text-[13px] font-bold uppercase tracking-[0.14em] ${
-            isBreak ? 'text-[#0A1628]' : 'text-[#10B981]'
+            isBreak ? 'text-[#0A1628]' : 'text-[#059669]'
           }`}>
             {isBreak ? 'On break' : 'On shift'}
           </span>
@@ -313,37 +314,23 @@ function TransferScreen({ netPay, onDone }: { netPay: number; onDone: () => void
         transition={{ type: 'spring', stiffness: 300, damping: 18 }}
         className="w-24 h-24 rounded-full bg-emerald-50 border-2 border-[#10B981] flex items-center justify-center">
         <motion.div animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 1.1 }}>
-          <ArrowUpRight size={40} aria-hidden className="text-[#10B981]" />
+          <ArrowUpRight size={40} aria-hidden className="text-[#059669]" />
         </motion.div>
       </motion.div>
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
         className="text-center">
         <p className="text-[#6B7280] text-[13px] font-semibold uppercase tracking-widest mb-1.5">Sending instant transfer</p>
-        <p className="text-[#10B981] font-bold" style={{ fontSize: 40 }}>{fmtMoney(netPay)}</p>
+        <p className="text-[#059669] font-bold" style={{ fontSize: 40 }}>{fmtMoney(netPay)}</p>
       </motion.div>
       <div className="w-6 h-6 rounded-full border-2 border-[#E5E7EB] border-t-[#10B981] animate-spin" role="status" aria-label="Processing transfer" />
     </motion.div>
   );
 }
 
-/* ── Summary row ─────────────────────────────────────────────────────────── */
-function SummaryRow({ label, value, valueClass = 'text-black', small = false, bold = false }: {
-  label: string; value: string; valueClass?: string; small?: boolean; bold?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <p className={`text-[#6B7280] ${small ? 'text-[12px]' : 'text-[14px]'}`}>{label}</p>
-      <p className={`${bold ? 'font-bold' : 'font-medium'} ${small ? 'text-[13px]' : 'text-[15px]'} ${valueClass}`}>
-        {value}
-      </p>
-    </div>
-  );
-}
 
 /* ── Summary screen ──────────────────────────────────────────────────────── */
-function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serviceFee, netPay, onRate, onDone }: {
-  shift: MockShift; shiftSecs: number; breakSecs: number; billedSecs: number;
-  grossPay: number; serviceFee: number; netPay: number; onRate: () => void; onDone: () => void;
+function SummaryScreen({ shift, entry, onRate, onDone }: {
+  shift: MockShift; entry: TimeEntryRow | null; onRate: () => void; onDone: () => void;
 }) {
   return (
     <motion.div key="summary" initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }}
@@ -354,7 +341,7 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.1 }}
           className="w-20 h-20 rounded-full bg-emerald-50 border-2 border-[#10B981] flex items-center justify-center mx-auto mb-5">
-          <CheckCircle2 size={38} aria-hidden className="text-[#10B981]" />
+          <CheckCircle2 size={38} aria-hidden className="text-[#059669]" />
         </motion.div>
         <h1 className="text-black font-bold text-[28px] tracking-tight">Shift Complete</h1>
         <p className="text-[#6B7280] text-[14px] mt-1.5 font-medium">
@@ -362,38 +349,12 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
         </p>
       </div>
 
-      {/* Summary card */}
-      <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-[16px] px-5 py-5 mb-5">
-        <p className="text-[#6B7280] text-[10px] font-bold uppercase tracking-[0.2em] mb-4">Shift Summary</p>
-
-        <div className="flex flex-col gap-3.5 pb-4 border-b border-[#E5E7EB]">
-          <SummaryRow label="Total time on clock" value={fmtHM(shiftSecs)} />
-          <SummaryRow label="Break deducted" value={breakSecs > 0 ? `−${fmtHM(breakSecs)}` : '—'}
-            valueClass="text-[#6B7280]" />
-          <SummaryRow label="Hours billed" value={fmtHM(billedSecs)} bold />
-        </div>
-
-        <div className="flex flex-col gap-3.5 pt-4">
-          <div className="flex items-center justify-between mt-1 pt-4 border-t border-[#E5E7EB]">
-            <div>
-              <p className="text-black font-bold text-[16px]">Estimated pay</p>
-              <p className="text-[#6B7280] text-[11px]">Final after manager approval · 365 Connect deducts no fee</p>
-            </div>
-            <p className="text-black font-bold" style={{ fontSize: 28 }}>{fmtMoney(netPay)}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Timesheet confirmation */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35 }}
-        className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-[12px] px-4 py-3.5 mb-8"
-        role="status" aria-label="Timesheet submitted">
-        <CheckCircle2 size={18} aria-hidden className="text-[#10B981] flex-shrink-0" />
-        <p className="text-[#10B981] text-[14px] font-medium">
-          Timesheet sent to {shift.companyName} for approval
-        </p>
-      </motion.div>
+      {/* The worker signs off the timesheet here; the organizer approves it next. */}
+      {entry ? (
+        <div className="mb-6"><TimesheetCard entry={entry} timezone={shift.timezone} companyName={shift.companyName} showTimeline={false} /></div>
+      ) : (
+        <p className="text-[#6B7280] text-[14px] text-center mb-6">Your timesheet was sent to {shift.companyName} for approval.</p>
+      )}
 
       {/* CTA */}
       <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={onRate}
@@ -402,9 +363,9 @@ function SummaryScreen({ shift, shiftSecs, breakSecs, billedSecs, grossPay, serv
         <Star size={18} aria-hidden className="fill-white" />
         Rate this Shift
       </motion.button>
-      <button type="button" onClick={onDone} aria-label="Back to your schedule"
+      <button type="button" onClick={onDone} aria-label="Back to Home"
         className="w-full h-[44px] mt-2 text-[#6B7280] font-semibold text-[14px]">
-        Done — back to Schedule
+        Done, back to Home
       </button>
     </motion.div>
   );
@@ -416,7 +377,7 @@ function AlreadyDoneScreen({ shift, netPay, onDone }: { shift: MockShift; netPay
     <motion.div key="already-done" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
       className="flex-1 flex flex-col items-center justify-center gap-5 px-8 min-h-[100dvh] text-center">
       <div className="w-20 h-20 rounded-full bg-emerald-50 border-2 border-[#10B981] flex items-center justify-center">
-        <CheckCircle2 size={36} aria-hidden className="text-[#10B981]" />
+        <CheckCircle2 size={36} aria-hidden className="text-[#059669]" />
       </div>
       <div>
         <p className="text-black font-bold text-[20px]">This shift is already complete</p>
@@ -476,6 +437,9 @@ export function ClockInScreen() {
   const [endShiftError, setEndShiftError] = useState<string | null>(null);
   const [contacting, setContacting] = useState(false);
   /** Hours / pay as computed by the server at clock-out (the only source for the summary). */
+  const [completedEntry, setCompletedEntry] = useState<TimeEntryRow | null>(null);
+  // The same entry from the shared cache, so the sign-off updates the summary in place.
+  const { entry: liveEntry } = useMyTimeEntry(phase === 'summary' ? id : undefined);
   const [serverResult, setServerResult] = useState<{ totalHours: number; totalPay: number; breakMinutes: number } | null>(null);
   const shiftRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const breakRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -650,11 +614,8 @@ export function ClockInScreen() {
     setPhase('active');
   }
 
-  // Billed time and pay come from the server's clock-out response (computed
-  // once there as clocked − break); the local timers are display-only.
-  const summaryBreakSecs = serverResult ? serverResult.breakMinutes * 60 : breakSecs;
-  const billedSecs  = serverResult ? Math.round(serverResult.totalHours * 3600) : 0;
-  const summaryShiftSecs = serverResult ? billedSecs + summaryBreakSecs : shiftSecs;
+  // Pay comes from the server's clock-out response (computed once there as
+  // clocked − break); the local timers are display-only.
   const grossPay    = serverResult ? serverResult.totalPay : 0;
   const serviceFee  = 0; // platform fee removed for now
   const netPay      = grossPay - serviceFee;
@@ -673,6 +634,7 @@ export function ClockInScreen() {
     // The server closes any open break and computes hours + pay itself.
     const { error: completeError, entry: completed } = await completeEntry(entryId);
     if (!completeError && completed) {
+      setCompletedEntry(completed);
       setServerResult({
         totalHours:   completed.total_hours ?? 0,
         totalPay:     completed.total_pay ?? 0,
@@ -752,8 +714,7 @@ export function ClockInScreen() {
         )}
         {phase === 'transfer' && <TransferScreen key="transfer" netPay={netPay} onDone={() => setPhase('summary')} />}
         {phase === 'summary' && (
-          <SummaryScreen key="summary" shift={shift} shiftSecs={summaryShiftSecs} breakSecs={summaryBreakSecs}
-            billedSecs={billedSecs} grossPay={grossPay} serviceFee={serviceFee} netPay={netPay}
+          <SummaryScreen key="summary" shift={shift} entry={liveEntry ?? completedEntry}
             onRate={() => navigate(`/review/${shift.id}/${shift.clientId}`)}
             onDone={() => navigate('/home')} />
         )}

@@ -164,7 +164,7 @@ function UserDetailSheet({
                   <p className="text-black font-bold text-[17px]">
                     {personName(user) || user.email}
                   </p>
-                  {user.is_pro && <BadgeCheck size={16} aria-hidden className="text-[#FFD700]" />}
+                  {user.is_pro && <BadgeCheck size={16} aria-hidden fill="#E8A800" className="text-white" />}
                 </div>
                 <p className="text-[#6B7280] text-[12px]">{[handleLine(user), user.email].filter(Boolean).join(' · ')}</p>
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -242,7 +242,7 @@ function UserDetailSheet({
         {confirmOp === 'unban' && (
           <ConfirmOverlay key="unban"
             message="Restore this account? The user will regain full platform access."
-            confirmLabel="Restore" confirmClass="bg-emerald-500 text-white"
+            confirmLabel="Restore" confirmClass="bg-emerald-600 text-white"
             onConfirm={() => applyUpdate({ status: 'active' } as Parameters<typeof updateUser.mutateAsync>[0]['body'])}
             onCancel={() => setConfirmOp(null)} />
         )}
@@ -256,7 +256,7 @@ function UserDetailSheet({
         {confirmOp === 'unflag' && (
           <ConfirmOverlay key="unflag"
             message="Remove the flag from this user's account?"
-            confirmLabel="Remove flag" confirmClass="bg-emerald-500 text-white"
+            confirmLabel="Remove flag" confirmClass="bg-emerald-600 text-white"
             onConfirm={() => applyUpdate({ status: 'active' } as Parameters<typeof updateUser.mutateAsync>[0]['body'])}
             onCancel={() => setConfirmOp(null)} />
         )}
@@ -310,7 +310,7 @@ function UserListRow({ user, onOpen }: { user: AdminUserRow; onOpen: (u: AdminUs
           <p className="text-black text-[14px] font-semibold truncate">
             {personName(user) || user.email}
           </p>
-          {user.is_pro && <BadgeCheck size={13} aria-hidden className="text-[#FFD700] flex-shrink-0" />}
+          {user.is_pro && <BadgeCheck size={13} aria-hidden fill="#E8A800" className="text-white flex-shrink-0" />}
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           <RoleBadge role={user.role} />

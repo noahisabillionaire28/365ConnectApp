@@ -34,8 +34,9 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { isDayOfWindow } from '@/hooks/useArrivalStatus';
-import { useMyTimeEntry, useClockActions, formatHoursMinutes, type TimeEntryRow } from '@/hooks/useTimeEntry';
+import { useMyTimeEntry, useClockActions, type TimeEntryRow } from '@/hooks/useTimeEntry';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
+import { TimesheetCard } from '@/components/TimesheetCard';
 import { useToast } from '@/contexts/ToastContext';
 import { useStatusBarColor } from '@/hooks/useStatusBarColor';
 import { shiftHeadline } from '@/lib/supabase';
@@ -167,11 +168,9 @@ function NextJobCard({ app, now }: { app: MyApplication; now: number }) {
             </div>
           </>
         ) : clockedOut ? (
-          <button type="button" onClick={() => navigate(`/shift/${app.shiftId}`)}
-            className="rounded-[12px] bg-[#ECFDF5] px-4 py-3 text-[#047857] text-[15px] text-left flex items-center justify-between gap-3">
-            <span>Clocked out <span className="text-[#6EE7B7]">•</span> {formatHoursMinutes(entry!.total_hours)} worked</span>
-            <span className="font-semibold flex items-center whitespace-nowrap flex-shrink-0">View hours<ChevronRight size={16} aria-hidden /></span>
-          </button>
+          <div className="rounded-[12px] bg-[#F9FAFB] border border-[#E5E7EB] px-4 py-3.5">
+            <TimesheetCard entry={entry!} timezone={app.timezone} companyName={app.companyName} compact showTimeline={false} />
+          </div>
         ) : window_ === 'open' ? (
           <button type="button" disabled={!!busy} data-testid="btn-home-clock-in"
             onClick={() => void act(clockIn, "Clocked in. Your time is running.")}

@@ -11,7 +11,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { BottomTabNav } from '@/components/BottomTabNav';
 import { LoadError } from '@/components/StateView';
 
-const GOLD = '#FFD700';
+const GOLD = '#E8A800';
 
 function AssignCardSkeleton() {
   return (
@@ -76,7 +76,7 @@ function AssignCard({ worker, shiftFull, shiftStarted, shiftJobTypes, isAssignin
 
       <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
         {alreadyAssigned ? (
-          <span className="h-10 px-3.5 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 bg-[#10B981]/10 text-[#10B981]">
+          <span className="h-10 px-3.5 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 bg-[#10B981]/10 text-[#047857]">
             <CheckCircle2 size={14} /> Assigned
           </span>
         ) : onStandby ? (

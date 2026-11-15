@@ -220,7 +220,7 @@ export function PostShiftStep2Screen() {
     <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[calc(env(safe-area-inset-bottom)+112px)]">
 
       {/* Header */}
-      <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
+      <div className="bg-white px-5 pt-[calc(env(safe-area-inset-top)+20px)] pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
         <div className="flex items-center gap-3 mb-4">
           <button
             type="button" aria-label="Back to job type"

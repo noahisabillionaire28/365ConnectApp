@@ -112,11 +112,11 @@ function NotificationCard({ item, index, onOpen }: { item: NotificationRowType; 
       <SystemAvatar type={item.type} photo={item.from_photo_url} name={item.from_name || item.from_username} />
       <div className="flex-1 min-w-0">
         <p className="text-black font-semibold text-[14px] leading-[1.4] break-words">{item.title}</p>
-        {item.body && <p className="text-[#6B7280] text-[13px] leading-[1.4] mt-0.5 break-words">{item.body}</p>}
+        {item.body && <p className="text-[#4B5563] text-[13px] leading-[1.4] mt-0.5 break-words">{item.body}</p>}
         {item.type === 'payment_received' && item.amount != null && (
           <p className="text-emerald-600 font-bold text-[14px] mt-1">{formatUsd(item.amount)}</p>
         )}
-        <p className="text-[#6B7280] text-[12px] font-medium mt-1">{relativeTime(item.created_at)}</p>
+        <p className="text-[#4B5563] text-[12px] font-medium mt-1">{relativeTime(item.created_at)}</p>
       </div>
     </button>
   );

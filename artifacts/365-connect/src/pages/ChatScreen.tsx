@@ -207,7 +207,7 @@ function ShiftCard({ card, mine, onOpen }: { card: NonNullable<MessageRow['shift
         </span>
         {ended
           ? <span className={`text-[10px] font-bold ${mine ? 'text-white/70' : 'text-[#6B7280]'}`}>Ended</span>
-          : <span className={`text-[10px] font-bold ${left === 0 ? (mine ? 'text-white/70' : 'text-[#6B7280]') : 'text-emerald-500'}`}>{left === 0 ? 'Full' : `${left} spot${left === 1 ? '' : 's'} left`}</span>}
+          : <span className={`text-[10px] font-bold ${left === 0 ? (mine ? 'text-white/70' : 'text-[#6B7280]') : 'text-emerald-600'}`}>{left === 0 ? 'Full' : `${left} spot${left === 1 ? '' : 's'} left`}</span>}
       </div>
       <p className={`font-bold text-[14px] leading-tight ${mine ? 'text-white' : 'text-[#111827]'}`}>{card.title ?? 'Shift'}</p>
       <p className={`text-[12px] mt-1 flex items-center gap-1 ${mine ? 'text-white/85' : 'text-[#6B7280]'}`}>
