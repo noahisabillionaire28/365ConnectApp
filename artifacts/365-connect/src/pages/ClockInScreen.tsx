@@ -175,7 +175,7 @@ function ActiveScreen({ shift, phase, shiftSecs, breakSecs, onTakeBreak, onEndBr
       exit={{ opacity: 0 }} className="flex-1 flex flex-col min-h-[100dvh]">
 
       {/* Shift info header */}
-      <div className="pt-[72px] px-6 text-center">
+      <div className="pt-[calc(env(safe-area-inset-top)+72px)] px-6 text-center">
         <p className="text-[#6B7280] text-[12px] font-semibold uppercase tracking-widest mb-1">
           {shift.jobType}
         </p>
@@ -722,11 +722,16 @@ export function ClockInScreen() {
     <div className="min-h-[100dvh] bg-white flex flex-col relative overflow-hidden">
       <AnimatePresence>
         {showBack && (
+          // Below the status bar (it used to sit under the clock and battery on
+          // iPhones, where it could not be tapped). Leaving never stops the
+          // clock: it runs on the server, and Home shows it with the controls.
           <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            type="button" aria-label="Go back to shift details"
-            onClick={() => navigate(`/shift/${shift.id}`)}
-            className="absolute top-5 left-4 w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center z-20">
+            type="button" aria-label={phase === 'geo-fail' ? 'Back' : 'Back to Home. Your clock keeps running'}
+            onClick={() => (phase === 'geo-fail' ? navigate(`/shift/${shift.id}`) : navigate('/home'))}
+            data-testid="btn-clock-back"
+            className="absolute top-[calc(env(safe-area-inset-top)+12px)] left-4 h-11 pl-2.5 pr-4 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center gap-1 z-20 text-black text-[14px] font-semibold">
             <ChevronLeft size={18} aria-hidden className="text-black" />
+            {phase === 'geo-fail' ? 'Back' : 'Home'}
           </motion.button>
         )}
       </AnimatePresence>
