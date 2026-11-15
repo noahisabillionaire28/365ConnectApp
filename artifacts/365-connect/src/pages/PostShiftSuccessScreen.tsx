@@ -45,7 +45,7 @@ export function PostShiftSuccessScreen() {
         transition={{ type: 'spring', stiffness: 300, damping: 18 }}
         className="w-20 h-20 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mb-6"
       >
-        <CheckCircle2 size={44} className="text-emerald-500" />
+        <CheckCircle2 size={44} className="text-emerald-600" />
       </motion.div>
 
       <h1 className="text-[#111827] font-bold text-[24px] tracking-tight mb-2">

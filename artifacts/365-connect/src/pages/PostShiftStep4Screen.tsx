@@ -89,7 +89,7 @@ export function PostShiftStep4Screen() {
     <div className="min-h-[100dvh] bg-[#F7F8FA] flex flex-col pb-[calc(env(safe-area-inset-bottom)+112px)]">
 
       {/* Header */}
-      <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
+      <div className="bg-white px-5 pt-[calc(env(safe-area-inset-top)+20px)] pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
         <div className="flex items-center gap-3 mb-4">
           <button
             type="button" aria-label="Back to schedule"
@@ -142,7 +142,7 @@ export function PostShiftStep4Screen() {
           </div>
           {errors.payRate && <p className="text-[#EF4444] text-[11px] mt-1.5">{errors.payRate}</p>}
           {payNum > 0 && !errors.payRate && (
-            <p className="text-[#10B981] text-[11px] mt-1.5 font-medium">
+            <p className="text-[#047857] text-[11px] mt-1.5 font-medium">
               ${payNum.toFixed(2)}/hr
             </p>
           )}

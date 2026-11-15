@@ -14,7 +14,7 @@ import { BottomTabNav } from '@/components/BottomTabNav';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { LoadError } from '@/components/StateView';
 
-const GOLD = '#FFD700';
+const GOLD = '#E8A800';
 
 function RosterCardSkeleton() {
   return (

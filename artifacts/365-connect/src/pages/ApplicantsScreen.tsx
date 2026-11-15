@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Avatar as SharedAvatar } from '@/components/Avatar';
 import { personName } from '@/lib/person';
 import { useParams, useLocation } from 'wouter';
-import { motion } from 'framer-motion';
 import {
   ChevronLeft, Check, X, Star, Send, UserPlus, Users, AlarmClock,
   CheckCircle2, Flag, DollarSign, Clock3, MessageCircle, MessagesSquare, ArrowRight, Repeat2, Banknote,
@@ -154,17 +153,26 @@ function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onP
                 {w.overtimeHours}h OT
               </span>
             )}
-            {w.approved && w.workerAck === 'accepted' && (
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5">
-                Accepted by worker
+            {/* The worker signs off on their own timesheet after clocking out,
+                before or after the manager approves it. */}
+            {w.workerAck === 'accepted' && (
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5"
+                data-testid="chip-worker-confirmed">
+                {w.approved ? 'Confirmed by worker' : 'Worker confirmed hours'}
               </span>
             )}
-            {w.approved && w.workerAck === 'disputed' && (
-              <span className="text-[10px] font-bold text-red-500 bg-red-50 border border-red-200 rounded-full px-1.5 py-0.5">
-                Disputed
+            {w.workerAck === 'disputed' && (
+              <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 rounded-full px-1.5 py-0.5"
+                data-testid="chip-worker-disputed">
+                Worker disputes hours
               </span>
             )}
-            {w.approved && w.workerAck === 'disputed' && w.dispute_note && (
+            {w.attendance === 'done' && !w.workerAck && !w.paid && (
+              <span className="text-[10px] font-bold text-[#4B5563] bg-[#F3F4F6] border border-[#E5E7EB] rounded-full px-1.5 py-0.5">
+                Awaiting worker OK
+              </span>
+            )}
+            {w.workerAck === 'disputed' && w.dispute_note && (
               <span className="basis-full text-[12px] text-[#92400E] leading-snug">“{w.dispute_note}”</span>
             )}
             {!w.clock_out && <DayOfChip s={w.dayOfStatus} />}
@@ -190,7 +198,7 @@ function ConfirmedRow({ w, late, closed, timezone, stripeEnabled, onApprove, onP
           <button type="button" disabled={busy} onClick={onApprove}
             className="flex-1 h-9 rounded-[8px] bg-[#0A1628] text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
             <Clock3 size={13} aria-hidden />
-            {forgotClockOut ? 'Set clock-out & approve' : w.workerAck === 'disputed' ? 'Adjust & re-approve' : 'Review & approve'}
+            {forgotClockOut ? 'Set clock-out & approve' : w.workerAck === 'disputed' ? (w.approved ? 'Adjust & re-approve' : 'Review & approve') : 'Review & approve'}
           </button>
         )}
         {/* Paying is off the table while the worker disputes the hours: adjust and re-approve first. */}
@@ -252,7 +260,7 @@ function ReviewSheet({ w, payRate, payPeriod, timezone, shiftEndISO, busy, onApp
   shiftEndISO: string | null; busy: boolean;
   onApprove: (breakMinutes: number, clockOutISO?: string, totalHours?: number) => void; onClose: () => void;
 }) {
-  const disputed = w.approved && w.workerAck === 'disputed';
+  const disputed = w.workerAck === 'disputed';
   const tz = timezone || DEFAULT_SHIFT_TZ;
   const hourly = isHourly(payPeriod);
   // Forgot to clock out: the manager sets the clock-out (defaults to the
@@ -681,7 +689,7 @@ export function ApplicantsScreen() {
           <button type="button" onClick={() => setConfirmBroadcast(true)} disabled={inviting}
             className="flex-1 h-[46px] rounded-[8px] bg-[#0A1628] text-white font-bold text-[13px] flex items-center justify-center gap-2 disabled:opacity-60">
             <Send size={15} aria-hidden />
-            {inviting ? 'Sending…' : 'Offer to all matching workers'}
+            {inviting ? 'Sending…' : 'Offer to matches'}
           </button>
           <ConfirmSheet
             open={confirmBroadcast}
@@ -753,7 +761,7 @@ export function ApplicantsScreen() {
                               <X size={13} aria-hidden /> Decline
                             </button>
                             <button type="button" disabled={busy} onClick={() => void handleSwapDecision(s, 'approve')}
-                              className="flex-1 h-9 rounded-[8px] bg-[#10B981] text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
+                              className="flex-1 h-9 rounded-[8px] bg-[#059669] text-white text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
                               <Repeat2 size={13} aria-hidden /> {busy ? 'Approving…' : 'Approve swap'}
                             </button>
                           </div>
@@ -854,7 +862,7 @@ export function ApplicantsScreen() {
                       </button>
                       <button type="button" aria-label="Approve" disabled={!!busyId}
                         onClick={() => void handleDecide(a.applicationId, 'approve', 'Worker confirmed!')}
-                        className="w-10 h-10 rounded-full bg-[#10B981] flex items-center justify-center disabled:opacity-40">
+                        className="w-10 h-10 rounded-full bg-[#059669] flex items-center justify-center disabled:opacity-40">
                         {busyId === a.applicationId
                           ? <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" aria-hidden />
                           : <Check size={17} aria-hidden className="text-white" />}
@@ -906,7 +914,7 @@ export function ApplicantsScreen() {
                         disabled={isFull || !!busyId}
                         aria-label={isFull ? 'Shift is full — remove someone to confirm a standby worker' : `Confirm ${personName(a, 'worker')}`}
                         onClick={() => void handleDecide(a.applicationId, 'approve', 'Worker confirmed!')}
-                        className="h-9 px-3 rounded-full bg-[#10B981] text-white text-[12px] font-bold flex items-center gap-1 disabled:opacity-40">
+                        className="h-9 px-3 rounded-full bg-[#059669] text-white text-[12px] font-bold flex items-center gap-1 disabled:opacity-40">
                         <Check size={14} aria-hidden /> {busyId === a.applicationId ? 'Confirming…' : 'Confirm'}
                       </button>
                     </div>
@@ -957,7 +965,7 @@ export function ApplicantsScreen() {
 
             {confirmed.length === 0 && pending.length === 0 && invitedPending.length === 0 && standby.length === 0 && pendingSwaps.length === 0 && (
               <div className="text-center py-10">
-                <p className="text-[#6B7280] text-[13px]">No one on the roster yet. Tap “Offer to all matching workers” to invite people.</p>
+                <p className="text-[#6B7280] text-[13px]">No one on the roster yet. Tap “Offer to matches” to invite everyone who fits the role.</p>
               </div>
             )}
           </>

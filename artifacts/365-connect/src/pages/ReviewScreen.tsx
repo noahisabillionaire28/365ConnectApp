@@ -127,7 +127,7 @@ export function ReviewScreen() {
         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 300, damping: 20 }}
           className="w-20 h-20 rounded-full bg-emerald-50 border-2 border-[#10B981] flex items-center justify-center">
-          <CheckCircle2 size={36} aria-hidden className="text-[#10B981]" />
+          <CheckCircle2 size={36} aria-hidden className="text-[#059669]" />
         </motion.div>
         <div>
           <p className="text-black font-bold text-[20px]">
@@ -204,7 +204,7 @@ export function ReviewScreen() {
               <motion.button key={tag} type="button" aria-pressed={on} whileTap={{ scale: 0.94 }}
                 onClick={() => toggleTag(setPositiveTags, tag)}
                 className={`rounded-full px-4 py-2 text-[13px] font-medium border transition-all duration-150 ${
-                  on ? 'bg-[#10B981]/10 border-[#10B981] text-[#10B981]' : 'bg-white border-[#E5E7EB] text-[#6B7280]'
+                  on ? 'bg-[#10B981]/10 border-[#10B981] text-[#059669]' : 'bg-white border-[#E5E7EB] text-[#6B7280]'
                 }`}>
                 {tag}
               </motion.button>

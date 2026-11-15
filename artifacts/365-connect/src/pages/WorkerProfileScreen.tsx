@@ -200,7 +200,7 @@ function RequestShiftSheet({ workerId, workerUsername, onClose }: {
                       aria-disabled={isSending || isSent || noteTooLong}
                       onClick={() => void handleRequest(shift.id)}
                       className={`flex-shrink-0 px-4 py-[9px] rounded-[8px] text-[13px] font-bold flex items-center gap-1.5 transition-colors ${
-                        isSent ? 'bg-[#10B981]/10 text-[#10B981]' : 'bg-black text-white disabled:opacity-50'
+                        isSent ? 'bg-[#10B981]/10 text-[#059669]' : 'bg-black text-white disabled:opacity-50'
                       }`}>
                       {isSent ? (<><CheckCircle2 size={14} /> Sent</>) : isSending ? 'Sending…' : 'Request'}
                     </button>
@@ -420,7 +420,7 @@ export function WorkerProfileScreen() {
     return (
       <div className="flex flex-col h-full bg-white text-black items-center justify-center px-6">
         <button type="button" aria-label="Go back" onClick={goBack}
-          className="absolute top-12 left-4 w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
+          className="absolute top-[calc(env(safe-area-inset-top)+12px)] left-4 w-10 h-10 rounded-full bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center">
           <ChevronLeft size={20} className="text-black" />
         </button>
         <p className="text-[18px] font-bold mb-2">User not found</p>
@@ -442,13 +442,13 @@ export function WorkerProfileScreen() {
       {/* Hero / Profile photo */}
       <div className="relative">
         <button type="button" aria-label="Go back" onClick={goBack}
-          className="absolute top-12 left-4 z-10 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform">
+          className="absolute top-[calc(env(safe-area-inset-top)+12px)] left-4 z-10 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform">
           <ChevronLeft size={20} className="text-white" />
         </button>
 
         {authUser && authUser.id !== profile.id && (
           <button type="button" aria-label={`Report @${profile.username}`} onClick={() => setShowReport(true)}
-            className="absolute top-12 right-4 z-10 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform">
+            className="absolute top-[calc(env(safe-area-inset-top)+12px)] right-4 z-10 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform">
             <Flag size={17} className="text-white" />
           </button>
         )}

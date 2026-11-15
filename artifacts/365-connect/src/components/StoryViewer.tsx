@@ -123,7 +123,7 @@ export function StoryViewer({
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
 
         {/* Progress segments */}
-        <div className="absolute top-2 left-2 right-2 flex gap-1 z-20">
+        <div className="absolute top-[calc(env(safe-area-inset-top)+8px)] left-2 right-2 flex gap-1 z-20">
           {group.stories.map((s, i) => (
             <div key={s.id} className="flex-1 h-[2.5px] rounded-full bg-white/35 overflow-hidden">
               <div className="h-full bg-white rounded-full"
@@ -133,7 +133,7 @@ export function StoryViewer({
         </div>
 
         {/* Header */}
-        <div className="absolute top-5 left-3 right-3 flex items-center gap-2.5 z-20">
+        <div className="absolute top-[calc(env(safe-area-inset-top)+20px)] left-3 right-3 flex items-center gap-2.5 z-20">
           <div className="w-8 h-8 rounded-full overflow-hidden bg-white/20 flex items-center justify-center flex-shrink-0 ring-1 ring-white/40">
             <AvatarFill src={group.photo_url} name={group.username} className="text-white text-[11px] font-bold" />
           </div>
@@ -185,7 +185,7 @@ export function StoryViewer({
 
         {/* Caption */}
         {story.caption && (
-          <div className="absolute bottom-8 left-4 right-4 z-20">
+          <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+32px)] left-4 right-4 z-20">
             <p className="text-white text-[15px] leading-snug drop-shadow-lg">{story.caption}</p>
           </div>
         )}

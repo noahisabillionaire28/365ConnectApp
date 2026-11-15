@@ -350,10 +350,9 @@ router.post('/approve', requireAuth, async (req, res) => {
         total_pay: pay,
         approved_pay: pay,
         clocked_hours: round2(clocked),
-        // A (re)approval asks the worker again.
-        worker_ack: null,
-        worker_ack_at: null,
-        dispute_note: null,
+        // Different hours from what the worker signed off (or a dispute being
+        // settled) ask the worker again; the same hours keep their sign-off.
+        ...(changed || entry.worker_ack !== 'accepted' ? { worker_ack: null, worker_ack_at: null, dispute_note: null } : {}),
       })
       .eq('id', entry.id)
       .select().single();
@@ -366,7 +365,7 @@ router.post('/approve', requireAuth, async (req, res) => {
       title: changed ? 'Hours updated' : 'Hours approved',
       body: changed
         ? `Hours updated: ${formatHoursMinutes(clocked)} → ${formatHoursMinutes(billable)} · ${formatUsd(pay)}. Tap to accept or dispute`
-        : `Hours approved · ${formatHoursMinutes(billable)} · ${formatUsd(pay)}`,
+        : `Hours approved · ${formatHoursMinutes(billable)} · ${formatUsd(pay)}${entry.worker_ack === 'accepted' ? '' : '. Tap to confirm your timesheet'}`,
       shiftId: entry.shift_id,
       url: `/shift/${entry.shift_id}`,
     });
@@ -382,10 +381,11 @@ const ackBody = z.object({
 });
 
 /**
- * POST /api/time-entries/:id/ack — the worker answers the approved hours.
- * Body: { action: 'accept' | 'dispute', note? }. Only the entry's worker, and
- * only once the poster approved. A dispute files a payment dispute and tells
- * the poster; accepting records the answer and nothing else.
+ * POST /api/time-entries/:id/ack — the worker signs off their timesheet.
+ * Body: { action: 'accept' | 'dispute', note? }. Only the entry's worker,
+ * once they have clocked out (before or after the poster approves). If the
+ * poster later approves different hours, the answer resets and they are
+ * asked again. A dispute files a payment dispute and tells the poster.
  */
 router.post('/:id/ack', requireAuth, async (req, res) => {
   try {
@@ -394,13 +394,14 @@ router.post('/:id/ack', requireAuth, async (req, res) => {
     const { action, note } = parsed.data;
 
     const entry = await loadOwnEntry(String(req.params.id), req.userId!);
-    if (!entry.approved) return res.status(409).json({ error: 'These hours have not been approved yet.' });
+    if (!entry.clock_out) return res.status(409).json({ error: 'Clock out first, then confirm your timesheet.' });
     if (entry.worker_ack) return res.status(409).json({ error: 'You already answered these hours.' });
     if (action === 'dispute' && await alreadyPaid(entry.shift_id, entry.worker_id)) {
       return res.status(409).json({ error: 'These hours were already paid. Contact support if the amount is wrong.' });
     }
 
     const ack = action === 'accept' ? 'accepted' : 'disputed';
+    const what = entry.approved ? 'the approved hours' : 'their timesheet';
     const { data: updated, error } = await adminDb
       .from('time_entries')
       .update({ worker_ack: ack, worker_ack_at: new Date().toISOString(), dispute_note: action === 'dispute' ? (note || null) : null })
@@ -426,7 +427,7 @@ router.post('/:id/ack', requireAuth, async (req, res) => {
           fromUserId: req.userId,
           type: 'hours_disputed',
           title: 'Hours disputed',
-          body: `${name} disputed the approved hours for ${shiftDayLabel(shift)}.${note ? ` "${note}"` : ''}`,
+          body: `${name} disputed ${what} for ${shiftDayLabel(shift)}.${note ? ` "${note}"` : ''}`,
           shiftId: entry.shift_id,
           url: `/shift/${entry.shift_id}/applicants`,
         });

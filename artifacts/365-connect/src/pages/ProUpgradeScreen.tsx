@@ -79,7 +79,7 @@ function BenefitRow({
         <p className="text-[#111827] font-semibold text-[14px] leading-snug">{title}</p>
         <p className="text-[#6B7280] text-[12px] mt-0.5 leading-relaxed">{body}</p>
       </div>
-      <CheckCircle2 size={16} aria-hidden className="text-[#10B981] flex-shrink-0 mt-1" />
+      <CheckCircle2 size={16} aria-hidden className="text-[#059669] flex-shrink-0 mt-1" />
     </div>
   );
 }
@@ -94,7 +94,7 @@ function PlanCard({
     <div className={`flex-1 rounded-[12px] border-2 px-4 py-4 flex flex-col gap-1 relative ${
       highlight ? 'border-[#FFD700] bg-[#FFFBEB]' : 'border-[#E5E7EB] bg-white'
     }`}>
-      <p className={`text-[11px] font-bold uppercase tracking-wider ${highlight ? 'text-[#B8860B]' : 'text-[#6B7280]'}`}>
+      <p className={`text-[11px] font-bold uppercase tracking-wider ${highlight ? 'text-[#92400E]' : 'text-[#6B7280]'}`}>
         {label}
       </p>
       <div className="flex items-baseline gap-1">
@@ -185,7 +185,7 @@ export function ProUpgradeScreen() {
       </AnimatePresence>
 
       {/* Header */}
-      <div className="bg-white px-5 pt-5 pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
+      <div className="bg-white px-5 pt-[calc(env(safe-area-inset-top)+20px)] pb-4 border-b border-[#E5E7EB] sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <button
             type="button" aria-label="Go back"
@@ -233,7 +233,7 @@ export function ProUpgradeScreen() {
             className="mb-5 bg-[#ECFDF5] border border-[#10B981]/30 rounded-[12px] px-4 py-3 flex items-center gap-3"
             role="status"
           >
-            <CheckCircle2 size={18} aria-hidden className="text-[#10B981] flex-shrink-0" />
+            <CheckCircle2 size={18} aria-hidden className="text-[#059669] flex-shrink-0" />
             <p className="text-[#065F46] text-[13px] font-medium">You're on the Pro plan. All Pro features are active.</p>
           </motion.div>
         )}

@@ -6,7 +6,7 @@ import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Star, ChevronRight, Settings,
-  CreditCard, Bell, Shield, HelpCircle, LogOut,
+  CreditCard, Bell, LogOut,
   Edit3, CalendarDays, LifeBuoy, AlertOctagon, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
   BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck, LayoutTemplate, Trash2, FileText, ShieldCheck,
   Receipt, Cookie, Download, Compass,
@@ -503,7 +503,7 @@ export function ProfileScreen() {
       {/* Coming-soon toast */}
       {comingSoonLabel && (
         <div role="status" aria-live="polite"
-          className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-3 flex items-center gap-3 shadow-lg max-w-[340px] w-[90%]">
+          className="fixed top-[calc(env(safe-area-inset-top)+12px)] left-1/2 -translate-x-1/2 z-[100] bg-white border border-[#E5E7EB] rounded-[12px] px-4 py-3 flex items-center gap-3 shadow-lg max-w-[340px] w-[90%]">
           <span className="text-black text-[13px] font-medium flex-1">{comingSoonLabel} — coming soon</span>
           <button type="button" aria-label="Dismiss" onClick={() => setComingSoon(null)}
             className="text-[#6B7280] text-[18px] leading-none">×</button>
@@ -512,11 +512,11 @@ export function ProfileScreen() {
 
       {/* Cover — subtle navy brand gradient (no empty grey band) */}
       <div className="relative">
-        <div aria-hidden className="h-[96px] w-full bg-gradient-to-br from-[#0A1628] via-[#152742] to-[#0A1628]" />
+        <div aria-hidden className="h-[calc(env(safe-area-inset-top)+96px)] w-full bg-gradient-to-br from-[#0A1628] via-[#152742] to-[#0A1628]" />
 
         {/* Settings gear — opens all settings */}
         <button type="button" aria-label="Settings" onClick={() => setSettingsOpen(true)}
-          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white border border-[#E5E7EB] flex items-center justify-center">
+          className="absolute top-[calc(env(safe-area-inset-top)+12px)] right-4 w-10 h-10 rounded-full bg-white border border-[#E5E7EB] flex items-center justify-center">
           <Settings size={16} aria-hidden className="text-black" />
         </button>
 
@@ -544,7 +544,7 @@ export function ProfileScreen() {
         <div className="flex items-center gap-2 mb-0.5">
           <h1 className="text-black font-bold text-[22px] tracking-tight">{displayName}</h1>
           {profile.isPro && (
-            <BadgeCheck size={20} aria-label="Pro member" className="text-[#FFD700] flex-shrink-0" />
+            <BadgeCheck size={20} aria-label="Pro member" fill="#E8A800" className="text-white flex-shrink-0" />
           )}
         </div>
 
@@ -659,7 +659,7 @@ export function ProfileScreen() {
           <div className="flex flex-col gap-2" role="list" aria-labelledby="certs-label">
             {certifications.map((cert) => (
               <div key={cert} role="listitem" className="flex items-center gap-2.5">
-                <CheckCircle size={13} aria-hidden className="text-emerald-500 flex-shrink-0" />
+                <CheckCircle size={13} aria-hidden className="text-emerald-600 flex-shrink-0" />
                 <span className="text-[#6B7280] text-[13px]">{cert}</span>
               </div>
             ))}

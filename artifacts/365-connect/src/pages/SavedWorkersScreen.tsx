@@ -15,7 +15,7 @@ function SavedCard({ w, onTap }: { w: SavedWorker; onTap: () => void }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <p className="text-[#111827] font-bold text-[14px] truncate">{personName(w, 'Worker')}</p>
-          {w.is_pro && <BadgeCheck size={14} aria-label="Pro" className="text-[#FFD700] flex-shrink-0" />}
+          {w.is_pro && <BadgeCheck size={14} aria-label="Pro" fill="#E8A800" className="text-white flex-shrink-0" />}
         </div>
         <p className="text-[#6B7280] text-[12px] truncate">
           {w.primary_job_type ?? 'Worker'}{w.hourly_rate != null ? ` · $${w.hourly_rate}/hr` : ''}
