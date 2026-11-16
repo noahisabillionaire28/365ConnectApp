@@ -9,7 +9,7 @@ import {
   CreditCard, Bell, LogOut,
   Edit3, CalendarDays, LifeBuoy, AlertOctagon, CheckCircle, UserCircle2, Briefcase, Clock3, XCircle, Hourglass, Users,
   BadgeCheck, Zap, Eye, ChevronLeft, Bookmark, CalendarCheck, LayoutTemplate, Trash2, FileText, ShieldCheck,
-  Receipt, Cookie, Download, Compass,
+  Receipt, Cookie, Download, Compass, Code2,
 } from 'lucide-react';
 import { LEGAL } from '@/legal/config';
 import { downloadMyData } from '@/lib/dataExport';
@@ -852,6 +852,8 @@ export function ProfileScreen() {
                   <SettingRow icon={ShieldCheck} label="Privacy Policy" onTap={() => go('/privacy')} />
                   <SettingRow icon={Receipt} label="Refund & Cancellation Policy" onTap={() => go('/refunds')} />
                   <SettingRow icon={Cookie} label="Cookie & Storage Policy" onTap={() => go('/cookies')} />
+                  <SettingRow icon={Code2} label="Open-source licenses" testId="settings-licenses"
+                    onTap={() => window.open(`${import.meta.env.BASE_URL}third-party-licenses.txt`, '_blank', 'noopener')} />
                   <SettingRow icon={Download} label={exporting ? 'Preparing your data…' : 'Download my data'} testId="settings-download-data"
                     onTap={() => { if (!exporting) void handleDownloadData(); }} />
                 </div>
