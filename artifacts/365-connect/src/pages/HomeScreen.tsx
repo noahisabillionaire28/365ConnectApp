@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { TimesheetAlerts } from '@/components/home/TimesheetAlerts';
 import { useLocation, useSearch, Redirect } from 'wouter';
 import {
   Bell, Compass, PlusCircle, SlidersHorizontal,
@@ -469,6 +470,7 @@ function ClientHomeFeed() {
           onChange={(v) => setTab(v as 'browse' | 'my-shifts')}
         />
       </div>
+      <TimesheetAlerts />
       <div className="pt-3"><InstallBanner compact /></div>
       {tab === 'browse' ? <WorkerDiscoveryBody /> : <ClientMyShiftsView />}
       <BottomTabNav />
@@ -494,6 +496,7 @@ function StafferHomeFeed() {
           onChange={(v) => setTab(v as 'browse' | 'my-shifts')}
         />
       </div>
+      <TimesheetAlerts />
       <div className="pt-3"><InstallBanner compact /></div>
       {tab === 'browse' ? <WorkerDiscoveryBody /> : <ClientMyShiftsView />}
 

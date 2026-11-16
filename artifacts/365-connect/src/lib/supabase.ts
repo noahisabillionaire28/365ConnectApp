@@ -266,6 +266,8 @@ export type NotificationType =
   | 'hours_updated'
   | 'hours_disputed'
   | 'timesheet_submitted'
+  | 'timesheets_due'
+  | 'timesheets_due_reminder'
   | 'timesheet_approved'
   | 'payment'
   | 'payment_received'

@@ -9,6 +9,7 @@ import { assertShiftOwner, loadShift } from '../lib/shiftAccess.js';
 import { shiftDayLabel, formatHoursMinutes, formatUsd } from '../lib/shiftLabel.js';
 import { setArrivalStatus, workerName } from './applications.js';
 import { alreadyPaid, MSG_PAID_LOCKED } from '../lib/payments.js';
+import { pingShift } from '../lib/liveShift.js';
 
 const router = Router();
 
@@ -369,6 +370,7 @@ router.post('/approve', requireAuth, async (req, res) => {
       shiftId: entry.shift_id,
       url: `/shift/${entry.shift_id}`,
     });
+    await pingShift(shift_id);
     return res.json(entryJson(updated as EntryRow));
   } catch (e) {
     return sendError(res, e);
@@ -429,11 +431,76 @@ router.post('/:id/ack', requireAuth, async (req, res) => {
           title: 'Hours disputed',
           body: `${name} disputed ${what} for ${shiftDayLabel(shift)}.${note ? ` "${note}"` : ''}`,
           shiftId: entry.shift_id,
-          url: `/shift/${entry.shift_id}/applicants`,
+          url: `/shift/${entry.shift_id}/timesheets`,
         });
       }
     }
+    await pingShift(entry.shift_id);
     return res.json(entryJson(updated as EntryRow));
+  } catch (e) {
+    return sendError(res, e);
+  }
+});
+
+/**
+ * GET /api/time-entries/pending-approvals — for a poster: their shifts that
+ * are live now or still have timesheets to sign off, with a live head-count
+ * (clocked in / on break / out) and how many timesheets wait for approval.
+ * Drives the "Live now" and "Approve timesheets" cards on the poster's Home.
+ * Shifts from the last 30 days only; everything settled drops off.
+ */
+router.get('/pending-approvals', requireAuth, async (req, res) => {
+  try {
+    const now = Date.now();
+    const since = new Date(now - 30 * 24 * 3600_000).toISOString();
+    const soon = new Date(now + CLOCK_IN_OPENS_BEFORE_MS).toISOString();
+    const { data: shifts, error } = await adminDb
+      .from('shifts')
+      .select('id, title, start_time, end_time, timezone, status')
+      .eq('client_id', req.userId)
+      .neq('status', 'cancelled')
+      .gte('start_time', since)
+      .lte('start_time', soon)
+      .order('start_time', { ascending: false })
+      .limit(60);
+    if (error) return res.status(500).json({ error: error.message });
+    const ids = (shifts ?? []).map((s) => s.id as string);
+    if (!ids.length) return res.json([]);
+    const none = Promise.resolve({ data: [] as any[], error: null });
+    const [entriesRes, appsRes, paysRes] = await Promise.all([
+      adminDb.from('time_entries').select('*').in('shift_id', ids),
+      adminDb.from('applications').select('shift_id, worker_id').in('shift_id', ids).eq('status', 'accepted'),
+      ids.length ? adminDb.from('payments').select('shift_id, worker_id').in('shift_id', ids).eq('status', 'completed') : none,
+    ]);
+    if (entriesRes.error) return res.status(500).json({ error: entriesRes.error.message });
+    const paid = new Set(((paysRes.data ?? []) as any[]).map((p) => `${p.shift_id}:${p.worker_id}`));
+    const booked = new Map<string, number>();
+    for (const a of (appsRes.data ?? []) as any[]) booked.set(a.shift_id, (booked.get(a.shift_id) ?? 0) + 1);
+    const out = [];
+    for (const s of shifts ?? []) {
+      const rows = ((entriesRes.data ?? []) as EntryRow[]).filter((e) => e.shift_id === s.id);
+      const endMs = s.end_time ? Date.parse(s.end_time as string) : NaN;
+      const startMs = s.start_time ? Date.parse(s.start_time as string) : NaN;
+      const ended = Number.isFinite(endMs) && now > endMs;
+      const live = Number.isFinite(startMs) && now >= startMs - CLOCK_IN_OPENS_BEFORE_MS && !ended;
+      const onClock = rows.filter((e) => e.clock_in && !e.clock_out);
+      const counts = {
+        booked: booked.get(s.id as string) ?? 0,
+        clocked_in: onClock.length,
+        on_break: onClock.filter((e) => !!e.break_started_at).length,
+        clocked_out: rows.filter((e) => e.clock_out).length,
+        // Needs the poster: clocked out and not approved yet, or disputed after approval.
+        to_approve: rows.filter((e) => !paid.has(`${e.shift_id}:${e.worker_id}`)
+          && ((e.clock_out && !e.approved) || (e.approved && e.worker_ack === 'disputed'))).length,
+        disputed: rows.filter((e) => e.worker_ack === 'disputed' && !paid.has(`${e.shift_id}:${e.worker_id}`)).length,
+        // The shift is over but the worker never clocked out: the poster sets it.
+        missing_clock_out: ended ? onClock.length : 0,
+        approved: rows.filter((e) => e.approved && e.worker_ack !== 'disputed').length,
+      };
+      if (!live && counts.to_approve === 0 && counts.missing_clock_out === 0) continue;
+      out.push({ shift_id: s.id, title: s.title, start_time: s.start_time, end_time: s.end_time, timezone: s.timezone, live, ...counts });
+    }
+    return res.json(out);
   } catch (e) {
     return sendError(res, e);
   }
@@ -560,6 +627,7 @@ router.post('/', requireAuth, async (req, res) => {
   // Clocking in means they're here: mark the application 'arrived' (the owner
   // sees "Clocked in", so no extra notification is sent).
   await setArrivalStatus(booked, 'arrived', { notify: false });
+  await pingShift(data?.shift_id ?? shift_id);
   return res.status(201).json(data);
 });
 
@@ -582,6 +650,7 @@ router.post('/:id/break/start', requireAuth, async (req, res) => {
       if (isMissingColumn(error)) return res.status(503).json({ error: 'Break tracking is not enabled on the server yet.' });
       return res.status(500).json({ error: error.message });
     }
+    await pingShift(entry.shift_id);
     return res.json(data);
   } catch (e) {
     return sendError(res, e);
@@ -605,6 +674,7 @@ router.post('/:id/break/stop', requireAuth, async (req, res) => {
       .eq('id', entry.id)
       .select().single();
     if (error) return res.status(500).json({ error: error.message });
+    await pingShift(entry.shift_id);
     return res.json(data);
   } catch (e) {
     return sendError(res, e);
@@ -682,11 +752,12 @@ router.patch('/:id', requireAuth, async (req, res) => {
         fromUserId: entry.worker_id,
         type: 'timesheet_submitted',
         title: 'Timesheet submitted',
-        body: `${await workerName(entry.worker_id)} clocked out of ${shiftDayLabel(owned)} · ${formatHoursMinutes(hours)} · ${formatUsd(pay)}. Review and approve it from the roster.`,
+        body: `${await workerName(entry.worker_id)} clocked out of ${shiftDayLabel(owned)} · ${formatHoursMinutes(hours)} · ${formatUsd(pay)}. Tap to review and approve it.`,
         shiftId: entry.shift_id,
-        url: `/shift/${entry.shift_id}/applicants`,
+        url: `/shift/${entry.shift_id}/timesheets`,
       });
     }
+    await pingShift(entry.shift_id);
     return res.json(entryJson(data as EntryRow));
   } catch (e) {
     return sendError(res, e);

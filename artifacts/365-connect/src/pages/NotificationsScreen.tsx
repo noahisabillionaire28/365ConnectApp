@@ -42,6 +42,8 @@ const ICON_META: Record<string, { icon: React.ComponentType<{ size?: number; cla
   hours_updated:         { icon: Pencil,      color: 'gold'  },
   hours_disputed:        { icon: AlertTriangle, color: 'red' },
   timesheet_submitted:   { icon: FileClock,   color: 'blue'  },
+  timesheets_due:        { icon: FileClock,   color: 'gold'  },
+  timesheets_due_reminder: { icon: FileClock, color: 'gold'  },
   // Ratings
   rate_client:           { icon: Star,        color: 'gold'  },
   rate_client_reminder:  { icon: Star,        color: 'gold'  },

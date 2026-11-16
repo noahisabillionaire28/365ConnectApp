@@ -380,6 +380,48 @@ async function promptRatings(fromH: number, toH: number, types: { worker: string
   return sent;
 }
 
+/**
+ * Timesheet sign-off reminders. For shifts that ended `fromH`–`toH` hours
+ * ago, the poster is told how many timesheets still wait for approval
+ * (clocked out and not approved, approved but disputed, or never clocked
+ * out). Once per (poster, shift, type); nothing is sent when all are done.
+ */
+async function remindApprovals(fromH: number, toH: number, type: string): Promise<number> {
+  const now = Date.now();
+  const { data: shifts } = await adminDb
+    .from('shifts')
+    .select('id, title, client_id, start_time, end_time, timezone, status')
+    .neq('status', 'cancelled')
+    .gte('end_time', new Date(now - toH * 3600_000).toISOString())
+    .lte('end_time', new Date(now - fromH * 3600_000).toISOString());
+  const list = (shifts ?? []) as Array<{ id: string; title: string | null; client_id: string; start_time: string; timezone: string | null }>;
+  const ids = list.map((s) => s.id);
+  if (!ids.length) return 0;
+  const [done, entriesRes, paysRes] = await Promise.all([
+    alreadyNotified(type, ids),
+    adminDb.from('time_entries').select('shift_id, worker_id, clock_in, clock_out, approved, worker_ack').in('shift_id', ids),
+    adminDb.from('payments').select('shift_id, worker_id').in('shift_id', ids).eq('status', 'completed'),
+  ]);
+  const paid = new Set((paysRes.data ?? []).map((p) => `${p.shift_id}:${p.worker_id}`));
+  let sent = 0;
+  for (const s of list) {
+    if (done.has(`${s.client_id}:${s.id}`)) continue;
+    const waiting = (entriesRes.data ?? []).filter((e) => e.shift_id === s.id && !paid.has(`${e.shift_id}:${e.worker_id}`)
+      && ((e.clock_in && !e.approved) || (e.approved && e.worker_ack === 'disputed')));
+    if (!waiting.length) continue;
+    const n = waiting.length;
+    await createNotification({
+      userId: s.client_id, type,
+      title: n === 1 ? 'A timesheet needs your approval' : `${n} timesheets need your approval`,
+      body: `${s.title ?? 'Your shift'} (${whenLabel(s.start_time, s.timezone)}): approve the hours so your crew can be paid.`,
+      shiftId: s.id,
+      url: `/shift/${s.id}/timesheets`,
+    });
+    sent++;
+  }
+  return sent;
+}
+
 async function sweepEnded(): Promise<number> {
   const { data } = await adminDb
     .from('shifts')
@@ -409,7 +451,10 @@ async function tick() {
   // (1–4h, 25–28h) tolerate a late tick; each prompt type is sent once.
   const ratePrompts = await promptRatings(1, 4, { worker: 'rate_client', poster: 'rate_crew' });
   const rateReminders = await promptRatings(25, 28, { worker: 'rate_client_reminder', poster: 'rate_crew_reminder' });
-  return { startingSoon, tomorrow, unfilled, completed, savedSearch, expiredSwaps, ratePrompts, rateReminders };
+  // Timesheets still unapproved: right after the shift, then again the next day.
+  const approvalPrompts = await remindApprovals(1, 4, 'timesheets_due');
+  const approvalReminders = await remindApprovals(24, 28, 'timesheets_due_reminder');
+  return { startingSoon, tomorrow, unfilled, completed, savedSearch, expiredSwaps, ratePrompts, rateReminders, approvalPrompts, approvalReminders };
 }
 
 async function handle(req: import('express').Request, res: import('express').Response) {

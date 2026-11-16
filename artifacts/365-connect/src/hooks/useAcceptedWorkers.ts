@@ -72,6 +72,8 @@ export type AcceptedWorker = RawAccepted & {
   arrivalStatusAt: string | null;
   /** day-of status for the roster chip: clocked in beats the self-report */
   dayOfStatus: DayOfStatus;
+  /** when the worker's current break started (null when working or out) */
+  breakStartedAt: string | null;
 };
 
 /**
@@ -103,6 +105,7 @@ const toAccepted = (rows: RawApplicant[]): AcceptedWorker[] => rows
       arrivalStatus:   r.arrival_status ?? null,
       arrivalStatusAt: r.arrival_status_at ?? null,
       dayOfStatus:     r.clock_in ? 'clocked_in' : (r.arrival_status ?? null),
+      breakStartedAt:  (r.break_started_at as string | null | undefined) ?? null,
     };
   });
 
@@ -110,12 +113,18 @@ export function useAcceptedWorkers(
   shiftId: string | undefined,
   /** optional — kept for compat, ignored (comes from auth context) */
   _ownerId?: string,
+  /** Poll this often (ms) while the page is visible; the live board uses it. */
+  pollMs?: number,
 ) {
   const { user } = useAuth();
   const q = useQuery<RawApplicant[], Error, AcceptedWorker[]>({
     queryKey: shiftRosterQueryKey(shiftId, user?.id),
     enabled: !!shiftId && !!user?.id,
-    staleTime: 15_000,
+    staleTime: pollMs ? 0 : 15_000,
+    refetchInterval: pollMs
+      ? () => (typeof document !== 'undefined' && document.visibilityState === 'visible' ? pollMs : false)
+      : undefined,
+    refetchOnWindowFocus: pollMs ? 'always' : undefined,
     placeholderData: keepPreviousData,
     queryFn: () => fetchShiftRoster(user!.id, shiftId!),
     select: toAccepted,
