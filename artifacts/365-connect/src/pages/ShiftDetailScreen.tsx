@@ -10,7 +10,7 @@ import { useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Share2, Sparkles, Calendar, Clock, Timer,
-  MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, UserPlus,
+  MapPin, Phone, Users, Shirt, CheckCircle2, AlarmClock, Pencil, UserPlus, ClipboardCheck,
   Edit3, Trash2, Navigation, X, Zap, Send, MessageSquareText, MessagesSquare, Repeat2, DollarSign, Star, CalendarPlus,
   BookmarkPlus,
   CalendarX2,
@@ -725,6 +725,14 @@ export function ShiftDetailScreen() {
                 {booked} of {shift.spotsTotal} booked
                 {pendingCount > 0 && <span className="text-[#B45309]"> · {pendingCount} applicant{pendingCount === 1 ? '' : 's'} waiting</span>}
               </p>
+              {/* Once the shift is on (or over), the live timesheets come first. */}
+              {lifecycle !== 'upcoming' && booked > 0 && (
+                <button type="button" onClick={() => navigate(`/shift/${shiftId}/timesheets`)} data-testid="btn-open-timesheets"
+                  className="w-full h-[52px] mb-2 rounded-[12px] bg-[#059669] text-white text-[14px] font-bold flex items-center justify-center gap-2 active:opacity-90">
+                  <ClipboardCheck size={17} aria-hidden />
+                  {lifecycle === 'in_progress' ? 'Live timesheets' : 'Approve timesheets'}
+                </button>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => navigate(`/shift/${shiftId}/applicants`)}
                   className="h-[52px] rounded-[12px] bg-[#0A1628] text-white text-[14px] font-semibold flex items-center justify-center gap-2 active:opacity-90">

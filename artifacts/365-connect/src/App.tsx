@@ -80,6 +80,7 @@ const ShiftDetailScreen = lazyNamed(() => import('@/pages/ShiftDetailScreen'), '
 const WorkerProfileScreen = lazyNamed(() => import('@/pages/WorkerProfileScreen'), 'WorkerProfileScreen');
 const ClockInScreen = lazyNamed(() => import('@/pages/ClockInScreen'), 'ClockInScreen');
 const ApplicantsScreen = lazyNamed(() => import('@/pages/ApplicantsScreen'), 'ApplicantsScreen');
+const TimesheetsScreen = lazyNamed(() => import('@/pages/TimesheetsScreen'), 'TimesheetsScreen');
 const ShiftUpdatesScreen = lazyNamed(() => import('@/pages/ShiftUpdatesScreen'), 'ShiftUpdatesScreen');
 const ReviewScreen = lazyNamed(() => import('@/pages/ReviewScreen'), 'ReviewScreen');
 const RosterScreen = lazyNamed(() => import('@/pages/RosterScreen'), 'RosterScreen');
@@ -222,6 +223,7 @@ function MobileRouter() {
             {/* ── Detail & misc ─────────────────────────────────── */}
             <Route path="/shift/:id"        component={ShiftDetailScreen}   />
             <Route path="/shift/:id/applicants" component={ApplicantsScreen} />
+            <Route path="/shift/:id/timesheets" component={TimesheetsScreen} />
             <Route path="/shift/:id/updates"    component={ShiftUpdatesScreen} />
             {/* Legacy: offers now live on Home → Requests */}
             <Route path="/requests">{() => <Redirect to="/home" />}</Route>

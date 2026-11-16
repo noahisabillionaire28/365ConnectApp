@@ -3,6 +3,7 @@ import { limitUser } from '../lib/rateLimit.js';
 import { posterMap, shiftLabel as posterShiftLabel, labelFor } from '../lib/poster.js';
 import { z } from 'zod';
 import { adminDb } from '../lib/supabaseAdmin.js';
+import { pingShift } from '../lib/liveShift.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { createNotification } from './notifications.js';
 import {
@@ -158,7 +159,7 @@ router.get('/', requireAuth, async (req, res) => {
         workerIds.length
           ? adminDb
             .from('time_entries')
-            .select('worker_id, clock_in, clock_out, total_hours, total_pay, approved, approved_pay, overtime_hours, break_minutes, worker_ack, dispute_note')
+            .select('*')
             .eq('shift_id', shift_id)
             .in('worker_id', workerIds)
           : none,
@@ -188,6 +189,7 @@ router.get('/', requireAuth, async (req, res) => {
         total_hours: number | null; total_pay: number | null;
         approved: boolean; approved_pay: number | null; overtime_hours: number | null;
         break_minutes: number | null; worker_ack: string | null; dispute_note: string | null;
+        break_started_at: string | null;
       }>();
       for (const t of (entriesRes.data ?? []) as any[]) {
         entryMap.set(t.worker_id, {
@@ -201,6 +203,7 @@ router.get('/', requireAuth, async (req, res) => {
           break_minutes: t.break_minutes ?? null,
           worker_ack: (t as { worker_ack?: string | null }).worker_ack ?? null,
           dispute_note: (t as { dispute_note?: string | null }).dispute_note ?? null,
+          break_started_at: (t as { break_started_at?: string | null }).break_started_at ?? null,
         });
       }
 
@@ -251,6 +254,8 @@ router.get('/', requireAuth, async (req, res) => {
           // The worker's answer to the approved hours (null until they respond).
           worker_ack: e?.worker_ack ?? null,
           dispute_note: e?.dispute_note ?? null,
+          // Open break right now (null when working or clocked out).
+          break_started_at: e?.clock_out ? null : (e?.break_started_at ?? null),
           attendance,
           // Worker's self-reported day-of status (null until they tap a pill).
           arrival_status: a.arrival_status ?? null,
@@ -925,6 +930,7 @@ router.post('/:id/arrival', requireAuth, requireRole('worker'), async (req, res)
     }
     const result = await setArrivalStatus(app, parsed.data.status);
     if (!result) return res.status(500).json({ error: 'Could not update your status.' });
+    await pingShift(app.shift_id);
     return res.json({ id: app.id, shift_id: app.shift_id, ...result });
   } catch (e) {
     return sendError(res, e);

@@ -50,6 +50,11 @@ export function notificationDeepLink(
   if (n.shift_id && n.from_user_id && (n.type === 'rate_client' || n.type === 'rate_client_reminder')) {
     return `/review/${n.shift_id}/${n.from_user_id}`;
   }
+  // Timesheets waiting on the poster open the live Timesheets board.
+  if (n.shift_id && (n.type === 'timesheet_submitted' || n.type === 'timesheets_due'
+    || n.type === 'timesheets_due_reminder' || n.type === 'hours_disputed')) {
+    return `/shift/${n.shift_id}/timesheets`;
+  }
   // Anything the poster acts on from the roster opens the applicants list.
   if (n.shift_id && (n.type === 'application_received' || n.type === 'new_application' || n.type === 'application'
     || n.type === 'arrival_status' || n.type === 'call_out' || n.type === 'invite_declined'
